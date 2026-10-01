@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check a Hutch Clarity receipt</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div class="demo-banner">
+  Prototype · synthetic data. In production this page is public and anyone can check a receipt here.
+</div>
+
+<header class="site">
+  <div class="inner">
+    <div>
+      <div class="brand">Hutch <span>Clarity</span></div>
+      <div class="tagline">Check a Trust Receipt</div>
+    </div>
+    <nav class="site"><a href="/">My Hutch</a><a href="/desk">Clarity Desk</a></nav>
+  </div>
+</header>
+
+<main class="wrap" style="max-width:680px">
+  <section class="card">
+    <h2>Check a receipt</h2>
+    <p class="sub">Enter the receipt number from an SMS, a PDF, or a QR code.</p>
+    <form id="form" style="display:flex;gap:10px;flex-wrap:wrap">
+      <label for="rid" class="hidden">Receipt number</label>
+      <input id="rid" name="rid" placeholder="TR-2027-000001" required
+             style="flex:1;min-width:220px;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <button class="btn-primary" type="submit">Check it</button>
+    </form>
+  </section>
+
+  <div id="error"></div>
+  <section class="card proof-card hidden" id="result"></section>
+
+  <section class="card">
+    <h3 style="margin-top:0">How this check works</h3>
+    <p class="small muted" style="margin:0">
+      Every receipt is signed with an Ed25519 key and linked to the receipt issued before it.
+      This page recomputes the receipt's hash, checks the signature against the
+      <a href="/.well-known/clarity-keys.json">published public key</a>, and confirms the link is intact.
+      Nothing secret is needed, so a customer, an agent on 1788, or a regulator can all run the same check.
+      A receipt that was altered, or never issued by Hutch, fails here.
+    </p>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+<script>
+const el = id => document.getElementById(id);
+
+async function check(receiptId) {
+  clearError();
+  hide('result');
+  try {
+    const v = await api(`/v1/receipts/${encodeURIComponent(receiptId)}/verify`, 'POST');
+    render(v);
+  } catch (e) {
+    showError(e.status === 404
+      ? new Error(`No receipt numbered ${receiptId} has ever been issued.`)
+      : e);
+  }
+}
+
+function render(v) {
+  el('result').innerHTML = `
+    <div class="receipt-head">
+      <div>
+        <h2>Trust Receipt</h2>
+        <div class="receipt-id">${esc(v.receipt_id)}</div>
+      </div>
+      <span class="stamp ${v.valid ? 'ok' : 'bad'}">${esc(v.status)}</span>
+    </div>
+
+    <p class="sub" style="margin-top:10px">${esc(v.reason)}</p>
+
+    <dl class="kv">
+      <dt>Issued</dt><dd>${esc(fmtDate(v.issued_at))}</dd>
+      <dt>Number</dt><dd>${esc(v.number)}</dd>
+      <dt>Returned</dt><dd>LKR ${esc(v.corrected_lkr)}</dd>
+      ${v.safeguard ? `<dt>Safeguard</dt><dd>${esc(v.safeguard.replace(/_/g,' ').toLowerCase())}</dd>` : ''}
+      ${v.recurrence_test ? `<dt>Recurrence test</dt><dd><strong>${esc(v.recurrence_test)}</strong></dd>` : ''}
+      <dt>Signed with</dt><dd class="mono">${esc(v.key_id || '—')}</dd>
+      <dt>Chain</dt><dd>${v.chain_ok ? 'intact' : 'not verified'}</dd>
+      ${v.superseded_by ? `<dt>Replaced by</dt><dd><a href="/v/${esc(v.superseded_by)}">${esc(v.superseded_by)}</a></dd>` : ''}
+    </dl>
+
+    <p class="small muted" style="margin:0">
+      This page shows only what is needed to confirm the receipt is genuine.
+      The full case evidence is visible to the account holder and to Hutch staff.
+    </p>`;
+  show('result');
+}
+
+el('form').onsubmit = e => {
+  e.preventDefault();
+  const value = el('rid').value.trim();
+  if (value) { history.replaceState({}, '', '/v/' + encodeURIComponent(value)); check(value); }
+};
+
+// /v/TR-2027-000001 checks immediately — this is what the QR code opens.
+const fromPath = decodeURIComponent(location.pathname.replace(/^\/v\/?/, ''));
+if (fromPath) { el('rid').value = fromPath; check(fromPath); }
+</script>
+</body>
+</html>
