@@ -1,0 +1,55 @@
+# Money captured by the bank, never credited to the balance.
+#
+# Deliberately NOT auto-fix whitelisted even though it is money-back-only:
+# a missing credit can also mean settlement is still in flight, so the
+# decision policy decides between explaining and refunding based on amount,
+# risk and how long ago the capture was.
+rule_id: RELOAD_NOT_CREDITED
+version: 1
+status: active
+owner: payments-ops
+description: "A payment was captured but no matching balance credit was found."
+
+required_evidence:
+  - payments
+  - charging
+
+conditions:
+  all:
+    - exists:
+        event: payment_captured
+        as: p
+    - absent:
+        event: balance_credited
+        where: { bank_ref: "$p.bank_ref" }
+    - absent:
+        event: payment_reversed
+        where: { bank_ref: "$p.bank_ref" }
+    - absent:
+        event: payment_failed
+        where: { bank_ref: "$p.bank_ref" }
+
+confidence_base: 0.80
+confidence_adjustments:
+  - amount: -0.30
+    reason: "charging records incomplete, so the credit may exist but be unreadable"
+    when_source_partial: charging
+
+rules_out:
+  - LOAN_RECOVERY
+
+category: reload_not_credited
+money_effect:
+  value: "$p.amount"
+
+allowed_actions:
+  - REFUND
+recurrence_check: null
+
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+
+explanation_templates:
+  en: reload_not_credited_en_v1
+  si: reload_not_credited_si_v1
+  ta: reload_not_credited_ta_v1

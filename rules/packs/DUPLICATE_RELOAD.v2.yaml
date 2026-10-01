@@ -1,0 +1,63 @@
+# The same reload captured twice, credited once.
+#
+# "The bank took 3,500 for my 90-day pack twice. My Hutch balance is still
+# zero." (deck S2). This is the zero-contact case: money back only, no service
+# change, so it is the one rule whitelisted for AUTO_FIX (deck S5, S7).
+rule_id: DUPLICATE_RELOAD
+version: 2
+status: active
+owner: payments-ops
+description: "Two captures share a bank reference within a short window, but the balance was credited only once."
+
+required_evidence:
+  - payments
+  - charging
+
+conditions:
+  all:
+    - exists:
+        event: payment_captured
+        as: first
+    - exists:
+        event: payment_captured
+        as: second
+        where: { bank_ref: "$first.bank_ref" }
+        after: "$first.at"
+        within: PT30M
+    - compare: { left: "$second.amount", op: eq, right: "$first.amount" }
+    # Credited once (or not at all) despite two captures.
+    - count:
+        event: balance_credited
+        where: { bank_ref: "$first.bank_ref" }
+        at_most: 1
+    # Not already put right.
+    - absent:
+        event: payment_reversed
+        where: { bank_ref: "$first.bank_ref" }
+
+confidence_base: 0.97
+confidence_adjustments:
+  - amount: -0.35
+    reason: "payment records incomplete, so the second capture may be a reporting artefact"
+    when_source_partial: payments
+
+rules_out:
+  - RELOAD_NOT_CREDITED
+  - LOAN_RECOVERY
+
+category: duplicate_payment
+money_effect:
+  value: "$second.amount"
+
+allowed_actions:
+  - REFUND
+# Money back only, nothing switched off, so no safeguard is needed.
+recurrence_check: null
+
+auto_fix_whitelisted: true
+disclosed_to_customer: false
+
+explanation_templates:
+  en: duplicate_reload_en_v1
+  si: duplicate_reload_si_v1
+  ta: duplicate_reload_ta_v1

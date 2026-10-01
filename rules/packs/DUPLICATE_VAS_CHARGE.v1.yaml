@@ -1,0 +1,52 @@
+# The same VAS subscription charged twice in one billing period.
+#
+# Unlike VAS_NO_CONSENT this says nothing about consent: the subscription may
+# be perfectly legitimate and still have been charged twice. Money back only,
+# no service change, so it is whitelisted for auto-fix.
+rule_id: DUPLICATE_VAS_CHARGE
+version: 1
+status: active
+owner: vas-ops
+description: "One subscription was charged more than once within its renewal period."
+
+required_evidence:
+  - charging
+
+conditions:
+  all:
+    - exists:
+        event: vas_charge
+        as: a
+    # 12 hours, not 24: a daily subscription legitimately charges every 24
+    # hours, and treating that as a duplicate would refund normal billing.
+    # LIMITATION: this assumes a daily renewal period. Production should read
+    # the product's actual renewal period from the catalogue and compare
+    # against that, so weekly and monthly products are covered too.
+    - exists:
+        event: vas_charge
+        as: b
+        where: { subscription_id: "$a.subscription_id" }
+        after: "$a.at"
+        within: PT12H
+    - compare: { left: "$b.amount", op: eq, right: "$a.amount" }
+
+confidence_base: 0.95
+
+rules_out:
+  - LOAN_RECOVERY
+
+category: duplicate_vas_charge
+money_effect:
+  value: "$b.amount"
+
+allowed_actions:
+  - REFUND
+recurrence_check: null
+
+auto_fix_whitelisted: true
+disclosed_to_customer: false
+
+explanation_templates:
+  en: duplicate_vas_charge_en_v1
+  si: duplicate_vas_charge_si_v1
+  ta: duplicate_vas_charge_ta_v1

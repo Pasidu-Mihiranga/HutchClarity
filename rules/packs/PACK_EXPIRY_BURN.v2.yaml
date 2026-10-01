@@ -1,0 +1,52 @@
+# Data kept flowing on the main balance after a pack ended.
+#
+# "LKR 480 burned the same way last month" (deck S6). The charge itself is
+# correct, so the remedy is a safeguard rather than a refund: stop data or cap
+# spend before it happens again.
+rule_id: PACK_EXPIRY_BURN
+version: 2
+status: active
+owner: product-data
+description: "Pay-as-you-go data charges followed a pack expiry while data stayed on."
+
+required_evidence:
+  - charging
+  - usage_fup
+
+conditions:
+  all:
+    - exists:
+        event: pack_expired
+        as: expiry
+    - exists:
+        event: charge_applied
+        as: burn
+        where: { reason: payg_data }
+        after: "$expiry.at"
+        within: P7D
+
+confidence_base: 0.88
+
+rules_out:
+  - FUP_CAP_REACHED
+
+category: post_pack_burn
+money_effect:
+  sum:
+    event: charge_applied
+    where: { reason: payg_data }
+    after: "$expiry.at"
+
+allowed_actions:
+  - ENABLE_DATA_STOP
+  - SET_SPEND_CAP
+safeguard: ENABLE_DATA_STOP
+recurrence_check: data_stop_active
+
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+
+explanation_templates:
+  en: pack_expiry_burn_en_v1
+  si: pack_expiry_burn_si_v1
+  ta: pack_expiry_burn_ta_v1

@@ -1,0 +1,69 @@
+# A VAS charge with no consent evidence.
+#
+# Gazette 2316/14 requires consent + OTP for VAS, and requires that the logs be
+# producible (deck S3). So the absence of an OTP in the consent log is itself
+# the evidence — provided the consent source actually answered, which
+# `required_evidence` enforces.
+rule_id: VAS_NO_CONSENT
+version: 4
+status: active
+owner: vas-ops
+legal_basis: "Gazette 2316/14 - VAS requires consent + OTP; logs producible"
+description: "A VAS charge was applied with no verified OTP and no second confirmation."
+
+required_evidence:
+  - charging
+  - vas_consent
+
+conditions:
+  all:
+    - exists:
+        event: vas_charge
+        as: c
+    - absent:
+        event: consent_otp_verified
+        where: { subscription_id: "$c.subscription_id" }
+        before: "$c.at"
+    - absent:
+        event: second_confirmation
+        where: { subscription_id: "$c.subscription_id" }
+        before: "$c.at"
+
+confidence_base: 0.90
+confidence_adjustments:
+  - amount: 0.06
+    reason: "merchant is already on the watch list"
+    when_condition:
+      exists:
+        event: complaint_received
+        where: { merchant_id: "$c.merchant_id" }
+  - amount: -0.30
+    reason: "consent log answered only partially, so absence is weaker evidence"
+    when_source_partial: vas_consent
+
+rules_out:
+  - PACK_EXPIRY_BURN
+  - LOAN_RECOVERY
+
+category: unauthorized_vas
+money_effect:
+  sum:
+    event: vas_charge
+    where: { subscription_id: "$c.subscription_id" }
+
+allowed_actions:
+  - REFUND
+  - DEACTIVATE_VAS
+  - BLOCK_MERCHANT_UNTIL_OPTIN
+safeguard: BLOCK_MERCHANT_UNTIL_OPTIN
+recurrence_check: merchant_block_active
+
+# A service change is involved, so this is never a silent auto-fix:
+# the customer confirms in one tap (deck S7).
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+
+explanation_templates:
+  en: vas_no_consent_en_v1
+  si: vas_no_consent_si_v1
+  ta: vas_no_consent_ta_v1

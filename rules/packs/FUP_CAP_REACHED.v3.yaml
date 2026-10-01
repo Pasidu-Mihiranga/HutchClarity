@@ -1,0 +1,56 @@
+# "Unlimited" data slowed down after a fair-use cap that was disclosed.
+#
+# "The app says 4 days left. My 'unlimited' data just stopped." (deck S2).
+# The customer is owed an explanation, not money: the rule they hit was shown
+# at purchase, so this resolves to EXPLAIN_ONLY (deck S7).
+rule_id: FUP_CAP_REACHED
+version: 3
+status: active
+owner: product-data
+description: "Throttling followed a fair-use cap that the catalogue shows was disclosed at purchase."
+
+required_evidence:
+  - usage_fup
+  - catalogue
+
+conditions:
+  all:
+    - exists:
+        event: fup_cap_reached
+        as: cap
+    - exists:
+        event: pack_purchased
+        as: pack
+        where:
+          offering_id: "$cap.bucket"
+          fup_disclosed: true
+        before: "$cap.at"
+
+confidence_base: 0.94
+confidence_adjustments:
+  - amount: 0.04
+    reason: "throttling is recorded, confirming the cap took effect"
+    when_condition:
+      exists:
+        event: throttle_applied
+        where: { bucket: "$cap.bucket" }
+
+rules_out:
+  - PACK_EXPIRY_BURN
+  - BALANCE_BURN_PAYG
+
+category: fair_use_cap
+# No money effect: nothing was wrongly charged.
+
+allowed_actions:
+  - ENABLE_FUP_ALERTS
+recurrence_check: null
+
+auto_fix_whitelisted: false
+# The decisive flag: the customer saw this rule, so Clarity explains it.
+disclosed_to_customer: true
+
+explanation_templates:
+  en: fup_cap_reached_en_v1
+  si: fup_cap_reached_si_v1
+  ta: fup_cap_reached_ta_v1
