@@ -1,0 +1,125 @@
+[project]
+name = "hutch-clarity"
+version = "0.1.0"
+description = "Hutch Clarity - explain every rupee, fix it by rule, prove it won't happen again."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "pyyaml>=6.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0",
+    "cryptography>=43.0",
+    "httpx>=0.27",
+    "python-ulid>=2.7",
+    "qrcode[pil]>=8.0",
+    "pyjwt[crypto]>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "hypothesis>=6.112",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "types-PyYAML>=6.0",
+    "types-qrcode>=8.0",
+    "import-linter>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clarity"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+# The receipt template is HTML and localized strings: wrapping them would hurt
+# readability more than the long lines do.
+"src/clarity/core/receipts/render.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["clarity"]
+strict = true
+warn_unused_ignores = true
+plugins = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers"
+markers = [
+    "golden: golden rule tests (positive/negative/boundary)",
+    "property: property-based tests",
+]
+
+
+# --------------------------------------------------------------------------- #
+# Architectural contracts (improvement plan 2.2)
+#
+# These are the boundaries that protect money. They are enforced on every run
+# of `make check`, so a future refactor cannot quietly reopen a path the
+# security story depends on.
+# --------------------------------------------------------------------------- #
+
+[tool.importlinter]
+root_package = "clarity"
+
+[[tool.importlinter.contracts]]
+name = "AI and MCP cannot reach the tool layer's capabilities"
+type = "forbidden"
+source_modules = ["clarity.ai", "clarity.mcp"]
+forbidden_modules = [
+    "clarity.core.tools.layer",
+    "clarity.core.tools.confirmation",
+    "clarity.core.tools.budget",
+]
+# They may import clarity.core.tools.errors: catching a typed refusal is
+# vocabulary, not capability. What they must never reach is the code that
+# executes, mints confirmations or spends budget.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "The core does not depend on its delivery mechanism"
+type = "forbidden"
+source_modules = ["clarity.core", "clarity.integrations", "clarity.schemas"]
+forbidden_modules = ["clarity.api"]
+
+[[tool.importlinter.contracts]]
+name = "Schemas are the shared vocabulary and depend on nothing above them"
+type = "forbidden"
+source_modules = ["clarity.schemas"]
+forbidden_modules = ["clarity.core", "clarity.ai", "clarity.mcp", "clarity.integrations"]
+
+[[tool.importlinter.contracts]]
+name = "Layers run bottom-up"
+type = "layers"
+layers = [
+    "clarity.api",
+    "clarity.mcp",
+    "clarity.ai",
+    "clarity.core",
+    "clarity.integrations",
+    "clarity.events",
+    "clarity.schemas",
+]
+# clarity.schemas is the shared vocabulary (money, ids, canonical hashing);
+# clarity.events sits just above it and below the domain.
+exhaustive = false
