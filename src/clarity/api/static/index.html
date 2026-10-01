@@ -6,37 +6,48 @@
 <title>Hutch Clarity — Why?</title>
 <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="customer">
 
 <div class="demo-banner">
-  Prototype · all HUTCH systems are <strong>mocked</strong> and every customer, charge and payment here is <strong>synthetic</strong>.
+  Customer app · all HUTCH systems are <strong>mocked</strong> · synthetic data only
 </div>
 
-<header class="site">
+<header class="agent-bar">
   <div class="inner">
-    <div>
-      <div class="brand">Hutch <span>Clarity</span></div>
-      <div class="tagline">Explain every rupee. Fix it by rule. Prove it won't happen again.</div>
+    <div class="agent-identity">
+      <span class="agent-avatar" aria-hidden="true">C</span>
+      <div>
+        <div class="agent-name">Clarity</div>
+        <div class="agent-sub">Hutch charge companion</div>
+      </div>
     </div>
-    <nav class="site">
-      <a href="/">My Hutch</a>
-      <a href="/desk">Clarity Desk</a>
-      <a href="/docs">API</a>
-    </nav>
+    <div class="header-links">
+      <a class="header-link switch" href="/desk">Staff Desk</a>
+      <a class="header-link" href="/docs">API</a>
+    </div>
   </div>
 </header>
 
-<main class="wrap">
+<main class="agent-shell">
 
-  <!-- 1. Pick a synthetic customer -->
-  <section class="card" id="pick">
-    <h2 id="pick-title">Choose a demo customer</h2>
-    <p class="sub" id="pick-sub">Four synthetic subscribers, one per journey the prototype covers.</p>
-    <div class="people" id="people"><div class="spinner">Loading…</div></div>
-    <div class="btn-row"><button class="btn-ghost" id="reset">Reset demo data</button></div>
+  <section id="home">
+    <h1 class="greeting" id="greeting">How can I help you today?</h1>
+
+    <button type="button" class="hero-prompt" id="heroWhy" disabled>
+      <div class="hero-copy">
+        <strong id="hero-title">Explain my last charge</strong>
+        <span class="hero-desc" id="hero-desc">Pick a demo number below first — then Clarity joins eight log sources into one answer.</span>
+      </div>
+      <span class="hero-go" aria-hidden="true">→</span>
+    </button>
+
+    <div class="explore-label" id="explore-label"><span>or pick a demo number</span></div>
+    <div class="option-list" id="people"><div class="spinner">Loading…</div></div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-ghost" id="reset" type="button">Reset demo data</button>
+    </div>
   </section>
 
-  <!-- 2. Prove the number before showing the account -->
   <section class="card hidden" id="signin">
     <h2 id="signin-title">Confirm it's your number</h2>
     <p class="sub" id="signin-sub">
@@ -58,7 +69,6 @@
     </div>
   </section>
 
-  <!-- 3. Their account -->
   <section class="card hidden" id="account">
     <h2 id="acct-name">Account</h2>
     <p class="sub">Balance <strong id="acct-balance"></strong> · <span id="acct-num" class="mono"></span></p>
@@ -70,7 +80,6 @@
     </div>
   </section>
 
-  <!-- 4. The answer -->
   <section class="card rule-card hidden" id="answer">
     <div id="verdictRow"></div>
     <div class="headline" id="headline"></div>
@@ -90,11 +99,44 @@
     <div id="offer"></div>
   </section>
 
-  <!-- 5. The proof -->
   <section class="card proof-card hidden" id="receipt"></section>
+
+  <section class="hidden" id="dash"></section>
+  <section class="hidden" id="activity"></section>
+  <section class="card hidden" id="txn"></section>
+  <section class="hidden" id="receipts-view"></section>
+  <section class="hidden" id="more"></section>
 
   <div id="error"></div>
 </main>
+
+<div class="composer-dock">
+  <form class="composer" id="composer" autocomplete="off">
+    <label class="hidden" for="composerInput">Ask Clarity</label>
+    <input id="composerInput" type="text"
+           placeholder="Ask anything about a charge…"
+           disabled>
+    <button type="submit" id="composerSend" aria-label="Send" disabled>↑</button>
+  </form>
+  <p class="composer-note">Rules decide. Clarity explains. Double-check any money movement on your receipt.</p>
+</div>
+
+<nav class="bottom-nav" id="nav-gate" aria-label="Customer">
+  <a href="/" class="active" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"/></svg>
+    My Hutch
+  </a>
+  <a href="/verify">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7z"/><path d="M10 8h4M10 12h4M10 16h2"/><path d="M9 20l1.5 1.5L14 18"/></svg>
+    Verify
+  </a>
+</nav>
+<nav class="bottom-nav tabs-4 hidden" id="nav-app" aria-label="Customer app">
+  <button type="button" data-view="dash" class="active">Home</button>
+  <button type="button" data-view="activity">Activity</button>
+  <button type="button" data-view="receipts">Receipts</button>
+  <button type="button" data-view="more">More</button>
+</nav>
 
 <script src="/static/app.js"></script>
 <script>
@@ -102,6 +144,11 @@
 // NOT reviewed by native speakers — see agent.md P7.4.
 const UI = {
   en: { choose: "Choose a demo customer", chooseSub: "Four synthetic subscribers, one per journey the prototype covers.",
+        greeting: "How can I help you today?",
+        heroTitle: "Explain my last charge",
+        heroDesc: "Pick a demo number below first — then Clarity joins eight log sources into one answer.",
+        heroReady: "Clarity will join eight log sources into one case file with evidence.",
+        explore: "or pick a demo number",
         balance: "Balance", recent: "Recent activity", hint: "Tap Why? and Clarity will join eight log sources into one case file.",
         why: "Why? — explain my last charge", human: "I'd rather speak to a person", reset: "Reset demo data",
         whySo: "Why we think so", checked: "What we checked", wasnt: "What it wasn't", canDo: "What we can do",
@@ -110,8 +157,14 @@ const UI = {
         receipt: "Trust Receipt", corrected: "What we corrected", returned: "Returned", number: "Number",
         safeguard: "Safeguard", recurrence: "Recurrence test", signed: "Signed with", chain: "Chain",
         scan: "Scan to verify, or quote", on: "on 1788, WhatsApp, or to TRCSL.", openCheck: "open the check page",
-        done: "Done. Your receipt is below.", nothing: "Nothing else applied." },
+        done: "Done. Your receipt is below.", nothing: "Nothing else applied.",
+        askPlaceholder: "Ask anything about a charge…" },
   si: { choose: "ආදර්ශන පාරිභෝගිකයෙකු තෝරන්න", chooseSub: "කෘතිම පාරිභෝගිකයන් හතර දෙනෙක්.",
+        greeting: "අද මට ඔබට උදව් කළ හැක්කේ කෙසේද?",
+        heroTitle: "මගේ අවසන් අයකිරීම පැහැදිලි කරන්න",
+        heroDesc: "පහතින් අංකයක් තෝරන්න — පසුව Clarity පිළිතුරක් ලබා දෙයි.",
+        heroReady: "Clarity ලොග් මූලාශ්‍ර අටක් එක් ගොනුවකට එකතු කරයි.",
+        explore: "හෝ ආදර්ශන අංකයක් තෝරන්න",
         balance: "ශේෂය", recent: "මෑත ක්‍රියාකාරකම්", hint: "Why? ඔබන්න, Clarity ලොග් මූලාශ්‍ර අටක් එක් ගොනුවකට එකතු කරයි.",
         why: "ඇයි? — මගේ අවසන් අයකිරීම පැහැදිලි කරන්න", human: "මට පුද්ගලයෙකු සමඟ කතා කිරීමට අවශ්‍යයි", reset: "ආදර්ශන දත්ත නැවත සකසන්න",
         whySo: "අපි එසේ සිතන්නේ ඇයි", checked: "අප පරීක්ෂා කළ දේ", wasnt: "එය නොවූ දේ", canDo: "අපට කළ හැකි දේ",
@@ -120,8 +173,14 @@ const UI = {
         receipt: "විශ්වාස රිසිට්පත", corrected: "අප නිවැරදි කළ දේ", returned: "ආපසු ගෙවූ මුදල", number: "අංකය",
         safeguard: "ආරක්ෂණය", recurrence: "නැවත සිදුවීම් පරීක්ෂණය", signed: "අත්සන් කර ඇත", chain: "දාමය",
         scan: "තහවුරු කිරීමට ස්කෑන් කරන්න, හෝ", on: "1788, WhatsApp හෝ TRCSL වෙත දක්වන්න.", openCheck: "පරීක්ෂණ පිටුව විවෘත කරන්න",
-        done: "අවසන්. ඔබගේ රිසිට්පත පහතින්.", nothing: "වෙනත් කිසිවක් අදාළ නොවීය." },
+        done: "අවසන්. ඔබගේ රිසිට්පත පහතින්.", nothing: "වෙනත් කිසිවක් අදාළ නොවීය.",
+        askPlaceholder: "අයකිරීමක් ගැන අසන්න…" },
   ta: { choose: "ஒரு மாதிரி வாடிக்கையாளரைத் தேர்வு செய்யவும்", chooseSub: "நான்கு செயற்கை சந்தாதாரர்கள்.",
+        greeting: "இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?",
+        heroTitle: "என் கடைசி கட்டணத்தை விளக்கவும்",
+        heroDesc: "கீழே ஒரு எண்ணைத் தேர்வு செய்யவும் — பிறகு Clarity பதிலளிக்கும்.",
+        heroReady: "Clarity எட்டு பதிவு மூலங்களை ஒன்றாக இணைக்கும்.",
+        explore: "அல்லது ஒரு மாதிரி எண்ணைத் தேர்வு செய்யவும்",
         balance: "இருப்பு", recent: "சமீபத்திய செயல்பாடு", hint: "Why? அழுத்தவும், Clarity எட்டு பதிவு மூலங்களை ஒன்றாக இணைக்கும்.",
         why: "ஏன்? — எனது கடைசி கட்டணத்தை விளக்கவும்", human: "நான் ஒரு நபருடன் பேச விரும்புகிறேன்", reset: "மாதிரி தரவை மீட்டமை",
         whySo: "நாங்கள் ஏன் அப்படி நினைக்கிறோம்", checked: "நாங்கள் சரிபார்த்தது", wasnt: "அது என்னவாக இல்லை", canDo: "நாங்கள் செய்யக்கூடியது",
@@ -130,20 +189,34 @@ const UI = {
         receipt: "நம்பிக்கை ரசீது", corrected: "நாங்கள் சரிசெய்தது", returned: "திரும்பப் பெற்றது", number: "எண்",
         safeguard: "பாதுகாப்பு", recurrence: "மீண்டும் நிகழ்வு சோதனை", signed: "கையொப்பமிடப்பட்டது", chain: "சங்கிலி",
         scan: "சரிபார்க்க ஸ்கேன் செய்யவும், அல்லது", on: "1788, WhatsApp அல்லது TRCSL இல் குறிப்பிடவும்.", openCheck: "சரிபார்ப்புப் பக்கத்தைத் திறக்கவும்",
-        done: "முடிந்தது. உங்கள் ரசீது கீழே உள்ளது.", nothing: "வேறு எதுவும் பொருந்தவில்லை." }
+        done: "முடிந்தது. உங்கள் ரசீது கீழே உள்ளது.", nothing: "வேறு எதுவும் பொருந்தவில்லை.",
+        askPlaceholder: "கட்டணம் பற்றி கேளுங்கள்…" }
 };
 let lang = 'en';
 const T = k => (UI[lang] || UI.en)[k] || UI.en[k];
 
 function applyLanguage() {
   document.documentElement.lang = lang;
-  setText('pick-title', T('choose')); setText('pick-sub', T('chooseSub'));
+  setText('greeting', T('greeting'));
+  setText('hero-title', T('heroTitle'));
+  setText('hero-desc', signedIn() ? T('heroReady') : T('heroDesc'));
+  const explore = document.querySelector('#explore-label span');
+  if (explore) explore.textContent = T('explore');
   setText('recent-title', T('recent'));
   setText('askWhy', T('why')); setText('askHuman', T('human')); setText('reset', T('reset'));
   setText('whySo-title', T('whySo')); setText('checked-title', T('checked'));
   setText('wasnt-title', T('wasnt'));
+  const input = el('composerInput');
+  if (input) input.placeholder = T('askPlaceholder');
 }
 function setText(id, value) { const n = document.getElementById(id); if (n) n.textContent = value; }
+
+function setComposerEnabled(on) {
+  el('composerInput').disabled = !on;
+  el('composerSend').disabled = !on;
+  el('heroWhy').disabled = !on;
+  setText('hero-desc', on ? T('heroReady') : T('heroDesc'));
+}
 
 let state = { msisdn: null, caseId: null, planId: null, decision: null };
 
@@ -154,11 +227,16 @@ async function loadPeople() {
   el('people').innerHTML = '';
   for (const p of people) {
     const b = document.createElement('button');
+    b.type = 'button';
     b.className = 'person';
     b.setAttribute('aria-pressed', 'false');
-    b.innerHTML = `<div class="who">${esc(p.scenario || p.name)}</div>
-                   <div class="num">${esc(p.masked)} · ${esc(p.language.toUpperCase())}</div>
-                   <div class="scenario">Balance LKR ${esc(p.balance_lkr)}</div>`;
+    const initial = (p.scenario || p.name || '?').trim().charAt(0).toUpperCase();
+    b.innerHTML = `<span class="option-icon" aria-hidden="true">${esc(initial)}</span>
+                   <span class="option-body">
+                     <span class="who">${esc(p.scenario || p.name)}</span>
+                     <span class="num">${esc(p.masked)} · ${esc(p.language.toUpperCase())} · LKR ${esc(p.balance_lkr)}</span>
+                   </span>
+                   <span class="option-chevron" aria-hidden="true">›</span>`;
     b.onclick = () => selectPerson(p, b);
     el('people').appendChild(b);
   }
@@ -168,24 +246,22 @@ async function selectPerson(p, button) {
   document.querySelectorAll('.person').forEach(x => x.setAttribute('aria-pressed', 'false'));
   button.setAttribute('aria-pressed', 'true');
   signOut();
+  setComposerEnabled(false);
   state = { msisdn: p.msisdn, person: p, caseId: null, planId: null, decision: null, challenge: null };
   lang = p.language; applyLanguage();
   hide('account'); hide('answer'); hide('receipt'); clearError();
 
-  // Sign in as this customer before anything of theirs is fetched.
   try {
     const started = await api('/v1/auth/otp/request', 'POST', { msisdn: p.msisdn });
     state.challenge = started.challenge_id;
     el('signin-num').textContent = started.sent_to || p.masked;
 
-    // The demo reads the code out of the simulated inbox and offers it,
-    // because nobody can receive a real SMS here. The label says so, and
-    // the code still has to be submitted and checked server-side.
     const inbox = await api(`/v1/demo/inbox?msisdn=${encodeURIComponent(p.msisdn)}`);
     el('sim-sms').textContent = inbox.text || '';
     el('otp').value = inbox.code || '';
     show('signin');
     el('otp').focus();
+    el('signin').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) {
     showError(error);
   }
@@ -204,9 +280,9 @@ async function verifyOtp() {
     });
     signIn(signedIn.token, signedIn.subject);
     hide('signin');
+    setComposerEnabled(true);
     showAccount(state.person);
   } catch (error) {
-    // A wrong code says only that it is wrong. Attempts are capped server-side.
     showError(error);
     el('otp').select();
   }
@@ -217,11 +293,196 @@ function showAccount(p) {
   el('acct-balance').textContent = 'LKR ' + p.balance_lkr;
   el('acct-num').textContent = p.masked;
   el('charges').innerHTML = `<p class="muted small">${esc(T('hint'))}</p>`;
-  show('account');
+  hide('home');
+  hide('nav-gate');
+  show('nav-app');
+  showView('dash');
+  loadHome().catch(showError);
 }
 
+let homePayload = null;
+
+function showView(name) {
+  for (const id of ['dash', 'activity', 'receipts-view', 'more', 'account', 'answer', 'receipt', 'txn']) {
+    hide(id);
+  }
+  const map = { dash: 'dash', activity: 'activity', receipts: 'receipts-view', more: 'more' };
+  show(map[name] || 'dash');
+  if (name === 'dash') { show('account'); }
+  document.querySelectorAll('#nav-app button').forEach(button => {
+    const on = button.dataset.view === name;
+    button.classList.toggle('active', on);
+    if (on) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+}
+
+async function loadHome() {
+  homePayload = await api('/v1/me/home');
+  renderDash(homePayload);
+  renderActivity(homePayload);
+  renderMore(homePayload);
+  await loadReceipts();
+  await loadCases();
+}
+
+function renderDash(home) {
+  const pack = home.pack;
+  const pct = pack && pack.used_pct != null ? Math.min(pack.used_pct, 100) : 0;
+  const fup = pack && pack.data_gb ? `
+    <div class="fup">
+      <div class="fup-label"><span>Fair use</span><span>${pack.used_gb || '—'} / ${esc(pack.data_gb)} GB</span></div>
+      <div class="fup-track" role="img" aria-label="Fair use ${pct} percent">
+        <div class="fup-fill" style="width:${pct}%"></div>
+        <i class="mark" style="left:80%"></i>
+        <i class="mark" style="left:95%"></i>
+      </div>
+      <p class="small muted">Marks at 80% and 95%.</p>
+    </div>` : '';
+  const alerts = (home.alerts || []).map(a => `<div class="note">${esc(a.text)}</div>`).join('');
+  const subs = (home.subscriptions || []).map(s =>
+    `<li>${esc(s.name)} · ${esc(s.merchant)} · LKR ${esc(s.price_lkr)}${s.active ? '' : ' · off'}</li>`
+  ).join('');
+  const truth = pack ? `
+    <section class="card">
+      <h2>Pack truth</h2>
+      <p class="sub">${esc(pack.name)} · LKR ${esc(pack.price_lkr)}</p>
+      <dl class="kv">
+        <dt>Validity</dt><dd>${esc(pack.days_left)} days left</dd>
+        <dt>Data</dt><dd>${esc(pack.data_gb || '—')} GB</dd>
+        <dt>Apps</dt><dd>${esc(pack.apps)}</dd>
+        <dt>Fair-use cap</dt><dd>${esc(pack.data_gb || 'none')} GB</dd>
+        <dt>After the cap</dt><dd>${esc(pack.after_cap_speed || 'unchanged')}</dd>
+        <dt>Restrictions</dt><dd>${esc(pack.restrictions)}</dd>
+        <dt>Renewal</dt><dd>${esc(pack.renewal)}</dd>
+        <dt>After expiry</dt><dd>${esc(pack.after_expiry)}</dd>
+        <dt>Shown at purchase</dt><dd>${pack.disclosed ? 'yes' : 'not on the record'}</dd>
+      </dl>
+    </section>` : '';
+  el('dash').innerHTML = `
+    <section class="card balance-card">
+      <p class="sub" style="margin:0">Balance</p>
+      <div class="balance">LKR ${esc(home.balance_lkr)}</div>
+      <p class="small muted">${esc(home.masked)}</p>
+    </section>
+    ${alerts}
+    ${fup ? `<section class="card">${fup}</section>` : ''}
+    ${truth}
+    ${subs ? `<section class="card"><h2>Subscriptions</h2><ul class="why-list">${subs}</ul></section>` : ''}
+    <section class="card">
+      <h2>Recent deductions</h2>
+      ${moneyRows((home.activity || []).slice(0, 4))}
+    </section>`;
+}
+
+function moneyRows(rows) {
+  if (!rows.length) return '<p class="muted small">No money events on this number.</p>';
+  return `<div class="option-list">${rows.map(row => `
+    <button type="button" class="option-card" data-txn="${esc(row.id)}">
+      <span class="option-icon">₹</span>
+      <span class="option-body">
+        <span class="who">${esc(row.detail)}</span>
+        <span class="num">${esc(row.type.replace(/_/g, ' '))} · ${esc(fmtDate(row.at))}</span>
+      </span>
+      <span class="who">${row.amount_lkr ? 'LKR ' + esc(row.amount_lkr) : ''}</span>
+    </button>`).join('')}</div>`;
+}
+
+function renderActivity(home) {
+  el('activity').innerHTML = `
+    <h2 class="greeting" style="font-size:28px">Activity</h2>
+    <p class="sub">Every money event. Why? uses the same rules as the home action.</p>
+    ${moneyRows(home.activity || [])}`;
+  el('activity').querySelectorAll('[data-txn]').forEach(button => {
+    button.onclick = () => openTxn(button.dataset.txn);
+  });
+  el('dash').querySelectorAll('[data-txn]').forEach(button => {
+    button.onclick = () => openTxn(button.dataset.txn);
+  });
+}
+
+function openTxn(id) {
+  const row = (homePayload.activity || []).find(item => item.id === id);
+  if (!row) return;
+  el('txn').innerHTML = `
+    <h2>Transaction</h2>
+    <dl class="kv">
+      <dt>Amount</dt><dd>${row.amount_lkr ? 'LKR ' + esc(row.amount_lkr) : '—'}</dd>
+      <dt>When</dt><dd>${esc(fmtDate(row.at))}</dd>
+      <dt>Type</dt><dd>${esc(row.type.replace(/_/g, ' '))}</dd>
+      <dt>Detail</dt><dd>${esc(row.detail)}</dd>
+      <dt>Source</dt><dd>${esc(row.source)}</dd>
+      ${row.balance_before ? `<dt>Before</dt><dd>LKR ${esc(row.balance_before)}</dd>` : ''}
+      ${row.balance_after ? `<dt>After</dt><dd>LKR ${esc(row.balance_after)}</dd>` : ''}
+    </dl>
+    <div class="btn-row">
+      <button class="btn-why" id="txnWhy" type="button">Why this happened</button>
+    </div>`;
+  show('txn');
+  el('txnWhy').onclick = () => { showView('dash'); askWhy(false); };
+  el('txn').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadReceipts() {
+  const rows = await api('/v1/me/receipts');
+  el('receipts-view').innerHTML = `
+    <h2 class="greeting" style="font-size:28px">Receipts</h2>
+    <p class="sub">Signed Trust Receipts for this number.</p>
+    ${rows.length ? `<div class="option-list">${rows.map(r => `
+      <button type="button" class="option-card" data-rid="${esc(r.receipt_id)}">
+        <span class="option-body">
+          <span class="who">${esc(r.receipt_id)}</span>
+          <span class="num">${esc(r.summary)} · LKR ${esc(r.corrected_lkr)}</span>
+        </span>
+        <span class="option-chevron">›</span>
+      </button>`).join('')}</div>`
+      : '<p class="muted small">None yet. Ask Why? and confirm a fix to issue one.</p>'}`;
+  el('receipts-view').querySelectorAll('[data-rid]').forEach(button => {
+    button.onclick = () => openReceipt(button.dataset.rid);
+  });
+}
+
+async function openReceipt(id) {
+  const verified = await api(`/v1/receipts/${encodeURIComponent(id)}/verify`, 'POST');
+  renderReceipt({ actions: [], receipt_id: id }, verified);
+  show('receipt');
+  el('receipt').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadCases() {
+  const rows = await api('/v1/me/cases');
+  const alerts = (homePayload && homePayload.alerts || []).map(a => `<li>${esc(a.text)}</li>`).join('');
+  el('more').innerHTML = `
+    <h2 class="greeting" style="font-size:28px">More</h2>
+    <section class="card">
+      <h2>My cases</h2>
+      ${rows.length ? `<ul class="why-list">${rows.map(c =>
+        `<li>${esc(c.case_no)} · ${esc(c.state)}${c.outcome ? ' · ' + esc(c.outcome) : ''}</li>`
+      ).join('')}</ul>` : '<p class="muted small">No case yet.</p>'}
+    </section>
+    <section class="card">
+      <h2>Alerts</h2>
+      ${alerts ? `<ul class="why-list">${alerts}</ul>` : '<p class="muted small">No alerts on this number.</p>'}
+    </section>
+    <section class="card">
+      <h2>Settings</h2>
+      <p class="sub">Language follows the number you signed in with.</p>
+      <label class="role"><input type="checkbox" id="largeText"> Large text</label>
+      <p class="small muted" style="margin-top:12px">
+        Voice notes, family guardian, WhatsApp and SMS are not in this prototype.
+      </p>
+    </section>`;
+  el('largeText').onchange = () => {
+    document.body.classList.toggle('large-text', el('largeText').checked);
+  };
+}
+
+document.querySelectorAll('#nav-app button').forEach(button => {
+  button.onclick = () => showView(button.dataset.view);
+});
+
 async function askWhy(wantsHuman) {
-  if (!state.msisdn) return;
+  if (!state.msisdn || !signedIn()) return;
   clearError();
   hide('receipt');
   el('answer').classList.remove('hidden');
@@ -230,10 +491,9 @@ async function askWhy(wantsHuman) {
   el('rationale').innerHTML = ''; el('evidence').innerHTML = '';
   el('sources').innerHTML = ''; el('ruledOut').innerHTML = ''; el('offer').innerHTML = '';
   el('explanation').textContent = '';
+  el('answer').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
-    // The customer's language decides the explanation language, so it has
-    // to travel with the case, not just the page copy.
     const c = await api('/v1/cases', 'POST', { msisdn: state.msisdn, channel: 'app', language: lang });
     state.caseId = c.case_id;
     const [decision, timeline] = await Promise.all([
@@ -257,7 +517,6 @@ function renderDecision(d, timeline) {
     el('confidence').textContent = d.handoff_reason ? 'Reason: ' + d.handoff_reason.replace(/_/g, ' ') : '';
   }
 
-  // The wording comes from the API, where it was verified against the facts.
   el('explanation').textContent = d.explanation || '';
   el('explanation').title = 'Source: ' + (d.explanation_source || 'template');
 
@@ -422,24 +681,37 @@ el('reset').onclick = async () => {
   button.disabled = true; button.textContent = 'Resetting…';
   try {
     await api('/v1/demo/reset', 'POST');
-    // Resetting the demo data does not sign anyone out: identity is not
-    // demo data. Picking a customer starts a fresh sign-in anyway.
     state = { msisdn: null, caseId: null, planId: null, decision: null };
+    signOut();
+    setComposerEnabled(false);
     hide('signin'); hide('account'); hide('answer'); hide('receipt');
+    hide('dash'); hide('activity'); hide('txn'); hide('receipts-view'); hide('more');
+    hide('nav-app'); show('nav-gate'); show('home');
     await loadPeople();
   } catch (e) { showError(e); }
-  button.disabled = false; button.textContent = 'Reset demo data';
+  button.disabled = false; button.textContent = T('reset');
 };
 
 el('askWhy').onclick = () => askWhy(false);
 el('askHuman').onclick = () => askWhy(true);
+el('heroWhy').onclick = () => askWhy(false);
 el('verifyOtp').onclick = () => verifyOtp();
 el('otp').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOtp(); });
 el('backToPick').onclick = () => {
   signOut();
+  setComposerEnabled(false);
   hide('signin'); clearError();
   document.querySelectorAll('.person').forEach(x => x.setAttribute('aria-pressed', 'false'));
 };
+el('composer').onsubmit = e => {
+  e.preventDefault();
+  if (!signedIn()) return;
+  const q = el('composerInput').value.trim().toLowerCase();
+  el('composerInput').value = '';
+  askWhy(/human|person|agent|හුමා|நபர்/.test(q));
+};
+
+applyLanguage();
 loadPeople().catch(showError);
 </script>
 </body>

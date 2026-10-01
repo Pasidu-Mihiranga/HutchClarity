@@ -268,6 +268,10 @@ class ReceiptService:
     def get(self, receipt_id: str) -> TrustReceipt | None:
         return self._ledger.receipts.get(receipt_id)
 
+    def issued(self) -> list[TrustReceipt]:
+        """Every receipt in issue order."""
+        return [self._ledger.receipts[receipt_id] for receipt_id in self._ledger.order]
+
     def verify(self, receipt_id: str) -> VerificationResult:
         """Verify a receipt we issued, by id (what the QR code resolves to)."""
         receipt = self._ledger.receipts.get(receipt_id)

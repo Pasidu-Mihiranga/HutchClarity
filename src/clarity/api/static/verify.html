@@ -6,30 +6,36 @@
 <title>Check a Hutch Clarity receipt</title>
 <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="customer">
 
 <div class="demo-banner">
-  Prototype · synthetic data. In production this page is public and anyone can check a receipt here.
+  Customer app · synthetic data · anyone can check a receipt here
 </div>
 
-<header class="site">
+<header class="agent-bar">
   <div class="inner">
-    <div>
-      <div class="brand">Hutch <span>Clarity</span></div>
-      <div class="tagline">Check a Trust Receipt</div>
+    <div class="agent-identity">
+      <span class="agent-avatar" aria-hidden="true">C</span>
+      <div>
+        <div class="agent-name">Clarity</div>
+        <div class="agent-sub">Check a Trust Receipt</div>
+      </div>
     </div>
-    <nav class="site"><a href="/">My Hutch</a><a href="/desk">Clarity Desk</a></nav>
+    <div class="header-links">
+      <a class="header-link switch" href="/desk">Staff Desk</a>
+      <a class="header-link" href="/docs">API</a>
+    </div>
   </div>
 </header>
 
-<main class="wrap" style="max-width:680px">
+<main class="agent-shell" style="max-width:680px">
+  <h1 class="greeting">Check a receipt</h1>
+  <p class="sub" style="margin:-8px 0 18px">Enter the number from an SMS, a PDF, or a QR code.</p>
+
   <section class="card">
-    <h2>Check a receipt</h2>
-    <p class="sub">Enter the receipt number from an SMS, a PDF, or a QR code.</p>
-    <form id="form" style="display:flex;gap:10px;flex-wrap:wrap">
+    <form id="form" class="verify-form">
       <label for="rid" class="hidden">Receipt number</label>
-      <input id="rid" name="rid" placeholder="TR-2027-000001" required
-             style="flex:1;min-width:220px;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <input id="rid" class="verify-input" name="rid" placeholder="TR-2027-000001" required>
       <button class="btn-primary" type="submit">Check it</button>
     </form>
   </section>
@@ -44,10 +50,29 @@
       This page recomputes the receipt's hash, checks the signature against the
       <a href="/.well-known/clarity-keys.json">published public key</a>, and confirms the link is intact.
       Nothing secret is needed, so a customer, an agent on 1788, or a regulator can all run the same check.
-      A receipt that was altered, or never issued by Hutch, fails here.
     </p>
   </section>
 </main>
+
+<div class="composer-dock">
+  <form class="composer" id="composerJump" autocomplete="off">
+    <label class="hidden" for="composerJumpInput">Receipt number</label>
+    <input id="composerJumpInput" type="text" placeholder="Paste a receipt number…">
+    <button type="submit" aria-label="Check">↑</button>
+  </form>
+  <p class="composer-note">Public check — no sign-in required.</p>
+</div>
+
+<nav class="bottom-nav" aria-label="Customer">
+  <a href="/" data-tab="home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"/></svg>
+    My Hutch
+  </a>
+  <a href="/verify" class="active" data-tab="verify" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7z"/><path d="M10 8h4M10 12h4M10 16h2"/><path d="M9 20l1.5 1.5L14 18"/></svg>
+    Verify
+  </a>
+</nav>
 
 <script src="/static/app.js"></script>
 <script>
@@ -96,15 +121,31 @@ function render(v) {
   show('result');
 }
 
+function submitReceipt(value) {
+  const id = value.trim();
+  if (!id) return;
+  history.replaceState({}, '', '/v/' + encodeURIComponent(id));
+  el('rid').value = id;
+  check(id);
+}
+
 el('form').onsubmit = e => {
   e.preventDefault();
-  const value = el('rid').value.trim();
-  if (value) { history.replaceState({}, '', '/v/' + encodeURIComponent(value)); check(value); }
+  submitReceipt(el('rid').value);
 };
 
-// /v/TR-2027-000001 checks immediately — this is what the QR code opens.
-const fromPath = decodeURIComponent(location.pathname.replace(/^\/v\/?/, ''));
-if (fromPath) { el('rid').value = fromPath; check(fromPath); }
+el('composerJump').onsubmit = e => {
+  e.preventDefault();
+  submitReceipt(el('composerJumpInput').value);
+  el('composerJumpInput').value = '';
+};
+
+const pathMatch = location.pathname.match(/^\/v\/(.+)$/);
+if (pathMatch) {
+  const fromPath = decodeURIComponent(pathMatch[1]);
+  el('rid').value = fromPath;
+  check(fromPath);
+}
 </script>
 </body>
 </html>

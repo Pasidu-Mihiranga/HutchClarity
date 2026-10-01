@@ -69,8 +69,10 @@ from clarity.core.iam.principal import Assurance, Role
 from clarity.core.tools.errors import ToolLayerError
 from clarity.integrations.mocks.world import ref_for
 from clarity.schemas.canonical import hash_payload
+from clarity.schemas.case import CaseState
 from clarity.schemas.common import Language, mask_msisdn, normalise_msisdn
 from clarity.schemas.decision import Outcome
+from clarity.schemas.timeline import EventType
 
 #: HTTP status per tool-layer refusal. Refusals are expected outcomes of a
 #: guard working, not server faults, so none of them are 5xx.
@@ -792,6 +794,147 @@ def _register_routes(app: FastAPI) -> None:
             for r in waiting
         ]
 
+    @app.get("/v1/me/home", tags=["customer"])
+    def my_home(clarity: ClarityDep, principal: CurrentPrincipal) -> dict[str, Any]:
+        """Balance, pack, activity and alerts for the signed-in number."""
+        return _home_for(clarity, _customer_ref(principal))
+
+    @app.get("/v1/me/cases", tags=["customer"])
+    def my_cases(clarity: ClarityDep, principal: CurrentPrincipal) -> list[dict[str, Any]]:
+        """Cases opened for the signed-in number."""
+        ref = _customer_ref(principal)
+        rows = [record for record in clarity.cases.all_cases() if record.subscriber_ref == ref]
+        rows.sort(key=lambda record: record.case.opened_at, reverse=True)
+        return [
+            {
+                "case_id": record.case_id,
+                "case_no": record.case.case_no,
+                "state": record.case.state.value,
+                "channel": record.case.origin_channel,
+                "opened_at": record.case.opened_at.isoformat(),
+                "outcome": record.decision.outcome.value if record.decision else None,
+            }
+            for record in rows
+        ]
+
+    @app.get("/v1/me/receipts", tags=["customer"])
+    def my_receipts(clarity: ClarityDep, principal: CurrentPrincipal) -> list[dict[str, Any]]:
+        """Trust Receipts already issued for the signed-in number."""
+        ref = _customer_ref(principal)
+        mine = {
+            record.case_id
+            for record in clarity.cases.all_cases()
+            if record.subscriber_ref == ref
+        }
+        rows = []
+        for receipt in reversed(clarity.receipts.issued()):
+            if receipt.case_id not in mine:
+                continue
+            corrected = receipt.payload.total_corrected_lkr
+            rows.append(
+                {
+                    "receipt_id": receipt.receipt_id,
+                    "issued_at": receipt.payload.issued_at.isoformat(),
+                    "corrected_lkr": str(corrected) if corrected is not None else "0.00",
+                    "summary": receipt.payload.what_happened.summary,
+                    "case_id": receipt.case_id,
+                }
+            )
+        return rows
+
+    @app.get(
+        "/v1/demo/ops",
+        tags=["demo"],
+        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
+    )
+    def demo_ops(clarity: ClarityDep) -> dict[str, Any]:
+        """Case counts already in memory. Empty until someone creates demo cases."""
+        records = [record for record in clarity.cases.all_cases() if record.decision is not None]
+        by_outcome: dict[str, int] = {}
+        by_reason: dict[str, int] = {}
+        money = 0.0
+        for record in records:
+            assert record.decision is not None
+            key = record.decision.outcome.value
+            by_outcome[key] = by_outcome.get(key, 0) + 1
+            stake = record.case.money_at_stake_lkr
+            if stake is not None:
+                money += float(stake)
+            if record.decision.handoff_reason is not None:
+                reason = record.decision.handoff_reason.value
+                by_reason[reason] = by_reason.get(reason, 0) + 1
+        return {
+            "cases": len(clarity.cases.all_cases()),
+            "decided": len(records),
+            "money_at_stake_lkr": f"{money:.2f}",
+            "by_outcome": by_outcome,
+            "handoff_reasons": by_reason,
+            "note": "Counts from cases in this process. Create demo cases if this is empty.",
+        }
+
+    @app.get(
+        "/v1/demo/autopsy",
+        tags=["demo"],
+        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
+    )
+    def demo_autopsy() -> dict[str, Any]:
+        """Run Complaint Autopsy on a fixed set of synthetic complaints."""
+        from clarity.ai.autopsy import Complaint, ComplaintAutopsy
+
+        complaints = [
+            Complaint(complaint_id=f"c-{index}", text=text)
+            for index, text in enumerate(_DEMO_COMPLAINTS, start=1)
+        ]
+        report = ComplaintAutopsy().run(complaints)
+        return {
+            "run_id": report.run_id,
+            "total_received": report.total_received,
+            "duplicates_removed": report.duplicates_removed,
+            "hypothesis": True,
+            "clusters": [
+                {
+                    "label": cluster.label,
+                    "size": cluster.size,
+                    "status": cluster.status.value,
+                    "suggested_rule_id": cluster.suggested_rule_id,
+                }
+                for cluster in report.clusters
+            ],
+            "noise": len(report.noise),
+            "note": "Hypotheses until a person reviews them. Clustering here is not embeddings.",
+        }
+
+    @app.get(
+        "/v1/demo/foresight",
+        tags=["demo"],
+        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
+    )
+    def demo_foresight() -> dict[str, Any]:
+        """Rehearse retiring a pack. Scenarios, not certainties."""
+        from clarity.ai.foresight import ChangeType, Foresight, Scenario
+
+        report = Foresight().run(
+            Scenario(name="Retire Unlimited Data", change_type=ChangeType.PACK_RETIRED)
+        )
+        return {
+            "run_id": report.run_id,
+            "scenario": report.scenario,
+            "backtested": report.backtested,
+            "basis": report.basis,
+            "caveats": report.caveats,
+            "predictions": [
+                {
+                    "theme": item.theme,
+                    "segment": item.segment,
+                    "band": item.band.value,
+                    "mitigation": item.suggested_mitigation,
+                }
+                for item in report.predictions
+                if item.band.value != "low"
+            ],
+            "note": "Scenarios, not certainties. This does not change any customer.",
+        }
+
 
 def _verification_view(clarity: Clarity, receipt_id: str) -> VerificationView:
     receipt = clarity.receipts.get(receipt_id)
@@ -814,6 +957,166 @@ def _verification_view(clarity: Clarity, receipt_id: str) -> VerificationView:
         safeguard=str(view["safeguard"]) if view["safeguard"] else None,
         recurrence_test=str(view["recurrence_test"]) if view["recurrence_test"] else None,
     )
+
+
+_MONEY_TYPES = {
+    EventType.VAS_CHARGE,
+    EventType.PAYMENT_CAPTURED,
+    EventType.BALANCE_CREDITED,
+    EventType.CHARGE_APPLIED,
+    EventType.PACK_PURCHASED,
+    EventType.PAYMENT_REVERSED,
+    EventType.BALANCE_ADJUSTED,
+    EventType.SUBSCRIPTION_RENEWED,
+}
+
+_DEMO_COMPLAINTS = (
+    "VAS game subscription charged with no OTP",
+    "daily game subscription deducted again",
+    "reload taken twice from my bank",
+    "the same reload was captured two times",
+    "unlimited data became slow after the cap",
+    "fup speed dropped on my unlimited pack",
+    "balance disappeared after the pack ended",
+    "money gone from balance when the pack expired",
+    "wrong pack was activated",
+    "I bought a different pack and it was not activated",
+    "no reply from support after a week",
+    "still waiting, no response on WhatsApp",
+)
+
+
+def _customer_ref(principal: Principal) -> str:
+    """The signed-in customer's subject. Staff tokens have no subscriber."""
+    if principal.subscriber_ref is None or not principal.roles:
+        raise HTTPException(status_code=401, detail="sign in to continue")
+    if not principal.has(Permission.CASE_READ):
+        raise HTTPException(status_code=403, detail="this account may not read that case")
+    return principal.subscriber_ref
+
+
+def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
+    """Shape the synthetic account into the customer home payload."""
+    from decimal import Decimal
+
+    account = clarity.world.account(ref)
+    if account is None:
+        raise HTTPException(status_code=404, detail="no such account")
+
+    events = [event for records in account.records.values() for event in records]
+    events.sort(key=lambda event: event.occurred_at, reverse=True)
+
+    used_gb: Decimal | None = None
+    for event in events:
+        raw_used = event.attributes.get("used_gb")
+        raw_left = event.attributes.get("remaining_gb")
+        if raw_used is not None:
+            used_gb = Decimal(str(raw_used))
+        elif raw_left is not None and account.packs:
+            cap = account.packs[0].fup_cap_gb
+            if cap is not None:
+                used_gb = cap - Decimal(str(raw_left))
+
+    pack_view: dict[str, Any] | None = None
+    alerts: list[dict[str, str]] = []
+    active = next((pack for pack in account.packs if pack.active), None)
+    if active is not None:
+        cap = active.fup_cap_gb
+        pct = None
+        if cap is not None and cap > 0 and used_gb is not None:
+            pct = int((used_gb / cap) * 100)
+        days_left = (active.expires_at - clarity.world.now).days
+        pack_view = {
+            "name": active.name,
+            "price_lkr": str(active.price_lkr),
+            "purchased_at": active.purchased_at.isoformat(),
+            "expires_at": active.expires_at.isoformat(),
+            "days_left": days_left,
+            "data_gb": str(cap) if cap is not None else None,
+            "used_gb": str(used_gb) if used_gb is not None else None,
+            "used_pct": pct,
+            "after_cap_speed": active.after_cap_speed,
+            "disclosed": active.fup_disclosed_at_purchase,
+            "apps": "All apps",
+            "restrictions": (
+                f"Speed drops to {active.after_cap_speed} after the fair-use cap."
+                if active.after_cap_speed
+                else "No extra speed restriction on this pack."
+            ),
+            "renewal": "Does not renew by itself.",
+            "after_expiry": "If data stays on, later use can draw from your main balance.",
+        }
+        if pct is not None and pct >= 95:
+            alerts.append({"kind": "fup", "text": "Fair-use is at or past 95%."})
+        elif pct is not None and pct >= 80:
+            alerts.append({"kind": "fup", "text": "Fair-use has passed 80%."})
+        if any(event.event_type is EventType.FUP_CAP_REACHED for event in events):
+            alerts.append(
+                {
+                    "kind": "fup",
+                    "text": "This pack has hit its fair-use cap. Data is slowed, not cut off.",
+                }
+            )
+        if days_left <= 5:
+            alerts.append(
+                {"kind": "pack", "text": f"This pack expires in {days_left} day(s)."}
+            )
+
+    open_case = next(
+        (
+            record
+            for record in clarity.cases.all_cases()
+            if record.subscriber_ref == ref and record.case.state is not CaseState.CLOSED
+        ),
+        None,
+    )
+    decision = open_case.decision if open_case is not None else None
+    if decision is not None and decision.outcome.value in {"STAFF_APPROVAL", "HANDOFF"}:
+        alerts.append({"kind": "case", "text": "A case is waiting for Hutch staff."})
+
+    activity = []
+    for event in events:
+        if event.event_type not in _MONEY_TYPES:
+            continue
+        attrs = event.attributes
+        activity.append(
+            {
+                "id": event.event_id,
+                "at": event.occurred_at.isoformat(),
+                "type": event.event_type.value,
+                "amount_lkr": str(event.amount_lkr) if event.amount_lkr is not None else None,
+                "source": event.source.value,
+                "detail": str(
+                    attrs.get("merchant_name")
+                    or attrs.get("product")
+                    or attrs.get("offering_id")
+                    or attrs.get("reason")
+                    or event.event_type.value.replace("_", " ")
+                ),
+                "balance_before": attrs.get("balance_before"),
+                "balance_after": attrs.get("balance_after"),
+            }
+        )
+
+    return {
+        "masked": account.masked,
+        "language": account.language.value,
+        "balance_lkr": str(account.balance_lkr),
+        "pack": pack_view,
+        "subscriptions": [
+            {
+                "name": sub.product,
+                "merchant": sub.merchant_name,
+                "price_lkr": str(sub.price_lkr),
+                "active": sub.active,
+            }
+            for sub in account.subscriptions
+        ],
+        "activity": activity,
+        "alerts": alerts,
+        "open_case_id": open_case.case_id if open_case else None,
+        "open_case_state": open_case.case.state.value if open_case else None,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -841,6 +1144,18 @@ def _register_pages(app: FastAPI) -> None:
     @app.get("/desk", include_in_schema=False)
     def desk_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "desk.html")
+
+    @app.get("/ops", include_in_schema=False)
+    @app.get("/autopsy", include_in_schema=False)
+    @app.get("/foresight", include_in_schema=False)
+    def desk_section() -> FileResponse:
+        """Insights, Autopsy and Foresight share the Desk page."""
+        return FileResponse(STATIC_DIR / "desk.html")
+
+    @app.get("/verify", include_in_schema=False)
+    def verify_landing() -> FileResponse:
+        """Bottom-tab landing for checking a Trust Receipt."""
+        return FileResponse(STATIC_DIR / "verify.html")
 
     @app.get("/v/{receipt_id}", include_in_schema=False)
     @app.get("/v", include_in_schema=False)
