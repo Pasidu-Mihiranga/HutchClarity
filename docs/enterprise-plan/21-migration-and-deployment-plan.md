@@ -199,7 +199,7 @@ The modular monolith is **microservice-ready by construction**: modules own thei
 | **R3 Core modules move to the database and events** | case → timeline → detection → decision (ZEN table) → actions (DB idempotency, row locks) → receipts (event-driven); rule parameters into policy | Acceptance suite green in `lite` and `full`; two API replicas pass the concurrency tests |
 | **R4 Satellites** - *in progress: H01 complete* | Real MCP server; signer; AI gateway with roles; channel gateway; `hutch-sim` HTTP | `hutch-sim` read and command parity suites are green over HTTP; external MCP and the other satellites remain |
 | **R5 Frontend** - *started early by the team: Next.js 14 apps; build to verify* | Next.js `customer-web`, `console` (desk, insights, studio, admin), `verify`; shared UI, i18n, widget | Browser journeys pass; accessibility checks pass |
-| **R6 New capabilities** | Notifications, proactive detectors, knowledge/RAG, insights, desk-ops, guardian, voice | Walkthroughs verified |
+| **R6 New capabilities** - *in progress: N01 complete* | Notifications, proactive detectors, knowledge/RAG, insights, desk-ops, guardian, voice | Notification template, preference, consent, quiet-hour, idempotency and fallback tests are green; remaining capabilities and walkthroughs remain |
 | **R7 Hardening** | Security tests, load, chaos, OTel + Grafana, Helm/OpenTofu reference, signed images, SBOM | Release v1.0 tagged |
 
 ## 8. Schedule

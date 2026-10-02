@@ -4,6 +4,15 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (N01, #39)
+
+- Notifications consume `receipt.issued@v1`, `risk.detected@v1` and
+  `approval.requested@v1` through the existing consumer framework.
+- Approved template references, exact parameter validation, recipient
+  preferences, consent, quiet hours, channel fallback and delivery status.
+- Idempotency per `(event, recipient, template)` and an explicit refusal
+  for every free-text body.
+
 ### Changed (H01, #29)
 
 **`/v1` contract change.** The seven development-only `/mock/*` operations were

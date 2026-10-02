@@ -2,7 +2,7 @@
 
 > The [enterprise plan](docs/enterprise-plan/README.md) is the **intended** design, and [chapter 21](docs/enterprise-plan/21-migration-and-deployment-plan.md) is the plan for getting there. This file is the **as-built** state: what exists, how it is layered, what differs from the plan, and how far the migration has gone. It is updated in the same change as anything that affects it.
 >
-> **Last updated:** 2026-10-02 (branch `main`) · **Migration:** R1 complete; R2 and R3 in progress; R4 started with H01 · **Tests:** 1,210 passed, 511 infrastructure-dependent skipped · `ruff`, `mypy --strict` (187 files), 3 import contracts and the module-boundary tests all clean
+> **Last updated:** 2026-10-02 (branch `main`) · **Migration:** R1 complete; R2 and R3 in progress; R4 started with H01; R6 started with N01 · **Tests:** 1,214 passed, 512 infrastructure-dependent skipped · `ruff`, `mypy --strict` (190 files), 3 import contracts and the module-boundary tests all clean
 
 ---
 
@@ -82,7 +82,8 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | R2 Infrastructure drivers | **In progress.** PostgreSQL, Kafka, Keycloak, OPA and OpenBao drivers are wired behind parity-tested ports; lite remains Python-only. Remaining full-stack components are tracked in the backlog. |
 | R3 Core migration | **In progress.** Wave 1 core work M-ACT, M-CASE, M-DET, M-GOV, M-DEC, M-RCPT and M-REC is implemented. |
 | R4 Satellites | **In progress.** H01 is complete: `hutch-sim` runs as a separate HTTP service and the `full` profile selects parity-tested HTTP read and command drivers. Other satellites remain in the backlog. |
-| R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
+| R6 Capabilities | **In progress.** N01 notifications is built with template-only dispatch, preferences, consent, quiet hours, idempotency and fallback. Other capabilities remain in the backlog. |
+| R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
 ## 6. Where this differs from the target
@@ -100,7 +101,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js 16 apps + shared packages (plan 19) | Static UI served by FastAPI **and** Next.js 14 apps in `frontend/` | R5: verify the build, retire the static UI, move to Next.js 16 |
 | Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
-| Channels | Web, app, WhatsApp, SMS/USSD | Web only | R4/R6 |
+| Channels | Web, app, WhatsApp, SMS/USSD | Web plus template-only notification routing and a simulated dispatch driver; external channel gateway remains | N02 |
 | Rules | 16 candidates | 10 | Remaining candidates need product/CX confirmation |
 
 ## 7. Known gaps

@@ -51,6 +51,13 @@ from clarity.modules.iam.public import (
     TokenIssuer,
     TokenVerifier,
 )
+from clarity.modules.notifications.public import (
+    CONSUMED_EVENTS as NOTIFICATION_EVENTS,
+)
+from clarity.modules.notifications.public import (
+    MemoryNotificationDispatcher,
+    NotificationService,
+)
 from clarity.modules.receipts.public import (
     BY_PLAN,
     RECEIPT_SEQUENCE,
@@ -370,6 +377,12 @@ class Clarity:
             bus=self.bus,
             alert=self.dead_letters,
         )
+        self.notification_dispatcher = MemoryNotificationDispatcher()
+        self.notifications = NotificationService(
+            open_unit=self.open_unit,
+            dispatcher=self.notification_dispatcher,
+            clock=lambda: clock or DEMO_NOW,
+        )
         # The aggregate owns the case; the resolution service orchestrates
         # (M-CASE, plan 21 section 2.2).
         self.case_aggregate = CaseAggregate(
@@ -418,6 +431,12 @@ class Clarity:
             group="reconciliation",
             handler=self.reconciliation.on_action_completed,
         )
+        for event_type in NOTIFICATION_EVENTS:
+            self.consumers.register(
+                event_type,
+                group="notifications",
+                handler=self.notifications.consume_event,
+            )
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts)

@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.9 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| R6 capabilities | Recorded N01 complete: event-driven, template-only notification routing with preferences, consent, quiet hours, idempotency, fallback and delivery tracking | 21 §7 |
+
 ## v1.8 - 2026-10-02
 
 | Area | Change | Chapters |
