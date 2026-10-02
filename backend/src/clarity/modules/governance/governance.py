@@ -14,19 +14,30 @@ production is not the editor but the lifecycle around it:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 
+from clarity.contracts.events import PolicyPublishedV1
 from clarity.kernel.common import utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.governance.artefacts import (
     Approval,
     ChangeRefused,
     ChangeState,
+    PolicyActivation,
     PolicyChange,
 )
 from clarity.modules.governance.replay import ImpactReport
-from clarity.modules.governance.repository import PolicyChangeRepository
+from clarity.modules.governance.repository import (
+    CHANGES,
+    PolicyChangeRepository,
+    StoredPolicyChangeRepository,
+)
 from clarity.platform.config.artefacts import ChangeClass, PolicyValue
+from clarity.platform.config.resolver import PolicyResolver
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
+from clarity.platform.persistence import UnitOfWorkFactory
 
 
 class PolicyGovernance:
@@ -41,10 +52,25 @@ class PolicyGovernance:
         }
     )
 
-    def __init__(self, changes: PolicyChangeRepository, *, audit: object | None = None) -> None:
+    def __init__(
+        self,
+        changes: PolicyChangeRepository,
+        *,
+        policies: PolicyResolver | None = None,
+        audit: object | None = None,
+        clock: Callable[[], datetime] = utc_now,
+        publish: Callable[[PolicyPublishedV1], None] | None = None,
+        open_unit: UnitOfWorkFactory | None = None,
+        deliver_events: Callable[[], None] | None = None,
+    ) -> None:
         # Policy changes live in the repository (B02); the gate keeps none.
         self._changes = changes
+        self._policies = policies
         self._audit = audit
+        self._clock = clock
+        self._publish = publish
+        self._open_unit = open_unit
+        self._deliver_events = deliver_events
 
     def draft(
         self,
@@ -124,7 +150,7 @@ class PolicyGovernance:
             Approval(
                 approver_ref=approver_ref,
                 role=role,
-                at=now or utc_now(),
+                at=now or self._clock(),
                 mfa_step_up=mfa_step_up,
             )
         )
@@ -132,20 +158,138 @@ class PolicyGovernance:
         self._changes.save(change)
         return change
 
+    def schedule(
+        self,
+        change_id: str,
+        *,
+        effective_from: datetime,
+    ) -> PolicyChange:
+        """Schedule an approved version for its effective date."""
+        change = self.get(change_id)
+        if not change.is_approved:
+            raise ChangeRefused("NOT_APPROVED", f"{change.key} is not approved")
+        change.scheduled_for = effective_from
+        change.candidate = change.candidate.model_copy(update={"effective_from": effective_from})
+        change.state = ChangeState.SCHEDULED
+        self._changes.save(change)
+        return change
+
+    def activate_due(self, *, now: datetime | None = None) -> list[PolicyChange]:
+        """Activate scheduled changes whose injected clock has reached them."""
+        moment = now or self._clock()
+        activated: list[PolicyChange] = []
+        for change in self._changes.all_changes():
+            if (
+                change.state is ChangeState.SCHEDULED
+                and change.scheduled_for is not None
+                and change.scheduled_for <= moment
+            ):
+                activated.append(self.activate(change.change_id, now=moment))
+        return activated
+
     def activate(self, change_id: str, *, now: datetime | None = None) -> PolicyChange:
         """Publish an approved change."""
-        change = self.get(change_id)
+        moment = now or self._clock()
+        # Validate the resolver update before committing lifecycle state.
+        preview = self.get(change_id)
+        if self._policies is not None:
+            self._policies.with_override(preview.key, preview.candidate)
+
+        if self._open_unit is not None:
+            with self._open_unit() as unit:
+                changes = StoredPolicyChangeRepository(unit.repository(CHANGES))
+                change = self._activate_in(changes, change_id, moment)
+                outbox_in(unit).append(Event.of(self._published(change), subject="policy"))
+                unit.commit()
+        else:
+            change = self._activate_in(self._changes, change_id, moment)
+
+        if self._policies is not None:
+            self._policies.publish(change.key, change.candidate)
+        self._record(change)
+        if self._open_unit is None and self._publish is not None:
+            self._publish(self._published(change))
+        if self._deliver_events is not None:
+            self._deliver_events()
+        return change
+
+    def _activate_in(
+        self,
+        changes: PolicyChangeRepository,
+        change_id: str,
+        moment: datetime,
+    ) -> PolicyChange:
+        change = changes.get(change_id)
+        if change is None:
+            raise ChangeRefused("UNKNOWN_CHANGE", f"no change {change_id}")
         if not change.is_approved:
             raise ChangeRefused(
                 "NOT_APPROVED",
                 f"{change.key} needs {change.approvals_needed} approvals, "
                 f"has {len(change.approvals)}",
             )
+        if change.scheduled_for is not None and moment < change.scheduled_for:
+            raise ChangeRefused(
+                "NOT_EFFECTIVE_YET",
+                f"{change.key} is scheduled for {change.scheduled_for.isoformat()}",
+            )
+        for previous in changes.all_changes():
+            if (
+                previous.change_id != change.change_id
+                and previous.key == change.key
+                and previous.state is ChangeState.ACTIVE
+                and previous.candidate.scope == change.candidate.scope
+            ):
+                previous.state = ChangeState.SUPERSEDED
+                changes.save(previous)
+                change.supersedes = previous.change_id
         change.state = ChangeState.ACTIVE
-        change.activated_at = now or utc_now()
-        self._changes.save(change)
-        self._record(change)
+        change.activated_at = moment
+        change.activations.append(
+            PolicyActivation(
+                activated_at=moment,
+                reason="scheduled" if change.scheduled_for else "publish",
+                actor_ref=change.maker_ref,
+            )
+        )
+        changes.save(change)
         return change
+
+    @staticmethod
+    def _published(change: PolicyChange) -> PolicyPublishedV1:
+        return PolicyPublishedV1(
+            change_id=change.change_id,
+            key=change.key,
+            policy_version=change.candidate.version,
+            change_class=change.change_class.value,
+            effective_from=change.candidate.effective_from,
+        )
+
+    def rollback(
+        self,
+        change_id: str,
+        *,
+        maker_ref: str,
+        reason: str,
+    ) -> PolicyChange:
+        """Draft a governed reactivation of the version this change replaced."""
+        current = self.get(change_id)
+        if current.supersedes is None:
+            raise ChangeRefused("NO_PREVIOUS_VERSION", f"{change_id} supersedes no version")
+        previous = self.get(current.supersedes)
+        return self.draft(
+            key=previous.key,
+            candidate=previous.candidate.model_copy(
+                update={
+                    "version": current.candidate.version + 1,
+                    "effective_from": None,
+                    "effective_to": None,
+                }
+            ),
+            computed_class=current.change_class,
+            maker_ref=maker_ref,
+            reason=reason,
+        )
 
     def get(self, change_id: str) -> PolicyChange:
         change = self._changes.get(change_id)
@@ -154,7 +298,14 @@ class PolicyGovernance:
         return change
 
     def pending(self) -> list[PolicyChange]:
-        return [c for c in self._changes.all_changes() if c.state is not ChangeState.ACTIVE]
+        return [
+            c
+            for c in self._changes.all_changes()
+            if c.state not in {ChangeState.ACTIVE, ChangeState.SUPERSEDED}
+        ]
+
+    def all_changes(self) -> list[PolicyChange]:
+        return self._changes.all_changes()
 
     def _record(self, change: PolicyChange) -> None:
         if self._audit is None:

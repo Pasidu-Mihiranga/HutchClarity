@@ -163,7 +163,44 @@ class PolicyReplay:
             candidate_summary=f"{key} = {candidate.value} for {candidate.scope.label()}",
         )
 
-    def _decide(self, case: ReplayCase, resolver: PolicyResolver) -> Decision:
+    def preview_table(
+        self,
+        candidate: DecisionPolicy,
+        cases: list[ReplayCase],
+        *,
+        version: str,
+        now: datetime | None = None,
+    ) -> ImpactReport:
+        """Compare a candidate ZEN table with the currently active policy."""
+        changes: list[OutcomeChange] = []
+        for case in cases:
+            after = self._decide(case, self._resolver, policy=candidate)
+            if after.outcome is not case.outcome:
+                changes.append(
+                    OutcomeChange(
+                        case_id=case.case_id,
+                        rule_id=case.rule_id,
+                        before=case.outcome,
+                        after=after.outcome,
+                        amount_lkr=case.amount_lkr,
+                    )
+                )
+        return ImpactReport(
+            key="decision.outcome_table",
+            change_class=ChangeClass.C2_OUTCOME_AFFECTING,
+            cases_evaluated=len(cases),
+            changes=changes,
+            generated_at=now,
+            candidate_summary=f"decision table version {version}",
+        )
+
+    def _decide(
+        self,
+        case: ReplayCase,
+        resolver: PolicyResolver,
+        *,
+        policy: DecisionPolicy | None = None,
+    ) -> Decision:
         """Re-decide one case under a given resolver, at its original time."""
         as_of = case.decision_input.as_of
         context = {"rule": case.rule_id, "channel": case.channel}
@@ -172,7 +209,7 @@ class PolicyReplay:
             as_of=as_of or (self._fallback_time(case)),
             context=context,
         )
-        return self._policy.decide(
+        return (policy or self._policy).decide(
             case.decision_input,
             thresholds=PolicyThresholds.from_snapshot(
                 snapshot, version=self._policy.thresholds.version

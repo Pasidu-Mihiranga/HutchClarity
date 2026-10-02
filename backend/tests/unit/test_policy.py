@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from clarity.contracts.decision import BudgetState, DecisionInput, Outcome, RiskSignals
 from clarity.kernel.common import Channel, money
 from clarity.modules.decision.policy import DecisionPolicy, PolicyThresholds
+from clarity.modules.decision.zen import DecisionTable, DecisionTableRow, ZenDecisionPolicy
 from clarity.modules.governance.governance import ChangeRefused, PolicyGovernance
 from clarity.modules.governance.replay import ImpactReport, PolicyReplay, ReplayCase, cases_from
 from clarity.platform.audit.ledger import AuditLedger
@@ -293,6 +295,31 @@ def test_the_report_names_the_change_class(replay: PolicyReplay):
     assert report.change_class is ChangeClass.C3_MONEY_AFFECTING
 
 
+def test_a_table_version_change_reports_outcome_deltas(replay: PolicyReplay):
+    path = Path(__file__).resolve().parents[3] / "config" / "policy" / "decision-table.json"
+    active = DecisionTable.load(path)
+    candidate = DecisionTable(
+        version="2027.10.0",
+        rows=tuple(
+            DecisionTableRow(row.row_id, Outcome.ONE_TAP_FIX) if row.row_id == "auto_fix" else row
+            for row in active.rows
+        ),
+    )
+    cases = [
+        a_case(
+            "C1",
+            rule="DUPLICATE_RELOAD",
+            amount="500.00",
+            outcome=Outcome.AUTO_FIX,
+        )
+    ]
+
+    report = replay.preview_table(ZenDecisionPolicy(candidate), cases, version=candidate.version)
+
+    assert report.transitions == {"AUTO_FIX -> ONE_TAP_FIX": 1}
+    assert report.candidate_summary == "decision table version 2027.10.0"
+
+
 def test_a_case_without_a_recorded_input_is_skipped_not_guessed():
     """A replay that invents its inputs proves nothing."""
     assert cases_from([object()]) == []
@@ -409,6 +436,31 @@ def test_activating_a_change_is_audited():
 
     assert len(ledger) == 1
     assert ledger.verify().intact
+
+
+def test_scheduled_change_uses_new_value_only_from_its_effective_time(
+    policies: PolicyResolver,
+):
+    governance = PolicyGovernance(policies=policies, changes=change_repository(), clock=lambda: APR)
+    change = governance.draft(
+        key="decision.conflict_margin",
+        candidate=PolicyValue(value="0.25", version=2),
+        computed_class=ChangeClass.C2_OUTCOME_AFFECTING,
+        maker_ref="cx-1",
+        reason="reduce ambiguous automatic outcomes",
+    )
+    governance.attach_impact(change.change_id, ImpactReport("k", change.change_class, 0))
+    governance.approve(change.change_id, approver_ref="cx-lead", role="cx_lead")
+    governance.schedule(change.change_id, effective_from=JUL)
+
+    assert policies.resolve("decision.conflict_margin", as_of=APR) == Decimal("0.20")
+    assert governance.activate_due(now=APR) == []
+
+    activated = governance.activate_due(now=JUL)
+
+    assert [item.change_id for item in activated] == [change.change_id]
+    assert policies.resolve("decision.conflict_margin", as_of=APR) == Decimal("0.20")
+    assert policies.resolve("decision.conflict_margin", as_of=JUL) == Decimal("0.25")
 
 
 # --------------------------------------------------------------------------- #

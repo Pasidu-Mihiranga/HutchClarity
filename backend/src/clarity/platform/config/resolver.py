@@ -217,3 +217,12 @@ class PolicyResolver:
         return PolicyResolver(
             {**self._keys, name: PolicyKey.model_validate(candidate.model_dump())}
         )
+
+    def publish(self, name: str, value: PolicyValue) -> None:
+        """Activate a governed version in this live resolver.
+
+        The replacement is built and validated first, so a bad value cannot
+        partially mutate the active policy catalogue.
+        """
+        candidate = self.with_override(name, value)
+        self._keys = candidate._keys

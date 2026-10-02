@@ -16,7 +16,7 @@ Policy change governance: change classes, maker-checker publication, replay impa
 Other code imports only these names: `Approval`, `ChangeRefused`, `ChangeState`, `ImpactReport`, `OutcomeChange`, `PolicyChange`, `PolicyGovernance`, `PolicyReplay`, `ReplayCase`, `cases_from`.
 
 ## 3. Used by
-Tests only (no runtime caller yet).
+`clarity.app`, `clarity.interfaces.http`
 
 ## 4. Depends on
 | Package | Through |
@@ -28,14 +28,14 @@ Tests only (no runtime caller yet).
 | `clarity.platform.config` | - |
 
 ## 5. Data owned
-Policy change artefacts from draft to active, behind `PolicyChangeRepository` (B02). Collection: `governance.changes`. The `demo` profile binds the in-memory driver, `full` binds PostgreSQL schema `governance` with its own role (ADR-0013); both pass `tests/contract/test_repository_parity.py`.
+Policy change aggregates persist candidate versions, impact reports, approvals, schedules, activations and supersession history behind `PolicyChangeRepository`. Collection: `governance.changes`; full binds the governance PostgreSQL schema (ADR-0013).
 
 ## 6. Invariants
 - A money-affecting change needs a second approver and an impact report.
 - A preview never touches the live resolver.
 
 ## 7. Migration status (enterprise-plan 21)
-In memory. R2/R3 persist artefacts, approvals and activations (enterprise-plan 20 section 11).
+M-GOV complete: Policy Studio exposes draft, replay review, approval, scheduling, activation and governed rollback. Activation updates the live resolver and publishes `policy.published@v1`.
 
 ## 8. Tests
 - `tests/unit/test_policy.py`
@@ -45,3 +45,4 @@ In memory. R2/R3 persist artefacts, approvals and activations (enterprise-plan 2
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.governance` with a public surface (R1) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-B02-unit-of-work-and-repositories.md` | Policy changes moved behind `PolicyChangeRepository`; `PolicyChange` and its vocabulary extracted to `artefacts.py` (B02, #5) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-M-GOV-policy-studio-lifecycle.md` | Persisted lifecycle and Policy Studio API (M-GOV, #20) |

@@ -11,6 +11,7 @@ from clarity.modules.governance.artefacts import (
     Approval,
     ChangeRefused,
     ChangeState,
+    PolicyActivation,
     PolicyChange,
 )
 from clarity.modules.governance.governance import PolicyGovernance
@@ -34,6 +35,7 @@ __all__ = [
     "ChangeState",
     "ImpactReport",
     "OutcomeChange",
+    "PolicyActivation",
     "PolicyChange",
     "PolicyChangeRepository",
     "PolicyGovernance",

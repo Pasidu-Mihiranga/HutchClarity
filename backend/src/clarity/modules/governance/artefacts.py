@@ -19,7 +19,9 @@ class ChangeState(StrEnum):
     DRAFT = "draft"
     IN_REVIEW = "in_review"
     APPROVED = "approved"
+    SCHEDULED = "scheduled"
     ACTIVE = "active"
+    SUPERSEDED = "superseded"
     REJECTED = "rejected"
 
 
@@ -39,6 +41,13 @@ class Approval:
     mfa_step_up: bool
 
 
+@dataclass(frozen=True)
+class PolicyActivation:
+    activated_at: datetime
+    reason: str
+    actor_ref: str
+
+
 @dataclass
 class PolicyChange:
     """One proposed change, from draft to active."""
@@ -53,7 +62,10 @@ class PolicyChange:
     impact: ImpactReport | None = None
     reason: str = ""
     created_at: datetime = field(default_factory=utc_now)
+    scheduled_for: datetime | None = None
     activated_at: datetime | None = None
+    supersedes: str | None = None
+    activations: list[PolicyActivation] = field(default_factory=list)
 
     @property
     def approvals_needed(self) -> int:
@@ -64,4 +76,10 @@ class PolicyChange:
         return len(self.approvals) >= self.approvals_needed
 
 
-__all__ = ["Approval", "ChangeRefused", "ChangeState", "PolicyChange"]
+__all__ = [
+    "Approval",
+    "ChangeRefused",
+    "ChangeState",
+    "PolicyActivation",
+    "PolicyChange",
+]
