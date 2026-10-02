@@ -1,6 +1,7 @@
 """Durable store for the synthetic HUTCH estate."""
 
 from clarity.integration.drivers.mock.store.db import (
+    configure,
     create_schema,
     default_database_url,
     get_engine,
@@ -30,6 +31,7 @@ from clarity.integration.drivers.mock.store.repository import (
 
 __all__ = [
     "account_for_customer",
+    "configure",
     "consent_for_customer",
     "create_schema",
     "customer_id_for_msisdn",

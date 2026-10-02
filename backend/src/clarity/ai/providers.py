@@ -18,7 +18,6 @@ path (S7). That is why this prototype's measured token use is zero.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,16 +43,26 @@ class ProviderConfig:
     """Low: this job is faithful restatement of facts, not invention."""
 
     @classmethod
-    def from_env(cls) -> ProviderConfig | None:
-        """Build from environment, or ``None`` if no model is configured."""
-        base_url = os.environ.get("CLARITY_MODEL_BASE_URL")
+    def of(
+        cls,
+        *,
+        base_url: str | None,
+        model: str = "local-model",
+        api_key: str | None = None,
+        timeout_seconds: float = 20.0,
+    ) -> ProviderConfig | None:
+        """Build from values the composition root resolved, or ``None``.
+
+        ``None`` means no model is configured, which is the default: the gateway
+        answers from approved templates and spends no tokens (ADR-0009).
+        """
         if not base_url:
             return None
         return cls(
             base_url=base_url.rstrip("/"),
-            model=os.environ.get("CLARITY_MODEL_NAME", "local-model"),
-            api_key=os.environ.get("CLARITY_MODEL_API_KEY"),
-            timeout_seconds=float(os.environ.get("CLARITY_MODEL_TIMEOUT", "20")),
+            model=model,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
         )
 
     @property
@@ -121,7 +130,6 @@ class OpenAICompatibleProvider:
         return str(text).strip(), usage
 
 
-def provider_from_env() -> OpenAICompatibleProvider | None:
-    """The provider this deployment is configured with, if any."""
-    config = ProviderConfig.from_env()
+def provider_for(config: ProviderConfig | None) -> OpenAICompatibleProvider | None:
+    """The provider for a resolved config, or ``None`` when no model is set."""
     return None if config is None else OpenAICompatibleProvider(config)

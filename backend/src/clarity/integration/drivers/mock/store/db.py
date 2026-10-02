@@ -6,7 +6,6 @@ in memory. FULL profile uses Postgres (or a file SQLite when Docker is not up).
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -20,11 +19,25 @@ _ENGINE: Engine | None = None
 _SESSION: sessionmaker[Session] | None = None
 
 
+#: Used when the composition root passes no URL. A file, so the simulated
+#: estate survives a restart with no server to run (ADR-0006).
+FALLBACK_DATABASE_URL = "sqlite+pysqlite:///./clarity_world.db"
+
+#: Set once by the composition root (B07). A driver never reads the environment.
+_CONFIGURED_URL: str | None = None
+
+
+def configure(database_url: str | None) -> None:
+    """Tell this driver which database to use. Called by ``app.container``."""
+    global _CONFIGURED_URL, _ENGINE, _SESSION
+    if database_url != _CONFIGURED_URL:
+        _ENGINE = None
+        _SESSION = None
+    _CONFIGURED_URL = database_url
+
+
 def default_database_url() -> str:
-    return os.environ.get(
-        "DATABASE_URL",
-        "sqlite+pysqlite:///./clarity_world.db",
-    )
+    return _CONFIGURED_URL or FALLBACK_DATABASE_URL
 
 
 def get_engine(url: str | None = None, *, echo: bool = False) -> Engine:
