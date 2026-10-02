@@ -52,7 +52,7 @@ class Profile(StrEnum):
     clone and run with no infrastructure."""
 
     FULL = "full"
-    """Real components (PostgreSQL and the rest) where drivers exist."""
+    """Synthetic HUTCH world backed by SQL (Postgres or SQLite via DATABASE_URL)."""
 
     PROD = "prod"
     """HUTCH platform. No driver is implemented for this yet."""
@@ -67,6 +67,46 @@ DEFAULT_RULES_DIR = Path(__file__).resolve().parents[3] / "rules" / "packs"
 
 #: Policy artefacts: caps, thresholds and windows that change without a deploy.
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parents[3] / "config" / "policy"
+
+
+def _world_for_profile(
+    profile: Profile,
+    world: SyntheticWorld | None,
+    clock: datetime | None,
+) -> tuple[SyntheticWorld, bool]:
+    """Return (world, persist_receipts)."""
+    if profile is Profile.DEMO:
+        return world or build_demo_world(now=clock or DEMO_NOW), False
+    if profile is Profile.FULL:
+        # An explicit world (tests) keeps DEMO-style memory unless they seed.
+        if world is not None:
+            return world, bool(getattr(world, "_persist", False))
+        from clarity.integrations.store import (
+            create_schema,
+            load_world,
+            save_complaints,
+            save_world,
+            session_scope,
+            upsert_knowledge,
+            world_is_seeded,
+        )
+        from clarity.integrations.store.knowledge import KNOWLEDGE_ARTICLES
+        from clarity.integrations.store.volume import generate_complaints
+
+        create_schema()
+        with session_scope() as session:
+            if world_is_seeded(session):
+                chosen = load_world(session, now=clock or DEMO_NOW)
+            else:
+                chosen = build_demo_world(now=clock or DEMO_NOW, persist=False)
+                save_world(session, chosen)
+                upsert_knowledge(session, KNOWLEDGE_ARTICLES)
+                save_complaints(session, generate_complaints(2000))
+            chosen._persist = True
+        return chosen, True
+    raise ProfileNotAvailable(
+        f"the {profile.value} profile has no drivers yet: real HUTCH adapters are not implemented"
+    )
 
 
 class Clarity:
@@ -90,18 +130,13 @@ class Clarity:
     ) -> None:
         # The composition root, and the only reader of CLARITY_PROFILE.
         self.profile = Profile(profile or os.environ.get("CLARITY_PROFILE", Profile.DEMO))
-        if self.profile is not Profile.DEMO:
-            raise ProfileNotAvailable(
-                f"the {self.profile.value} profile has no drivers yet: persistence and "
-                "real infrastructure are Phase 5 of docs/improvement-plan.md"
-            )
         self._rules_dir = rules_dir
         self._policy_dir = policy_dir
         self._clock = clock
         self._verify_base = verify_base
         self._daily_refund_limit_lkr = daily_refund_limit_lkr
         self._provider = provider
-        self.world = world or build_demo_world()
+        self.world, persist = _world_for_profile(self.profile, world, clock)
         self.registry = AdapterRegistry(mode=DriverMode.MOCK, world=self.world)
         self.rules = RuleEngine(load_packs(rules_dir or DEFAULT_RULES_DIR))
         self.policy = DecisionPolicy(thresholds)
@@ -120,6 +155,7 @@ class Clarity:
             self.signing,
             probe=MockRecurrenceProbe(self.world),
             verify_base=verify_base,
+            persist=persist,
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
@@ -145,6 +181,42 @@ class Clarity:
         The demo mutates balances and subscriptions, so a reset gives a clean
         synthetic world without restarting the process.
         """
+        if self.profile is Profile.FULL:
+            from clarity.integrations.store import reset_engine
+
+            # Drop the file/DB seed so the next construct re-seeds cleanly when
+            # using the default SQLite file; Postgres users should run make seed.
+            reset_engine()
+            from clarity.integrations.store import (
+                create_schema,
+                save_complaints,
+                save_world,
+                session_scope,
+                upsert_knowledge,
+            )
+            from clarity.integrations.store.knowledge import KNOWLEDGE_ARTICLES
+            from clarity.integrations.store.volume import generate_complaints
+
+            create_schema()
+            fresh = build_demo_world(now=self._clock or DEMO_NOW, persist=False)
+            with session_scope() as session:
+                save_world(session, fresh)
+                upsert_knowledge(session, KNOWLEDGE_ARTICLES)
+                save_complaints(session, generate_complaints(2000))
+            fresh._persist = True
+            return Clarity(
+                rules_dir=self._rules_dir,
+                policy_dir=self._policy_dir,
+                world=fresh,
+                thresholds=self.policy.thresholds,
+                clock=self._clock,
+                verify_base=self._verify_base,
+                daily_refund_limit_lkr=self._daily_refund_limit_lkr,
+                provider=self._provider,
+                profile=self.profile,
+                tokens=self.tokens,
+                otp=self.otp,
+            )
         return Clarity(
             rules_dir=self._rules_dir,
             policy_dir=self._policy_dir,

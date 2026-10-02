@@ -1,0 +1,85 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Mypy
+        run: mypy
+
+  test-legacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Pytest (legacy tree)
+        run: pytest tests/
+
+  test-new:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Pytest (backend / modular monolith)
+        run: PYTHONPATH=backend/src pytest backend/tests -q -o pythonpath=backend/src
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks (placeholder)
+        run: |
+          echo "gitleaks placeholder — wire gitleaks/gitleaks-action when secrets scanning is enabled"
+          # Example (uncomment when ready):
+          # docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest detect --source=/path --verbose
+
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SBOM placeholder
+        run: |
+          mkdir -p artifacts
+          echo '{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"hutch-clarity","version":"0.2.0-baseline"}},"components":[]}' \
+            > artifacts/sbom-placeholder.json
+          echo "SBOM placeholder written to artifacts/sbom-placeholder.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-placeholder
+          path: artifacts/sbom-placeholder.json

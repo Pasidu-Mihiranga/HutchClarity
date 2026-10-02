@@ -92,6 +92,7 @@ class ReceiptService:
         *,
         probe: RecurrenceProbe | None = None,
         verify_base: str = DEFAULT_VERIFY_BASE,
+        persist: bool = False,
     ) -> None:
         self._signing = signing
         self._probe = probe
@@ -99,6 +100,31 @@ class ReceiptService:
         self._ledger = _Ledger()
         self._lock = threading.Lock()
         self._sequence = 0
+        self._persist = persist
+        self._subscriber_by_receipt: dict[str, str] = {}
+        if persist:
+            self._hydrate()
+
+    def _hydrate(self) -> None:
+        from clarity.integrations.store import list_receipts, session_scope
+
+        with session_scope() as session:
+            for receipt, subscriber_ref in list_receipts(session):
+                self._ledger.receipts[receipt.receipt_id] = receipt
+                self._ledger.order.append(receipt.receipt_id)
+                self._subscriber_by_receipt[receipt.receipt_id] = subscriber_ref
+                if receipt.payload.supersedes:
+                    self._ledger.superseded_by[receipt.payload.supersedes] = receipt.receipt_id
+                # Keep sequence ahead of any restored receipt number.
+                try:
+                    # RCP-2027-000042 → 42
+                    num = int(receipt.receipt_id.rsplit("-", 1)[-1])
+                    self._sequence = max(self._sequence, num)
+                except ValueError:
+                    pass
+
+    def subscriber_ref_for(self, receipt_id: str) -> str | None:
+        return self._subscriber_by_receipt.get(receipt_id)
 
     # ------------------------------------------------------------------ #
     # Issuing
@@ -172,8 +198,14 @@ class ReceiptService:
 
             self._ledger.receipts[receipt.receipt_id] = receipt
             self._ledger.order.append(receipt.receipt_id)
+            self._subscriber_by_receipt[receipt.receipt_id] = subscriber_ref
             if supersedes:
                 self._ledger.superseded_by[supersedes] = receipt.receipt_id
+            if self._persist:
+                from clarity.integrations.store import save_receipt, session_scope
+
+                with session_scope() as session:
+                    save_receipt(session, receipt, subscriber_ref=subscriber_ref)
             return receipt
 
     def _chain_head(self) -> str | None:

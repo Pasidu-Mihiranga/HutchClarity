@@ -1,0 +1,76 @@
+# Model roles → providers. Code requests roles; never hard-code model IDs.
+# Prototype: Groq for fast/extract/STT/TTS; Gemini for reason/judge/guard; local BGE for embed.
+
+roles:
+  fast-text:
+    primary:
+      provider: groq
+      model: llama-3.3-70b-versatile
+    fallback:
+      - provider: gemini
+        model: gemini-2.0-flash-lite
+      - provider: template
+        model: local-template
+
+  extract:
+    primary:
+      provider: groq
+      model: llama-3.3-70b-versatile
+    fallback:
+      - provider: gemini
+        model: gemini-2.0-flash-lite
+
+  reason:
+    primary:
+      provider: gemini
+      model: gemini-2.0-flash
+    fallback:
+      - provider: groq
+        model: openai/gpt-oss-120b
+      - provider: gemini
+        model: gemini-2.0-flash-lite
+
+  judge:
+    primary:
+      provider: gemini
+      model: gemini-2.0-flash
+    fallback:
+      - provider: groq
+        model: openai/gpt-oss-120b
+
+  guard:
+    primary:
+      provider: gemini
+      model: gemini-2.0-flash-lite
+    fallback:
+      - provider: template
+        model: local-guard-rules
+
+  embed:
+    primary:
+      provider: local-bge
+      model: BAAI/bge-m3
+    fallback:
+      - provider: local-bge
+        model: BAAI/bge-small-en-v1.5
+
+  stt:
+    primary:
+      provider: groq
+      model: whisper-large-v3
+    fallback:
+      - provider: groq
+        model: whisper-large-v3-turbo
+
+  tts:
+    primary:
+      provider: groq
+      model: playai-tts
+    fallback:
+      - provider: template
+        model: local-tts-stub
+
+defaults:
+  prefer_templates: true
+  mask_pii_before_send: true
+  record_replay_cassette_dir: cassettes

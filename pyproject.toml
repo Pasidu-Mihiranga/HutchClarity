@@ -13,6 +13,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
     "cryptography>=43.0",
     "httpx>=0.27",
     "python-ulid>=2.7",
@@ -37,12 +38,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
+# Old app only. backend/src/clarity also uses the package name `clarity` and
+# cannot share this wheel — use PYTHONPATH=backend/src for the new tree
+# (see Makefile targets `dev-new` and `test-g1`).
 packages = ["src/clarity"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src", "tests", "backend/src", "backend/tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ANN"]
@@ -50,6 +54,7 @@ ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN"]
+"backend/tests/**" = ["ANN"]
 # The receipt template is HTML and localized strings: wrapping them would hurt
 # readability more than the long lines do.
 "src/clarity/core/receipts/render.py" = ["E501"]
@@ -62,6 +67,8 @@ warn_unused_ignores = true
 plugins = []
 
 [tool.pytest.ini_options]
+# Legacy tree only. Backend/G1 tests: `make test-g1` (PYTHONPATH=backend/src)
+# — do not add backend/src here; package name `clarity` conflicts with src/clarity.
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q --strict-markers"

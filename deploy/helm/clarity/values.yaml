@@ -1,0 +1,16 @@
+replicaCount: 1
+
+image:
+  repository: clarity-api
+  tag: "0.2.0-baseline"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+env:
+  CLARITY_PROFILE: prod
+  OTEL_EXPORTER: otlp
+
+resources: {}

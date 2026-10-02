@@ -10,3 +10,7 @@ dist/
 build/
 .DS_Store
 .env
+.keys/
+cassettes/
+clarity_world.db
+HutchClarity-new/*.pdf

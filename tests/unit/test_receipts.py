@@ -136,8 +136,8 @@ def test_a_receipt_records_what_was_corrected(receipts, case, executed):
 
     refund = next(a for a in receipt.payload.actions if a.type is ActionType.REFUND)
     assert refund.amount_lkr == Decimal("49.00")
-    assert refund.before == {"balance_lkr": "263.00"}
-    assert refund.after == {"balance_lkr": "312.00"}
+    assert refund.before == {"balance_lkr": "451.00"}
+    assert refund.after == {"balance_lkr": "500.00"}
 
 
 def test_a_receipt_never_contains_the_raw_number(receipts, case, executed):

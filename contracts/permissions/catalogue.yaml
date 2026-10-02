@@ -1,0 +1,51 @@
+# Permission catalogue — deny by default. Roles map to subsets in kernel/principal.py.
+version: 1
+permissions:
+  - id: case:read
+    description: Read own case
+  - id: case:read:any
+    description: Read any subscriber's case (staff)
+  - id: case:evaluate
+    description: Run detection / decision on a case
+  - id: action:propose
+    description: Propose a remediating action
+  - id: action:confirm:own
+    description: Customer confirms an action on their own case
+  - id: action:approve
+    description: Staff approve a remediating action
+  - id: action:approve:high_value
+    description: Approve high-value financial actions
+  - id: receipt:read
+    description: Read own receipt
+  - id: receipt:read:any
+    description: Read any receipt (staff / auditor)
+  - id: desk:queue:read
+    description: View desk queue
+  - id: rule:draft
+    description: Draft detector / decision-table changes
+  - id: rule:publish
+    description: Publish a signed rule bundle
+  - id: config:draft
+    description: Draft config changes
+  - id: config:approve
+    description: Approve config for publish
+  - id: merchant:suspend
+    description: Suspend a VAS merchant
+  - id: regulator_pack:export
+    description: Export regulator evidence pack
+  - id: audit:read
+    description: Read the audit ledger
+  - id: flags:kill_switch
+    description: Flip kill switches
+  - id: admin:manage
+    description: Platform administration
+  - id: notify:send
+    description: Send a templated notification
+  - id: knowledge:search
+    description: Search knowledge base
+  - id: policy:replay
+    description: Replay a decision from a snapshot
+  - id: autopsy:read
+    description: Read autopsy / post-mortem packs
+  - id: foresight:run
+    description: Run foresight / what-if simulations

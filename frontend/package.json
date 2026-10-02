@@ -1,0 +1,18 @@
+{
+  "name": "clarity-frontend",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:customer": "npm run dev -w @clarity/customer-web",
+    "dev:console": "npm run dev -w @clarity/console",
+    "dev:verify": "npm run dev -w @clarity/verify",
+    "build": "npm run build -w @clarity/customer-web -w @clarity/console -w @clarity/verify",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

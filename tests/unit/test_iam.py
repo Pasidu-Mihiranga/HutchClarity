@@ -532,10 +532,9 @@ def test_the_otp_inbox_is_a_demo_only_route():
     client = TestClient(create_app(clarity))
     assert client.get("/v1/demo/subscribers").status_code == 200
 
-    # Only the demo profile is constructible today, so move this container past
-    # the gate rather than inventing drivers that do not exist. Note that
-    # `/v1/demo/reset` would swap the container out, so it is not called here.
-    clarity.profile = Profile.FULL
+    # PROD is the profile with real subscribers. Note that `/v1/demo/reset`
+    # would swap the container out, so it is not called here.
+    clarity.profile = Profile.PROD
 
     assert client.get("/v1/demo/subscribers").status_code == 404
     assert client.get("/v1/demo/inbox", params={"msisdn": DILANI}).status_code == 404

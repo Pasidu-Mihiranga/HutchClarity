@@ -1,0 +1,146 @@
+openapi: 3.1.0
+info:
+  title: Hutch Clarity API
+  version: 0.1.0
+  description: Minimal OpenAPI surface for the modular monolith (cases, receipts, health).
+servers:
+  - url: http://localhost:8000
+    description: Local lite profile
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+  /v1/cases:
+    get:
+      operationId: listCases
+      summary: List cases visible to the caller
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Case list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CaseSummary"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCase
+      summary: Open a billing case
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaseRequest"
+      responses:
+        "201":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseSummary"
+        "401":
+          description: Unauthorized
+  /v1/receipts/{id}:
+    get:
+      operationId: getReceipt
+      summary: Fetch a signed receipt by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+        "404":
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateCaseRequest:
+      type: object
+      required: [subscriber_ref, channel]
+      properties:
+        subscriber_ref:
+          type: string
+        channel:
+          type: string
+          enum: [web, app, whatsapp, sms, ussd, desk, shop, system]
+        complaint_text:
+          type: string
+    CaseSummary:
+      type: object
+      required: [id, case_no, status]
+      properties:
+        id:
+          type: string
+        case_no:
+          type: string
+        status:
+          type: string
+        subscriber_ref:
+          type: string
+    Receipt:
+      type: object
+      required: [id, case_id, payload_hash, signature]
+      properties:
+        id:
+          type: string
+        case_id:
+          type: string
+        payload_hash:
+          type: string
+        signature:
+          type: object
+          required: [alg, kid, value]
+          properties:
+            alg:
+              type: string
+              enum: [Ed25519]
+            kid:
+              type: string
+            value:
+              type: string

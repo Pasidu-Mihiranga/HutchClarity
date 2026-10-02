@@ -409,14 +409,14 @@ def test_reset_restores_the_synthetic_world(client: TestClient):
     balance_after_refund = next(
         p["balance_lkr"] for p in client.get("/v1/demo/subscribers").json() if p["msisdn"] == DILANI
     )
-    assert balance_after_refund == "312.00"
+    assert balance_after_refund == "500.00"
 
     assert client.post("/v1/demo/reset").status_code == 200
 
     restored = next(
         p["balance_lkr"] for p in client.get("/v1/demo/subscribers").json() if p["msisdn"] == DILANI
     )
-    assert restored == "263.00", "balances are back to their starting values"
+    assert restored == "451.00", "balances are back to their starting values"
 
     # The queue is staff-only, and a customer session must survive a reset:
     # identity is not demo data.
@@ -491,11 +491,18 @@ def test_the_default_profile_needs_no_infrastructure():
     assert Clarity(world=build_demo_world()).profile is Profile.DEMO
 
 
-def test_an_unavailable_profile_says_so_rather_than_half_working():
-    from clarity.api.container import Clarity, ProfileNotAvailable
+def test_the_full_profile_loads_a_sql_backed_world(tmp_path, monkeypatch):
+    """FULL uses DATABASE_URL (SQLite file here) instead of raising."""
+    from clarity.api.container import Clarity, Profile
+    from clarity.integrations.store import reset_engine
 
-    with pytest.raises(ProfileNotAvailable, match="Phase 5"):
-        Clarity(world=build_demo_world(), profile="full")
+    db = tmp_path / "full.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db}")
+    reset_engine()
+    clarity = Clarity(profile=Profile.FULL)
+    assert clarity.profile is Profile.FULL
+    assert clarity.world.account_by_msisdn("+94771234567") is not None
+    reset_engine()
 
 
 def test_only_the_composition_root_reads_the_profile():

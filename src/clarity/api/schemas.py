@@ -261,6 +261,25 @@ class StaffSignIn(ApiModel):
     )
 
 
+class ReloadRequest(ApiModel):
+    amount_lkr: str
+
+
+class SafeguardRequest(ApiModel):
+    kind: str
+    value: str
+
+
+class FamilyRequest(ApiModel):
+    msisdn: str
+
+
+class PreferencesRequest(ApiModel):
+    language: Language
+    notify: str = "important"
+    large_text: bool = False
+
+
 class SessionView(ApiModel):
     token: str
     expires_at: datetime | None = None

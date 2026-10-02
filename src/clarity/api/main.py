@@ -20,6 +20,7 @@ these routes exactly as plan §19 describes.
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -48,14 +49,18 @@ from clarity.api.schemas import (
     DecisionView,
     DemoSubscriber,
     ExecutionView,
+    FamilyRequest,
     OpenCaseRequest,
     OtpRequest,
     OtpVerify,
     PendingApprovalView,
     PlanView,
+    PreferencesRequest,
     ProposeRequest,
     QueueItem,
+    ReloadRequest,
     RuledOutView,
+    SafeguardRequest,
     SessionView,
     SourceStatusView,
     StaffSignIn,
@@ -67,7 +72,7 @@ from clarity.core.cases.service import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.core.iam.otp import OtpRefused, SimulatedInbox
 from clarity.core.iam.principal import Assurance, Role
 from clarity.core.tools.errors import ToolLayerError
-from clarity.integrations.mocks.world import ref_for
+from clarity.integrations.mocks.world import CATALOGUE, ref_for
 from clarity.schemas.canonical import hash_payload
 from clarity.schemas.case import CaseState
 from clarity.schemas.common import Language, mask_msisdn, normalise_msisdn
@@ -233,13 +238,12 @@ def _decision_view(record: CaseRecord, clarity: Clarity | None = None) -> Decisi
 
 
 def demo_only(clarity: ClarityDep) -> None:
-    """Refuse a prototype-only route outside the demo profile.
+    """Refuse a prototype-only route outside synthetic profiles.
 
-    `/v1/demo/inbox` hands out OTP codes, so it must not exist anywhere with
-    real subscribers. Stated as a dependency rather than a check inside the
-    handler, so it is visible in the route table next to the permissions.
+    `/v1/demo/inbox` hands out OTP codes, so it must not exist where subscribers
+    are real. DEMO and FULL both run synthetic Hutch data; only PROD is gated.
     """
-    if clarity.profile is not Profile.DEMO:
+    if clarity.profile is Profile.PROD:
         raise HTTPException(status_code=404, detail="not found")
 
 
@@ -342,6 +346,9 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
+        if clarity.world.account_by_msisdn(msisdn) is None:
+            raise HTTPException(status_code=404, detail="We could not find this Hutch number.")
+
         try:
             challenge_id = clarity.otp.request(msisdn)
         except OtpRefused as error:
@@ -373,7 +380,7 @@ def _register_routes(app: FastAPI) -> None:
 
         account = clarity.world.account_by_msisdn(msisdn)
         if account is None:
-            raise HTTPException(status_code=404, detail="no such subscriber in the demo data")
+            raise HTTPException(status_code=404, detail="We could not find this Hutch number.")
 
         issued = clarity.tokens.for_customer(
             account.ref, assurance=Assurance.OTP, channel=body.channel.value
@@ -799,6 +806,101 @@ def _register_routes(app: FastAPI) -> None:
         """Balance, pack, activity and alerts for the signed-in number."""
         return _home_for(clarity, _customer_ref(principal))
 
+    @app.get("/v1/me/app", tags=["customer"])
+    def my_app(clarity: ClarityDep, principal: CurrentPrincipal) -> dict[str, Any]:
+        """The only customer read. Every screen renders this payload."""
+        return _app_for(clarity, _customer_ref(principal))
+
+    @app.post("/v1/me/reload", tags=["customer"])
+    def my_reload(
+        body: ReloadRequest, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        try:
+            amount = Decimal(body.amount_lkr)
+        except InvalidOperation as error:
+            raise HTTPException(status_code=422, detail="enter a reload amount") from error
+        allowed_amounts = {
+            Decimal("100"),
+            Decimal("200"),
+            Decimal("500"),
+            Decimal("1000"),
+            Decimal("2000"),
+        }
+        if amount not in allowed_amounts:
+            raise HTTPException(status_code=422, detail="choose a listed reload amount")
+        clarity.world.reload(ref, amount)
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/packages/{offering_id}/purchase", tags=["customer"])
+    def my_purchase(
+        offering_id: str, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        try:
+            clarity.world.purchase_pack(ref, offering_id)
+        except KeyError as error:
+            raise HTTPException(
+                status_code=404, detail="that pack is not in the catalogue"
+            ) from error
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/subscriptions/{subscription_id}/cancel", tags=["customer"])
+    def my_cancel(
+        subscription_id: str, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        if not clarity.world.deactivate_subscription(ref, subscription_id):
+            raise HTTPException(status_code=404, detail="that subscription is not active")
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/safeguards", tags=["customer"])
+    def my_safeguard(
+        body: SafeguardRequest, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        allowed = {"data_on_expiry", "spend_cap", "vas_confirm", "usage_alerts", "merchant_block"}
+        if body.kind not in allowed:
+            raise HTTPException(status_code=422, detail="unknown safeguard")
+        if body.kind == "merchant_block" and body.value:
+            clarity.world.block_merchant(ref, body.value)
+        clarity.world.set_safeguard(ref, body.kind, {"value": body.value})
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/family", tags=["customer"])
+    def my_family(
+        body: FamilyRequest, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        try:
+            clarity.world.add_family(ref, body.msisdn)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except KeyError as error:
+            raise HTTPException(
+                status_code=404, detail="We could not find this Hutch number."
+            ) from error
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/preferences", tags=["customer"])
+    def my_preferences(
+        body: PreferencesRequest, clarity: ClarityDep, principal: CurrentPrincipal
+    ) -> dict[str, Any]:
+        ref = _customer_ref(principal)
+        account = clarity.world.account(ref)
+        if account is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        if body.notify not in {"all", "important", "none"}:
+            raise HTTPException(status_code=422, detail="choose a notification preference")
+        account.language = body.language
+        account.notify = body.notify
+        account.large_text = body.large_text
+        account.onboarded = True
+        clarity.world._flush(account)
+        return _app_for(clarity, ref)
+
     @app.get("/v1/me/cases", tags=["customer"])
     def my_cases(clarity: ClarityDep, principal: CurrentPrincipal) -> list[dict[str, Any]]:
         """Cases opened for the signed-in number."""
@@ -822,13 +924,15 @@ def _register_routes(app: FastAPI) -> None:
         """Trust Receipts already issued for the signed-in number."""
         ref = _customer_ref(principal)
         mine = {
-            record.case_id
-            for record in clarity.cases.all_cases()
-            if record.subscriber_ref == ref
+            record.case_id for record in clarity.cases.all_cases() if record.subscriber_ref == ref
         }
         rows = []
+        ref_hash = hash_payload(ref)
         for receipt in reversed(clarity.receipts.issued()):
-            if receipt.case_id not in mine:
+            belongs = receipt.case_id in mine or (
+                receipt.payload.subject.subscriber_ref_hash == ref_hash
+            )
+            if not belongs:
                 continue
             corrected = receipt.payload.total_corrected_lkr
             rows.append(
@@ -841,6 +945,202 @@ def _register_routes(app: FastAPI) -> None:
                 }
             )
         return rows
+
+    @app.get("/v1/knowledge/search", tags=["knowledge"])
+    def knowledge_search(q: str = "") -> dict[str, Any]:
+        """Keyword search over how-to articles. Never opens a charge case."""
+        from clarity.integrations.store.knowledge import KNOWLEDGE_ARTICLES, classify_intent
+
+        articles: list[dict[str, Any]] = []
+        try:
+            from clarity.integrations.store import search_knowledge, session_scope
+
+            with session_scope() as session:
+                articles = search_knowledge(session, q)
+        except Exception:
+            articles = []
+        if not articles:
+            # In-memory fallback for DEMO profile (no DB).
+            hay = q.lower()
+            scored: list[tuple[int, dict[str, Any]]] = []
+            for article in KNOWLEDGE_ARTICLES:
+                blob = (
+                    f"{article['title']} {article['body']} {' '.join(article['keywords'])}"
+                ).lower()
+                score = sum(
+                    2 for token in hay.replace("?", " ").split() if len(token) > 1 and token in blob
+                )
+                if score:
+                    scored.append((score, article))
+            scored.sort(key=lambda item: item[0], reverse=True)
+            articles = [item for _, item in scored[:5]]
+        return {"query": q, "intent": classify_intent(q), "articles": articles}
+
+    @app.post("/v1/clarity/route", tags=["knowledge"])
+    def clarity_route(body: dict[str, Any]) -> dict[str, Any]:
+        """Server intent: account vs knowledge vs both."""
+        from clarity.integrations.store.knowledge import classify_intent
+
+        question = str(body.get("question") or "")
+        intent = classify_intent(question)
+        articles: list[dict[str, Any]] = []
+        if intent in {"knowledge", "both"}:
+            articles = knowledge_search(question).get("articles") or []
+        return {"question": question, "intent": intent, "articles": articles}
+
+    def _mock_customer_id(customer_id: str) -> str:
+        """Accept MSISDN or subscriber_ref for mock Hutch facades."""
+        if customer_id.startswith("sub_") or customer_id.startswith("SUB"):
+            return customer_id
+        try:
+            return ref_for(normalise_msisdn(customer_id))
+        except Exception:
+            return customer_id
+
+    @app.get("/mock/charging/customers/{customer_id}/events", tags=["mock-hutch"])
+    def mock_charging_events(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import events_for_customer, session_scope
+        from clarity.schemas.common import EventSource
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                rows = events_for_customer(session, cid, source="charging")
+        except Exception:
+            account = get_clarity().world.account(cid)
+            rows = []
+            if account:
+                for event in account.records.get(EventSource.CHARGING, []):
+                    rows.append(
+                        {
+                            "event_id": event.event_id,
+                            "source": event.source.value,
+                            "event_type": event.event_type.value,
+                            "occurred_at": event.occurred_at.isoformat(),
+                            "amount_lkr": str(event.amount_lkr) if event.amount_lkr else None,
+                            "attributes": dict(event.attributes),
+                        }
+                    )
+        return {"customer_id": cid, "events": rows}
+
+    @app.get("/mock/payments/customers/{customer_id}", tags=["mock-hutch"])
+    def mock_payments(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import (
+            account_for_customer,
+            events_for_customer,
+            session_scope,
+        )
+        from clarity.schemas.common import EventSource
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                account = account_for_customer(session, cid)
+                events = events_for_customer(session, cid, source="payments")
+        except Exception:
+            acct = get_clarity().world.account(cid)
+            account = {"balance_lkr": str(acct.balance_lkr)} if acct else None
+            events = [
+                {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type.value,
+                    "occurred_at": event.occurred_at.isoformat(),
+                    "amount_lkr": str(event.amount_lkr) if event.amount_lkr else None,
+                    "attributes": dict(event.attributes),
+                }
+                for event in (acct.records.get(EventSource.PAYMENTS, []) if acct else [])
+            ]
+        return {"customer_id": cid, "account": account, "events": events}
+
+    @app.get("/mock/usage/customers/{customer_id}", tags=["mock-hutch"])
+    def mock_usage(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import events_for_customer, session_scope
+        from clarity.schemas.common import EventSource
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                events = events_for_customer(session, cid, source="usage_fup")
+        except Exception:
+            acct = get_clarity().world.account(cid)
+            events = [
+                {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type.value,
+                    "occurred_at": event.occurred_at.isoformat(),
+                    "attributes": dict(event.attributes),
+                }
+                for event in (acct.records.get(EventSource.USAGE_FUP, []) if acct else [])
+            ]
+        return {"customer_id": cid, "events": events}
+
+    @app.get("/mock/vas/customers/{customer_id}/subscriptions", tags=["mock-hutch"])
+    def mock_vas(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import session_scope, subscriptions_for_customer
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                rows = subscriptions_for_customer(session, cid)
+        except Exception:
+            acct = get_clarity().world.account(cid)
+            rows = [
+                {
+                    "subscription_id": sub.subscription_id,
+                    "merchant_id": sub.merchant_id,
+                    "merchant_name": sub.merchant_name,
+                    "product": sub.product,
+                    "price_lkr": str(sub.price_lkr),
+                    "active": sub.active,
+                }
+                for sub in (acct.subscriptions if acct else [])
+            ]
+        return {"customer_id": cid, "subscriptions": rows}
+
+    @app.get("/mock/consent/customers/{customer_id}", tags=["mock-hutch"])
+    def mock_consent(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import consent_for_customer, session_scope
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                rows = consent_for_customer(session, cid)
+        except Exception:
+            acct = get_clarity().world.account(cid)
+            rows = []
+            for sub in acct.subscriptions if acct else []:
+                rows.append(
+                    {
+                        "subscription_id": sub.subscription_id,
+                        "kind": "otp" if sub.otp_verified_at else "absent",
+                        "verified_at": (
+                            sub.otp_verified_at.isoformat() if sub.otp_verified_at else None
+                        ),
+                    }
+                )
+        return {"customer_id": cid, "consent": rows}
+
+    @app.get("/mock/network/status/{customer_id}", tags=["mock-hutch"])
+    def mock_network(customer_id: str) -> dict[str, Any]:
+        from clarity.integrations.store import network_for, session_scope
+
+        cid = _mock_customer_id(customer_id)
+        try:
+            with session_scope() as session:
+                status = network_for(session, cid)
+        except Exception:
+            acct = get_clarity().world.account(cid)
+            net = (acct.safeguards.get("_network") if acct else None) or {
+                "status": "clear",
+                "text": "No outage in your area.",
+                "eta": None,
+            }
+            status = net
+        return {"customer_id": cid, **status}
+
+    @app.get("/mock/catalogue/packages", tags=["mock-hutch"])
+    def mock_catalogue() -> dict[str, Any]:
+        return {"packages": CATALOGUE}
 
     @app.get(
         "/v1/demo/ops",
@@ -877,13 +1177,24 @@ def _register_routes(app: FastAPI) -> None:
         tags=["demo"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
-    def demo_autopsy() -> dict[str, Any]:
-        """Run Complaint Autopsy on a fixed set of synthetic complaints."""
+    def demo_autopsy(clarity: ClarityDep) -> dict[str, Any]:
+        """Run Complaint Autopsy on generated historical complaints when seeded."""
         from clarity.ai.autopsy import Complaint, ComplaintAutopsy
+
+        texts: list[str] = list(_DEMO_COMPLAINTS)
+        try:
+            from clarity.integrations.store import list_complaints, session_scope
+
+            with session_scope() as session:
+                stored = list_complaints(session)
+            if stored:
+                texts = [row["text"] for row in stored]
+        except Exception:
+            texts = list(_DEMO_COMPLAINTS)
 
         complaints = [
             Complaint(complaint_id=f"c-{index}", text=text)
-            for index, text in enumerate(_DEMO_COMPLAINTS, start=1)
+            for index, text in enumerate(texts, start=1)
         ]
         report = ComplaintAutopsy().run(complaints)
         return {
@@ -1058,8 +1369,17 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
                 }
             )
         if days_left <= 5:
+            alerts.append({"kind": "pack", "text": f"This pack expires in {days_left} day(s)."})
+
+    for sub in account.subscriptions:
+        if sub.active and sub.otp_verified_at is None:
             alerts.append(
-                {"kind": "pack", "text": f"This pack expires in {days_left} day(s)."}
+                {
+                    "kind": "charge",
+                    "text": (
+                        f"{sub.merchant_name} charged LKR {sub.price_lkr} without a confirmation."
+                    ),
+                }
             )
 
     open_case = next(
@@ -1074,16 +1394,39 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     if decision is not None and decision.outcome.value in {"STAFF_APPROVAL", "HANDOFF"}:
         alerts.append({"kind": "case", "text": "A case is waiting for Hutch staff."})
 
+    shown = _MONEY_TYPES | {
+        EventType.DATA_SESSION,
+        EventType.FUP_CAP_REACHED,
+        EventType.THROTTLE_APPLIED,
+        EventType.USAGE_THRESHOLD_CROSSED,
+    }
     activity = []
     for event in events:
-        if event.event_type not in _MONEY_TYPES:
+        if event.event_type not in shown:
             continue
         attrs = event.attributes
+        reason = str(attrs.get("reason") or "")
+        if event.event_type is EventType.PACK_PURCHASED:
+            bucket = "packages"
+        elif event.event_type in {
+            EventType.DATA_SESSION,
+            EventType.FUP_CAP_REACHED,
+            EventType.THROTTLE_APPLIED,
+            EventType.USAGE_THRESHOLD_CROSSED,
+        }:
+            bucket = "usage"
+        elif event.event_type is EventType.PAYMENT_CAPTURED or reason == "reload":
+            bucket = "reloads"
+        elif event.event_type is EventType.BALANCE_CREDITED:
+            bucket = "refunds"
+        else:
+            bucket = "charges"
         activity.append(
             {
                 "id": event.event_id,
                 "at": event.occurred_at.isoformat(),
                 "type": event.event_type.value,
+                "bucket": bucket,
                 "amount_lkr": str(event.amount_lkr) if event.amount_lkr is not None else None,
                 "source": event.source.value,
                 "detail": str(
@@ -1095,20 +1438,36 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
                 ),
                 "balance_before": attrs.get("balance_before"),
                 "balance_after": attrs.get("balance_after"),
+                "status": str(attrs.get("status") or "posted"),
+                "subscription_id": attrs.get("subscription_id"),
             }
         )
 
     return {
+        "name": account.name,
+        "msisdn": account.msisdn,
         "masked": account.masked,
         "language": account.language.value,
+        "notify": account.notify,
+        "large_text": account.large_text,
+        "onboarded": account.onboarded,
         "balance_lkr": str(account.balance_lkr),
         "pack": pack_view,
         "subscriptions": [
             {
+                "id": sub.subscription_id,
                 "name": sub.product,
                 "merchant": sub.merchant_name,
+                "merchant_id": sub.merchant_id,
                 "price_lkr": str(sub.price_lkr),
                 "active": sub.active,
+                "consent": sub.otp_verified_at is not None,
+                "renewal": "Renews until you cancel.",
+                "charges": [
+                    row["amount_lkr"]
+                    for row in activity
+                    if row.get("subscription_id") == sub.subscription_id and row["amount_lkr"]
+                ],
             }
             for sub in account.subscriptions
         ],
@@ -1116,6 +1475,117 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
         "alerts": alerts,
         "open_case_id": open_case.case_id if open_case else None,
         "open_case_state": open_case.case.state.value if open_case else None,
+    }
+
+
+def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
+    """One payload for Home, Usage, Clarity, Activity and More."""
+    home = _home_for(clarity, ref)
+    account = clarity.world.account(ref)
+    if account is None:
+        raise HTTPException(status_code=404, detail="no such account")
+
+    cases: list[dict[str, Any]] = []
+    mine: set[str] = set()
+    for record in clarity.cases.all_cases():
+        if record.subscriber_ref != ref:
+            continue
+        mine.add(record.case_id)
+        cases.append(
+            {
+                "case_id": record.case_id,
+                "case_no": record.case.case_no,
+                "state": record.case.state.value,
+                "opened_at": record.case.opened_at.isoformat(),
+                "outcome": record.decision.outcome.value if record.decision else None,
+                "headline": (
+                    record.decision.rationale[0]
+                    if record.decision and record.decision.rationale
+                    else None
+                ),
+                "open": record.case.state is not CaseState.CLOSED,
+            }
+        )
+    cases.sort(key=lambda row: str(row["opened_at"]), reverse=True)
+
+    receipts: list[dict[str, Any]] = []
+    ref_hash = hash_payload(ref)
+    for issued in reversed(clarity.receipts.issued()):
+        belongs = issued.case_id in mine or (issued.payload.subject.subscriber_ref_hash == ref_hash)
+        if not belongs:
+            continue
+        corrected = issued.payload.total_corrected_lkr
+        receipts.append(
+            {
+                "receipt_id": issued.receipt_id,
+                "issued_at": issued.payload.issued_at.isoformat(),
+                "corrected_lkr": str(corrected) if corrected is not None else "0.00",
+                "summary": issued.payload.what_happened.summary,
+                "case_id": issued.case_id,
+            }
+        )
+
+    notifications = [{"kind": alert["kind"], "text": alert["text"]} for alert in home["alerts"]]
+    for case in cases[:5]:
+        notifications.append(
+            {
+                "kind": "case",
+                "text": f"Case {case['case_no']} is {str(case['state']).replace('_', ' ')}.",
+            }
+        )
+    for row in receipts[:5]:
+        notifications.append(
+            {
+                "kind": "receipt",
+                "text": f"Trust Receipt {row['receipt_id']} is ready.",
+                "receipt_id": row["receipt_id"],
+            }
+        )
+
+    family = []
+    for number in account.family:
+        other = clarity.world.account_by_msisdn(number)
+        if other is None:
+            continue
+        active = next((pack for pack in other.packs if pack.active), None)
+        family.append(
+            {
+                "name": other.name,
+                "masked": other.masked,
+                "msisdn": other.msisdn,
+                "pack": active.name if active else None,
+                "safeguards": [key for key in other.safeguards if not str(key).startswith("_")],
+            }
+        )
+
+    network = account.safeguards.get("_network")
+    if not isinstance(network, dict):
+        network = {"status": "clear", "text": "No outage in your area.", "eta": None}
+
+    return {
+        **home,
+        "catalogue": CATALOGUE,
+        "safeguards": {
+            key: (value.get("value") if isinstance(value, dict) else value)
+            for key, value in account.safeguards.items()
+            if not str(key).startswith("_")
+        },
+        "blocked_merchants": sorted(account.blocked_merchants),
+        "cases": cases,
+        "receipts": receipts,
+        "notifications": notifications,
+        "network": {
+            "status": network.get("status") or "clear",
+            "text": network.get("text") or "No outage in your area.",
+            "eta": network.get("eta"),
+        },
+        "family": family,
+        "usage": {
+            "data_used_gb": home["pack"]["used_gb"] if home["pack"] else None,
+            "data_cap_gb": home["pack"]["data_gb"] if home["pack"] else None,
+            "voice_minutes": 0,
+            "sms": 0,
+        },
     }
 
 

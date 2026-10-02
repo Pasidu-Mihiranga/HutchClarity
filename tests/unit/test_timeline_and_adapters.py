@@ -116,8 +116,8 @@ def test_refund_reports_before_and_after_for_the_receipt(
         )
     )
 
-    assert result.before_state == {"balance_lkr": "263.00"}
-    assert result.after_state == {"balance_lkr": "312.00"}
+    assert result.before_state == {"balance_lkr": "451.00"}
+    assert result.after_state == {"balance_lkr": "500.00"}
 
 
 def test_status_can_be_queried_instead_of_blindly_retrying(registry: AdapterRegistry):

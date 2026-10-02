@@ -6,6 +6,35 @@ One platform for HUTCH customers and staff — website, Hutch app, WhatsApp, SMS
 
 > **Hackathon prototype.** All HUTCH systems are **mocked** and all data is **synthetic**. No HUTCH APIs, credentials or production data are used. See [Known limitations](#known-limitations).
 
+## Modular monolith (HutchClarity-new alignment)
+
+The repo now carries a second code tree that matches the enterprise modular
+monolith plan (see `HutchClarity-new/` and `docs/adr/`). Business code never
+reads the runtime profile; only the composition root binds drivers.
+
+| Profile | Command | What runs |
+|---|---|---|
+| `lite` | `make up-lite` | Postgres (pgvector) only; in-process bus, cache, blob |
+| `full` | `make up-full` | Postgres + Kafka, Valkey, SeaweedFS, Keycloak, OPA, OTel/Grafana LGTM, Langfuse stub |
+
+```bash
+make up-lite    # daily inner loop
+make dev-new    # uvicorn clarity.entrypoints.api:app on :8000 (PYTHONPATH=backend/src)
+make test-g1    # backend/tests (in-memory)
+```
+
+| Path | Role |
+|---|---|
+| `backend/src/clarity/kernel` | L0 shared types (`Money`, `Clock`, events) |
+| `backend/src/clarity/integration` | L1 ports + drivers (`drivers/mock`, Kafka/Valkey/Seaweed stubs) |
+| `backend/src/clarity/platform` | L2 outbox, jobs, authz, idempotency, DB helpers |
+| `backend/src/clarity/modules/*` | L4 domain modules (schema-per-module) |
+| `backend/src/clarity/entrypoints` | `api.py`, `worker.py`, `stream.py` |
+| `deploy/` | OPA, Helm, OpenTofu reference stubs |
+| `docs/walkthroughs/WT-01-vas-journey.md` | VAS demo walkthrough |
+
+Agent rules: [`AGENTS.md`](AGENTS.md). Baseline version: see `VERSION`.
+
 ## Core principle: rules decide, the LLM explains
 
 | Deterministic (decides, moves money) | AI (language only) |

@@ -1,0 +1,39 @@
+flowchart TB
+  subgraph Users
+    C[Customers web / app / WhatsApp / SMS]
+    S[Staff Clarity Desk]
+    P[Public receipt verify]
+    AG[AI agents via MCP]
+  end
+
+  subgraph Clarity["Hutch Clarity modular monolith"]
+    API[clarity-api]
+    WK[clarity-worker]
+    ST[clarity-stream]
+    MCP[clarity-mcp]
+  end
+
+  subgraph Layers["backend/src/clarity"]
+    L4[L4 modules: case timeline detection decision actions receipts ...]
+    L2[L2 platform: outbox jobs idempotency authz vault]
+    L1[L1 integration ports + drivers]
+    L0[L0 kernel]
+  end
+
+  subgraph Infra["Profiles"]
+    LITE[lite: Postgres + in-process drivers]
+    FULL[full: Kafka Valkey SeaweedFS Keycloak OPA OTel Langfuse]
+  end
+
+  SIM[hutch-sim / mocks]
+
+  C --> API
+  S --> API
+  P --> API
+  AG --> MCP --> API
+  API --> L4 --> L2 --> L1 --> L0
+  API --> WK
+  API --> ST
+  L1 --> LITE
+  L1 --> FULL
+  L1 --> SIM

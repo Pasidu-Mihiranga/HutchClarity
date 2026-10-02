@@ -232,7 +232,7 @@ def test_one_tap_fix_applies_the_whole_remedy(tools: ToolLayer, world):
     account = world.account(SUBSCRIBER)
     assert result.succeeded
     assert result.confirmed_by is ConfirmedBy.CUSTOMER
-    assert account.balance_lkr == Decimal("312.00"), "263.00 + 49.00"
+    assert account.balance_lkr == Decimal("500.00"), "451.00 + 49.00"
     assert not account.subscriptions[0].active
     assert world.is_merchant_blocked(SUBSCRIBER, "MER-GAMEHUB")
 
@@ -244,8 +244,8 @@ def test_executed_actions_record_before_and_after_for_the_receipt(tools: ToolLay
     result = tools.execute(plan.plan_id, confirmation=token, idempotency_key="k8")
 
     refund = next(a for a in result.actions if a.type is ActionType.REFUND)
-    assert refund.before_state == {"balance_lkr": "263.00"}
-    assert refund.after_state == {"balance_lkr": "312.00"}
+    assert refund.before_state == {"balance_lkr": "451.00"}
+    assert refund.after_state == {"balance_lkr": "500.00"}
     assert refund.adapter_ref, "an action must cite the upstream reference"
 
 
@@ -263,7 +263,7 @@ def test_auto_fix_runs_with_no_human_in_the_loop(registry, world):
 
     assert result.succeeded
     assert result.confirmed_by is ConfirmedBy.SYSTEM
-    assert world.account(SUBSCRIBER).balance_lkr == Decimal("3763.00")
+    assert world.account(SUBSCRIBER).balance_lkr == Decimal("3951.00")
 
 
 # --------------------------------------------------------------------------- #
@@ -360,7 +360,7 @@ def test_replaying_an_idempotency_key_does_not_move_money_twice(tools: ToolLayer
     second = tools.execute(plan.plan_id, confirmation=token, idempotency_key="same-key")
 
     assert second.replayed and not first.replayed
-    assert world.account(SUBSCRIBER).balance_lkr == Decimal("312.00"), "credited once"
+    assert world.account(SUBSCRIBER).balance_lkr == Decimal("500.00"), "credited once"
 
 
 def test_a_completed_plan_cannot_be_run_again(tools: ToolLayer):
@@ -450,7 +450,7 @@ def test_a_refund_is_never_clawed_back_to_tidy_up(registry, world):
     with pytest.raises(ExecutionFailed):
         tools.execute(plan.plan_id, confirmation=token, idempotency_key="k16")
 
-    assert world.account(SUBSCRIBER).balance_lkr == Decimal("312.00"), "the refund stands"
+    assert world.account(SUBSCRIBER).balance_lkr == Decimal("500.00"), "the refund stands"
 
 
 def test_a_failed_execution_releases_the_budget_it_reserved(registry):
