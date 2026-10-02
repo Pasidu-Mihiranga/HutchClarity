@@ -3,51 +3,53 @@
 | Field | Value |
 |---|---|
 | Audience | developers / demo presenters / judges |
-| Journey | Customer asks "Why was I charged?" for a VAS renewal without recent OTP |
-| Status | draft |
+| Journey | Customer asks (chip or free-form) about an unexpected VAS charge; Clarity Investigation Card → confirm modal → refund → Trust Receipt |
+| Status | verified |
 | Last verified | 2026-10-02 |
 
 ## 1. What you will see
 
-Dilani opens Why? after a GameHub daily subscription renews for LKR 49 without
-a fresh OTP. Clarity shows the cause with evidence, proposes cancel + credit
-(or refund by rule), she confirms in one tap, and receives a signed Trust
-Receipt.
+Dilani opens **Clarity** (full-page chat). Welcome shows large suggestion
+cards; a personalized chip may already show **Why was LKR 49 deducted?**
+(or she types free-form / Sinhala). Clarity shows a short progress trail,
+then an **Investigation Card** with evidence, finding, and **Refund & Disable**.
+Confirm opens a consequence modal. After confirm she gets **Success** plus an
+in-thread **Trust Receipt** card and follow-up chips (prevent / support).
 
 ## 2. Prerequisites
 
 ```bash
-make up-lite
-make seed          # if wired against DATABASE_URL
-make dev-new       # modular monolith API, or `make dev` for legacy UI
+make dev       # legacy self-care UI + API (demo path)
+# optional modular brain:
+# make up-lite && make dev-new
 ```
 
-Demo subscriber (synthetic): MSISDN `0771234567` / scenario VAS silent renewal.
+Demo subscriber (synthetic): MSISDN `0771234567` (Dilani) / VAS silent renewal.
 
 ## 3. Steps
 
 | # | You do | UI / channel | API call | Module(s) | What to check |
 |---|---|---|---|---|---|
-| 1 | Open customer Why? | web `/` | `POST /v1/cases` | case, conversation | case created for Dilani |
-| 2 | Evaluate | Why? screen | `POST /v1/cases/{id}/evaluate` | timeline, detection, decision | cause `vas_silent_renewal`, evidence listed |
-| 3 | Propose fix | Confirm CTA | `POST /v1/actions/propose` (idempotency key) | actions | proposal pending |
-| 4 | Confirm | One tap | `POST /v1/actions/confirm` + execute | actions | action completed; no LLM authority |
-| 5 | Receipt | Receipt page | `GET` receipt / verify | receipts | Ed25519 verify OK |
+| 1 | Sign in as Dilani, open Clarity | immersive chat | `GET /v1/me/app` | iam, customer | Welcome + suggestion cards via `POST /v1/conversation/suggestions` |
+| 2 | Tap card **or** type "Why was Rs 49 deducted?" / Sinhala | Clarity chat | `POST /v1/conversation/turn` | conversation | Intent `UNEXPECTED_CHARGE` or `BALANCE_*`, route `account`; thinking + progress steps |
+| 3 | Wait for Investigation Card | transcript | `POST /v1/cases` + `.../evaluate` | case, detection, decision | Evidence checklist + finding + Refund & Disable CTA |
+| 4 | Confirm in modal | Confirm Disable modal | proposals + confirm / auto-fix | actions | Money moved only by tool layer after Confirm |
+| 5 | View Trust Receipt | Success + TrustReceipt cards | receipt verify | receipts | Ed25519 verify OK; follow-ups shown; New chat resets welcome |
 
 ## 4. Under the hood
 
-- Detectors: `vas_silent_renewal` (and related VAS rules).
-- Outbox event: `action.completed` → receipts consumer.
-- MCP path (optional): `propose_action` with Bearer + `idempotency_key` only;
-  never execute.
+- Suggestions are **shortcuts**, not FAQ answers; free-form uses the same turn → evaluate path.
+- Detectors: VAS silent renewal / no-consent family.
+- Follow-ups re-enter `ask()` with chat intent + prior `facts` (`case_id`, `product`, `amount_lkr`).
+- Chat history is demo-scale `localStorage` only (New chat / History in the header).
 
 ## 5. Variations and failure paths
 
-- Missing OTP evidence → handoff, not auto-credit.
-- Budget exhausted → 429 / desk queue.
-- LLM disabled → CX template explanation still works.
+- Missing OTP evidence → handoff / EXPLAIN_ONLY, not auto-credit.
+- Knowledge questions (eSIM) → KnowledgeAnswer card, no money path.
+- "Talk to support" → HumanHandoffCard.
 
 ## 6. Troubleshooting
 
-- Empty world: run seed / `POST /v1/demo/reset` on the legacy app.
-- Auth on MCP: send `Authorization: Bearer dev-token`.
+- Empty cards: hard-refresh; suggestions fall back to defaults if the API errors.
+- Empty world: `POST /v1/demo/reset` on the legacy app or re-seed.

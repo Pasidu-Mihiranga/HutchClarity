@@ -978,15 +978,65 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/clarity/route", tags=["knowledge"])
     def clarity_route(body: dict[str, Any]) -> dict[str, Any]:
-        """Server intent: account vs knowledge vs both."""
+        """Server intent: account vs knowledge vs both (legacy) + chat taxonomy."""
+        from clarity.core.conversation import handle_turn
         from clarity.integrations.store.knowledge import classify_intent
 
         question = str(body.get("question") or "")
-        intent = classify_intent(question)
+        legacy = classify_intent(question)
         articles: list[dict[str, Any]] = []
-        if intent in {"knowledge", "both"}:
+        if legacy in {"knowledge", "both"}:
             articles = knowledge_search(question).get("articles") or []
-        return {"question": question, "intent": intent, "articles": articles}
+        turn = handle_turn(question, language_hint=str(body.get("language") or "") or None)
+        return {
+            "question": question,
+            "intent": turn.intake.route if turn.intake.route != "handoff" else legacy,
+            "articles": articles,
+            "turn": turn.to_dict(),
+            "client_intent": turn.intake.client_intent,
+            "chat_intent": turn.intake.intent,
+        }
+
+    @app.post("/v1/conversation/turn", tags=["conversation"])
+    def conversation_turn(body: dict[str, Any]) -> dict[str, Any]:
+        from clarity.core.conversation import handle_turn
+
+        text = str(body.get("text") or "").strip()
+        if not text:
+            raise HTTPException(status_code=422, detail="text is required")
+        result = handle_turn(
+            text,
+            case_id=body.get("case_id"),
+            facts=body.get("facts") if isinstance(body.get("facts"), dict) else {},
+            language_hint=body.get("language"),
+            intent_override=body.get("intent"),
+        )
+        payload = result.to_dict()
+        # Attach knowledge articles when route needs them.
+        if result.intake.route in {"knowledge", "both"}:
+            payload["articles"] = knowledge_search(text).get("articles") or []
+        return {"turn": payload}
+
+    @app.post("/v1/conversation/suggestions", tags=["conversation"])
+    def conversation_suggestions(body: dict[str, Any]) -> dict[str, Any]:
+        from clarity.core.conversation import suggest_for_snapshot
+
+        snapshot = body.get("snapshot") if isinstance(body.get("snapshot"), dict) else {}
+        language = str(body.get("language") or "en")
+        limit = int(body.get("limit") or 6)
+        return suggest_for_snapshot(snapshot, language=language, limit=limit)
+
+    @app.get("/v1/conversation/suggestions", tags=["conversation"])
+    def conversation_suggestions_get(
+        language: str = "en",
+        limit: int = 6,
+    ) -> dict[str, Any]:
+        """Suggestions from the caller's session world when authenticated; else defaults."""
+        from clarity.core.conversation import suggest_for_snapshot
+
+        snapshot: dict[str, Any] = {}
+        # Optional auth: if customer token present, enrich from me/app shape later.
+        return suggest_for_snapshot(snapshot, language=language, limit=min(max(limit, 1), 10))
 
     def _mock_customer_id(customer_id: str) -> str:
         """Accept MSISDN or subscriber_ref for mock Hutch facades."""

@@ -4,39 +4,42 @@
 |---|---|
 | Kind | module |
 | Layer | L4 |
-| Deployable(s) | clarity-api / clarity-worker / clarity-stream |
-| Work package | phased |
+| Deployable(s) | clarity-api (also mirrored in legacy `src/clarity` for demo) |
+| Work package | D1 / chat UX |
 | Owner | @clarity |
-| Status | in-progress |
+| Status | built |
 | Postgres schema | `conversation` |
 
 ## 1. Purpose
-Intake extract (keyword+structure), language ID (si/ta/en), handoff check, compose reply from templates. LLM via ai-gateway later.
+Customer chat brain: unified intent taxonomy, context-aware suggestion chips,
+template replies, handoff detection, and follow-up chip catalogues. Does **not**
+move money; account routes continue into case evaluate / tool layer.
 
 ## 2. Public interface (`public.py` facade)
 | Method | Input | Output | Errors | Notes |
 |---|---|---|---|---|
-| `handle_turn` | text, case_id?, facts?, language_hint? | `TurnResult` | - | Full turn |
-| `extract_intake` | text | `IntakeResult` | - | Keyword extract |
-| `detect_language` | text | `si`/`ta`/`en` | - | Heuristic |
-| `check_handoff` | intake | handoff dict | - | - |
-| `compose_reply` | intake, facts? | str | - | Templates only |
+| `extract_intake` | text | IntakeResult | — | en/si/ta keywords |
+| `handle_turn` | text, optional intent | TurnResult | — | route + follow_ups |
+| `suggest_for_snapshot` | me/app snapshot | suggestions + more_topics | — | 4–6 chips |
 
 ## 3. HTTP endpoints
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/v1/conversation/turn` | Intake → handoff → reply |
+| Method & path | Permission | Idempotent? | Contract |
+|---|---|---|---|
+| `POST /v1/conversation/turn` | public/customer | yes | turn |
+| `POST /v1/conversation/suggestions` | public/customer | yes | chips |
+| `GET /v1/conversation/suggestions` | public | yes | chips |
 
 ## 4. Events
 None yet.
 
 ## 5. Data owned
-None yet (stateless turn handler).
+None (stateless).
 
 ## 6. Permissions declared
-None yet.
+None yet (deny-by-default still applies on money paths downstream).
 
 ## 7. Config keys declared
-| Key | Default | Description |
+| Key | Default | Notes |
 |---|---|---|
-| `conversation.handoff.confidence_floor` | `0.4` | Clarify below this score |
+| `conversation.handoff.confidence_floor` | 0.4 | clarify below |
+| `conversation.suggestions.limit` | 6 | max primary chips |

@@ -5,6 +5,8 @@ All notable changes to Hutch Clarity are recorded here. Format: [Keep a Changelo
 ## [Unreleased]
 
 ### Added
+- Kodee-style immersive Clarity chat on the legacy self-care UI (`clarity-chat.js` / `clarity-chat.css`): welcome suggestion cards, topic browser, investigation progress, confirm modal, in-thread Trust Receipt, and localStorage chat history.
+- Conversation turn accepts prior `facts` (`product`, `amount_lkr`, `case_id`, `chat_intent`) so follow-ups like "Can you stop it?" keep the discussed service.
 - Enterprise plan v1.1, including chapters 17 (build blueprint), 18 (tech stack and AI) and 19 (policy change management).
 - Runtime profiles (`lite`, `full`, `prod`) and local database and secrets workflow (ADR-0014, plan v1.2).
 - Commit rules (single author, no attribution, short bullet bodies) and no-em-dash rule.

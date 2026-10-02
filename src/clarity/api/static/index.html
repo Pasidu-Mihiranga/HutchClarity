@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hutch</title>
 <link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/clarity-chat.css">
 </head>
 <body class="customer no-nav no-compose">
 
@@ -29,7 +30,7 @@
 <form class="composer-dock hidden" id="composerForm" autocomplete="off">
   <div class="composer">
     <button class="mic-btn" id="mic" type="button" aria-label="Speak">Mic</button>
-    <input id="composerInput" type="text" placeholder="">
+    <textarea id="composerInput" rows="1" placeholder="" enterkeyhint="send"></textarea>
     <button type="submit" aria-label="Send">↑</button>
   </div>
 </form>
@@ -60,6 +61,7 @@
 </nav>
 
 <script src="/static/app.js"></script>
+<script src="/static/clarity-chat.js"></script>
 <script src="/static/customer.js"></script>
 </body>
 </html>

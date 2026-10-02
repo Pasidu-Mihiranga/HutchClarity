@@ -53,7 +53,7 @@ const I18N = {
     terms: 'Terms', privacy: 'Privacy', support: 'Support', signOut: 'Sign out',
     whatHelp: 'What can I help you with?',
     mic: 'Speak', listening: 'Listening…', micMissing: 'Voice input is not available in this browser.',
-    composerPh: 'Ask about a charge',
+    composerPh: 'Ask anything…',
     checking: 'Checking your account…',
     canDo: 'What we can do', confirm: 'Confirm', apply: 'Apply the correction',
     getReceipt: 'Get a receipt of this check', nothing: 'Nothing else matched.',
@@ -73,6 +73,93 @@ const I18N = {
     qMissing: "Why didn't my reload arrive?",
     qEsim: 'How do I convert to eSIM?',
     qActivate: 'How do I activate a pack?',
+    qFup: 'Why has my speed reduced?',
+    qPackIssue: "Why isn't my package working?",
+    qPackMissing: "I paid but didn't receive my data",
+    qRecommend: 'Which package is best for me?',
+    qExpiry: 'What happens when my package expires?',
+    qVasList: 'What subscriptions are active?',
+    qNetwork: 'Is there a network problem?',
+    qRefund: 'What happened to my refund?',
+    qCase: "What's happening with my case?",
+    qPrevent: 'How can I prevent unexpected charges?',
+    chatGreeting: 'Hi {name}, how can Clarity help?',
+    chatSubtitle: 'Ask me anything about your Hutch account.',
+    suggestedForYou: 'Suggested for you',
+    seeMoreTopics: 'See more topics',
+    seeFewerTopics: 'Show fewer',
+    recentChat: 'Recent',
+    foundReason: 'I found the reason',
+    whatIChecked: 'What I checked',
+    clarityFinding: 'Clarity finding',
+    recommendedFix: 'Recommended fix',
+    viewEvidence: 'View evidence',
+    talkSupport: 'Talk to Support',
+    resolvedTitle: 'Resolved',
+    viewReceipt: 'View Trust Receipt',
+    askAnything: 'Ask anything…',
+    askClarityAnything: 'Ask Clarity anything...',
+    confidenceLabel: '{n}% confidence',
+    clarityBrand: 'Clarity',
+    claritySubtitle: 'Hutch AI Assistant',
+    chatHi: 'Hi {name}',
+    howHelpToday: 'How can I help you today?',
+    forYou: 'For you',
+    newChat: 'New chat',
+    chatHistory: 'History',
+    browseTopics: 'Browse topics',
+    catMoney: 'Money & Balance',
+    catPacks: 'Packages & Data',
+    catReloads: 'Reloads',
+    catSubs: 'Subscriptions',
+    catNetwork: 'Network',
+    catEsim: 'SIM & eSIM',
+    catProtect: 'Account Protection',
+    catSupport: 'Support',
+    progUnderstand: 'Understanding your question',
+    progCharges: 'Checking recent charges',
+    progSubs: 'Checking subscriptions',
+    progConsent: 'Checking consent records',
+    lookingActivity: 'Looking at your recent activity…',
+    refundDisable: 'Refund & Disable',
+    confirmDisableTitle: 'Disable {product}?',
+    confirmBulletStop: 'Stops the subscription from renewing',
+    confirmBulletNoCharge: 'No further daily charges',
+    confirmBulletRefund: 'Refunds the disputed amount to your balance',
+    thisSubscription: 'this subscription',
+    refundedAmount: 'Refunded LKR {amount} to your balance',
+    subscriptionDisabled: 'Subscription disabled',
+    newBalance: 'New balance: LKR {amount}',
+    trustReceipt: 'Trust Receipt',
+    verified: 'Verified',
+    sentToSpecialist: 'Sent to a specialist',
+    viewCase: 'View case',
+    needMoreHelp: 'Need more help?',
+    couldNotConfirm: 'Could not confirm',
+    dataRemaining: 'Data remaining',
+    fupActive: 'Fair use cap is active',
+    fupOk: 'Within fair use',
+    viewUsageDetails: 'View usage details',
+    checkNetwork: 'Check network status',
+    reportIssue: 'Report an issue',
+    accountOk: 'Account status looks normal',
+    packOk: 'Pack is active',
+    checkLocalSignal: 'Local signal may be weak',
+    networkLikely: 'This looks like a coverage issue rather than a billing problem.',
+    fuDisable: 'Disable this service',
+    fuSubs: 'Show other subscriptions',
+    fuPrevent: 'Prevent this happening again',
+    fuSupport: 'Talk to support',
+    fuFup: 'Check my FUP',
+    fuUsage: 'Show remaining data',
+    fuBuy: 'Buy another package',
+    fuNetwork: 'Check network status',
+    fuCompare: 'Compare packages',
+    fuDetails: 'Show full details',
+    fuActivate: 'Activate package',
+    evidenceOk: 'Record found',
+    evidenceWarn: 'Valid consent not found',
+    evidenceMissing: 'Evidence incomplete',
     human: "I'd rather speak to a person",
     intentNone: 'We checked your account for that, and it is not what we found.',
     intentSlow: 'Your data is not slowed by a fair-use cap right now.',
@@ -186,6 +273,93 @@ const I18N = {
     qMissing: 'මගේ රීලෝඩ් නොආවේ ඇයි?',
     qEsim: 'eSIM එකට මාරු වෙන්නේ කොහොමද?',
     qActivate: 'පැකේජයක් සක්‍රිය කරන්නේ කොහොමද?',
+    qFup: 'මගේ වේගය අඩු වුණේ ඇයි?',
+    qPackIssue: 'මගේ පැකේජය වැඩ නොකරන්නේ ඇයි?',
+    qPackMissing: 'ගෙව්වත් දත්ත ලැබුණේ නැහැ',
+    qRecommend: 'මට හොඳම පැකේජය කුමක්ද?',
+    qExpiry: 'පැකේජය කල් ඉකුත් වුණාම මොකද වෙන්නේ?',
+    qVasList: 'සක්‍රීය දායකත්ව මොනවාද?',
+    qNetwork: 'ජාල ගැටලුවක් තිබේද?',
+    qRefund: 'මගේ ආපසු ගෙවීමට මොකද වුණේ?',
+    qCase: 'මගේ සිද්ධියේ තත්වය කුමක්ද?',
+    qPrevent: 'අනපේක්ෂිත අයකිරීම් වළක්වන්නේ කොහොමද?',
+    chatGreeting: 'ආයුබෝවන් {name}, Clarity උදව් කරන්නේ කෙසේද?',
+    chatSubtitle: 'ඔබේ Hutch ගිණුම ගැන ඕනෑම දෙයක් අසන්න.',
+    suggestedForYou: 'ඔබට යෝජිත',
+    seeMoreTopics: 'තවත් මාතෘකා',
+    seeFewerTopics: 'අඩුවෙන් පෙන්වන්න',
+    recentChat: 'මෑත',
+    foundReason: 'හේතුව හමු වුණා',
+    whatIChecked: 'මම පරීක්ෂා කළේ',
+    clarityFinding: 'Clarity සොයාගැනීම',
+    recommendedFix: 'නිර්දේශිත නිවැරදි කිරීම',
+    viewEvidence: 'සාක්ෂි බලන්න',
+    talkSupport: 'සහාය සමඟ කතා කරන්න',
+    resolvedTitle: 'විසඳුණා',
+    viewReceipt: 'Trust Receipt බලන්න',
+    askAnything: 'ඕනෑම දෙයක් අසන්න…',
+    askClarityAnything: 'Clarity ගෙන් ඕනෑම දෙයක් අසන්න...',
+    confidenceLabel: 'විශ්වාසය {n}%',
+    clarityBrand: 'Clarity',
+    claritySubtitle: 'Hutch AI සහායක',
+    chatHi: 'ආයුබෝවන් {name}',
+    howHelpToday: 'අද මම උදව් කරන්නේ කෙසේද?',
+    forYou: 'ඔබට',
+    newChat: 'නව කතාබස්',
+    chatHistory: 'ඉතිහාසය',
+    browseTopics: 'මාතෘකා බලන්න',
+    catMoney: 'මුදල් සහ ශේෂය',
+    catPacks: 'පැකේජ සහ දත්ත',
+    catReloads: 'රීලෝඩ්',
+    catSubs: 'දායකත්ව',
+    catNetwork: 'ජාලය',
+    catEsim: 'SIM සහ eSIM',
+    catProtect: 'ගිණුම් ආරක්ෂාව',
+    catSupport: 'සහාය',
+    progUnderstand: 'ඔබේ ප්‍රශ්නය තේරුම් ගනිමින්',
+    progCharges: 'මෑත ගාස්තු පරීක්ෂා කරමින්',
+    progSubs: 'දායකත්ව පරීක්ෂා කරමින්',
+    progConsent: 'අනුමති වාර්තා පරීක්ෂා කරමින්',
+    lookingActivity: 'මෑත ක්‍රියාකාරකම් බලමින්…',
+    refundDisable: 'ආපසු ගෙවීම සහ අක්‍රිය කරන්න',
+    confirmDisableTitle: '{product} අක්‍රිය කරන්නද?',
+    confirmBulletStop: 'දායකත්වය අලුත් වීම නවත්වයි',
+    confirmBulletNoCharge: 'තවත් දෛනික ගාස්තු නැත',
+    confirmBulletRefund: 'විවාදිත මුදල ශේෂයට ආපසු දෙයි',
+    thisSubscription: 'මෙම දායකත්වය',
+    refundedAmount: 'රු. {amount} ශේෂයට ආපසු දුන්නා',
+    subscriptionDisabled: 'දායකත්වය අක්‍රිය කළා',
+    newBalance: 'නව ශේෂය: රු. {amount}',
+    trustReceipt: 'Trust Receipt',
+    verified: 'තහවුරු විය',
+    sentToSpecialist: 'විශේෂඥයෙකුට යැව්වා',
+    viewCase: 'සිද්ධිය බලන්න',
+    needMoreHelp: 'තවත් උදව් අවශ්‍යද?',
+    couldNotConfirm: 'තහවුරු කළ නොහැකි විය',
+    dataRemaining: 'ඉතිරි දත්ත',
+    fupActive: 'සාධාරණ භාවිත සීමාව සක්‍රියයි',
+    fupOk: 'සාධාරණ භාවිතය තුළ',
+    viewUsageDetails: 'භාවිත විස්තර බලන්න',
+    checkNetwork: 'ජාල තත්වය පරීක්ෂා කරන්න',
+    reportIssue: 'ගැටලුවක් වාර්තා කරන්න',
+    accountOk: 'ගිණුම් තත්වය සාමාන්‍යයි',
+    packOk: 'පැකේජය සක්‍රියයි',
+    checkLocalSignal: 'දේශීය සංඥාව දුර්වල විය හැක',
+    networkLikely: 'මෙය ගාස්තු ගැටලුවකට වඩා ආවරණ ගැටලුවක් ලෙස පෙනේ.',
+    fuDisable: 'මෙම සේවාව අක්‍රිය කරන්න',
+    fuSubs: 'වෙනත් දායකත්ව පෙන්වන්න',
+    fuPrevent: 'නැවත සිදු නොවීමට',
+    fuSupport: 'සහාය සමඟ කතා කරන්න',
+    fuFup: 'FUP පරීක්ෂා කරන්න',
+    fuUsage: 'ඉතිරි දත්ත පෙන්වන්න',
+    fuBuy: 'තවත් පැකේජයක් මිලදී ගන්න',
+    fuNetwork: 'ජාල තත්වය පරීක්ෂා කරන්න',
+    fuCompare: 'පැකේජ සසඳන්න',
+    fuDetails: 'සම්පූර්ණ විස්තර',
+    fuActivate: 'පැකේජය සක්‍රිය කරන්න',
+    evidenceOk: 'වාර්තාව හමු විය',
+    evidenceWarn: 'වලංගු අනුමතියක් නැත',
+    evidenceMissing: 'සාක්ෂි අසම්පූර්ණයි',
     human: 'මම කෙනෙකුට කතා කිරීමට කැමතියි',
     intentNone: 'අපි ඒ සඳහා ඔබේ ගිණුම පරීක්ෂා කළා. එය අපට හමු වූ දේ නොවේ.',
     intentSlow: 'සාධාරණ භාවිත සීමාව නිසා ඔබේ දත්ත මන්දගාමී නැත.',
@@ -299,6 +473,93 @@ const I18N = {
     qMissing: 'என் ரீலோட் ஏன் வரவில்லை?',
     qEsim: 'eSIM-க்கு எப்படி மாறுவது?',
     qActivate: 'பேக்கை எப்படி செயல்படுத்துவது?',
+    qFup: 'என் வேகம் ஏன் குறைந்தது?',
+    qPackIssue: 'என் பேக் ஏன் வேலை செய்யவில்லை?',
+    qPackMissing: 'பணம் செலுத்தினும் தரவு வரவில்லை',
+    qRecommend: 'எனக்கு சிறந்த பேக் எது?',
+    qExpiry: 'பேக் காலாவதியாகும்போது என்ன ஆகும்?',
+    qVasList: 'எந்த சந்தாக்கள் செயலில் உள்ளன?',
+    qNetwork: 'நெட்வொர்க் பிரச்சனையா?',
+    qRefund: 'என் திரும்பப்பணத்திற்கு என்ன ஆனது?',
+    qCase: 'என் வழக்கின் நிலை என்ன?',
+    qPrevent: 'எதிர்பாராத கட்டணங்களை எப்படித் தடுப்பது?',
+    chatGreeting: 'வணக்கம் {name}, Clarity எப்படி உதவட்டும்?',
+    chatSubtitle: 'உங்கள் Hutch கணக்கு பற்றி எதையும் கேளுங்கள்.',
+    suggestedForYou: 'உங்களுக்கான பரிந்துரைகள்',
+    seeMoreTopics: 'மேலும் தலைப்புகள்',
+    seeFewerTopics: 'குறைவாகக் காட்டு',
+    recentChat: 'சமீபத்தியவை',
+    foundReason: 'காரணம் கிடைத்தது',
+    whatIChecked: 'நான் சரிபார்த்தவை',
+    clarityFinding: 'Clarity கண்டுபிடிப்பு',
+    recommendedFix: 'பரிந்துரைக்கப்பட்ட தீர்வு',
+    viewEvidence: 'ஆதாரத்தைப் பார்',
+    talkSupport: 'ஆதரவிடம் பேசு',
+    resolvedTitle: 'தீர்க்கப்பட்டது',
+    viewReceipt: 'Trust Receipt பார்',
+    askAnything: 'எதையும் கேளுங்கள்…',
+    askClarityAnything: 'Clarity இடம் எதையும் கேளுங்கள்...',
+    confidenceLabel: 'நம்பிக்கை {n}%',
+    clarityBrand: 'Clarity',
+    claritySubtitle: 'Hutch AI உதவியாளர்',
+    chatHi: 'வணக்கம் {name}',
+    howHelpToday: 'இன்று நான் எப்படி உதவட்டும்?',
+    forYou: 'உங்களுக்கு',
+    newChat: 'புதிய அரட்டை',
+    chatHistory: 'வரலாறு',
+    browseTopics: 'தலைப்புகளைப் பார்',
+    catMoney: 'பணம் & இருப்பு',
+    catPacks: 'பேக்குகள் & தரவு',
+    catReloads: 'ரீலோட்கள்',
+    catSubs: 'சந்தாக்கள்',
+    catNetwork: 'நெட்வொர்க்',
+    catEsim: 'SIM & eSIM',
+    catProtect: 'கணக்குப் பாதுகாப்பு',
+    catSupport: 'ஆதரவு',
+    progUnderstand: 'உங்கள் கேள்வியைப் புரிந்துகொள்கிறேன்',
+    progCharges: 'சமீபத்திய கட்டணங்களைச் சரிபார்க்கிறேன்',
+    progSubs: 'சந்தாக்களைச் சரிபார்க்கிறேன்',
+    progConsent: 'ஒப்புதல் பதிவுகளைச் சரிபார்க்கிறேன்',
+    lookingActivity: 'சமீபத்திய செயல்பாட்டைப் பார்க்கிறேன்…',
+    refundDisable: 'திரும்பப்பணம் & நிறுத்து',
+    confirmDisableTitle: '{product} நிறுத்தவா?',
+    confirmBulletStop: 'சந்தா புதுப்பிப்பை நிறுத்தும்',
+    confirmBulletNoCharge: 'மேலும் தினசரி கட்டணம் இல்லை',
+    confirmBulletRefund: 'விவாதத் தொகையை இருப்பிற்குத் திருப்பும்',
+    thisSubscription: 'இந்த சந்தா',
+    refundedAmount: 'ரூ. {amount} இருப்பிற்குத் திருப்பப்பட்டது',
+    subscriptionDisabled: 'சந்தா நிறுத்தப்பட்டது',
+    newBalance: 'புதிய இருப்பு: ரூ. {amount}',
+    trustReceipt: 'Trust Receipt',
+    verified: 'சரிபார்க்கப்பட்டது',
+    sentToSpecialist: 'நிபுணரிடம் அனுப்பப்பட்டது',
+    viewCase: 'வழக்கைப் பார்',
+    needMoreHelp: 'மேலும் உதவி வேண்டுமா?',
+    couldNotConfirm: 'உறுதிப்படுத்த முடியவில்லை',
+    dataRemaining: 'மீதமுள்ள தரவு',
+    fupActive: 'நியாய பயன்பாட்டு வரம்பு செயலில்',
+    fupOk: 'நியாய பயன்பாட்டிற்குள்',
+    viewUsageDetails: 'பயன்பாட்டு விவரம்',
+    checkNetwork: 'நெட்வொர்க் நிலையைச் சரிபார்',
+    reportIssue: 'சிக்கலைப் புகாரளி',
+    accountOk: 'கணக்கு நிலை சாதாரணம்',
+    packOk: 'பேக் செயலில் உள்ளது',
+    checkLocalSignal: 'உள்ளூர் சமிக்ஞை பலவீனமாக இருக்கலாம்',
+    networkLikely: 'இது கட்டணச் சிக்கலை விட கவரேஜ் சிக்கல் போல் தெரிகிறது.',
+    fuDisable: 'இந்த சேவையை நிறுத்து',
+    fuSubs: 'பிற சந்தாக்களைக் காட்டு',
+    fuPrevent: 'மீண்டும் நடக்காமல் தடு',
+    fuSupport: 'ஆதரவிடம் பேசு',
+    fuFup: 'FUP சரிபார்',
+    fuUsage: 'மீதமுள்ள தரவைக் காட்டு',
+    fuBuy: 'மற்றொரு பேக் வாங்கு',
+    fuNetwork: 'நெட்வொர்க் நிலையைச் சரிபார்',
+    fuCompare: 'பேக்குகளை ஒப்பிடு',
+    fuDetails: 'முழு விவரம்',
+    fuActivate: 'பேக்கைச் செயல்படுத்து',
+    evidenceOk: 'பதிவு கிடைத்தது',
+    evidenceWarn: 'செல்லுபடியாகும் ஒப்புதல் இல்லை',
+    evidenceMissing: 'ஆதாரம் முழுமையற்றது',
     human: 'ஒரு நபரிடம் பேச விரும்புகிறேன்',
     intentNone: 'அதற்காக உங்கள் கணக்கைச் சரிபார்த்தோம். அது நாங்கள் கண்டது அல்ல.',
     intentSlow: 'நியாய பயன்பாட்டு வரம்பால் உங்கள் தரவு மெதுவாக இல்லை.',
@@ -367,9 +628,21 @@ let clarityState = {
   planId: null,
   chargeRef: null,
   receipt: null,
+  receiptDoc: null,
+  receiptCheck: null,
   question: '',
   intent: null,
-  articles: null
+  chatIntent: null,
+  articles: null,
+  followUps: [],
+  messages: [],
+  suggestions: [],
+  moreTopics: [],
+  showMore: false,
+  turnReply: null,
+  threadId: null,
+  contextProduct: null,
+  contextAmount: null
 };
 let recognition = null;
 
@@ -382,14 +655,26 @@ const INTENT_EMPTY = {
 };
 
 const SUGGESTED = [
-  { key: 'qBalance', intent: 'balance' },
-  { key: 'qSub', intent: 'sub' },
-  { key: 'qTwice', intent: 'twice' },
-  { key: 'qSlow', intent: 'slow' },
-  { key: 'qMissing', intent: 'missing' },
-  { key: 'qEsim', intent: 'knowledge' },
-  { key: 'qActivate', intent: 'knowledge' }
+  { key: 'qBalance', intent: 'balance', chatIntent: 'BALANCE_DEDUCTION_QUERY' },
+  { key: 'qSub', intent: 'sub', chatIntent: 'UNEXPECTED_CHARGE' },
+  { key: 'qTwice', intent: 'twice', chatIntent: 'DOUBLE_CHARGE' },
+  { key: 'qSlow', intent: 'slow', chatIntent: 'DATA_SLOW' },
+  { key: 'qMissing', intent: 'missing', chatIntent: 'RELOAD_MISSING' },
+  { key: 'qEsim', intent: 'knowledge', chatIntent: 'ESIM_HELP' },
+  { key: 'qActivate', intent: 'knowledge', chatIntent: 'PACK_ACTIVATE' },
+  { key: 'qFup', intent: 'slow', chatIntent: 'FUP_QUERY' },
+  { key: 'qRecommend', intent: 'knowledge', chatIntent: 'PACK_RECOMMEND' },
+  { key: 'qPrevent', intent: 'knowledge', chatIntent: 'PREVENT_CHARGES' },
+  { key: 'qVasList', intent: 'sub', chatIntent: 'VAS_SUBSCRIPTIONS' },
+  { key: 'qNetwork', intent: 'knowledge', chatIntent: 'NETWORK_STATUS' },
+  { key: 'qExpiry', intent: 'balance', chatIntent: 'PACK_EXPIRY' },
+  { key: 'qPackIssue', intent: 'slow', chatIntent: 'PACK_NOT_WORKING' },
+  { key: 'qPackMissing', intent: 'missing', chatIntent: 'PACK_MISSING' },
+  { key: 'qRefund', intent: 'balance', chatIntent: 'REFUND_STATUS' },
+  { key: 'qCase', intent: 'balance', chatIntent: 'CASE_STATUS' }
 ];
+
+const DEFAULT_CHIP_KEYS = ['qBalance', 'qSlow', 'qRecommend', 'qEsim', 'qSub', 'qPrevent'];
 
 function activityRows() {
   return (appState && appState.activity) || [];
@@ -458,6 +743,7 @@ function go(next) {
 
 function paintChrome() {
   const authed = signedIn() && appState && appState.onboarded && !['login', 'otp', 'onboard'].includes(view);
+  const immersive = authed && view === 'clarity';
   document.getElementById('brandSub').textContent = authed ? `${appState.name} · ${appState.masked}` : T('selfCare');
   document.getElementById('langSlot').innerHTML = ['en', 'si', 'ta'].map(code => {
     const label = code === 'en' ? 'English' : code === 'si' ? 'සිංහල' : 'தமிழ்';
@@ -465,11 +751,15 @@ function paintChrome() {
   }).join('');
   document.getElementById('langSlot').className = 'seg';
   const nav = document.getElementById('tabbar');
-  nav.classList.toggle('hidden', !authed);
-  document.body.classList.toggle('no-nav', !authed);
-  const compose = authed && view === 'clarity';
+  nav.classList.toggle('hidden', !authed || immersive);
+  document.body.classList.toggle('no-nav', !authed || immersive);
+  document.body.classList.toggle('clarity-immersive', immersive);
+  if (!immersive && window.ClarityChat) ClarityChat.unmount();
+  const compose = immersive;
   document.getElementById('composerForm').classList.toggle('hidden', !compose);
   document.body.classList.toggle('no-compose', !compose);
+  const composerInput = document.getElementById('composerInput');
+  if (composerInput) composerInput.placeholder = immersive ? T('askClarityAnything') : T('askAnything');
   const tab = ['packages', 'package', 'subs', 'safeguards', 'receipts', 'receipt', 'cases', 'notifications', 'network', 'family', 'profile', 'terms', 'privacy'].includes(view)
     ? 'more' : (view === 'txn' ? 'activity' : view);
   nav.querySelectorAll('button').forEach(button => {
@@ -477,8 +767,6 @@ function paintChrome() {
     const label = button.querySelector('.tab-label');
     if (label) label.textContent = T(button.dataset.go);
   });
-  const input = document.getElementById('composerInput');
-  input.placeholder = T('composerPh');
   document.getElementById('mic').textContent = T('mic');
   document.getElementById('mic').setAttribute('aria-label', T('mic'));
   document.documentElement.lang = htmlLang();
@@ -489,6 +777,10 @@ function render() {
   window.scrollTo(0, 0);
   paintChrome();
   const screen = document.getElementById('screen');
+  if (view === 'clarity' && window.ClarityChat) {
+    ClarityChat.mount();
+    return;
+  }
   const pages = {
     login: loginHtml, otp: otpHtml, onboard: onboardHtml, home: homeHtml, usage: usageHtml,
     clarity: clarityHtml, activity: activityHtml, txn: txnHtml, more: moreHtml, reload: reloadHtml,
@@ -497,7 +789,6 @@ function render() {
     network: networkHtml, family: familyHtml, profile: profileHtml, terms: termsHtml, privacy: privacyHtml
   };
   screen.innerHTML = (pages[view] || loginHtml)();
-  if (view === 'clarity' && clarityState.mode) renderAnswer();
   if (view === 'receipt' && clarityState.receiptDoc) paintReceipt(clarityState.receiptDoc, clarityState.receiptCheck);
 }
 
@@ -624,17 +915,176 @@ function windowed(rows) {
 }
 
 function clarityHtml() {
-  const can = accountIntents();
-  return `<h1 class="greeting">${esc(T('whatHelp'))}</h1>
-    <div class="option-list">
-      ${SUGGESTED.map(item => `<button type="button" class="menu-row ${can[item.intent] ? 'can-answer' : ''}" data-act="ask" data-q="${item.key}">
-        <span>${esc(T(item.key))}</span>
-        ${can[item.intent] ? `<span class="sub">${esc(T('onThisNumber'))}</span>` : ''}
-      </button>`).join('')}
-      <button type="button" class="menu-row" data-act="ask-human">${esc(T('human'))}</button>
-    </div>
-    <section id="answer"></section>
-    <section id="receipt"></section>`;
+  return `<div class="clarity-chat-kodee"></div>`;
+}
+
+async function loadSuggestions() {
+  const box = document.getElementById('suggestionChips');
+  const more = document.getElementById('moreTopics');
+  if (!box) return;
+  try {
+    const payload = await api('/v1/conversation/suggestions', 'POST', {
+      language: lang,
+      limit: 6,
+      snapshot: {
+        pack: appState.pack || {},
+        subscriptions: appState.subscriptions || [],
+        activity: appState.activity || [],
+        open_case: (appState.cases || []).some(c => c.status === 'open')
+      }
+    });
+    clarityState.suggestions = payload.suggestions || [];
+    clarityState.moreTopics = payload.more_topics || [];
+  } catch (_error) {
+    clarityState.suggestions = DEFAULT_CHIP_KEYS.map(key => {
+      const item = SUGGESTED.find(s => s.key === key);
+      return { id: key, i18n_key: key, intent: item ? item.chatIntent : 'BALANCE_DEDUCTION_QUERY', reason: 'default' };
+    });
+    clarityState.moreTopics = SUGGESTED.filter(s => !DEFAULT_CHIP_KEYS.includes(s.key)).map(s => ({
+      id: s.key, i18n_key: s.key, intent: s.chatIntent
+    }));
+  }
+  paintSuggestionChips();
+}
+
+function paintSuggestionChips() {
+  const box = document.getElementById('suggestionChips');
+  const more = document.getElementById('moreTopics');
+  const btn = document.getElementById('moreTopicsBtn');
+  if (!box) return;
+  const chipHtml = (chip) => {
+    const label = chip.label || T(chip.i18n_key) || chip.id;
+    const qKey = chip.i18n_key || chip.id;
+    return `<button type="button" class="chip suggestion-chip" data-act="ask" data-q="${esc(qKey)}" data-intent="${esc(chip.intent || '')}">${esc(label)}</button>`;
+  };
+  box.innerHTML = (clarityState.suggestions || []).map(chipHtml).join('');
+  if (more) {
+    more.innerHTML = (clarityState.moreTopics || []).map(chipHtml).join('');
+    more.classList.toggle('hidden', !clarityState.showMore);
+  }
+  if (btn) btn.textContent = T(clarityState.showMore ? 'seeFewerTopics' : 'seeMoreTopics');
+}
+
+function paintTranscript() {
+  const box = document.getElementById('chatTranscript');
+  if (!box) return;
+  if (!clarityState.messages.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = clarityState.messages.map((msg, index) => {
+    if (msg.role === 'user') {
+      return `<div class="chat-bubble user"><span class="chat-who">${esc(T('you'))}</span><p>${esc(msg.text)}</p></div>`;
+    }
+    return `<div class="chat-bubble clarity" data-msg="${index}">${msg.html}</div>`;
+  }).join('');
+  const last = box.lastElementChild;
+  if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // Rebind offer buttons inside last result card
+  const offer = box.querySelector('#offer');
+  if (offer && clarityState.decision) fillOffer(clarityState.decision);
+}
+
+function evidenceChecklist(decision, timeline) {
+  const sources = (timeline && timeline.sources) || [];
+  const items = [];
+  if (sources.length) {
+    for (const src of sources.slice(0, 5)) {
+      const name = src.source || src.name || 'source';
+      const status = (src.completeness || src.status || '').toLowerCase();
+      if (status === 'missing' || status === 'partial') {
+        items.push({ ok: false, warn: status === 'partial', text: `${name}: ${T('evidenceMissing')}` });
+      } else {
+        items.push({ ok: true, warn: false, text: `${name}: ${T('evidenceOk')}` });
+      }
+    }
+  }
+  const rule = decision && (decision.matched_rule || decision.rule_id);
+  if (rule && /VAS|CONSENT|NO_CONSENT/i.test(String(rule))) {
+    items.push({ ok: false, warn: true, text: T('evidenceWarn') });
+  }
+  if (!items.length) {
+    items.push({ ok: true, warn: false, text: T('evidenceOk') });
+  }
+  return `<ul class="evidence-list">${items.map(item => {
+    const mark = item.ok && !item.warn ? '✓' : '⚠';
+    const cls = item.ok && !item.warn ? 'ok' : 'warn';
+    return `<li class="${cls}"><span>${mark}</span> ${esc(item.text)}</li>`;
+  }).join('')}</ul>`;
+}
+
+function followUpHtml(followUps) {
+  if (!followUps || !followUps.length) return '';
+  return `<div class="chip-row follow-ups">${followUps.map(fu => {
+    const label = T(fu.i18n_key) || fu.id;
+    return `<button type="button" class="chip" data-act="follow" data-intent="${esc(fu.intent || '')}" data-key="${esc(fu.i18n_key || '')}">${esc(label)}</button>`;
+  }).join('')}</div>`;
+}
+
+function buildResultCardHtml() {
+  const d = clarityState.decision || {};
+  const timeline = clarityState.timeline || { events: [], sources: [] };
+  const outcome = d.outcome || 'HANDOFF';
+  const finding = d.explanation || T('unknown');
+  const amount = d.amount_lkr ? lkr(d.amount_lkr) : '';
+  const conf = d.confidence != null ? T('confidenceLabel').replace('{n}', Math.round(Number(d.confidence) * (Number(d.confidence) <= 1 ? 100 : 1))) : '';
+  const caseLabel = clarityState.caseId ? T('caseNo').replace('{id}', clarityState.caseId) : '';
+  const detail = answerMode === 'detailed' ? `
+    <ul class="why-list">${(d.rationale || []).map(line => `<li>${esc(line)}</li>`).join('')}</ul>
+    <h3>${esc(T('find'))}</h3>
+    <ul class="why-list">${(timeline.events || []).map(event => `<li>${esc(describe(event))} · ${esc(fmtDate(event.occurred_at))}</li>`).join('')}</ul>
+  ` : '';
+  return `<div class="result-card">
+    <p class="card-title">${esc(T('foundReason'))}</p>
+    ${amount ? `<p class="card-amount"><strong>${esc(amount)}</strong></p>` : ''}
+    <span class="verdict v-${esc(outcome)}">${esc(String(outcome).replace(/_/g, ' '))}</span>
+    <h3>${esc(T('whatIChecked'))}</h3>
+    ${evidenceChecklist(d, timeline)}
+    <h3>${esc(T('clarityFinding'))}</h3>
+    <p>${esc(clarityState.mode === 'human' ? T('humanFinding') : finding)}</p>
+    ${conf ? `<p class="sub">${esc(conf)}</p>` : ''}
+    ${caseLabel ? `<p class="sub">${esc(caseLabel)}</p>` : ''}
+    ${detail}
+    <button type="button" class="btn-ghost" data-act="toggle-evidence">${esc(T('viewEvidence'))}</button>
+    <div id="evidencePanel" class="hidden">${detail || `<ul class="why-list">${(timeline.events || []).slice(0, 8).map(event => `<li>${esc(describe(event))} · ${esc(fmtDate(event.occurred_at))}</li>`).join('')}</ul>`}</div>
+    <h3>${esc(T('recommendedFix'))}</h3>
+    <div id="offer"></div>
+    ${followUpHtml(clarityState.followUps)}
+  </div>`;
+}
+
+function buildKnowledgeCardHtml() {
+  const articles = clarityState.articles || [];
+  const top = articles[0];
+  return `<div class="result-card">
+    <p class="card-title">${esc('HOW TO')}</p>
+    <h3>${esc(top ? top.title : T('unknown'))}</h3>
+    <p>${esc(top ? top.body : T('intentHint'))}</p>
+    ${followUpHtml(clarityState.followUps)}
+  </div>`;
+}
+
+function buildMissCardHtml() {
+  const finding = T(INTENT_EMPTY[clarityState.intent] || 'intentNone');
+  return `<div class="result-card">
+    <span class="verdict v-EXPLAIN_ONLY">EXPLAIN ONLY</span>
+    <h3>${esc(finding)}</h3>
+    <p class="sub">${esc(T('intentHint'))}</p>
+    ${followUpHtml(clarityState.followUps)}
+  </div>`;
+}
+
+function buildCheckingHtml() {
+  return `<div class="result-card"><p class="sub">${esc(T('checking'))}</p><p class="sub">${esc(clarityState.turnReply || '')}</p></div>`;
+}
+
+function pushClarityMessage(html) {
+  clarityState.messages.push({ role: 'clarity', html });
+  paintTranscript();
+}
+
+function pushUserMessage(text) {
+  clarityState.messages.push({ role: 'user', text });
 }
 
 function activityHtml() {
@@ -899,17 +1349,26 @@ async function refresh() {
   render();
 }
 
-async function ask(questionKey, wantsHuman, chargeRef) {
+async function ask(questionKey, wantsHuman, chargeRef, opts) {
   if (!appState) return;
+  opts = opts || {};
   if (wantsHuman) {
     await askHuman();
     return;
   }
-  const typed = questionKey ? T(questionKey) : (clarityState.question || '');
-  const intent = intentForQuestion(questionKey, typed);
-  const can = accountIntents();
+  const suggested = questionKey ? SUGGESTED.find(item => item.key === questionKey) : null;
+  const intentOverride = opts.chatIntent || (suggested && suggested.chatIntent) || null;
+  const typed = questionKey
+    ? T(questionKey)
+    : (clarityState.question || (intentOverride ? String(intentOverride) : ''));
+  if (!typed) return;
+  view = 'clarity';
+  if (window.ClarityChat) {
+    ClarityChat.pushUser(typed);
+  } else {
+    pushUserMessage(typed);
+  }
   clarityState.question = typed;
-  clarityState.intent = intent;
   clarityState.chargeRef = chargeRef || null;
   clarityState.decision = null;
   clarityState.timeline = null;
@@ -918,67 +1377,149 @@ async function ask(questionKey, wantsHuman, chargeRef) {
   clarityState.receipt = null;
   clarityState.receiptDoc = null;
   clarityState.articles = null;
-  view = 'clarity';
-
-  try {
-    const routed = await api('/v1/clarity/route', 'POST', { question: typed });
-    if (routed.intent === 'knowledge' || intent === 'knowledge') {
-      clarityState.mode = 'knowledge';
-      clarityState.articles = routed.articles || [];
-      clarityState.intent = 'knowledge';
-      render();
-      renderAnswer();
-      return;
-    }
-    if (routed.intent === 'both') {
-      clarityState.articles = routed.articles || [];
-    }
-  } catch (_error) {
-    if (intent === 'knowledge') {
-      clarityState.mode = 'knowledge';
-      clarityState.articles = [];
-      render();
-      renderAnswer();
-      return;
-    }
+  clarityState.mode = 'checking';
+  clarityState.turnReply = null;
+  clarityState.followUps = [];
+  if (!clarityState.contextProduct) {
+    const sub = ((appState && appState.subscriptions) || []).find(item => item.active && !item.consent);
+    if (sub) clarityState.contextProduct = sub.name || sub.product || sub.merchant || null;
+  }
+  paintChrome();
+  if (window.ClarityChat) {
+    ClarityChat.setThinking(T('checking'));
+  } else {
+    render();
+    pushClarityMessage(buildCheckingHtml());
   }
 
-  if (!chargeRef && intent !== 'knowledge' && !can[intent]) {
-    clarityState.mode = 'miss';
-    render();
+  let clientIntent = intentForQuestion(questionKey, typed);
+  let route = 'account';
+  const priorFacts = window.ClarityChat ? ClarityChat.contextFacts() : {};
+  try {
+    const turned = await api('/v1/conversation/turn', 'POST', {
+      text: typed,
+      language: lang,
+      intent: intentOverride,
+      facts: priorFacts,
+      snapshot: {
+        pack: appState.pack || {},
+        subscriptions: appState.subscriptions || [],
+        activity: appState.activity || []
+      }
+    });
+    const turn = turned.turn || {};
+    const intake = turn.intake || {};
+    clarityState.turnReply = turn.reply || '';
+    clarityState.chatIntent = intake.intent || intentOverride;
+    clarityState.followUps = turn.follow_ups || [];
+    clientIntent = turn.client_intent || intake.client_intent || clientIntent;
+    route = turn.route || intake.route || route;
+    if (turn.articles) clarityState.articles = turn.articles;
+    clarityState.intent = clientIntent;
+    if (intake.slots && intake.slots.product) clarityState.contextProduct = intake.slots.product;
+    if (intake.slots && intake.slots.amount_lkr) clarityState.contextAmount = intake.slots.amount_lkr;
+  } catch (_error) {
+    clarityState.intent = clientIntent;
+  }
+
+  const can = accountIntents();
+
+  if (route === 'knowledge' || clientIntent === 'knowledge') {
+    if (!clarityState.articles) {
+      try {
+        const routed = await api('/v1/clarity/route', 'POST', { question: typed, language: lang });
+        clarityState.articles = routed.articles || [];
+      } catch (_e) {
+        clarityState.articles = [];
+      }
+    }
+    clarityState.mode = 'knowledge';
+    clarityState.intent = 'knowledge';
+    if (window.ClarityChat) {
+      ClarityChat.finishWithCard('knowledge');
+    } else {
+      clarityState.messages.pop();
+      pushClarityMessage(buildKnowledgeCardHtml());
+    }
     return;
   }
-  clarityState.mode = 'checking';
-  render();
+
+  if (route === 'handoff' || clientIntent === 'human') {
+    await askHuman();
+    return;
+  }
+
+  if (!chargeRef && clientIntent !== 'knowledge' && !can[clientIntent]) {
+    clarityState.mode = 'miss';
+    if (window.ClarityChat) {
+      ClarityChat.finishWithCard('miss');
+    } else {
+      clarityState.messages.pop();
+      pushClarityMessage(buildMissCardHtml());
+    }
+    return;
+  }
+
   try {
-    await evaluateCase(intent, chargeRef || chargeForIntent(intent), false);
-    clarityState.mode = 'result';
-    renderAnswer();
+    if (window.ClarityChat) {
+      ClarityChat.setThinking(T('lookingActivity'));
+      ClarityChat.setProgress(0);
+    }
+    await evaluateCase(clientIntent, chargeRef || chargeForIntent(clientIntent), false, true);
+    const d = clarityState.decision || {};
+    if (d.product) clarityState.contextProduct = d.product;
+    if (d.amount_lkr) clarityState.contextAmount = d.amount_lkr;
+    clarityState.mode = d.outcome === 'HANDOFF' ? 'human' : 'result';
+    if (window.ClarityChat) {
+      ClarityChat.finishWithCard(ClarityChat.pickResultKind(clarityState));
+    } else {
+      clarityState.messages.pop();
+      pushClarityMessage(buildResultCardHtml());
+      fillOffer(clarityState.decision || {});
+    }
   } catch (error) {
     showError(error);
   }
 }
 
 async function askHuman() {
-  clarityState.question = T('human');
+  const q = T('human');
+  if (!clarityState.messages.length || clarityState.messages[clarityState.messages.length - 1].text !== q) {
+    if (window.ClarityChat) ClarityChat.pushUser(q);
+    else pushUserMessage(q);
+  }
+  clarityState.question = q;
   clarityState.intent = 'human';
+  clarityState.chatIntent = 'HANDOFF';
   clarityState.chargeRef = null;
   clarityState.decision = null;
   clarityState.receipt = null;
   clarityState.receiptDoc = null;
   clarityState.mode = 'checking';
+  clarityState.followUps = [];
   view = 'clarity';
-  render();
+  paintChrome();
+  if (window.ClarityChat) ClarityChat.setThinking(T('checking'));
+  else {
+    render();
+    pushClarityMessage(buildCheckingHtml());
+  }
   try {
-    await evaluateCase('human', null, true);
+    await evaluateCase('human', null, true, true);
     clarityState.mode = 'human';
-    renderAnswer();
+    if (window.ClarityChat) ClarityChat.finishWithCard('handoff');
+    else {
+      clarityState.messages.pop();
+      pushClarityMessage(buildResultCardHtml());
+      fillOffer(clarityState.decision || {});
+    }
   } catch (error) {
     showError(error);
   }
 }
 
-async function evaluateCase(intent, chargeRef, wantsHuman) {
+async function evaluateCase(intent, chargeRef, wantsHuman, withProgress) {
+  if (withProgress && window.ClarityChat) ClarityChat.setProgress(1);
   const opened = await api('/v1/cases', 'POST', {
     msisdn: appState.msisdn,
     channel: 'app',
@@ -988,68 +1529,19 @@ async function evaluateCase(intent, chargeRef, wantsHuman) {
   });
   clarityState.caseId = opened.case_id;
   clarityState.chargeRef = chargeRef || null;
+  if (withProgress && window.ClarityChat) ClarityChat.setProgress(2);
   const [decision, timeline] = await Promise.all([
     api(`/v1/cases/${opened.case_id}/evaluate?human=${wantsHuman ? 'true' : 'false'}`, 'POST'),
     api(`/v1/cases/${opened.case_id}/timeline`)
   ]);
+  if (withProgress && window.ClarityChat) ClarityChat.setProgress(3);
   clarityState.decision = decision;
   clarityState.timeline = timeline;
   return decision;
 }
 
 function renderAnswer() {
-  const box = document.getElementById('answer');
-  if (!box) return;
-  const receipt = document.getElementById('receipt');
-  if (receipt) receipt.innerHTML = '';
-  if (clarityState.mode === 'checking') {
-    box.innerHTML = `<p class="sub">${esc(T('checking'))}</p>`;
-    return;
-  }
-  if (clarityState.mode === 'miss') {
-    const finding = T(INTENT_EMPTY[clarityState.intent] || 'intentNone');
-    box.innerHTML = `
-      <p class="sub">${esc(clarityState.question)}</p>
-      <span class="verdict v-EXPLAIN_ONLY">${esc('EXPLAIN ONLY')}</span>
-      <h2>${esc(finding)}</h2>
-      <p class="sub">${esc(T('intentHint'))}</p>
-      <div id="offer" class="btn-row">
-        <button class="btn-primary" type="button" data-act="ask" data-q="qBalance">${esc(T('clarityAsk'))}</button>
-      </div>`;
-    return;
-  }
-  if (clarityState.mode === 'knowledge') {
-    const articles = clarityState.articles || [];
-    const top = articles[0];
-    box.innerHTML = `
-      <p class="sub">${esc(clarityState.question)}</p>
-      <span class="verdict v-EXPLAIN_ONLY">${esc('HOW TO')}</span>
-      <h2>${esc(top ? top.title : T('unknown'))}</h2>
-      <p>${esc(top ? top.body : T('intentHint'))}</p>`;
-    return;
-  }
-  const d = clarityState.decision || {};
-  const timeline = clarityState.timeline || { events: [], sources: [] };
-  const outcome = d.outcome || 'HANDOFF';
-  const finding = d.explanation || T('unknown');
-  const caseLabel = clarityState.caseId ? T('caseNo').replace('{id}', clarityState.caseId) : '';
-  const knowledgeExtra = (clarityState.articles && clarityState.articles[0])
-    ? `<h3>${esc(clarityState.articles[0].title)}</h3><p class="sub">${esc(clarityState.articles[0].body)}</p>`
-    : '';
-  const detail = answerMode === 'detailed' && clarityState.mode === 'result' ? `
-    <ul class="why-list">${(d.rationale || []).map(line => `<li>${esc(line)}</li>`).join('')}</ul>
-    <h3>${esc(T('find'))}</h3>
-    <ul class="why-list">${(timeline.events || []).map(event => `<li>${esc(describe(event))} · ${esc(fmtDate(event.occurred_at))}</li>`).join('')}</ul>
-  ` : '';
-  box.innerHTML = `
-    <p class="sub">${esc(clarityState.question)}</p>
-    <span class="verdict v-${esc(outcome)}">${esc(String(outcome).replace(/_/g, ' '))}</span>
-    <h2>${esc(clarityState.mode === 'human' ? T('humanFinding') : finding)}</h2>
-    ${caseLabel ? `<p class="sub">${esc(caseLabel)}</p>` : ''}
-    ${knowledgeExtra}
-    ${detail}
-    <div id="offer"></div>`;
-  fillOffer(d);
+  paintTranscript();
 }
 
 function fillOffer(d) {
@@ -1098,6 +1590,25 @@ async function propose() {
   return plan;
 }
 
+async function proposeAndSend() {
+  try {
+    await propose();
+    clarityState.mode = 'human';
+    clarityState.followUps = [{ id: 'support', i18n_key: 'fuSupport', intent: 'HANDOFF' }];
+    appState = await api('/v1/me/app');
+    if (window.ClarityChat) {
+      ClarityChat.pushAi('handoff');
+      ClarityChat.remountBody();
+      ClarityChat.persistCurrentThread();
+    } else {
+      const offer = document.getElementById('offer');
+      if (offer) offer.innerHTML = `<p>${esc(T('sent'))}</p>`;
+    }
+  } catch (error) {
+    showError(error);
+  }
+}
+
 async function confirmFix(outcome) {
   const button = document.getElementById('go');
   if (button) { button.disabled = true; button.textContent = T('working'); }
@@ -1109,10 +1620,25 @@ async function confirmFix(outcome) {
     const full = await api(`/v1/receipts/${done.receipt_id}`);
     clarityState.receiptDoc = full;
     clarityState.receiptCheck = verified;
+    clarityState.mode = 'resolved';
+    clarityState.followUps = [
+      { id: 'prevent', i18n_key: 'fuPrevent', intent: 'PREVENT_CHARGES' },
+      { id: 'support', i18n_key: 'fuSupport', intent: 'HANDOFF' }
+    ];
     appState = await api('/v1/me/app');
-    const offer = document.getElementById('offer');
-    if (offer) offer.innerHTML = `<p>${esc(T('done'))}</p>`;
-    paintReceipt(full, verified);
+    if (window.ClarityChat) {
+      ClarityChat.showSuccessAndReceipt();
+    } else {
+      const offer = document.getElementById('offer');
+      if (offer) offer.innerHTML = `<p>${esc(T('done'))}</p>`;
+      pushClarityMessage(`<div class="result-card resolved">
+        <p class="card-title">✓ ${esc(T('resolvedTitle'))}</p>
+        <p>${esc(T('done'))}</p>
+        <button type="button" class="btn-primary" data-act="receipt" data-id="${esc(done.receipt_id)}">${esc(T('viewReceipt'))}</button>
+        ${followUpHtml(clarityState.followUps)}
+      </div>`);
+      paintReceipt(full, verified);
+    }
   } catch (error) {
     showError(error);
     if (button) { button.disabled = false; button.textContent = T('tryAgain'); }
@@ -1126,7 +1652,15 @@ async function explainReceipt() {
     const verified = await api(`/v1/cases/${clarityState.caseId}/receipt`, 'POST');
     const full = await api(`/v1/receipts/${verified.receipt_id}`);
     appState = await api('/v1/me/app');
-    paintReceipt(full, verified);
+    clarityState.receiptDoc = full;
+    clarityState.receiptCheck = verified;
+    if (window.ClarityChat && view === 'clarity') {
+      ClarityChat.pushAi('receipt');
+      ClarityChat.remountBody();
+      ClarityChat.persistCurrentThread();
+    } else {
+      paintReceipt(full, verified);
+    }
   } catch (error) {
     showError(error);
     if (button) button.disabled = false;
@@ -1213,6 +1747,10 @@ async function setLang(next) {
 }
 
 document.addEventListener('click', async (event) => {
+  if (window.ClarityChat && view === 'clarity' && ClarityChat.onClick(event)) {
+    event.preventDefault();
+    return;
+  }
   const langBtn = event.target.closest('[data-lang]');
   if (langBtn) {
     event.preventDefault();
@@ -1236,8 +1774,28 @@ document.addEventListener('click', async (event) => {
       return;
     }
     if (name === 'go') go(act.dataset.view);
-    if (name === 'ask') await ask(act.dataset.q, false, null);
+    if (name === 'ask') await ask(act.dataset.q, false, null, { chatIntent: act.dataset.intent || null });
     if (name === 'ask-human') await ask(null, true, null);
+    if (name === 'follow') {
+      const key = act.dataset.key;
+      const intent = act.dataset.intent;
+      if (intent === 'HANDOFF') {
+        await ask(null, true, null);
+      } else if (key && T(key) !== key) {
+        clarityState.question = T(key);
+        await ask(null, false, null, { chatIntent: intent || null });
+      } else {
+        await ask(null, false, null, { chatIntent: intent || null });
+      }
+    }
+    if (name === 'toggle-more') {
+      clarityState.showMore = !clarityState.showMore;
+      paintSuggestionChips();
+    }
+    if (name === 'toggle-evidence') {
+      const panel = document.getElementById('evidencePanel');
+      if (panel) panel.classList.toggle('hidden');
+    }
     if (name === 'ask-txn') {
       if (selectedTxn) clarityState.question = selectedTxn.detail || T('askAbout');
       await ask(null, false, selectedTxn && selectedTxn.id);
@@ -1326,6 +1884,36 @@ document.addEventListener('submit', async (event) => {
 });
 
 document.getElementById('mic').onclick = () => listen();
+
+document.getElementById('composerInput').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    document.getElementById('composerForm').requestSubmit();
+  }
+});
+
+if (window.ClarityChat) {
+  ClarityChat.init({
+    T,
+    esc,
+    api,
+    getLang: () => lang,
+    setLang,
+    getState: () => clarityState,
+    getApp: () => appState,
+    go,
+    ask,
+    confirmFix,
+    proposeAndSend,
+    explainReceipt,
+    openReceipt,
+    SUGGESTED,
+    INTENT_EMPTY,
+    fmtDate,
+    describe,
+    packLabel
+  });
+}
 
 window.addEventListener('popstate', () => {
   const next = (location.hash || '#login').slice(1);

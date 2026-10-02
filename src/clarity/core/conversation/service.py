@@ -6,9 +6,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from clarity.modules.conversation.domain.intent_routes import routing_payload
-from clarity.modules.conversation.domain.intents import Intent
-from clarity.modules.conversation.domain.suggestions import (
+from clarity.core.conversation.intent_routes import routing_payload
+from clarity.core.conversation.intents import Intent
+from clarity.core.conversation.suggestions import (
     build_suggestions,
     signals_from_snapshot,
 )
@@ -233,6 +233,7 @@ def handle_turn(
 ) -> TurnResult:
     facts = facts or {}
     intake = extract_intake(text)
+    # Prior turn context from the UI (product under discussion, amount, case).
     for key in ("product", "amount_lkr", "case_id", "chat_intent"):
         value = facts.get(key)
         if value is not None and key not in intake.slots:
@@ -245,6 +246,7 @@ def handle_turn(
         intake.needs_handoff = intent_override == Intent.HANDOFF.value
         intake.confidence = max(intake.confidence, 0.95)
     elif intake.confidence < 0.5 and facts.get("chat_intent") and facts.get("product"):
+        # Weak follow-ups like "Can you stop it?" keep the discussed service.
         prior = str(facts["chat_intent"])
         intake.intent = prior
         routing = routing_payload(prior)
