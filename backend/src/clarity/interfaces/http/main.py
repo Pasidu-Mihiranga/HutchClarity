@@ -77,10 +77,13 @@ from clarity.interfaces.http.schemas import (
 )
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
+from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.iam.public import OtpRefused, SimulatedInbox
 from clarity.platform.config.switches import Switch
+from clarity.platform.messaging.correlation import correlated
+from clarity.platform.observability import current_trace_id, span
 from clarity.platform.security.principal import Assurance, Role
 
 #: HTTP status per tool-layer refusal. Refusals are expected outcomes of a
@@ -110,6 +113,38 @@ def get_clarity() -> Clarity:
 ClarityDep = Annotated[Clarity, Depends(get_clarity)]
 
 
+#: The header a caller may send to join its own trace, and the one every
+#: response carries back so a support agent can quote it.
+CORRELATION_HEADER = "X-Correlation-Id"
+
+
+async def _trace_requests(request: Request, call_next: Any) -> Response:
+    """One span per request, and one correlation id for everything it causes.
+
+    The id comes from the caller when it sends one, so a trace can start in the
+    app or the channel gateway and continue here, and is returned on the
+    response so the id in a customer's support ticket is the id in the trace.
+    """
+    correlation_id = request.headers.get(CORRELATION_HEADER) or new_id("REQ")
+    with (
+        correlated(correlation_id),
+        span(
+            "http.request",
+            **{
+                "http.method": request.method,
+                "http.route": request.url.path,
+                "clarity.correlation_id": correlation_id,
+            },
+        ) as current,
+    ):
+        response: Response = await call_next(request)
+        current.set_attribute("http.status_code", response.status_code)
+        response.headers[CORRELATION_HEADER] = correlation_id
+        if trace_id := current_trace_id():
+            response.headers["X-Trace-Id"] = trace_id
+        return response
+
+
 def create_app(clarity: Clarity | None = None) -> FastAPI:
     if clarity is not None:
         _app_state["clarity"] = clarity
@@ -128,6 +163,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(_trace_requests)
     # The auth dependency reads the issuer from app state, so one process
     # always validates against the keys it minted.
     app.state.token_issuer = (clarity or get_clarity()).tokens

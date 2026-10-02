@@ -23,6 +23,7 @@ from clarity.modules.detection.engine import RuleEngine
 from clarity.modules.detection.pack import RulePack, load_packs
 from clarity.modules.timeline.builder import TimelineBuilder, TimelineRequest
 from clarity.platform.config.resolver import PolicyResolver
+from clarity.platform.observability import configure_tracing
 
 PACKS_DIR = Path(__file__).resolve().parents[2] / "rules" / "packs"
 POLICY_DIR = Path(__file__).resolve().parents[2] / "config" / "policy"
@@ -160,3 +161,9 @@ def clarity_container():
     from clarity.app.container import Clarity
 
     return Clarity(world=build_demo_world())
+
+
+# No exporter unless a test installs one: the console exporter would print a
+# JSON span for every operation in the suite. ``tests/unit/test_tracing.py``
+# attaches an in-memory exporter where spans are the thing under test.
+configure_tracing(exporter="none")

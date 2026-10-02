@@ -499,29 +499,44 @@ def test_the_default_profile_needs_no_infrastructure():
     assert Clarity(world=build_demo_world()).profile is Profile.DEMO
 
 
-def test_the_full_profile_loads_a_sql_backed_world(tmp_path, monkeypatch):
-    """FULL uses DATABASE_URL (SQLite file here) instead of raising."""
-    from clarity.app.container import Clarity, Profile
-    from clarity.integration.drivers.mock.store import reset_engine
+def test_the_full_profile_refuses_a_non_postgresql_database(tmp_path):
+    """FULL needs PostgreSQL for Clarity's own state (B05).
 
-    db = tmp_path / "full.db"
-    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db}")
-    reset_engine()
-    clarity = Clarity(profile=Profile.FULL)
-    assert clarity.profile is Profile.FULL
-    assert clarity.world.account_by_msisdn("+94771234567") is not None
-    reset_engine()
+    It used to accept a SQLite file, which loaded the simulated HUTCH world but
+    left Clarity's own state in memory. That looked like success and gave a
+    deployment two replicas could not share, so it is now refused with the
+    reason. The simulated world still runs on SQLite in the demo profile.
+    """
+    from clarity.app.container import Clarity, Profile
+    from clarity.app.settings import Settings, SettingsInvalid
+
+    settings = Settings(
+        CLARITY_PROFILE="full",
+        DATABASE_URL=f"sqlite+pysqlite:///{tmp_path / 'full.db'}",
+        _env_file=None,
+    )
+
+    with pytest.raises(SettingsInvalid, match="PostgreSQL"):
+        Clarity(profile=Profile.FULL, settings=settings)
 
 
 def test_only_the_composition_root_reads_the_profile():
-    """Business code that branches on the profile is how drivers drift apart."""
+    """Business code that branches on the profile is how drivers drift apart.
+
+    The composition root is ``clarity.app``: ``settings.py`` declares the
+    variable and ``container.py`` turns it into driver choices (B07). Anything
+    else naming it would be business code deciding its own wiring, which I20
+    forbids.
+    """
     import pathlib
 
     root = pathlib.Path(__import__("clarity").__file__).parent
+    composition_root = {"app/settings.py", "app/container.py"}
     offenders = [
-        path.relative_to(root)
+        str(path.relative_to(root))
         for path in root.rglob("*.py")
-        if "CLARITY_PROFILE" in path.read_text(encoding="utf-8") and path.name != "container.py"
+        if "CLARITY_PROFILE" in path.read_text(encoding="utf-8")
+        and str(path.relative_to(root)) not in composition_root
     ]
 
-    assert offenders == [], f"CLARITY_PROFILE read outside the container: {offenders}"
+    assert offenders == [], f"CLARITY_PROFILE read outside the composition root: {offenders}"
