@@ -1,131 +1,20 @@
-"""Event outbox and audit ledger tests (plan §18.4, §20.3)."""
+"""Audit ledger tests (plan section 20.3).
+
+The outbox, the relay and the consumer framework moved to
+``test_outbox_wiring.py`` when B04 split them apart, and per-subject ordering is
+covered for every bus driver by ``tests/contract/test_bus_parity.py``.
+"""
 
 from __future__ import annotations
 
 from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.messaging.envelope import Event, EventType
-from clarity.platform.messaging.outbox import Outbox
 
 from ..support.events import SAMPLES
 
 
 def an_event(type_: EventType = EventType.ACTION_COMPLETED, subject: str = "sub_a") -> Event:
     return Event.of(SAMPLES[type_], subject=subject)
-
-
-# --------------------------------------------------------------------------- #
-# Outbox
-# --------------------------------------------------------------------------- #
-
-
-def test_appending_publishes_nothing_until_the_relay_runs():
-    """The whole point of an outbox: the write happens first."""
-    outbox = Outbox()
-    outbox.append(an_event())
-
-    assert outbox.published == []
-    assert len(outbox.pending) == 1
-
-
-def test_relay_delivers_to_subscribers():
-    outbox = Outbox()
-    seen: list[Event] = []
-    outbox.subscribe(EventType.ACTION_COMPLETED, "receipts", seen.append)
-    outbox.append(an_event())
-
-    assert outbox.relay() == 1
-    assert len(seen) == 1
-
-
-def test_a_consumer_ignores_a_redelivered_event():
-    """At-least-once delivery must not issue two receipts for one action."""
-    outbox = Outbox()
-    seen: list[Event] = []
-    outbox.subscribe(EventType.ACTION_COMPLETED, "receipts", seen.append)
-    event = an_event()
-
-    outbox.append(event)
-    outbox.relay()
-    outbox.append(event)
-    outbox.relay()
-
-    assert len(seen) == 1, "the duplicate was ignored"
-    assert outbox.stats("receipts").duplicates == 1
-
-
-def test_a_failing_consumer_does_not_stop_the_others():
-    outbox = Outbox()
-    delivered: list[str] = []
-
-    def broken(_: Event) -> None:
-        raise RuntimeError("downstream is down")
-
-    outbox.subscribe(EventType.ACTION_COMPLETED, "broken", broken)
-    outbox.subscribe(EventType.ACTION_COMPLETED, "working", lambda e: delivered.append(e.id))
-    outbox.append(an_event())
-    outbox.relay()
-
-    assert delivered, "the healthy consumer still received it"
-
-
-def test_a_failed_delivery_is_retried_then_dead_lettered():
-    outbox = Outbox(max_attempts=2)
-
-    def broken(_: Event) -> None:
-        raise RuntimeError("still down")
-
-    outbox.subscribe(EventType.ACTION_COMPLETED, "broken", broken)
-    outbox.append(an_event())
-
-    outbox.relay()
-    assert outbox.pending, "retried, not dropped"
-    outbox.relay()
-
-    assert outbox.dead_letters, "gives up after max_attempts"
-
-
-def test_a_stuck_critical_event_is_surfaced_not_buried():
-    """A lost receipt or action must page a human, not sit in a DLQ."""
-    outbox = Outbox(max_attempts=1)
-    outbox.subscribe(
-        EventType.RECEIPT_ISSUED, "broken", lambda _: (_ for _ in ()).throw(RuntimeError("x"))
-    )
-    outbox.append(an_event(EventType.RECEIPT_ISSUED))
-    outbox.relay()
-
-    assert outbox.undelivered_critical
-
-
-def test_per_subject_ordering_is_preserved():
-    outbox = Outbox()
-    order: list[str] = []
-    for type_ in (EventType.CASE_CREATED, EventType.DECISION_GENERATED, EventType.ACTION_COMPLETED):
-        outbox.subscribe(type_, "recorder", lambda e: order.append(e.type.value))
-        outbox.append(an_event(type_))
-
-    outbox.relay()
-
-    assert order == ["case.created", "decision.generated", "action.completed"]
-
-
-def test_a_derived_event_keeps_the_trace():
-    first = an_event(EventType.ACTION_COMPLETED)
-
-    second = first.caused(SAMPLES[EventType.RECEIPT_ISSUED])
-
-    assert second.causation_id == first.id
-    assert second.correlation_id == first.id
-    assert second.subject == first.subject
-
-
-def test_a_trace_can_be_reassembled_from_one_request():
-    outbox = Outbox()
-    first = outbox.append(an_event(EventType.CASE_CREATED))
-    outbox.append(first.caused(SAMPLES[EventType.DECISION_GENERATED]))
-    outbox.append(first.caused(SAMPLES[EventType.RECEIPT_ISSUED]))
-    outbox.relay()
-
-    assert len(outbox.trace(first.id)) == 3
 
 
 # --------------------------------------------------------------------------- #

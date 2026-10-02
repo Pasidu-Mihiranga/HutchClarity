@@ -1,172 +1,129 @@
-"""Transactional outbox and in-process bus (plan §18.4).
+"""Transactional outbox (B04, ADR-0014; plan 21 section 11.4).
 
 The rule this enforces: **never write to the database and publish to a broker
 as two separate acts.** If the publish fails after the write, the world and the
 event stream disagree; if the write fails after the publish, consumers act on
-something that did not happen. So events are appended to an outbox alongside
-the state change, and a relay publishes them afterwards, retrying until they
-land.
+something that did not happen.
 
-Consumers are at-least-once, so each one records the event ids it has already
-processed and ignores repeats. That is what makes a redelivered
-``action.completed`` issue one receipt rather than two.
+So an event is appended to the outbox *inside the unit of work that makes the
+state change* (B02). Commit stores both or neither. A relay
+(``clarity.platform.messaging.relay``) picks the committed rows up afterwards
+and publishes them to the bus, retrying until they land.
 
-**Prototype note.** The relay is in-process and the outbox is a list. Production
-puts the outbox in PostgreSQL in the same transaction as the state change, with
-Debezium or an app relay forwarding to Kafka (plan §18.4). The ordering and
-idempotency guarantees modelled here are the ones that matter.
+A row therefore has one honest failure mode: the relay can publish and die
+before recording that it did, so the row is published twice. That is why
+delivery is at-least-once and consumers are idempotent
+(``clarity.platform.messaging.consumers``).
 """
 
 from __future__ import annotations
 
-import threading
-from collections import defaultdict
-from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
 
-from clarity.platform.messaging.envelope import Event, EventType
+from clarity.kernel.common import utc_now
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.persistence import Repository, UnitOfWork
 
-Handler = Callable[[Event], None]
+#: Collection the outbox rows live in. One collection is one table in B05.
+OUTBOX = "platform.outbox"
+
+
+class OutboxStatus(StrEnum):
+    PENDING = "pending"
+    """Committed with its state change, not yet published."""
+
+    SENT = "sent"
+    """The bus accepted it. Kept, not deleted, so a relay restart is auditable."""
 
 
 @dataclass
-class _Delivery:
+class OutboxRow:
+    """One event waiting to be published, and what the relay has tried."""
+
     event: Event
+    status: OutboxStatus = OutboxStatus.PENDING
     attempts: int = 0
-    delivered: bool = False
-    dead_lettered: bool = False
     last_error: str | None = None
+    appended_at: datetime = field(default_factory=utc_now)
+    sent_at: datetime | None = None
 
+    @property
+    def event_id(self) -> str:
+        return self.event.id
 
-@dataclass
-class ConsumerStats:
-    received: int = 0
-    duplicates: int = 0
-    failures: int = 0
+    @property
+    def is_pending(self) -> bool:
+        return self.status is OutboxStatus.PENDING
 
 
 class Outbox:
-    """Collects events produced during a state change, then publishes them."""
+    """Appends events to the unit of work that is making the state change."""
 
-    def __init__(self, *, max_attempts: int = 3) -> None:
-        self._pending: list[_Delivery] = []
-        self._published: list[Event] = []
-        self._dlq: list[_Delivery] = []
-        self._handlers: dict[EventType, list[tuple[str, Handler]]] = defaultdict(list)
-        self._processed: dict[str, set[str]] = defaultdict(set)
-        self._stats: dict[str, ConsumerStats] = defaultdict(ConsumerStats)
-        self._max_attempts = max_attempts
-        self._lock = threading.Lock()
-
-    # ------------------------------------------------------------------ #
-    # Producing
-    # ------------------------------------------------------------------ #
+    def __init__(self, rows: Repository[str, OutboxRow]) -> None:
+        self._rows = rows
 
     def append(self, event: Event) -> Event:
-        """Record an event. Nothing is delivered until :meth:`relay` runs.
+        """Record an event. It is published only if this unit of work commits.
 
         The payload is checked against its registered schema first
         (``clarity.contracts.events``), so a malformed event fails at the
-        producer, inside its unit of work, never at a consumer.
+        producer, inside its own transaction, never at a consumer.
         """
         event.payload()
-        with self._lock:
-            self._pending.append(_Delivery(event=event))
+        self._rows.put(event.id, OutboxRow(event=event))
         return event
 
-    def subscribe(self, event_type: EventType, name: str, handler: Handler) -> None:
-        """Register a named consumer. The name is its idempotency scope."""
-        self._handlers[event_type].append((name, handler))
+    def pending(self) -> list[OutboxRow]:
+        """Committed rows the relay has not published yet, in append order."""
+        return [row for row in self._rows.values() if row.is_pending]
 
-    # ------------------------------------------------------------------ #
-    # Relaying
-    # ------------------------------------------------------------------ #
+    def all_rows(self) -> list[OutboxRow]:
+        return self._rows.values()
 
-    def relay(self) -> int:
-        """Deliver pending events in order. Returns how many were published.
+    def get(self, event_id: str) -> OutboxRow | None:
+        return self._rows.get(event_id)
 
-        Per-subject ordering is preserved because the outbox is append-ordered
-        and this drains it sequentially.
-        """
-        with self._lock:
-            batch, self._pending = self._pending, []
-
-        published = 0
-        for delivery in batch:
-            if self._deliver(delivery):
-                published += 1
-            else:
-                with self._lock:
-                    if delivery.dead_lettered:
-                        self._dlq.append(delivery)
-                    else:
-                        self._pending.append(delivery)
-        return published
-
-    def _deliver(self, delivery: _Delivery) -> bool:
-        event = delivery.event
-        delivery.attempts += 1
-        failed = False
-
-        for name, handler in self._handlers.get(event.type, []):
-            seen = self._processed[name]
-            if event.id in seen:
-                self._stats[name].duplicates += 1
-                continue
-            try:
-                handler(event)
-            except Exception as error:
-                self._stats[name].failures += 1
-                delivery.last_error = f"{name}: {error}"
-                failed = True
-                continue
-            seen.add(event.id)
-            self._stats[name].received += 1
-
-        if failed:
-            if delivery.attempts >= self._max_attempts:
-                # Critical events must not disappear into a DLQ unnoticed.
-                delivery.dead_lettered = True
-            return False
-
-        delivery.delivered = True
-        with self._lock:
-            self._published.append(event)
-        return True
-
-    # ------------------------------------------------------------------ #
-    # Inspection
-    # ------------------------------------------------------------------ #
-
-    @property
-    def published(self) -> list[Event]:
-        return list(self._published)
-
-    @property
-    def pending(self) -> list[Event]:
-        return [d.event for d in self._pending]
-
-    @property
-    def dead_letters(self) -> list[Event]:
-        """Non-empty is an alert condition (plan §18.4)."""
-        return [d.event for d in self._dlq]
-
-    @property
-    def undelivered_critical(self) -> list[Event]:
-        """Critical events stuck or dead-lettered - pages a human."""
-        return [d.event for d in (*self._pending, *self._dlq) if d.event.is_critical]
-
-    def stats(self, consumer: str) -> ConsumerStats:
-        return self._stats[consumer]
-
-    def events_for(self, subject: str) -> list[Event]:
-        """Everything published about one subscriber, in order."""
-        return [e for e in self._published if e.subject == subject]
+    def mark_sent(self, event_id: str, *, now: datetime | None = None) -> None:
+        """Record that the bus accepted this event."""
+        row = self._rows.get(event_id)
+        if row is None:
+            return
+        row.status = OutboxStatus.SENT
+        row.sent_at = now or utc_now()
+        self._rows.put(event_id, row)
 
     def trace(self, correlation_id: str) -> list[Event]:
-        """Every event from one request, for end-to-end tracing."""
+        """Every event from one request, in append order.
+
+        Answers "what did this request actually cause", which is the question
+        asked when a customer disputes an outcome.
+        """
         return [
-            e
-            for e in self._published
-            if e.correlation_id == correlation_id or e.id == correlation_id
+            row.event
+            for row in self._rows.values()
+            if row.event.correlation_id == correlation_id or row.event.id == correlation_id
         ]
+
+    def record_failure(self, event_id: str, error: str) -> None:
+        """Count a failed publish. The row stays pending, so it is retried."""
+        row = self._rows.get(event_id)
+        if row is None:
+            return
+        row.attempts += 1
+        row.last_error = error
+        self._rows.put(event_id, row)
+
+
+def outbox_in(unit: UnitOfWork) -> Outbox:
+    """The outbox for one unit of work.
+
+    This is the whole seam: a module appends through the same unit of work it is
+    writing its state with, so there is no way to publish an event for a change
+    that rolled back.
+    """
+    return Outbox(unit.repository(OUTBOX))
+
+
+__all__ = ["OUTBOX", "Outbox", "OutboxRow", "OutboxStatus", "outbox_in"]
