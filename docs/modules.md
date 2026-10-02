@@ -10,8 +10,9 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 |---|---|---|---|---|---|
 | kernel | L0 | `backend/src/clarity/kernel/` | - | built | - |
 | contracts | L0 | `backend/src/clarity/contracts/` | - | built; **domain event payloads typed and versioned** (`events.py`, #10) | AsyncAPI generation (R2) |
-| integration (ports, mock drivers) | L1 | `backend/src/clarity/integration/` | - | built (simulated) | `hutch-sim` HTTP drivers (R4) |
-| integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team; used by the `full` profile | Becomes `hutch-sim`'s own database (R4) |
+| integration (ports, mock and HTTP drivers) | L1 | `backend/src/clarity/integration/` | - | migrated (simulated) | HUTCH sandbox mappings require confirmation |
+| integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team | Persistent hutch-sim deployment wiring (X03) |
+| hutch-sim (SIMULATED HUTCH systems over HTTP) | service | `services/hutch-sim/` | - | built | Deployment image and Compose wiring (X03) |
 | resolution | L4 | `backend/src/clarity/modules/resolution/` | case, timeline, detection, decision, actions, receipts | built | Orchestration split out of `case` (M-CASE #34). The only module allowed to import `actions.capability`. |
 | platform: config, audit, messaging, persistence, observability, content, security | L2 | `backend/src/clarity/platform/` | - | built | Persistence port with in-memory and PostgreSQL drivers, schema and role per module, row-level security (B02, B05); event bus port with in-process and Kafka drivers (B03); transactional outbox, relay and consumer framework (B04); traces and masked structured logs (B08). OPA with R2. |
 | ai (gateway, providers, PII, verifier) | L3 | `backend/src/clarity/ai/` | - | built (no model) | Model roles, cassettes (R4) |
@@ -23,7 +24,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | iam | L4 | `backend/src/clarity/modules/iam/` | [MODULE.md](../backend/src/clarity/modules/iam/MODULE.md) | migrated | Keycloak/OPA full drivers and shared identity state (M-IAM) |
 | receipts | L4 | `backend/src/clarity/modules/receipts/` | [MODULE.md](../backend/src/clarity/modules/receipts/MODULE.md) | migrated | OpenBao signer driver and isolated render job (M-RCPT) |
 | reconciliation | L4 | `backend/src/clarity/modules/reconciliation/` | [MODULE.md](../backend/src/clarity/modules/reconciliation/MODULE.md) | built | Production worker schedule (M-REC) |
-| timeline | L4 | `backend/src/clarity/modules/timeline/` | [MODULE.md](../backend/src/clarity/modules/timeline/MODULE.md) | built | HTTP drivers (R4) |
+| timeline | L4 | `backend/src/clarity/modules/timeline/` | [MODULE.md](../backend/src/clarity/modules/timeline/MODULE.md) | migrated | HUTCH sandbox mappings require confirmation |
 | conversation | L4 | `backend/src/clarity/modules/conversation/` | [MODULE.md](../backend/src/clarity/modules/conversation/MODULE.md) | built by the team (keyword intake, no LLM) | Intents as policy content; optional `extract` role (R4) |
 | autopsy | L4 | `backend/src/clarity/modules/autopsy/` | [MODULE.md](../backend/src/clarity/modules/autopsy/MODULE.md) | built | Serverless batch job (R6/R7) |
 | foresight | L4 | `backend/src/clarity/modules/foresight/` | [MODULE.md](../backend/src/clarity/modules/foresight/MODULE.md) | built | Serverless batch job (R6/R7) |
@@ -42,7 +43,6 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | clarity-signer | service | `services/signer/` | R4 |
 | clarity-ai-gateway | service | `services/ai-gateway/` | R4 |
 | clarity-channel-gateway (WhatsApp, SMS/USSD) | service | `services/channel-gateway/` | R4 |
-| hutch-sim (SIMULATED HUTCH systems over HTTP) | service | `services/hutch-sim/` | R4 |
 | notifications | module | `backend/src/clarity/modules/notifications/` | R6 |
 | proactive (stream detectors) | module | `backend/src/clarity/modules/proactive/` | R6 |
 | knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 |

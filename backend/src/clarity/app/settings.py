@@ -61,6 +61,19 @@ class Settings(BaseSettings):
         description="Unset: the in-process bus. Set: the Kafka driver (needs the kafka extra).",
     )
 
+    # -- simulated HUTCH estate ------------------------------------------ #
+
+    hutch_sim_url: str = Field(
+        default="http://localhost:8090",
+        alias="CLARITY_HUTCH_SIM_URL",
+        description="Private hutch-sim service used by the full profile.",
+    )
+    hutch_sim_timeout_seconds: float = Field(
+        default=3.0,
+        alias="CLARITY_HUTCH_SIM_TIMEOUT",
+        gt=0,
+    )
+
     # -- identity and crypto ---------------------------------------------- #
 
     subscriber_hmac_key: str = Field(

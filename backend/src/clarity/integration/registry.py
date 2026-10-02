@@ -1,12 +1,15 @@
 """Adapter selection by configuration (deck S13: "plugs into Hutch systems by config").
 
-Only ``mock`` drivers exist. ``sandbox`` and ``production`` raise a clear error
-naming what HUTCH must confirm first, so nothing in this codebase can pretend a
-HUTCH interface exists.
+The lite profile uses the in-process mock driver. The full profile uses HTTP
+drivers against the separately running, explicitly simulated ``hutch-sim``
+service. ``sandbox`` and ``production`` still raise a clear error naming what
+HUTCH must confirm first.
 """
 
 from __future__ import annotations
 
+from clarity.integration.drivers.http import HttpCommandAdapter, HttpReadAdapter
+from clarity.integration.drivers.http.adapters import JsonHttpClient
 from clarity.integration.drivers.mock.adapters import MockCommandAdapter, MockReadAdapter
 from clarity.integration.drivers.mock.world import SyntheticWorld, build_demo_world
 from clarity.integration.ports import (
@@ -42,15 +45,36 @@ class AdapterRegistry:
         *,
         mode: DriverMode = DriverMode.MOCK,
         world: SyntheticWorld | None = None,
+        base_url: str | None = None,
+        client: JsonHttpClient | None = None,
+        timeout_seconds: float = 3.0,
     ) -> None:
-        if mode is not DriverMode.MOCK:
+        if mode in {DriverMode.SANDBOX, DriverMode.PRODUCTION}:
             raise NotYetIntegrated(mode, EventSource.CHARGING)
         self.mode = mode
         self.world = world if world is not None else build_demo_world()
-        self._reads: dict[EventSource, ReadPort] = {
-            source: MockReadAdapter(source, self.world) for source in ALL_SOURCES
-        }
-        self._command = MockCommandAdapter(self.world)
+        self._reads: dict[EventSource, ReadPort]
+        self._command: CommandPort
+        if mode is DriverMode.HUTCH_SIM:
+            if not base_url:
+                raise ValueError("hutch-sim mode needs a base_url")
+            self._reads = {
+                source: HttpReadAdapter(
+                    source,
+                    base_url,
+                    client=client,
+                    timeout_seconds=timeout_seconds,
+                )
+                for source in ALL_SOURCES
+            }
+            self._command = HttpCommandAdapter(
+                base_url,
+                client=client,
+                timeout_seconds=timeout_seconds,
+            )
+        else:
+            self._reads = {source: MockReadAdapter(source, self.world) for source in ALL_SOURCES}
+            self._command = MockCommandAdapter(self.world)
 
     def read_port(self, source: EventSource) -> ReadPort:
         return self._reads[source]

@@ -24,10 +24,13 @@ import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from fastapi.testclient import TestClient
 
 from clarity.contracts.decision import ActionType
 from clarity.contracts.receipt import RecurrenceResult
+from clarity.integration.drivers.http import HttpCommandAdapter, HttpReadAdapter
 from clarity.integration.drivers.mock.adapters import MockCommandAdapter, MockReadAdapter
+from clarity.integration.drivers.mock.http_service import create_hutch_sim_app
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, build_demo_world, ref_for
 from clarity.integration.ports import (
@@ -49,9 +52,17 @@ DILANI = "+94771234567"
 # ReadPort
 # --------------------------------------------------------------------------- #
 
+
 #: Every read driver. A HUTCH sandbox driver joins this list unchanged.
+def _http_read_driver(source: EventSource) -> ReadPort:
+    world = build_demo_world()
+    client = TestClient(create_hutch_sim_app(world))
+    return HttpReadAdapter(source, "http://hutch-sim.test", client=client)
+
+
 READ_DRIVERS: list[tuple[str, Callable[[EventSource], ReadPort]]] = [
     ("mock", lambda source: MockReadAdapter(source, build_demo_world())),
+    ("http", _http_read_driver),
 ]
 
 
@@ -125,8 +136,16 @@ class TestReadPortParity:
 # CommandPort
 # --------------------------------------------------------------------------- #
 
+
+def _http_command_driver() -> tuple[CommandPort, object]:
+    world = build_demo_world()
+    client = TestClient(create_hutch_sim_app(world))
+    return HttpCommandAdapter("http://hutch-sim.test", client=client), world
+
+
 COMMAND_DRIVERS: list[tuple[str, Callable[[], tuple[CommandPort, object]]]] = [
     ("mock", lambda: (lambda w: (MockCommandAdapter(w), w))(build_demo_world())),
+    ("http", _http_command_driver),
 ]
 
 

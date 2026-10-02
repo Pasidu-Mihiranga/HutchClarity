@@ -105,13 +105,6 @@ SYNTHETIC_ONLY = {
     ("GET", "/v1/demo/inbox"),
     ("GET", "/v1/demo/subscribers"),
     ("POST", "/v1/auth/staff/session"),
-    ("GET", "/mock/catalogue/packages"),
-    ("GET", "/mock/charging/customers/{customer_id}/events"),
-    ("GET", "/mock/payments/customers/{customer_id}"),
-    ("GET", "/mock/usage/customers/{customer_id}"),
-    ("GET", "/mock/vas/customers/{customer_id}/subscriptions"),
-    ("GET", "/mock/consent/customers/{customer_id}"),
-    ("GET", "/mock/network/status/{customer_id}"),
 }
 
 #: Valid bodies, so a 401 proves the sign-in check rather than input validation.

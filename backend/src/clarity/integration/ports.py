@@ -30,7 +30,9 @@ class DriverMode(StrEnum):
     """Which implementation sits behind an adapter."""
 
     MOCK = "mock"
-    """Synthetic data. The only mode available in the prototype."""
+    """Synthetic data in the Clarity process (the lite profile)."""
+    HUTCH_SIM = "hutch-sim"
+    """Synthetic data over HTTP from the separately running hutch-sim service."""
     SANDBOX = "sandbox"
     """HUTCH non-production. REQUIRES HUTCH CONFIRMATION."""
     PRODUCTION = "production"

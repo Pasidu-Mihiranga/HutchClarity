@@ -283,7 +283,13 @@ class Clarity:
         self.store, self.open_unit, self._repository = _persistence_for_profile(
             self.profile, self.settings
         )
-        self.registry = AdapterRegistry(mode=DriverMode.MOCK, world=self.world)
+        adapter_mode = DriverMode.HUTCH_SIM if self.profile is Profile.FULL else DriverMode.MOCK
+        self.registry = AdapterRegistry(
+            mode=adapter_mode,
+            world=self.world,
+            base_url=self.settings.hutch_sim_url,
+            timeout_seconds=self.settings.hutch_sim_timeout_seconds,
+        )
         self.rules = RuleEngine(load_packs(rules_dir or default_rules_dir(self.settings.rules_dir)))
         self.policy = ZenDecisionPolicy.from_file(
             default_policy_dir(policy_dir or self.settings.policy_dir) / "decision-table.json",

@@ -4,6 +4,18 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (H01, #29)
+
+**`/v1` contract change.** The seven development-only `/mock/*` operations were
+removed from the Clarity API. The reviewed OpenAPI snapshot and generated
+frontend SDK were regenerated on purpose.
+
+- Added a separately runnable, explicitly simulated `hutch-sim` HTTP service.
+- Added HTTP read and command drivers for all eight evidence sources and the
+  action command port; the existing parity suites run against both transports.
+- The `full` profile selects the HTTP drivers. The `lite` profile remains
+  Python-only with in-process synthetic adapters.
+
 ### Added (Wave 1 core modules)
 
 **`/v1` contract change.** Nine new operations; the reviewed OpenAPI snapshot

@@ -18,60 +18,6 @@
       "response": "object",
       "status": "200"
     },
-    "GET /mock/catalogue/packages": {
-      "parameters": [],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/charging/customers/{customer_id}/events": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/consent/customers/{customer_id}": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/network/status/{customer_id}": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/payments/customers/{customer_id}": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/usage/customers/{customer_id}": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /mock/vas/customers/{customer_id}/subscriptions": {
-      "parameters": [
-        "path:customer_id"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "GET /v1/admin/policy/changes": {
       "parameters": [
         "header:authorization?"

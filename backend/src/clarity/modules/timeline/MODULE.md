@@ -6,7 +6,7 @@
 | Layer | L4 domain (`clarity.modules.timeline`) |
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
-| Status | built (`lite` profile); migration notes below |
+| Status | migrated (`lite` in-process, `full` over HTTP) |
 | Files | `builder.py`, `public.py` |
 
 ## 1. Purpose
@@ -32,14 +32,17 @@ In-memory structures in the `lite` profile. Target: one PostgreSQL schema `timel
 - Missing or partial sources are flagged, never guessed.
 
 ## 7. Migration status (enterprise-plan 21)
-Reads through in-process mock drivers (`lite`). R4 adds the `hutch-sim` HTTP drivers behind the same ports.
+Reads through in-process mock drivers in `lite` and parity-tested HTTP drivers
+to the separately running, explicitly simulated `hutch-sim` service in `full`.
 
 ## 8. Tests
 - `tests/unit/test_journeys.py`
 - `tests/unit/test_receipts.py`
 - `tests/unit/test_timeline_and_adapters.py`
+- `tests/contract/test_port_parity.py`
 
 ## 9. Change history
 | Date | Devlog entry | Summary |
 |---|---|---|
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-H01-hutch-sim-http.md` | Added HTTP drivers and the standalone hutch-sim service (H01) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.timeline` with a public surface (R1) |

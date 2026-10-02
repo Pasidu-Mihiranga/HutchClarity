@@ -263,7 +263,7 @@ Linked to the 42 open issues in the repo. Check off each item as it is merged. I
 
 ### Wave 4 - Enrichment, ops, channels (parallel tracks)
 
-- [ ] #29 `[H01]` hutch-sim as an HTTP service with HTTP drivers `p1`
+- [x] #29 `[H01]` hutch-sim as an HTTP service with HTTP drivers `p1`
 - [ ] #39 `[N01]` Notifications module: templates, preferences, consent, dispatch, delivery status `p1`
 - [ ] #41 `[P01]` Proactive module: stream detectors and risk.detected `p1`
 - [ ] #13 `[AU01]` Autopsy: event-fed, embeddings via the embed role, review workflow `p2`

@@ -2,7 +2,7 @@
 
 > The [enterprise plan](docs/enterprise-plan/README.md) is the **intended** design, and [chapter 21](docs/enterprise-plan/21-migration-and-deployment-plan.md) is the plan for getting there. This file is the **as-built** state: what exists, how it is layered, what differs from the plan, and how far the migration has gone. It is updated in the same change as anything that affects it.
 >
-> **Last updated:** 2026-10-02 (branch `dev`) · **Migration:** R1 complete; D1-D4 and D6 fixed; team work from `main` merged (chat module, admin APIs, `full`-profile SQL store, Next.js apps) · **Tests:** 546 · `ruff`, `mypy --strict` (106 files), 3 import contracts and the module-boundary tests all clean
+> **Last updated:** 2026-10-02 (branch `main`) · **Migration:** R1 complete; R2 and R3 in progress; R4 started with H01 · **Tests:** 1,210 passed, 511 infrastructure-dependent skipped · `ruff`, `mypy --strict` (187 files), 3 import contracts and the module-boundary tests all clean
 
 ---
 
@@ -76,12 +76,13 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 
 | Step | Status |
 |---|---|
-| R0 Freeze behaviour | **Done.** `backend/tests/acceptance`: route contract for all 66 routes (public, signed-in, synthetic-only), the four journeys plus subject binding over HTTP, and an OpenAPI snapshot of 54 operations. |
+| R0 Freeze behaviour | **Done.** `backend/tests/acceptance`: route contract for all 68 routes (public, signed-in, synthetic-only), the four journeys plus subject binding over HTTP, and an OpenAPI snapshot of 56 operations. |
 | R0.5 Defects | **D1-D8 fixed.** D5 now resolves rule confidence/windows from effective-dated policy values (M-DET). |
 | R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
 | R2 Infrastructure drivers | **In progress.** PostgreSQL, Kafka, Keycloak, OPA and OpenBao drivers are wired behind parity-tested ports; lite remains Python-only. Remaining full-stack components are tracked in the backlog. |
 | R3 Core migration | **In progress.** Wave 1 core work M-ACT, M-CASE, M-DET, M-GOV, M-DEC, M-RCPT and M-REC is implemented. |
-| R4, R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
+| R4 Satellites | **In progress.** H01 is complete: `hutch-sim` runs as a separate HTTP service and the `full` profile selects parity-tested HTTP read and command drivers. Other satellites remain in the backlog. |
+| R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
 ## 6. Where this differs from the target
@@ -94,6 +95,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Events | Outbox → Kafka + Apicurio | Transactional outbox, Kafka/in-process buses, idempotent consumers and core fact events are built. | Apicurio with later R2 work |
 | Decision outcomes | ZEN decision table | Versioned ZEN-compatible JSON table with Python parity oracle | Complete (M-DEC) |
 | Rule parameters | In the policy store | Confidence and time windows resolve effective-dated policy values | Complete (M-DET) |
+| Simulated HUTCH | Separate `hutch-sim` HTTP service in `full` | `lite` keeps in-process mock drivers; `full` selects HTTP read and command drivers; the Clarity API exposes no `/mock/*` routes | Complete (H01); deployment image belongs to X03 |
 | MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | In-process class; tools listed at `/v1/mcp/tools` | R4. No external agent can connect yet. |
 | Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js 16 apps + shared packages (plan 19) | Static UI served by FastAPI **and** Next.js 14 apps in `frontend/` | R5: verify the build, retire the static UI, move to Next.js 16 |

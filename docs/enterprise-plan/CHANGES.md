@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.8 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| R4 satellites | Recorded H01 complete: the full profile uses parity-tested HTTP read and command drivers to the separate, explicitly simulated hutch-sim service | 21 §7 |
+
 ## v1.7 - 2026-10-02
 
 | Area | Change | Chapters |
