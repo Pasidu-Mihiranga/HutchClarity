@@ -1,135 +1,212 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ClarityClient } from "@clarity/sdk";
 import { t } from "@clarity/i18n";
-import { Button, Card, Input } from "@clarity/ui";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 
 const client = new ClarityClient();
 
 export default function LoginPage() {
   const { lang } = useLanguage();
+  const router = useRouter();
   const [msisdn, setMsisdn] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"request" | "verify">("request");
-  const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState<{ text: string; tone: "ok" | "info" } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onRequest(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setStatus("");
+    setBusy(true); setStatus(null);
     try {
       const result = await client.requestOtp(msisdn);
-      setStatus(
-        result.message ??
-          (result.demo_code
-            ? `OTP sent (demo: ${result.demo_code})`
-            : "OTP sent"),
-      );
+      setStatus({
+        text: result.message ?? (result.demo_code ? `OTP sent (demo: ${result.demo_code})` : "OTP sent to your number."),
+        tone: "ok",
+      });
       setStep("verify");
     } catch (err) {
-      setStatus(
-        err instanceof Error
-          ? `${err.message} — demo mode: enter any 6-digit code`
-          : "Request failed",
-      );
+      setStatus({ text: (err instanceof Error ? err.message : "Request failed") + " - demo mode: enter any 6-digit code", tone: "info" });
       setStep("verify");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
 
   async function onVerify(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setStatus("");
+    setBusy(true); setStatus(null);
     try {
       const result = await client.verifyOtp(msisdn, code);
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("clarity_token", result.token);
-      }
+      try { window.sessionStorage.setItem("clarity_token", result.token); } catch {}
       client.setToken(result.token);
-      setStatus("Signed in — redirecting…");
-      window.location.href = "/";
+      setStatus({ text: "Signed in - redirecting...", tone: "ok" });
+      router.push("/");
     } catch (err) {
-      setStatus(
-        err instanceof Error
-          ? `${err.message} — placeholder login accepted locally`
-          : "Verify failed",
-      );
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("clarity_token", "demo-token");
-      }
-    } finally {
-      setBusy(false);
-    }
+      setStatus({ text: (err instanceof Error ? err.message : "Verify failed") + " - placeholder login accepted", tone: "info" });
+      try { window.sessionStorage.setItem("clarity_token", "demo-token"); } catch {}
+      setTimeout(() => router.push("/"), 1200);
+    } finally { setBusy(false); }
   }
 
   return (
-    <main className="space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t(lang, "app.title")}</h1>
-        <LanguageSwitcher />
-      </header>
+    <main
+      style={{
+        maxWidth: 420,
+        margin: "0 auto",
+        padding: "40px 0",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "80vh",
+        justifyContent: "center",
+      }}
+    >
+      {/* Title */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ margin: "0 0 4px", fontSize: 12, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--muted)" }}>Hutch</p>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: "-.03em" }}>
+          {t(lang, "app.title")}
+        </h1>
+      </div>
 
-      <Card className="space-y-4">
-        <h2 className="text-lg font-medium">Login with OTP</h2>
+      <div className="h-card">
+        {/* Step indicator */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            <span style={{ height: 4, width: 24, borderRadius: 999, background: "var(--orange)" }} />
+            <span style={{ height: 4, width: 24, borderRadius: 999, background: step === "verify" ? "var(--orange)" : "var(--line)" }} />
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+            {step === "request" ? "Step 1 of 2 - Enter your number" : "Step 2 of 2 - Enter your OTP"}
+          </p>
+        </div>
+
         {step === "request" ? (
-          <form className="space-y-3" onSubmit={onRequest}>
-            <label className="block space-y-1 text-sm">
-              <span>Mobile number</span>
-              <Input
+          <form onSubmit={onRequest} style={{ display: "grid", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+                Hutch number
+              </label>
+              <input
                 inputMode="tel"
                 placeholder="07XXXXXXXX"
                 value={msisdn}
                 onChange={(e) => setMsisdn(e.target.value)}
                 required
+                style={{
+                  width: "100%",
+                  font: "inherit",
+                  fontSize: 15,
+                  padding: "12px 16px",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#fff",
+                  color: "var(--ink)",
+                  outline: "none",
+                }}
               />
-            </label>
-            <Button type="submit" disabled={busy || !msisdn}>
-              Send OTP
-            </Button>
+            </div>
+            <button
+              type="submit"
+              disabled={busy || !msisdn}
+              className="h-btn h-btn-primary"
+              style={{ width: "100%" }}
+            >
+              Continue
+            </button>
           </form>
         ) : (
-          <form className="space-y-3" onSubmit={onVerify}>
-            <label className="block space-y-1 text-sm">
-              <span>OTP code</span>
-              <Input
+          <form onSubmit={onVerify} style={{ display: "grid", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+                6-digit code
+              </label>
+              <input
                 inputMode="numeric"
                 placeholder="123456"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 required
+                maxLength={6}
+                style={{
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 24,
+                  letterSpacing: ".32em",
+                  padding: "10px 12px",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#fff",
+                  color: "var(--ink)",
+                  width: "100%",
+                  outline: "none",
+                }}
               />
-            </label>
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy || !code}>
-                Verify
-              </Button>
-              <Button
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="submit"
+                disabled={busy || !code}
+                className="h-btn h-btn-primary"
+                style={{ flex: 1 }}
+              >
+                Sign in
+              </button>
+              <button
                 type="button"
-                variant="ghost"
-                onClick={() => setStep("request")}
+                className="h-btn h-btn-ghost"
+                onClick={() => { setStep("request"); setStatus(null); }}
               >
                 Back
-              </Button>
+              </button>
             </div>
           </form>
         )}
-        {status ? (
-          <p className="text-sm text-slate-600" role="status">
-            {status}
-          </p>
-        ) : null}
-      </Card>
 
-      <Link href="/" className="text-sm text-sky-700 hover:underline">
-        ← Home
-      </Link>
+        {status && (
+          <div
+            role="status"
+            style={{
+              marginTop: 14,
+              padding: "10px 14px",
+              borderRadius: 10,
+              fontSize: 14,
+              background: status.tone === "ok" ? "#f0fdf4" : "var(--orange-soft)",
+              border: `1px solid ${status.tone === "ok" ? "#86efac" : "#fdd5c0"}`,
+              color: status.tone === "ok" ? "#166534" : "var(--orange-ink)",
+            }}
+          >
+            {status.text}
+          </div>
+        )}
+      </div>
+
+      {/* Simulated OTP inbox */}
+      <div
+        style={{
+          marginTop: 16,
+          border: "1px dashed var(--warn)",
+          borderRadius: 10,
+          background: "#fffbeb",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            background: "var(--warn)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: ".03em",
+            textTransform: "uppercase",
+            padding: "5px 10px",
+          }}
+        >
+          Simulated SMS inbox
+        </div>
+        <p style={{ margin: 0, padding: 12, fontSize: 14, color: "var(--ink)" }}>
+          Any 6-digit code works in demo mode.
+        </p>
+      </div>
     </main>
   );
 }

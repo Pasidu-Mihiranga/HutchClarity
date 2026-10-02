@@ -19,11 +19,12 @@ export function LanguageSwitcher() {
           key={code}
           type="button"
           onClick={() => setLang(code)}
-          className={`rounded px-2 py-1 text-xs font-medium ${
+          className="rounded px-2 py-1 text-xs font-medium"
+          style={
             lang === code
-              ? "bg-sky-700 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-          }`}
+              ? { background: "var(--orange)", color: "#fff" }
+              : { background: "#f4f4f5", color: "#52525b" }
+          }
         >
           {labels[code]}
         </button>

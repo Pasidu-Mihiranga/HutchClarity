@@ -4,22 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClarityClient } from "@clarity/sdk";
 import { t } from "@clarity/i18n";
-import { Badge, Button, Card } from "@clarity/ui";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { WhyWidget } from "@/components/WhyWidget";
+import { ChargeHero } from "@/components/ChargeHero";
 
 const client = new ClarityClient();
 
-export default function CaseDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function CaseDetailPage({ params }: { params: { id: string } }) {
   const { lang } = useLanguage();
-  const [caseData, setCaseData] = useState<Record<string, unknown> | null>(
-    null,
-  );
+  const [caseData, setCaseData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,61 +28,64 @@ export default function CaseDetailPage({
         if (!cancelled) setCaseData(data);
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Could not load case",
-          );
-          setCaseData({
-            case_id: params.id,
-            state: "OPEN",
-            cause: "VAS silent renewal",
-            amount: "99.00",
-          });
+          setError(err instanceof Error ? err.message : "Could not load case");
+          setCaseData({ case_id: params.id, state: "OPEN", cause: "VAS silent renewal", amount: "99.00" });
         }
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [params.id]);
 
-  const cause =
-    (caseData?.cause as string) ??
-    (caseData?.primary_cause as string) ??
-    "Investigating…";
+  const cause = (caseData?.cause as string) ?? (caseData?.primary_cause as string) ?? "Investigating...";
   const amount = String(caseData?.amount ?? "99.00");
-  const state = String(caseData?.state ?? "OPEN");
+  const state  = String(caseData?.state ?? "OPEN");
 
   return (
-    <main className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-500">Case</p>
-          <h1 className="font-mono text-lg">{params.id}</h1>
-        </div>
-        <LanguageSwitcher />
-      </header>
+    <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
 
-      <Card className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Badge tone={state === "OPEN" ? "warning" : "success"}>
-            {state}
-          </Badge>
-          {error ? <Badge tone="neutral">Offline placeholder</Badge> : null}
-        </div>
-        <h2 className="text-lg font-medium">{t(lang, "why.heading")}</h2>
-        <WhyWidget cause={cause} amount={amount} />
-        <Button>{t(lang, "fix.cta")}</Button>
-      </Card>
+      {/* Reference row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, color: "var(--muted)" }}>
+          {params.id}
+        </span>
+        {error && (
+          <span
+            style={{
+              padding: "3px 8px", borderRadius: 999, fontSize: 11,
+              fontWeight: 700, background: "#f4f4f5", color: "#52525b",
+            }}
+          >
+            Offline placeholder
+          </span>
+        )}
+      </div>
 
-      <div className="flex gap-3 text-sm">
-        <Link href="/" className="text-sky-700 hover:underline">
-          ← Home
-        </Link>
+      <ChargeHero amount={amount} cause={cause} state={state} />
+
+      {/* Why section */}
+      <p style={{ fontSize: 13, fontWeight: 650, color: "var(--muted)", margin: "18px 0 8px" }}>
+        {t(lang, "why.heading")}
+      </p>
+      <WhyWidget cause={cause} amount={amount} />
+
+      {/* Actions */}
+      <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
+        <button className="h-btn h-btn-primary" style={{ width: "100%", fontSize: 16 }}>
+          {t(lang, "fix.cta")}
+        </button>
         <Link
-          href="/receipt/TR-demo"
-          className="text-sky-700 hover:underline"
+          href={`/receipt/TR-${params.id}`}
+          style={{
+            display: "block",
+            textAlign: "center",
+            fontSize: 14,
+            fontWeight: 650,
+            color: "var(--orange-ink)",
+            padding: "10px 0",
+            textDecoration: "none",
+          }}
         >
-          {t(lang, "receipt.verify")}
+          {t(lang, "receipt.verify")} →
         </Link>
       </div>
     </main>

@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Understand and fix prepaid balance changes",
     start_url: "/",
     display: "standalone",
-    background_color: "#f8fafc",
-    theme_color: "#0369a1",
+    background_color: "#ffffff",
+    theme_color: "#f26226",
     lang: "en",
     icons: [
       {
