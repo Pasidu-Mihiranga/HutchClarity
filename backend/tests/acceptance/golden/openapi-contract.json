@@ -1,0 +1,846 @@
+{
+  "operations": {
+    "GET /.well-known/clarity-keys.json": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /.well-known/jwks.json": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /health": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/catalogue/packages": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/charging/customers/{customer_id}/events": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/consent/customers/{customer_id}": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/network/status/{customer_id}": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/payments/customers/{customer_id}": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/usage/customers/{customer_id}": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /mock/vas/customers/{customer_id}/subscriptions": {
+      "parameters": [
+        "path:customer_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/admin/switches": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/ai/usage": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/auth/me": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "SessionView",
+      "status": "200"
+    },
+    "GET /v1/cases/{case_id}": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": null,
+      "response": "CaseSummary",
+      "status": "200"
+    },
+    "GET /v1/cases/{case_id}/timeline": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": null,
+      "response": "TimelineView",
+      "status": "200"
+    },
+    "GET /v1/conversation/suggestions": {
+      "parameters": [
+        "query:language?",
+        "query:limit?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/demo/autopsy": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/demo/foresight": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/demo/inbox": {
+      "parameters": [
+        "query:msisdn"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/demo/ops": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/demo/subscribers": {
+      "parameters": [],
+      "request": null,
+      "response": "array[DemoSubscriber]",
+      "status": "200"
+    },
+    "GET /v1/desk/queue": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[QueueItem]",
+      "status": "200"
+    },
+    "GET /v1/knowledge/search": {
+      "parameters": [
+        "query:q?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/mcp/tools": {
+      "parameters": [
+        "query:profile?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/me/app": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/me/cases": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[object]",
+      "status": "200"
+    },
+    "GET /v1/me/home": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/me/receipts": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[object]",
+      "status": "200"
+    },
+    "GET /v1/receipts/{receipt_id}": {
+      "parameters": [
+        "header:authorization?",
+        "path:receipt_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/receipts/{receipt_id}/qr.svg": {
+      "parameters": [
+        "path:receipt_id"
+      ],
+      "request": null,
+      "response": null,
+      "status": "200"
+    },
+    "GET /v1/receipts/{receipt_id}/render": {
+      "parameters": [
+        "header:authorization?",
+        "path:receipt_id",
+        "query:format?",
+        "query:language?"
+      ],
+      "request": null,
+      "response": null,
+      "status": "200"
+    },
+    "POST /v1/admin/merchants/suspend": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "MerchantSuspendRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/switches": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "SwitchFlipRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/auth/otp/request": {
+      "parameters": [],
+      "request": "OtpRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/auth/otp/verify": {
+      "parameters": [],
+      "request": "OtpVerify",
+      "response": "SessionView",
+      "status": "200"
+    },
+    "POST /v1/auth/staff/session": {
+      "parameters": [],
+      "request": "StaffSignIn",
+      "response": "SessionView",
+      "status": "200"
+    },
+    "POST /v1/cases": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "OpenCaseRequest",
+      "response": "CaseSummary",
+      "status": "201"
+    },
+    "POST /v1/cases/{case_id}/approve": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": "ApproveRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/cases/{case_id}/auto-fix": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": "ConfirmRequest",
+      "response": "ExecutionView",
+      "status": "200"
+    },
+    "POST /v1/cases/{case_id}/confirm": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": "ConfirmRequest",
+      "response": "ExecutionView",
+      "status": "200"
+    },
+    "POST /v1/cases/{case_id}/evaluate": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id",
+        "query:human?"
+      ],
+      "request": null,
+      "response": "DecisionView",
+      "status": "200"
+    },
+    "POST /v1/cases/{case_id}/proposals": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": "ProposeRequest",
+      "response": "PlanView",
+      "status": "201"
+    },
+    "POST /v1/cases/{case_id}/receipt": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": null,
+      "response": "VerificationView",
+      "status": "200"
+    },
+    "POST /v1/clarity/route": {
+      "parameters": [],
+      "request": "object",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/conversation/suggestions": {
+      "parameters": [],
+      "request": "object",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/conversation/turn": {
+      "parameters": [],
+      "request": "object",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/demo/reset": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/family": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "FamilyRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/packages/{offering_id}/purchase": {
+      "parameters": [
+        "header:authorization?",
+        "path:offering_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/preferences": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "PreferencesRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/reload": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "ReloadRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/safeguards": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "SafeguardRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/me/subscriptions/{subscription_id}/cancel": {
+      "parameters": [
+        "header:authorization?",
+        "path:subscription_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/receipts/{receipt_id}/verify": {
+      "parameters": [
+        "path:receipt_id"
+      ],
+      "request": null,
+      "response": "VerificationView",
+      "status": "200"
+    }
+  },
+  "schemas": {
+    "ActionType": {
+      "fields": [],
+      "required": []
+    },
+    "ActionView": {
+      "fields": [
+        "action_id",
+        "after",
+        "amount_lkr",
+        "before",
+        "status",
+        "type"
+      ],
+      "required": [
+        "action_id",
+        "status",
+        "type"
+      ]
+    },
+    "ApproveRequest": {
+      "fields": [
+        "plan_id",
+        "role"
+      ],
+      "required": [
+        "plan_id",
+        "role"
+      ]
+    },
+    "CaseSummary": {
+      "fields": [
+        "case_id",
+        "case_no",
+        "channel",
+        "language",
+        "money_at_stake_lkr",
+        "msisdn_masked",
+        "opened_at",
+        "state"
+      ],
+      "required": [
+        "case_id",
+        "case_no",
+        "channel",
+        "language",
+        "msisdn_masked",
+        "opened_at",
+        "state"
+      ]
+    },
+    "CauseView": {
+      "fields": [
+        "category",
+        "confidence",
+        "evidence_refs",
+        "money_effect_lkr",
+        "rule_id",
+        "rule_version"
+      ],
+      "required": [
+        "confidence",
+        "rule_id",
+        "rule_version"
+      ]
+    },
+    "Channel": {
+      "fields": [],
+      "required": []
+    },
+    "Completeness": {
+      "fields": [],
+      "required": []
+    },
+    "ConfirmRequest": {
+      "fields": [
+        "plan_id"
+      ],
+      "required": [
+        "plan_id"
+      ]
+    },
+    "DecisionView": {
+      "fields": [
+        "allowed_actions",
+        "amount_lkr",
+        "case_id",
+        "cause",
+        "decision_id",
+        "explanation",
+        "explanation_source",
+        "handoff_reason",
+        "outcome",
+        "policy_version",
+        "rationale",
+        "requires_approval",
+        "requires_confirmation",
+        "ruled_out",
+        "unknown"
+      ],
+      "required": [
+        "case_id",
+        "decision_id",
+        "outcome",
+        "policy_version",
+        "requires_approval",
+        "requires_confirmation"
+      ]
+    },
+    "DemoSubscriber": {
+      "fields": [
+        "balance_lkr",
+        "language",
+        "masked",
+        "msisdn",
+        "name",
+        "scenario"
+      ],
+      "required": [
+        "balance_lkr",
+        "language",
+        "masked",
+        "msisdn",
+        "name",
+        "scenario"
+      ]
+    },
+    "EventSource": {
+      "fields": [],
+      "required": []
+    },
+    "ExecutionView": {
+      "fields": [
+        "actions",
+        "case_id",
+        "confirmed_by",
+        "plan_id",
+        "receipt_id",
+        "status",
+        "verify_url"
+      ],
+      "required": [
+        "actions",
+        "case_id",
+        "confirmed_by",
+        "plan_id",
+        "status"
+      ]
+    },
+    "FamilyRequest": {
+      "fields": [
+        "msisdn"
+      ],
+      "required": [
+        "msisdn"
+      ]
+    },
+    "HTTPValidationError": {
+      "fields": [
+        "detail"
+      ],
+      "required": []
+    },
+    "Language": {
+      "fields": [],
+      "required": []
+    },
+    "MerchantSuspendRequest": {
+      "fields": [
+        "merchant_id",
+        "reason",
+        "subscriber_msisdn"
+      ],
+      "required": [
+        "merchant_id",
+        "reason"
+      ]
+    },
+    "OpenCaseRequest": {
+      "fields": [
+        "channel",
+        "charge_ref",
+        "customer_requested_human",
+        "language",
+        "msisdn"
+      ],
+      "required": [
+        "msisdn"
+      ]
+    },
+    "OtpRequest": {
+      "fields": [
+        "msisdn"
+      ],
+      "required": [
+        "msisdn"
+      ]
+    },
+    "OtpVerify": {
+      "fields": [
+        "challenge_id",
+        "channel",
+        "code"
+      ],
+      "required": [
+        "challenge_id",
+        "code"
+      ]
+    },
+    "Outcome": {
+      "fields": [],
+      "required": []
+    },
+    "PlanView": {
+      "fields": [
+        "actions",
+        "case_id",
+        "outcome",
+        "plan_id",
+        "status",
+        "summary",
+        "total_amount_lkr"
+      ],
+      "required": [
+        "actions",
+        "case_id",
+        "outcome",
+        "plan_id",
+        "status",
+        "summary",
+        "total_amount_lkr"
+      ]
+    },
+    "PreferencesRequest": {
+      "fields": [
+        "language",
+        "large_text",
+        "notify"
+      ],
+      "required": [
+        "language"
+      ]
+    },
+    "ProposeRequest": {
+      "fields": [
+        "action_types",
+        "created_by"
+      ],
+      "required": []
+    },
+    "QueueItem": {
+      "fields": [
+        "case_id",
+        "case_no",
+        "cause",
+        "channel",
+        "money_at_stake_lkr",
+        "msisdn_masked",
+        "outcome",
+        "plan_id",
+        "reason",
+        "state"
+      ],
+      "required": [
+        "case_id",
+        "case_no",
+        "channel",
+        "msisdn_masked",
+        "state"
+      ]
+    },
+    "ReloadRequest": {
+      "fields": [
+        "amount_lkr"
+      ],
+      "required": [
+        "amount_lkr"
+      ]
+    },
+    "RuledOutView": {
+      "fields": [
+        "reason",
+        "rule_id"
+      ],
+      "required": [
+        "rule_id"
+      ]
+    },
+    "SafeguardRequest": {
+      "fields": [
+        "kind",
+        "value"
+      ],
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionView": {
+      "fields": [
+        "assurance",
+        "expires_at",
+        "permissions",
+        "roles",
+        "subject",
+        "token"
+      ],
+      "required": [
+        "assurance",
+        "subject",
+        "token"
+      ]
+    },
+    "SourceStatusView": {
+      "fields": [
+        "completeness",
+        "event_count",
+        "note",
+        "source"
+      ],
+      "required": [
+        "completeness",
+        "event_count",
+        "source"
+      ]
+    },
+    "StaffSignIn": {
+      "fields": [
+        "roles",
+        "step_up",
+        "user_ref"
+      ],
+      "required": [
+        "roles",
+        "user_ref"
+      ]
+    },
+    "SwitchFlipRequest": {
+      "fields": [
+        "enabled",
+        "key",
+        "reason"
+      ],
+      "required": [
+        "enabled",
+        "key",
+        "reason"
+      ]
+    },
+    "TimelineEventView": {
+      "fields": [
+        "amount_lkr",
+        "attributes",
+        "event_id",
+        "event_type",
+        "occurred_at",
+        "source"
+      ],
+      "required": [
+        "event_id",
+        "event_type",
+        "occurred_at",
+        "source"
+      ]
+    },
+    "TimelineView": {
+      "fields": [
+        "case_id",
+        "events",
+        "snapshot_hash",
+        "sources",
+        "window_from",
+        "window_to"
+      ],
+      "required": [
+        "case_id",
+        "events",
+        "snapshot_hash",
+        "sources",
+        "window_from",
+        "window_to"
+      ]
+    },
+    "ValidationError": {
+      "fields": [
+        "ctx",
+        "input",
+        "loc",
+        "msg",
+        "type"
+      ],
+      "required": [
+        "loc",
+        "msg",
+        "type"
+      ]
+    },
+    "VerificationView": {
+      "fields": [
+        "chain_ok",
+        "corrected_lkr",
+        "issued_at",
+        "key_id",
+        "number",
+        "reason",
+        "receipt_id",
+        "recurrence_test",
+        "safeguard",
+        "status",
+        "superseded_by",
+        "valid"
+      ],
+      "required": [
+        "reason",
+        "receipt_id",
+        "status",
+        "valid"
+      ]
+    }
+  }
+}

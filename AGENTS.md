@@ -51,6 +51,7 @@ Hutch Clarity is a resolve-and-support platform for HUTCH (Sri Lanka) customers 
 | I19 | **One author per commit: the developer's own GitHub user.** No `Co-authored-by` trailers, no AI tool attribution (Claude, Cursor, Codex, Copilot or any other), no "Generated with" lines, in commits or PR descriptions. AI tools must have commit attribution turned off. See §10.1. |
 | I20 | **Business code never checks the runtime profile.** Only `clarity.app.container` reads `CLARITY_PROFILE` (test-enforced). Every driver passes its port's parity suite. |
 | I21 | **The deck wins.** `documents/Hutch Clarity (17 slides).pdf` is the authoritative concept; if the plan conflicts with it, fix the plan. Never edit the two source documents. |
+| I22 | **Calls for answers, events for side effects** (ADR-0029). A module calls another module's `public.py` only along the edges declared in `tests/architecture/test_module_dependencies.py` (acyclic). Anything that reacts to a fact (receipts, notifications, audit, insights) is an outbox event, never a call and never an event used as a command. |
 
 ---
 
@@ -67,7 +68,7 @@ Hutch Clarity is a resolve-and-support platform for HUTCH (Sri Lanka) customers 
 | `backend/src/clarity/app/` | Composition root (`container.py`, the only reader of `CLARITY_PROFILE`) and the narrow MCP view |
 | `backend/src/clarity/interfaces/` | `http` (FastAPI `/v1`, auth, static UI until R5) and `mcp` |
 | `backend/src/clarity/entrypoints/` | Process entry points (`asgi.py`) |
-| `backend/tests/` | unit, golden, property, contract (parity), architecture |
+| `backend/tests/` | unit, golden, property, contract (parity), architecture, acceptance (black-box `/v1`, route contract, OpenAPI snapshot) |
 | `frontend/` | Next.js apps (`customer-web`, `console`, `verify`) and packages (`ui`, `sdk`, `i18n`, `widget`); they use only the `/v1` API |
 | `rules/packs/`, `config/policy/`, `config/ai/` | Policy artefacts and AI model roles (YAML), shared by every profile |
 | `docs/enterprise-plan/` | The plan (changes via `CHANGES.md`) |
@@ -88,7 +89,9 @@ If your change does the left column, the same change must update the right colum
 | A module's public surface or a `/v1` contract | `CHANGELOG.md` and every consumer's `MODULE.md` |
 | A plan chapter | `docs/enterprise-plan/CHANGES.md` (+ an ADR if it is a decision) and the plan README revision table |
 | A new ADR | `docs/adr/README.md` index |
-| A new module, or a new dependency between modules | `docs/modules.md` and `ARCHITECTURE.md` module map |
+| A new module, or a new dependency between modules | `docs/modules.md`, `ARCHITECTURE.md`, the dependency map in `tests/architecture/test_module_dependencies.py` and plan 21 §11.2 |
+| A new or changed event | The producer's contract in `clarity.contracts.events`, plan 21 §11.3, and each producer and consumer `MODULE.md` |
+| A `/v1` contract change | Regenerate the snapshot (`UPDATE_GOLDEN=1 make test`), `CHANGELOG.md`, the frontend SDK |
 | A migration step lands (R0-R7) | `ARCHITECTURE.md` status and plan 21 |
 | A user-visible flow, setup step or demo path | The walkthrough (re-verified) and `docs/submission/DEMO_SCRIPT.md` |
 | An environment variable | `.env.example` and the deployment docs |

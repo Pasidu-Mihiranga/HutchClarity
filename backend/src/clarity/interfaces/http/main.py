@@ -895,18 +895,26 @@ def _register_routes(app: FastAPI) -> None:
         }
 
     @app.get("/v1/me/home", tags=["customer"])
-    def my_home(clarity: ClarityDep, principal: CurrentPrincipal) -> dict[str, Any]:
+    def my_home(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
+    ) -> dict[str, Any]:
         """Balance, pack, activity and alerts for the signed-in number."""
         return _home_for(clarity, _customer_ref(principal))
 
     @app.get("/v1/me/app", tags=["customer"])
-    def my_app(clarity: ClarityDep, principal: CurrentPrincipal) -> dict[str, Any]:
+    def my_app(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
+    ) -> dict[str, Any]:
         """The only customer read. Every screen renders this payload."""
         return _app_for(clarity, _customer_ref(principal))
 
     @app.post("/v1/me/reload", tags=["customer"])
     def my_reload(
-        body: ReloadRequest, clarity: ClarityDep, principal: CurrentPrincipal
+        body: ReloadRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         try:
@@ -927,7 +935,9 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/me/packages/{offering_id}/purchase", tags=["customer"])
     def my_purchase(
-        offering_id: str, clarity: ClarityDep, principal: CurrentPrincipal
+        offering_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         try:
@@ -942,7 +952,9 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/me/subscriptions/{subscription_id}/cancel", tags=["customer"])
     def my_cancel(
-        subscription_id: str, clarity: ClarityDep, principal: CurrentPrincipal
+        subscription_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         if not clarity.world.deactivate_subscription(ref, subscription_id):
@@ -951,7 +963,9 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/me/safeguards", tags=["customer"])
     def my_safeguard(
-        body: SafeguardRequest, clarity: ClarityDep, principal: CurrentPrincipal
+        body: SafeguardRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_SETTINGS))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         allowed = {"data_on_expiry", "spend_cap", "vas_confirm", "usage_alerts", "merchant_block"}
@@ -964,7 +978,9 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/me/family", tags=["customer"])
     def my_family(
-        body: FamilyRequest, clarity: ClarityDep, principal: CurrentPrincipal
+        body: FamilyRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_SETTINGS))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         try:
@@ -979,7 +995,9 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v1/me/preferences", tags=["customer"])
     def my_preferences(
-        body: PreferencesRequest, clarity: ClarityDep, principal: CurrentPrincipal
+        body: PreferencesRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_SETTINGS))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         account = clarity.world.account(ref)
@@ -995,7 +1013,10 @@ def _register_routes(app: FastAPI) -> None:
         return _app_for(clarity, ref)
 
     @app.get("/v1/me/cases", tags=["customer"])
-    def my_cases(clarity: ClarityDep, principal: CurrentPrincipal) -> list[dict[str, Any]]:
+    def my_cases(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
+    ) -> list[dict[str, Any]]:
         """Cases opened for the signed-in number."""
         ref = _customer_ref(principal)
         rows = [record for record in clarity.cases.all_cases() if record.subscriber_ref == ref]
@@ -1013,7 +1034,10 @@ def _register_routes(app: FastAPI) -> None:
         ]
 
     @app.get("/v1/me/receipts", tags=["customer"])
-    def my_receipts(clarity: ClarityDep, principal: CurrentPrincipal) -> list[dict[str, Any]]:
+    def my_receipts(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
+    ) -> list[dict[str, Any]]:
         """Trust Receipts already issued for the signed-in number."""
         ref = _customer_ref(principal)
         mine = {
@@ -1143,7 +1167,11 @@ def _register_routes(app: FastAPI) -> None:
         except Exception:
             return customer_id
 
-    @app.get("/mock/charging/customers/{customer_id}/events", tags=["mock-hutch"])
+    @app.get(
+        "/mock/charging/customers/{customer_id}/events",
+        tags=["mock-hutch"],
+        dependencies=[Depends(demo_only)],
+    )
     def mock_charging_events(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import events_for_customer, session_scope
         from clarity.kernel.common import EventSource
@@ -1169,7 +1197,11 @@ def _register_routes(app: FastAPI) -> None:
                     )
         return {"customer_id": cid, "events": rows}
 
-    @app.get("/mock/payments/customers/{customer_id}", tags=["mock-hutch"])
+    @app.get(
+        "/mock/payments/customers/{customer_id}",
+        tags=["mock-hutch"],
+        dependencies=[Depends(demo_only)],
+    )
     def mock_payments(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import (
             account_for_customer,
@@ -1198,7 +1230,11 @@ def _register_routes(app: FastAPI) -> None:
             ]
         return {"customer_id": cid, "account": account, "events": events}
 
-    @app.get("/mock/usage/customers/{customer_id}", tags=["mock-hutch"])
+    @app.get(
+        "/mock/usage/customers/{customer_id}",
+        tags=["mock-hutch"],
+        dependencies=[Depends(demo_only)],
+    )
     def mock_usage(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import events_for_customer, session_scope
         from clarity.kernel.common import EventSource
@@ -1220,7 +1256,11 @@ def _register_routes(app: FastAPI) -> None:
             ]
         return {"customer_id": cid, "events": events}
 
-    @app.get("/mock/vas/customers/{customer_id}/subscriptions", tags=["mock-hutch"])
+    @app.get(
+        "/mock/vas/customers/{customer_id}/subscriptions",
+        tags=["mock-hutch"],
+        dependencies=[Depends(demo_only)],
+    )
     def mock_vas(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import session_scope, subscriptions_for_customer
 
@@ -1243,7 +1283,11 @@ def _register_routes(app: FastAPI) -> None:
             ]
         return {"customer_id": cid, "subscriptions": rows}
 
-    @app.get("/mock/consent/customers/{customer_id}", tags=["mock-hutch"])
+    @app.get(
+        "/mock/consent/customers/{customer_id}",
+        tags=["mock-hutch"],
+        dependencies=[Depends(demo_only)],
+    )
     def mock_consent(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import consent_for_customer, session_scope
 
@@ -1266,7 +1310,9 @@ def _register_routes(app: FastAPI) -> None:
                 )
         return {"customer_id": cid, "consent": rows}
 
-    @app.get("/mock/network/status/{customer_id}", tags=["mock-hutch"])
+    @app.get(
+        "/mock/network/status/{customer_id}", tags=["mock-hutch"], dependencies=[Depends(demo_only)]
+    )
     def mock_network(customer_id: str) -> dict[str, Any]:
         from clarity.integration.drivers.mock.store import network_for, session_scope
 
@@ -1284,7 +1330,7 @@ def _register_routes(app: FastAPI) -> None:
             status = net
         return {"customer_id": cid, **status}
 
-    @app.get("/mock/catalogue/packages", tags=["mock-hutch"])
+    @app.get("/mock/catalogue/packages", tags=["mock-hutch"], dependencies=[Depends(demo_only)])
     def mock_catalogue() -> dict[str, Any]:
         return {"packages": CATALOGUE}
 
@@ -1444,11 +1490,14 @@ _DEMO_COMPLAINTS = (
 
 
 def _customer_ref(principal: Principal) -> str:
-    """The signed-in customer's subject. Staff tokens have no subscriber."""
-    if principal.subscriber_ref is None or not principal.roles:
-        raise HTTPException(status_code=401, detail="sign in to continue")
-    if not principal.has(Permission.CASE_READ):
-        raise HTTPException(status_code=403, detail="this account may not read that case")
+    """The signed-in customer's own subject, after the route's ``self:*`` check.
+
+    The permission itself is declared on each route with ``requires(...)``
+    (I9). This only binds the request to the caller's own account; a staff
+    token has no subscriber, so it has no "me" to act on.
+    """
+    if principal.subscriber_ref is None:
+        raise HTTPException(status_code=403, detail="only a customer account has a 'me'")
     return principal.subscriber_ref
 
 

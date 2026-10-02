@@ -6,7 +6,7 @@
 |---|---|
 | Team | **[Team name - to fill]** · [University and batch - to fill] |
 | Track | **Track A - Resolve & Support:** Intelligent Automation & Root-Cause AI |
-| Status | Working prototype (447 tests). Migrating into the target architecture: step R1 done ([plan 21](docs/enterprise-plan/21-migration-and-deployment-plan.md)). |
+| Status | Working prototype (546 tests). Migrating into the target architecture: step R1 done ([plan 21](docs/enterprise-plan/21-migration-and-deployment-plan.md)). |
 
 One platform for HUTCH customers and staff: website, Hutch app, WhatsApp, SMS/USSD and the Clarity Desk staff console. For any charge it explains the exact cause with evidence, fixes safe cases by deterministic rule, and issues a signed, QR-verifiable **Trust Receipt** as proof.
 

@@ -16,6 +16,13 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.4 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| Module interaction | Calls through `public.py` for answers, outbox events for side effects; declared dependency map; event catalogue; delivery rules; first event-driven flow; R2a platform baseline (ADR-0029) | 21 §11 (new) |
+| Migration status | R0 done (acceptance suite); D7 fixed (`/mock/*` routes refused in `prod`) | 21 §3, §7 |
+
 ## v1.3.1 - 2026-10-02
 
 | Area | Change | Chapters |

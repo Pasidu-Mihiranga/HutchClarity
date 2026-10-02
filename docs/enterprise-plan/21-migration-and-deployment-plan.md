@@ -74,6 +74,8 @@ Notifications + channel gateway (WhatsApp, SMS/USSD) · proactive stream detecto
 | D4 | **Signed receipts named the wrong approver role.** Every staff-approved receipt said `supervisor`, even when finance approved. (Customers triggering a whitelisted AUTO_FIX is by design: policy is the authority; the trigger is now recorded on the token.) | `ReceiptService._actor` hard-coded the role | The result carries the approving roles; the receipt records them (for example `supervisor+finance`) | **Fixed** |
 | D5 | **ADR-0001 said rule parameters live in the policy store; they do not.** | Confidence and windows are in the YAML packs | Move parameters to the policy store | ADR amended; implementation in **R3** |
 | D6 | **`make check` failed on a clean clone.** | Playwright not declared; mypy could not find it | Optional `render` extra + mypy override | **Fixed** |
+| D7 | **Simulated-HUTCH `/mock/*` routes were open in every profile.** No sign-in, no profile guard; anyone could read any customer's synthetic charging, payment and consent records by ID. | Found by the R0 route audit | `demo_only` guard: 404 in `prod`; frozen by the route contract test | **Fixed** |
+| D8 | **Customer self-service routes used the wrong permission.** All ten `/v1/me/*` routes (including reload, buy a pack, cancel a subscription) were authorised by `case:read`, and a staff token got a misleading 401. | Found by the R0 route audit (rule I9) | Named permissions `self:read`, `self:settings`, `self:transact`, held only by customers and declared on each route; staff get 403 | **Fixed** |
 
 ## 4. Target package layout
 
@@ -190,10 +192,10 @@ The modular monolith is **microservice-ready by construction**: modules own thei
 
 | Step | Work | Done when |
 |---|---|---|
-| **R0 Freeze behaviour** | Black-box acceptance tests over `/v1` for the four journeys, auth, receipts, MCP tools; concurrency tests for double confirm | Suite green on today's code |
+| **R0 Freeze behaviour** | Black-box acceptance tests over `/v1` for the four journeys, auth, receipts, MCP tools; concurrency tests for double confirm | **Done 2026-10-02:** `backend/tests/acceptance` (route contract for all 66 routes, 6 journeys, OpenAPI snapshot of 54 operations) |
 | **R0.5 Fix defects D1-D6** | §3 | Each defect has a failing test first, then passes (done for D1-D4, D6) |
 | **R1 Restructure** | Target layout (§4); `backend/`; layers + module rule enforced; composition root in `app`, process entry in `entrypoints`; `public.py` per module; `MODULE.md` per module; docs merged (AGENTS.md, ADRs, plan) | **Done 2026-10-02:** 447 tests green; `make check` green; no behaviour change except the deliberate D1 contract |
-| **R2 Real infrastructure drivers** (`full` profile) - *started by the team: simulated estate and receipts in SQL* | PostgreSQL repositories + migrations + RLS; Kafka bus; Keycloak; OPA; Valkey; SeaweedFS; OpenBao; Compose `full` stack; nightly CI lane | Each driver passes its port's parity suite |
+| **R2 Real infrastructure drivers** (`full` profile; platform baseline R2a in §11.6) - *started by the team: simulated estate and receipts in SQL* | PostgreSQL repositories + migrations + RLS; Kafka bus; Keycloak; OPA; Valkey; SeaweedFS; OpenBao; Compose `full` stack; nightly CI lane | Each driver passes its port's parity suite |
 | **R3 Core modules move to the database and events** | case → timeline → detection → decision (ZEN table) → actions (DB idempotency, row locks) → receipts (event-driven); rule parameters into policy | Acceptance suite green in `lite` and `full`; two API replicas pass the concurrency tests |
 | **R4 Satellites** | Real MCP server; signer; AI gateway with roles; channel gateway; `hutch-sim` HTTP | External MCP client demo works; parity suites green over HTTP |
 | **R5 Frontend** - *started early by the team: Next.js 14 apps; build to verify* | Next.js `customer-web`, `console` (desk, insights, studio, admin), `verify`; shared UI, i18n, widget | Browser journeys pass; accessibility checks pass |
@@ -270,6 +272,90 @@ Docker, Kubernetes and Terraform are **never** required to build, run or test th
 | Every step | `ARCHITECTURE.md` (module map + status), affected `MODULE.md`, a devlog file, `CHANGELOG.md` |
 | A decision | ADR first, then this plan via [CHANGES.md](CHANGES.md) |
 | A flow changes | The walkthrough, re-verified |
+
+---
+
+## 11. Module interaction model (ADR-0029)
+
+### 11.1 The rule
+- **Call** a module's `public.py` when you need the answer to continue: read, evaluate, decide, propose, execute a confirmed plan.
+- **Publish an event** through the outbox for anything that *reacts* to a fact: receipts, notifications, audit, insights, reconciliation, Autopsy.
+- **Never** send an event as a remote command, never share tables, never pass raw PII in an event.
+
+### 11.2 Synchronous dependency map (declared and test-enforced)
+
+Source of truth: `backend/tests/architecture/test_module_dependencies.py`. A new edge needs that file and this table changed in the same PR.
+
+| Module | May call (public surface) | Why |
+|---|---|---|
+| `case` | `timeline`, `detection`, `decision`, `actions`, `receipts` | Orchestrates the resolution of one case |
+| `decision` | `detection` | Decides on the ranked causes |
+| `governance` | `decision` | Replays decisions under candidate policy |
+| `receipts` | `actions` | Reads result types (vocabulary only); moves to the `action.completed` event in §11.5 |
+| `timeline`, `detection`, `actions`, `iam`, `conversation`, `autopsy`, `foresight` | none | Leaf modules |
+
+```mermaid
+flowchart LR
+    case --> timeline
+    case --> detection
+    case --> decision
+    case --> actions
+    case --> receipts
+    decision --> detection
+    governance --> decision
+    receipts --> actions
+```
+
+### 11.3 Event catalogue
+
+Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key = `subscriber_ref` unless stated. Status: **exists** = defined in `platform/messaging/envelope.py` today; **planned** = to add.
+
+| Event | Producer | Consumers | Status |
+|---|---|---|---|
+| `case.created` | case | insights, autopsy | exists |
+| `cause.detected` | detection | insights, autopsy | exists |
+| `decision.generated` | decision | insights, desk queue projection | exists |
+| `action.requested` | actions | audit | exists |
+| `action.completed` | actions | **receipts** (issue proof), reconciliation, insights, audit | exists |
+| `action.failed` | actions | case (hand off), notifications, audit | exists |
+| `approval.requested` | actions | notifications (supervisor push), desk queue projection | planned |
+| `receipt.issued` | receipts | notifications (send link), insights, audit | exists |
+| `risk.detected` | proactive | case (open zero-contact case), notifications | exists |
+| `notification.sent` / `.failed` | notifications | insights, audit | planned |
+| `policy.published` / `rule.published` | governance | detection, decision (reload artefacts), audit | exists (`rule.published`) |
+| `switch.changed` | platform config | decision, ai gateway, audit | planned |
+| `mcp.invoked` | interfaces.mcp | audit, security alerts | exists |
+| `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |
+| `complaint.created` | channels / case | autopsy | exists |
+| `payment.recorded`, `charge.applied`, `usage.threshold_reached`, `pack.expiring`, `vas.renewed` | integration (HUTCH feeds) | proactive, timeline cache | exists |
+
+### 11.4 Delivery rules
+| Concern | Rule |
+|---|---|
+| Producing | Outbox row in the same transaction as the state change; a relay publishes it. No dual writes. |
+| Consuming | At-least-once; idempotent by event ID (`processed_event`); handlers must be safe to repeat |
+| Ordering | Per `subscriber_ref` (partition key); no ordering promise across subscribers |
+| Failure | Retry with backoff, then dead-letter queue + alert; money-affecting consumers never guess, they ask the owning module |
+| Versioning | Additive changes within `@vN`; breaking change = new version published alongside until consumers move |
+| Profiles | `lite`: in-process bus dispatching after commit; `full`/`prod`: Kafka; one parity suite for both |
+| Tests | Producer contract test per event type; consumer tests feed recorded events through the in-process bus |
+
+### 11.5 First event-driven flow: receipts on `action.completed`
+1. `actions` writes `action.completed` (plan, actions, approver roles, policy snapshot hash) to the outbox in the same unit of work as the plan status change.
+2. `receipts` consumes it and issues **one** receipt per plan; a repeated event finds the receipt already issued and does nothing.
+3. `case` stops calling `receipts` directly for executed plans; it reads the receipt for the response (and returns the original on a replay).
+4. The per-plan lock added for D1 is removed; the R0 acceptance suite and the D1 regression tests must stay green.
+
+Done when: 1,500 concurrent double confirms give one refund and one receipt, the `case → receipts` call edge is removed from §11.2 for this path, and the flow passes in `lite` and `full`.
+
+### 11.6 Work packages before §11.5 (R2a, platform baseline)
+| # | Work | Done when |
+|---|---|---|
+| R2a.1 | `clarity.contracts.events`: typed payloads per event, versioned | Producer contract tests exist for every "exists" row in §11.3 |
+| R2a.2 | Unit of work + repository interfaces per module (in-memory driver for `lite`) | Case, plan and receipt state go through repositories |
+| R2a.3 | Event bus port: in-process driver + Kafka driver, one parity suite | Same tests pass on both drivers |
+| R2a.4 | Outbox wired into the unit of work; relay; consumer framework with `processed_event` and dead-letter handling | Chaos test: kill the relay mid-flight, no lost or duplicated side effect |
+| R2a.5 | PostgreSQL repositories, schema and role per module, row-level security | Parity suites pass on PostgreSQL in the CI `full` lane |
 
 ---
 

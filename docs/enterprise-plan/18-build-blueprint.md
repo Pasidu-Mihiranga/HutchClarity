@@ -271,6 +271,7 @@ Roles are coarse, permissions are fine-grained (declared by modules), and **OPA*
 | Permission ↓ / Role → | customer | agent | supervisor | finance | vas_ops | cx_engineer | compliance | auditor | platform_admin | security_admin |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `case:read` (own) | ✅ | | | | | | | | | |
+| `self:read`, `self:settings`, `self:transact` (own account; self:transact = simulated HUTCH self-care such as reload) | ✅ | | | | | | | | | |
 | `case:read` (any) | | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | | |
 | `action:propose` | ✅ (own) | ✅ | ✅ | | ✅ | | | | | |
 | `action:approve` ≤ one-tap cap | | ✅ | ✅ | | | | | | | |
