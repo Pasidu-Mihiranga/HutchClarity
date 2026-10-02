@@ -6,9 +6,11 @@ from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.messaging.envelope import Event, EventType
 from clarity.platform.messaging.outbox import Outbox
 
+from ..support.events import SAMPLES
+
 
 def an_event(type_: EventType = EventType.ACTION_COMPLETED, subject: str = "sub_a") -> Event:
-    return Event(type=type_, subject=subject, data={"amount_lkr": "49.00"})
+    return Event.of(SAMPLES[type_], subject=subject)
 
 
 # --------------------------------------------------------------------------- #
@@ -109,7 +111,7 @@ def test_per_subject_ordering_is_preserved():
 def test_a_derived_event_keeps_the_trace():
     first = an_event(EventType.ACTION_COMPLETED)
 
-    second = first.caused(EventType.RECEIPT_ISSUED, receipt_id="TR-2027-000001")
+    second = first.caused(SAMPLES[EventType.RECEIPT_ISSUED])
 
     assert second.causation_id == first.id
     assert second.correlation_id == first.id
@@ -119,8 +121,8 @@ def test_a_derived_event_keeps_the_trace():
 def test_a_trace_can_be_reassembled_from_one_request():
     outbox = Outbox()
     first = outbox.append(an_event(EventType.CASE_CREATED))
-    outbox.append(first.caused(EventType.DECISION_GENERATED))
-    outbox.append(first.caused(EventType.RECEIPT_ISSUED))
+    outbox.append(first.caused(SAMPLES[EventType.DECISION_GENERATED]))
+    outbox.append(first.caused(SAMPLES[EventType.RECEIPT_ISSUED]))
     outbox.relay()
 
     assert len(outbox.trace(first.id)) == 3

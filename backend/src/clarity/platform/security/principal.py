@@ -69,6 +69,13 @@ class Permission(StrEnum):
     AUDIT_READ = "audit:read"
     KILL_SWITCH = "flags:kill_switch"
     ADMIN_MANAGE = "admin:manage"
+    SELF_READ = "self:read"
+    """Read your own account view, cases and receipts (customer self-service)."""
+    SELF_SETTINGS = "self:settings"
+    """Change your own preferences, safeguards and family links."""
+    SELF_TRANSACT = "self:transact"
+    """Simulated HUTCH self-care that moves money or changes a service on your own
+    account: reload, buy a pack, cancel a subscription. Not a Clarity remedy."""
 
 
 #: Permissions that move money or change a paid service. Admins never hold
@@ -101,6 +108,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ACTION_PROPOSE,
             Permission.ACTION_CONFIRM_OWN,
             Permission.RECEIPT_READ,
+            Permission.SELF_READ,
+            Permission.SELF_SETTINGS,
+            Permission.SELF_TRANSACT,
         }
     ),
     Role.AGENT: frozenset(

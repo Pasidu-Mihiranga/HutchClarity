@@ -11,7 +11,7 @@ These rules apply to **every contributor, human or AI coding agent**, across the
 1. This file.
 2. [`ARCHITECTURE.md`](ARCHITECTURE.md): what is built today, module status, deviations from the plan.
 3. The `MODULE.md` of the module you are touching (registry: [`docs/modules.md`](docs/modules.md)).
-4. The plan chapter for your area. Start with [21 Migration & deployment](docs/enterprise-plan/21-migration-and-deployment-plan.md), then [18 Build blueprint](docs/enterprise-plan/18-build-blueprint.md), [19 Tech stack & AI](docs/enterprise-plan/19-tech-stack-and-ai.md), [20 Policy change](docs/enterprise-plan/20-policy-change-management.md); chapters 01-17 for depth ([index](docs/enterprise-plan/README.md)).
+4. Your issue in [`docs/backlog/`](docs/backlog/README.md) and the plan chapter for your area. Start with [21 Migration & deployment](docs/enterprise-plan/21-migration-and-deployment-plan.md), [22 Agentic assistant & RAG](docs/enterprise-plan/22-agentic-assistant-and-rag.md), then [18 Build blueprint](docs/enterprise-plan/18-build-blueprint.md), [19 Tech stack & AI](docs/enterprise-plan/19-tech-stack-and-ai.md), [20 Policy change](docs/enterprise-plan/20-policy-change-management.md); chapters 01-17 for depth ([index](docs/enterprise-plan/README.md)).
 5. Accepted ADRs in [`docs/adr/`](docs/adr/README.md).
 
 **When documents disagree:** accepted ADR > `ARCHITECTURE.md` > plan chapters 18-21 > plan chapters 01-17. A disagreement is a bug: fix it in the same change, or raise it before writing code.
@@ -51,6 +51,7 @@ Hutch Clarity is a resolve-and-support platform for HUTCH (Sri Lanka) customers 
 | I19 | **One author per commit: the developer's own GitHub user.** No `Co-authored-by` trailers, no AI tool attribution (Claude, Cursor, Codex, Copilot or any other), no "Generated with" lines, in commits or PR descriptions. AI tools must have commit attribution turned off. See §10.1. |
 | I20 | **Business code never checks the runtime profile.** Only `clarity.app.container` reads `CLARITY_PROFILE` (test-enforced). Every driver passes its port's parity suite. |
 | I21 | **The deck wins.** `documents/Hutch Clarity (17 slides).pdf` is the authoritative concept; if the plan conflicts with it, fix the plan. Never edit the two source documents. |
+| I22 | **Calls for answers, events for side effects** (ADR-0029). A module calls another module's `public.py` only along the edges declared in `tests/architecture/test_module_dependencies.py` (acyclic). Anything that reacts to a fact (receipts, notifications, audit, insights) is an outbox event, never a call and never an event used as a command. |
 
 ---
 
@@ -67,11 +68,12 @@ Hutch Clarity is a resolve-and-support platform for HUTCH (Sri Lanka) customers 
 | `backend/src/clarity/app/` | Composition root (`container.py`, the only reader of `CLARITY_PROFILE`) and the narrow MCP view |
 | `backend/src/clarity/interfaces/` | `http` (FastAPI `/v1`, auth, static UI until R5) and `mcp` |
 | `backend/src/clarity/entrypoints/` | Process entry points (`asgi.py`) |
-| `backend/tests/` | unit, golden, property, contract (parity), architecture |
+| `backend/tests/` | unit, golden, property, contract (parity), architecture, acceptance (black-box `/v1`, route contract, OpenAPI snapshot) |
 | `frontend/` | Next.js apps (`customer-web`, `console`, `verify`) and packages (`ui`, `sdk`, `i18n`, `widget`); they use only the `/v1` API |
 | `rules/packs/`, `config/policy/`, `config/ai/` | Policy artefacts and AI model roles (YAML), shared by every profile |
 | `docs/enterprise-plan/` | The plan (changes via `CHANGES.md`) |
 | `docs/adr/` · `docs/devlog/` · `docs/walkthroughs/` · `docs/templates/` · `docs/modules.md` | Decisions · history · verified flows · templates · module registry |
+| `docs/backlog/` | Work items as issues: waves, dependencies, acceptance tests, Definition of Done |
 | `docs/submission/` | Hackathon submission material |
 | `documents/` | The two source documents (read-only) |
 
@@ -88,7 +90,9 @@ If your change does the left column, the same change must update the right colum
 | A module's public surface or a `/v1` contract | `CHANGELOG.md` and every consumer's `MODULE.md` |
 | A plan chapter | `docs/enterprise-plan/CHANGES.md` (+ an ADR if it is a decision) and the plan README revision table |
 | A new ADR | `docs/adr/README.md` index |
-| A new module, or a new dependency between modules | `docs/modules.md` and `ARCHITECTURE.md` module map |
+| A new module, or a new dependency between modules | `docs/modules.md`, `ARCHITECTURE.md`, the dependency map in `tests/architecture/test_module_dependencies.py` and plan 21 §11.2 |
+| A new or changed event | The producer's contract in `clarity.contracts.events`, plan 21 §11.3, and each producer and consumer `MODULE.md` |
+| A `/v1` contract change | Regenerate the snapshot (`UPDATE_GOLDEN=1 make test`), `CHANGELOG.md`, the frontend SDK |
 | A migration step lands (R0-R7) | `ARCHITECTURE.md` status and plan 21 |
 | A user-visible flow, setup step or demo path | The walkthrough (re-verified) and `docs/submission/DEMO_SCRIPT.md` |
 | An environment variable | `.env.example` and the deployment docs |

@@ -1,0 +1,361 @@
+"""Domain event contracts: typed, versioned payloads (ADR-0029, plan 21 §11.3).
+
+Every event Clarity publishes has one payload model per version, owned by the
+producing module and shared here so producers and consumers are checked
+against the same shape. The rules:
+
+- **Identifiers and minimal facts only.** A payload carries IDs, ``Money``
+  strings, hashes and enums. The subscriber is the envelope's ``subject``
+  (a pseudonymous ``subscriber_ref``), never a field here. A consumer that
+  needs more asks the owning module.
+- **No personal data, by construction.** A payload class cannot even be
+  defined with a field named like personal data (see ``_FORBIDDEN_SEGMENTS``).
+- **Versioned.** A schema is addressed as ``type@vN``. Additive changes stay
+  within a version; a breaking change is a new model registered as ``N+1``
+  and published alongside the old one until consumers move.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from enum import StrEnum
+from typing import Any, ClassVar, Literal
+
+from pydantic import Field, ValidationError
+
+from clarity.contracts.decision import ActionType, Outcome
+from clarity.kernel.common import Channel, ClarityModel, Language, Money
+
+
+class DomainEventType(StrEnum):
+    """The event catalogue (plan 21 §11.3).
+
+    Ingest events describe something that happened in a HUTCH system; core
+    events describe what Clarity did about it.
+    """
+
+    # Ingest - from HUTCH via adapters
+    PAYMENT_RECORDED = "payment.recorded"
+    CHARGE_APPLIED = "charge.applied"
+    USAGE_THRESHOLD_REACHED = "usage.threshold_reached"
+    PACK_EXPIRING = "pack.expiring"
+    VAS_RENEWED = "vas.renewed"
+    COMPLAINT_CREATED = "complaint.created"
+
+    # Core - Clarity's own outbox
+    CASE_CREATED = "case.created"
+    CAUSE_DETECTED = "cause.detected"
+    DECISION_GENERATED = "decision.generated"
+    ACTION_REQUESTED = "action.requested"
+    ACTION_COMPLETED = "action.completed"
+    ACTION_FAILED = "action.failed"
+    RECEIPT_ISSUED = "receipt.issued"
+    RISK_DETECTED = "risk.detected"
+    MCP_INVOKED = "mcp.invoked"
+    RULE_PUBLISHED = "rule.published"
+    RECONCILIATION_MISMATCH = "reconciliation.mismatch"
+
+
+#: Field-name segments that indicate personal data. Matched on ``_``-separated
+#: segments, so ``merchant_id`` is fine and ``merchant_name`` is not.
+_FORBIDDEN_SEGMENTS = frozenset(
+    {
+        "msisdn",
+        "phone",
+        "mobile",
+        "nic",
+        "passport",
+        "name",
+        "email",
+        "address",
+        "otp",
+        "card",
+        "cvv",
+    }
+)
+
+
+class UnknownEventSchema(LookupError):
+    """No payload model is registered for this event type and version."""
+
+
+class InvalidEventPayload(ValueError):
+    """A payload does not match its registered schema."""
+
+
+class EventPayload(ClarityModel):
+    """Base for every event payload. Strict: unknown fields are rejected."""
+
+    event_type: ClassVar[DomainEventType]
+    version: ClassVar[int] = 1
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for field_name in cls.__annotations__:
+            segments = set(field_name.lower().split("_"))
+            if segments & _FORBIDDEN_SEGMENTS:
+                raise TypeError(
+                    f"{cls.__name__}.{field_name}: event payloads must not carry personal "
+                    "data; reference it by ID and let the consumer ask the owning module"
+                )
+
+    @classmethod
+    def schema_id(cls) -> str:
+        return f"{cls.event_type.value}@v{cls.version}"
+
+
+# --------------------------------------------------------------------------- #
+# Ingest events (produced by integration adapters)
+# --------------------------------------------------------------------------- #
+
+
+class PaymentRecordedV1(EventPayload):
+    event_type = DomainEventType.PAYMENT_RECORDED
+    payment_ref: str
+    amount_lkr: Money
+    bank_ref_hash: str = Field(description="Hash of the bank reference, never the reference.")
+    captured_at: datetime
+
+
+class ChargeAppliedV1(EventPayload):
+    event_type = DomainEventType.CHARGE_APPLIED
+    charge_ref: str
+    amount_lkr: Money
+    merchant_id: str | None = None
+    service_id: str | None = None
+    rated_at: datetime
+
+
+class UsageThresholdReachedV1(EventPayload):
+    event_type = DomainEventType.USAGE_THRESHOLD_REACHED
+    offering_id: str
+    bucket: str
+    threshold_percent: int = Field(ge=1, le=100)
+    reached_at: datetime
+
+
+class PackExpiringV1(EventPayload):
+    event_type = DomainEventType.PACK_EXPIRING
+    offering_id: str
+    expires_at: datetime
+
+
+class VasRenewedV1(EventPayload):
+    event_type = DomainEventType.VAS_RENEWED
+    subscription_id: str
+    merchant_id: str
+    amount_lkr: Money
+    renewed_at: datetime
+
+
+class ComplaintCreatedV1(EventPayload):
+    event_type = DomainEventType.COMPLAINT_CREATED
+    complaint_id: str
+    channel: Channel
+    language: Language
+    case_id: str | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Core events (produced by Clarity modules through the outbox)
+# --------------------------------------------------------------------------- #
+
+
+class CaseCreatedV1(EventPayload):
+    event_type = DomainEventType.CASE_CREATED
+    case_id: str
+    case_no: str
+    channel: Channel
+    trigger: str
+    language: Language
+    money_at_stake_lkr: Money | None = None
+
+
+class CauseDetectedV1(EventPayload):
+    event_type = DomainEventType.CAUSE_DETECTED
+    case_id: str
+    rule_id: str
+    rule_version: int
+    confidence: float = Field(ge=0, le=1)
+    snapshot_hash: str
+    ruled_out: list[str] = Field(default_factory=list)
+
+
+class DecisionGeneratedV1(EventPayload):
+    event_type = DomainEventType.DECISION_GENERATED
+    case_id: str
+    decision_id: str
+    outcome: Outcome
+    amount_lkr: Money | None = None
+    policy_version: str
+    input_hash: str
+    config_snapshot_hash: str | None = None
+
+
+class ActionRequestedV1(EventPayload):
+    event_type = DomainEventType.ACTION_REQUESTED
+    case_id: str
+    plan_id: str
+    action_id: str
+    action_type: ActionType
+    amount_lkr: Money | None = None
+    idempotency_key: str
+
+
+class ActionStepV1(ClarityModel):
+    """One executed step, as reported in ``action.completed``."""
+
+    action_id: str
+    action_type: ActionType
+    amount_lkr: Money | None = None
+    status: str
+
+
+class ActionCompletedV1(EventPayload):
+    event_type = DomainEventType.ACTION_COMPLETED
+    case_id: str
+    plan_id: str
+    decision_id: str
+    steps: list[ActionStepV1] = Field(min_length=1)
+    confirmed_by: str
+    approver_roles: list[str] = Field(default_factory=list)
+    total_amount_lkr: Money
+    config_snapshot_hash: str | None = None
+
+
+class ActionFailedV1(EventPayload):
+    event_type = DomainEventType.ACTION_FAILED
+    case_id: str
+    plan_id: str
+    failed_step: ActionType
+    error_code: str
+    compensated: bool
+
+
+class ReceiptIssuedV1(EventPayload):
+    event_type = DomainEventType.RECEIPT_ISSUED
+    case_id: str
+    receipt_id: str
+    plan_id: str | None = None
+    payload_hash: str
+    key_id: str
+
+
+class RiskDetectedV1(EventPayload):
+    event_type = DomainEventType.RISK_DETECTED
+    risk_type: str
+    band: Literal["low", "medium", "high"]
+    score: float | None = Field(default=None, ge=0, le=1)
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
+class McpInvokedV1(EventPayload):
+    event_type = DomainEventType.MCP_INVOKED
+    invocation_id: str
+    tool: str
+    profile: str
+    allowed: bool
+    args_hash: str
+    result_hash: str | None = None
+    latency_ms: int = Field(ge=0)
+
+
+class RulePublishedV1(EventPayload):
+    event_type = DomainEventType.RULE_PUBLISHED
+    rule_id: str
+    rule_version: int
+    pack_hash: str
+    change_class: str
+
+
+class ReconciliationMismatchV1(EventPayload):
+    event_type = DomainEventType.RECONCILIATION_MISMATCH
+    plan_id: str
+    action_id: str
+    expected_lkr: Money
+    confirmed_lkr: Money | None = None
+    reason: str
+
+
+# --------------------------------------------------------------------------- #
+# Registry
+# --------------------------------------------------------------------------- #
+
+_PAYLOADS: tuple[type[EventPayload], ...] = (
+    PaymentRecordedV1,
+    ChargeAppliedV1,
+    UsageThresholdReachedV1,
+    PackExpiringV1,
+    VasRenewedV1,
+    ComplaintCreatedV1,
+    CaseCreatedV1,
+    CauseDetectedV1,
+    DecisionGeneratedV1,
+    ActionRequestedV1,
+    ActionCompletedV1,
+    ActionFailedV1,
+    ReceiptIssuedV1,
+    RiskDetectedV1,
+    McpInvokedV1,
+    RulePublishedV1,
+    ReconciliationMismatchV1,
+)
+
+#: (event type, schema version) -> payload model.
+REGISTRY: dict[tuple[DomainEventType, int], type[EventPayload]] = {
+    (model.event_type, 1): model for model in _PAYLOADS
+}
+
+
+def payload_model(event_type: DomainEventType | str, version: int = 1) -> type[EventPayload]:
+    """The payload model for ``event_type@v<version>``."""
+    try:
+        key = (DomainEventType(event_type), version)
+    except ValueError as error:
+        raise UnknownEventSchema(f"{event_type}@v{version}: unknown event type") from error
+    model = REGISTRY.get(key)
+    if model is None:
+        raise UnknownEventSchema(f"{key[0].value}@v{version}: no schema registered")
+    return model
+
+
+def validate_payload(
+    event_type: DomainEventType | str, data: dict[str, Any], version: int = 1
+) -> EventPayload:
+    """Check ``data`` against its registered schema, or raise a typed error."""
+    model = payload_model(event_type, version)
+    try:
+        return model.model_validate(data)
+    except ValidationError as error:
+        raise InvalidEventPayload(
+            f"{model.schema_id()}: {error.error_count()} problem(s)"
+        ) from error
+
+
+__all__ = [
+    "REGISTRY",
+    "ActionCompletedV1",
+    "ActionFailedV1",
+    "ActionRequestedV1",
+    "ActionStepV1",
+    "CaseCreatedV1",
+    "CauseDetectedV1",
+    "ChargeAppliedV1",
+    "ComplaintCreatedV1",
+    "DecisionGeneratedV1",
+    "DomainEventType",
+    "EventPayload",
+    "InvalidEventPayload",
+    "McpInvokedV1",
+    "PackExpiringV1",
+    "PaymentRecordedV1",
+    "ReceiptIssuedV1",
+    "ReconciliationMismatchV1",
+    "RiskDetectedV1",
+    "RulePublishedV1",
+    "UnknownEventSchema",
+    "UsageThresholdReachedV1",
+    "VasRenewedV1",
+    "payload_model",
+    "validate_payload",
+]

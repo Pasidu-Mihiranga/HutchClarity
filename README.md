@@ -6,7 +6,7 @@
 |---|---|
 | Team | **[Team name - to fill]** · [University and batch - to fill] |
 | Track | **Track A - Resolve & Support:** Intelligent Automation & Root-Cause AI |
-| Status | Working prototype (447 tests). Migrating into the target architecture: step R1 done ([plan 21](docs/enterprise-plan/21-migration-and-deployment-plan.md)). |
+| Status | Working prototype (546 tests). Migrating into the target architecture: step R1 done ([plan 21](docs/enterprise-plan/21-migration-and-deployment-plan.md)). |
 
 One platform for HUTCH customers and staff: website, Hutch app, WhatsApp, SMS/USSD and the Clarity Desk staff console. For any charge it explains the exact cause with evidence, fixes safe cases by deterministic rule, and issues a signed, QR-verifiable **Trust Receipt** as proof.
 
@@ -96,4 +96,4 @@ See [backend/pyproject.toml](backend/pyproject.toml). Key: FastAPI, Uvicorn, Pyd
 No model is configured by default. Model roles and the opt-in provider plan: [plan 19 §4](docs/enterprise-plan/19-tech-stack-and-ai.md). Declaration: [docs/submission/AI_DISCLOSURE.md](docs/submission/AI_DISCLOSURE.md).
 
 ## For contributors
-[AGENTS.md](AGENTS.md) (rules for people and AI agents) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/modules.md](docs/modules.md) · [docs/WALKTHROUGHS.md](docs/WALKTHROUGHS.md) · [docs/devlog/](docs/devlog/README.md)
+[AGENTS.md](AGENTS.md) (rules for people and AI agents) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/backlog](docs/backlog/README.md) (issues by wave) · [docs/modules.md](docs/modules.md) · [docs/WALKTHROUGHS.md](docs/WALKTHROUGHS.md) · [docs/devlog/](docs/devlog/README.md)

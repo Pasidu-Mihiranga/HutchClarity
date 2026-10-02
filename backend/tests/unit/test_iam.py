@@ -617,3 +617,15 @@ def test_the_otp_inbox_is_a_demo_only_route():
     assert client.post("/v1/demo/reset").status_code == 404
     # The gate is on the demo routes only; the rest still answer as themselves.
     assert client.get("/v1/desk/queue").status_code == 401
+
+
+def test_self_service_permissions_belong_to_customers_only():
+    """A staff role never gets a customer's self-service rights, however senior."""
+    from clarity.platform.security.principal import ROLE_PERMISSIONS, Permission, Role
+
+    self_service = {Permission.SELF_READ, Permission.SELF_SETTINGS, Permission.SELF_TRANSACT}
+
+    assert self_service <= ROLE_PERMISSIONS[Role.CUSTOMER]
+    for role, permissions in ROLE_PERMISSIONS.items():
+        if role is not Role.CUSTOMER:
+            assert not (self_service & permissions), role

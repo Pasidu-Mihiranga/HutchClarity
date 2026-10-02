@@ -7,7 +7,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | Item | Value |
 |---|---|
 | Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
-| Version / date | **v1.3 (merged)** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
+| Version / date | **v1.5** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
 | Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
 | Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
@@ -51,6 +51,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | [19-tech-stack-and-ai.md](19-tech-stack-and-ai.md) | Enterprise tech stack with selection criteria, AWS/Azure/on-prem mapping, AI model roles (Gemini + Groq) | ch. 19 |
 | [20-policy-change-management.md](20-policy-change-management.md) | Policy & change management: packs, prices, caps, regulations, rules, wording | ch. 20 |
 | [21-migration-and-deployment-plan.md](21-migration-and-deployment-plan.md) | **Migration plan** (prototype → target architecture) and **runtime model**: containers for the core, serverless at the edges, microservice extraction path | ch. 21 |
+| [22-agentic-assistant-and-rag.md](22-agentic-assistant-and-rag.md) | **Agentic assistant**: flows as state machines, bounded agent step, RAG with citations, guardrails, evaluation | ch. 22 |
 | [CHANGES.md](CHANGES.md) | Plan change record and the process for changing this plan | - |
 
 ## Reading paths
@@ -59,7 +60,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 |---|---|
 | Hackathon judges | [01](01-executive-summary-problem.md) → [05](05-architecture-diagrams.md) → [06](06-integration-tmf.md) → [13](13-delivery-plan.md) → [15](15-cost-scale-failure-kpi.md) → [16](16-gap-submission-repo-docs.md) → [17](17-governance-compliance-change-cost.md) |
 | Solution architects / engineering | [21](21-migration-and-deployment-plan.md), [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md), [04](04-enterprise-architecture.md), [05](05-architecture-diagrams.md), [09](09-rules-decision-receipts.md), [10](10-data-api-events.md), [12](12-platform-devops-testing-observability.md) |
-| AI / MCP teams | [07](07-mcp.md), [08](08-ai-architecture.md), [15](15-cost-scale-failure-kpi.md) |
+| AI / MCP teams | [22](22-agentic-assistant-and-rag.md), [07](07-mcp.md), [08](08-ai-architecture.md), [15](15-cost-scale-failure-kpi.md) |
 | Security & compliance | [11](11-security-privacy-audit.md), [17 §48](17-governance-compliance-change-cost.md), [07](07-mcp.md), [14](14-risk-pilot-readiness-operations.md) |
 | CX, product, finance, business | [01](01-executive-summary-problem.md), [02](02-solution-capabilities.md), [03](03-requirements-personas-journeys.md), [09](09-rules-decision-receipts.md), [14](14-risk-pilot-readiness-operations.md), [17](17-governance-compliance-change-cost.md) |
 | Project management / DevOps / SRE | [13](13-delivery-plan.md), [17](17-governance-compliance-change-cost.md), [12](12-platform-devops-testing-observability.md), [14](14-risk-pilot-readiness-operations.md) |
@@ -75,6 +76,8 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.1 | 2026-10-01 | **Plan audit.** The plan was checked against the 51-point brief, the Final Submission Guidelines and all 17 deck slides. Gaps found and added are listed below. |
 | v1.2 | 2026-10-01 | Parallel line ("Plan v1"): build blueprint, tech stack with AI roles, policy change management, runtime profiles. Kept as chapters 18–20. |
 | v1.3 | 2026-10-02 | **Merged plan.** v1.1 audit + the v1.2 line + chapter 21 (migration and runtime model). Details in [CHANGES.md](CHANGES.md). |
+| v1.4 | 2026-10-02 | Module interaction model (21 §11, ADR-0029); R0 acceptance suite; D7. |
+| v1.5 | 2026-10-02 | Agentic assistant and RAG (ch. 22, ADR-0030); per-module backlog with acceptance tests and DoD (`docs/backlog`). |
 
 ### v1.1 audit: gaps found and added
 
