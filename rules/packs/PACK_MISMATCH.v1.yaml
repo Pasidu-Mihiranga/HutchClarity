@@ -1,0 +1,33 @@
+# A purchased pack and the pack provisioned for the same order disagree.
+rule_id: PACK_MISMATCH
+version: 1
+status: active
+owner: product-data
+description: "The pack provisioned for an order differs from the pack purchased."
+
+required_evidence: [catalogue, charging]
+
+conditions:
+  all:
+    - exists:
+        event: pack_purchased
+        as: purchased
+    - exists:
+        event: pack_activated
+        as: activated
+        where: { order_id: "$purchased.order_id" }
+        after: "$purchased.at"
+        within_param: detection.pack_mismatch.activation_window
+    - compare: { left: "$activated.offering_id", op: ne, right: "$purchased.offering_id" }
+
+confidence_param: detection.pack_mismatch.confidence_base
+rules_out: [WRONG_PACK_PURCHASE]
+category: pack_mismatch
+money_effect: { value: "$purchased.amount" }
+allowed_actions: [REFUND, CREATE_SUPPORT_CASE]
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+explanation_templates:
+  en: pack_mismatch_en_v1
+  si: pack_mismatch_si_v1
+  ta: pack_mismatch_ta_v1

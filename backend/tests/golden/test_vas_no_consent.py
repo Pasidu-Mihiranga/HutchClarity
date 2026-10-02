@@ -188,7 +188,9 @@ def test_unreadable_consent_log_makes_the_rule_indeterminate(
 def test_never_matches_when_consent_precedes_the_charge(offset_hours: int):
     """For any prior-consent gap, the rule must stay silent."""
     from clarity.modules.detection.pack import load_packs
-    from tests.conftest import PACKS_DIR
+    from clarity.modules.detection.parameters import PolicyRuleParameters
+    from clarity.platform.config.resolver import PolicyResolver
+    from tests.conftest import PACKS_DIR, POLICY_DIR
 
     engine = RuleEngine(load_packs(PACKS_DIR))
     snap = SnapshotBuilder()
@@ -207,4 +209,11 @@ def test_never_matches_when_consent_precedes_the_charge(offset_hours: int):
         subscription_id="SUB-1",
     )
 
-    assert outcome_for(engine, snap.build()) is None
+    snapshot = snap.build()
+    parameters = PolicyRuleParameters(
+        PolicyResolver.from_directory(POLICY_DIR), as_of=snapshot.built_at
+    )
+    assert all(
+        found.assessment.rule_id != RULE
+        for found in engine.evaluate(snapshot, parameters=parameters).matched
+    )

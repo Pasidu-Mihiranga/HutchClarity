@@ -1,0 +1,32 @@
+# A previous emergency-credit advance was recovered from a later reload.
+rule_id: LOAN_RECOVERY
+version: 1
+status: active
+owner: payments-ops
+description: "A balance reduction is the recorded recovery of earlier emergency credit."
+
+required_evidence: [loans, charging]
+
+conditions:
+  all:
+    - exists:
+        event: loan_given
+        as: loan
+    - exists:
+        event: loan_recovered
+        as: recovery
+        where: { loan_id: "$loan.loan_id" }
+        after: "$loan.at"
+        within_param: detection.loan_recovery.window
+    - compare: { left: "$recovery.amount", op: lte, right: "$loan.amount" }
+
+confidence_param: detection.loan_recovery.confidence_base
+rules_out: [RELOAD_NOT_CREDITED, DUPLICATE_RELOAD]
+category: loan_recovery
+allowed_actions: []
+auto_fix_whitelisted: false
+disclosed_to_customer: true
+explanation_templates:
+  en: loan_recovery_en_v1
+  si: loan_recovery_si_v1
+  ta: loan_recovery_ta_v1

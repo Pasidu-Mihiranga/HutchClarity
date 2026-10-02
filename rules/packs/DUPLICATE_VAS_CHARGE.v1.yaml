@@ -27,10 +27,10 @@ conditions:
         as: b
         where: { subscription_id: "$a.subscription_id" }
         after: "$a.at"
-        within: PT12H
+        within_param: detection.duplicate_vas_charge.window
     - compare: { left: "$b.amount", op: eq, right: "$a.amount" }
 
-confidence_base: 0.95
+confidence_param: detection.duplicate_vas_charge.confidence_base
 
 rules_out:
   - LOAN_RECOVERY

@@ -50,24 +50,24 @@ tests_ref: tests/rules/VAS_NO_CONSENT/v4/
 ### 13.3 Candidate rule catalogue (16)
 **Inferred from deck causes - final list REQUIRES HUTCH product/CX confirmation.**
 
-| # | Rule ID | Cause | Typical outcome | Deck basis |
-|---|---|---|---|---|
-| 1 | VAS_NO_CONSENT | VAS charge with no OTP / second confirmation | One-tap fix | S6, S7 |
-| 2 | VAS_RENEWAL_UNNOTIFIED | Renewal without required prior notice (**policy to confirm**) | One-tap fix / explain | S6 "early VAS renewal" |
-| 3 | DUPLICATE_RELOAD | Two captures, one credit | Auto-fix | S2, S5 |
-| 4 | RELOAD_NOT_CREDITED | Capture with no balance credit | Auto-fix if small, else staff | S2, S11 |
-| 5 | PAYMENT_PENDING_SETTLEMENT | Bank pending; not yet failed | Explain only + watch | `[PROPOSED]` |
-| 6 | PACK_EXPIRY_BURN | Data on main balance after pack end | Explain + safeguard offer | S6, S7 |
-| 7 | FUP_CAP_REACHED | Throttled after disclosed FUP | Explain only | S2, S7 |
-| 8 | FUP_NOT_DISCLOSED | Cap applied but not shown at purchase (catalogue version) | Staff / one-tap remedy | S5 pack truth label |
-| 9 | PACK_MISMATCH | Sold pack ≠ provisioned pack | One-tap fix + product alert | S10, S11 |
-| 10 | SOCIAL_PACK_SCOPE | App traffic outside social-pack scope | Explain only | S11 |
-| 11 | PACK_SUNSET | Retired pack auto-migrated | Explain + migration card | S11 |
-| 12 | LOAN_RECOVERY | Emergency credit recovered from reload | Explain only | S7 |
-| 13 | BALANCE_BURN_PAYG | Pay-as-you-go usage with no pack | Explain + safeguard | S11 |
-| 14 | WRONG_PACK_PURCHASE | Customer bought the wrong pack (even if used) | One-tap fix within policy window | S7 |
-| 15 | DUPLICATE_VAS_CHARGE | Same subscription charged twice in a period | Auto-fix | `[PROPOSED]` |
-| 16 | OUTAGE_DURING_PACK | Network outage consumed pack validity | Staff / goodwill per policy | S6, S10 |
+| # | Rule ID | Status | Cause | Typical outcome | Deck basis |
+|---|---|---|---|---|---|
+| 1 | VAS_NO_CONSENT | active | VAS charge with no OTP / second confirmation | One-tap fix | S6, S7 |
+| 2 | VAS_RENEWAL_UNNOTIFIED | active | Renewal without required prior notice (**policy to confirm**) | One-tap fix / explain | S6 "early VAS renewal" |
+| 3 | DUPLICATE_RELOAD | active | Two captures, one credit | Auto-fix | S2, S5 |
+| 4 | RELOAD_NOT_CREDITED | active | Capture with no balance credit | Auto-fix if small, else staff | S2, S11 |
+| 5 | PAYMENT_PENDING_SETTLEMENT | candidate | Bank pending; not yet failed | Explain only + watch | `[PROPOSED]` |
+| 6 | PACK_EXPIRY_BURN | active | Data on main balance after pack end | Explain + safeguard offer | S6, S7 |
+| 7 | FUP_CAP_REACHED | active | Throttled after disclosed FUP | Explain only | S2, S7 |
+| 8 | FUP_NOT_DISCLOSED | candidate | Cap applied but not shown at purchase (catalogue version) | Staff / one-tap remedy | S5 pack truth label |
+| 9 | PACK_MISMATCH | active | Sold pack ≠ provisioned pack | One-tap fix + product alert | S10, S11 |
+| 10 | SOCIAL_PACK_SCOPE | candidate | App traffic outside social-pack scope | Explain only | S11 |
+| 11 | PACK_SUNSET | candidate | Retired pack auto-migrated | Explain + migration card | S11 |
+| 12 | LOAN_RECOVERY | active | Emergency credit recovered from reload | Explain only | S7 |
+| 13 | BALANCE_BURN_PAYG | candidate | Pay-as-you-go usage with no pack | Explain + safeguard | S11 |
+| 14 | WRONG_PACK_PURCHASE | candidate | Customer bought the wrong pack (even if used) | One-tap fix within policy window | S7 |
+| 15 | DUPLICATE_VAS_CHARGE | active | Same subscription charged twice in a period | Auto-fix | `[PROPOSED]` |
+| 16 | OUTAGE_DURING_PACK | active | Network outage consumed pack validity | Staff / goodwill per policy | S6, S10 |
 
 ### 13.4 Rule lifecycle (teach once → publish) - Diagram 23
 

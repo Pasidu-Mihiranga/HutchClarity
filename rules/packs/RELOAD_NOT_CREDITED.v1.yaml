@@ -29,7 +29,7 @@ conditions:
         event: payment_failed
         where: { bank_ref: "$p.bank_ref" }
 
-confidence_base: 0.80
+confidence_param: detection.reload_not_credited.confidence_base
 confidence_adjustments:
   - amount: -0.30
     reason: "charging records incomplete, so the credit may exist but be unreadable"

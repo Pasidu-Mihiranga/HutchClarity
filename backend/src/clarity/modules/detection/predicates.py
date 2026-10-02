@@ -39,7 +39,17 @@ from clarity.contracts.timeline import EventType, EvidenceSnapshot, TimelineEven
 
 Bindings = dict[str, TimelineEvent]
 
-_SELECTOR_KEYS = {"event", "as", "where", "after", "before", "within", "at_least", "at_most"}
+_SELECTOR_KEYS = {
+    "event",
+    "as",
+    "where",
+    "after",
+    "before",
+    "within",
+    "within_param",
+    "at_least",
+    "at_most",
+}
 _DURATION_RE = re.compile(
     r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?)?$"
 )
@@ -88,6 +98,10 @@ def validate_condition(node: Any, *, path: str = "conditions") -> None:
                 raise RuleSyntaxError(f"{path}.{key}: unknown event {value['event']!r}") from error
             if key == "count" and not ({"at_least", "at_most"} & set(value)):
                 raise RuleSyntaxError(f"{path}.count: needs 'at_least' and/or 'at_most'")
+            if "within" in value and "within_param" in value:
+                raise RuleSyntaxError(
+                    f"{path}.{key}: use exactly one of 'within' or 'within_param'"
+                )
             for field in ("within",):
                 if field in value:
                     parse_duration(str(value[field]))

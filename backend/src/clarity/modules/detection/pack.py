@@ -90,7 +90,18 @@ class RulePack(ClarityModel):
         description="Sources that must answer completely, or the rule is indeterminate.",
     )
     conditions: dict[str, Any]
-    confidence_base: float = Field(ge=0, le=1)
+    confidence_base: float | None = Field(default=None, ge=0, le=1)
+    """A literal confidence. Use ``confidence_param`` instead to make it policy.
+
+    One of the two is required. A literal is fine for a rule whose confidence is
+    a property of its logic; a parameter is for one that Risk tunes, because a
+    literal here means a code release and a rule bundle to change a number
+    (D5, ADR-0001).
+    """
+    confidence_param: str | None = Field(
+        default=None,
+        description="Policy key holding this rule's base confidence, resolved as_of the event.",
+    )
     confidence_adjustments: list[ConfidenceAdjustment] = Field(default_factory=list)
     rules_out: list[str] = Field(
         default_factory=list,
@@ -101,6 +112,25 @@ class RulePack(ClarityModel):
     allowed_actions: list[ActionType] = Field(default_factory=list)
     safeguard: ActionType | None = None
     recurrence_check: str | None = None
+
+    @model_validator(mode="after")
+    def _confidence_has_exactly_one_source(self) -> RulePack:
+        """A pack states its confidence once, as a literal or as a parameter.
+
+        Refused at load rather than defaulted, because a pack with neither has
+        no confidence to report and one with both has two answers that can
+        disagree. A rule bundle that cannot be read is better than a rule that
+        reports a number nobody chose.
+        """
+        has_literal = self.confidence_base is not None
+        has_param = self.confidence_param is not None
+        if has_literal == has_param:
+            raise ValueError(
+                f"{self.rule_id}@{self.version}: set exactly one of confidence_base "
+                "(a literal) or confidence_param (a policy key)"
+            )
+        return self
+
     disclosed_to_customer: bool = Field(
         default=False,
         description="True when the cause is a rule the customer saw at purchase; "

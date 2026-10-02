@@ -1,0 +1,39 @@
+# ASSUMPTION - REQUIRES HUTCH CONFIRMATION: a renewal notice is required in
+# the policy window before a paid VAS renewal.
+rule_id: VAS_RENEWAL_UNNOTIFIED
+version: 1
+status: active
+owner: vas-ops
+description: "A paid VAS renewed without a recorded advance notice."
+
+required_evidence: [charging, vas_consent]
+
+conditions:
+  all:
+    - exists:
+        event: subscription_renewed
+        as: renewal
+    - exists:
+        event: vas_charge
+        as: charge
+        where: { subscription_id: "$renewal.subscription_id" }
+        after: "$renewal.at"
+    - absent:
+        event: vas_renewal_notice
+        where: { subscription_id: "$renewal.subscription_id" }
+        before: "$renewal.at"
+        within_param: detection.vas_renewal_unnotified.notice_window
+
+confidence_param: detection.vas_renewal_unnotified.confidence_base
+rules_out: [VAS_NO_CONSENT, DUPLICATE_VAS_CHARGE]
+category: unnotified_vas_renewal
+money_effect: { value: "$charge.amount" }
+allowed_actions: [REFUND, DEACTIVATE_VAS]
+safeguard: DEACTIVATE_VAS
+recurrence_check: vas_inactive
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+explanation_templates:
+  en: vas_renewal_unnotified_en_v1
+  si: vas_renewal_unnotified_si_v1
+  ta: vas_renewal_unnotified_ta_v1

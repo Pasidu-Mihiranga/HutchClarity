@@ -48,6 +48,7 @@ class EventType(StrEnum):
     SECOND_CONFIRMATION = "second_confirmation"
     SUBSCRIPTION_CREATED = "subscription_created"
     SUBSCRIPTION_RENEWED = "subscription_renewed"
+    VAS_RENEWAL_NOTICE = "vas_renewal_notice"
     SUBSCRIPTION_DEACTIVATED = "subscription_deactivated"
     # catalogue / packs
     PACK_PURCHASED = "pack_purchased"
@@ -58,6 +59,7 @@ class EventType(StrEnum):
     USAGE_THRESHOLD_CROSSED = "usage_threshold_crossed"
     FUP_CAP_REACHED = "fup_cap_reached"
     THROTTLE_APPLIED = "throttle_applied"
+    NETWORK_OUTAGE = "network_outage"
     # loans
     LOAN_GIVEN = "loan_given"
     LOAN_RECOVERED = "loan_recovered"

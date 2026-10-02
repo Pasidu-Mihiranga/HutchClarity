@@ -23,7 +23,7 @@ conditions:
         as: second
         where: { bank_ref: "$first.bank_ref" }
         after: "$first.at"
-        within: PT30M
+        within_param: detection.duplicate_reload.window
     - compare: { left: "$second.amount", op: eq, right: "$first.amount" }
     # Credited once (or not at all) despite two captures.
     - count:
@@ -35,7 +35,7 @@ conditions:
         event: payment_reversed
         where: { bank_ref: "$first.bank_ref" }
 
-confidence_base: 0.97
+confidence_param: detection.duplicate_reload.confidence_base
 confidence_adjustments:
   - amount: -0.35
     reason: "payment records incomplete, so the second capture may be a reporting artefact"

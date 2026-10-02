@@ -23,9 +23,9 @@ conditions:
         as: burn
         where: { reason: payg_data }
         after: "$expiry.at"
-        within: P7D
+        within_param: detection.pack_expiry_burn.window
 
-confidence_base: 0.88
+confidence_param: detection.pack_expiry_burn.confidence_base
 
 rules_out:
   - FUP_CAP_REACHED

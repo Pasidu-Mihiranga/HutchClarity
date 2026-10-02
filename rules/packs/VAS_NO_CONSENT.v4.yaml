@@ -29,7 +29,7 @@ conditions:
         where: { subscription_id: "$c.subscription_id" }
         before: "$c.at"
 
-confidence_base: 0.90
+confidence_param: detection.vas_no_consent.confidence_base
 confidence_adjustments:
   - amount: 0.06
     reason: "merchant is already on the watch list"

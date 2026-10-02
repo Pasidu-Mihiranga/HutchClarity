@@ -26,7 +26,7 @@ conditions:
           fup_disclosed: true
         before: "$cap.at"
 
-confidence_base: 0.94
+confidence_param: detection.fup_cap_reached.confidence_base
 confidence_adjustments:
   - amount: 0.04
     reason: "throttling is recorded, confirming the cap took effect"

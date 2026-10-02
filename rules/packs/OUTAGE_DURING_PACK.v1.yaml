@@ -1,0 +1,37 @@
+# ASSUMPTION - REQUIRES HUTCH CONFIRMATION: a recorded network outage in the
+# pack's service area may justify a staff-reviewed goodwill remedy.
+rule_id: OUTAGE_DURING_PACK
+version: 1
+status: active
+owner: network-ops
+description: "A network outage occurred while a paid pack was active."
+
+required_evidence: [catalogue, usage_fup]
+
+conditions:
+  all:
+    - exists:
+        event: pack_activated
+        as: pack
+    - exists:
+        event: network_outage
+        as: outage
+        where: { region: "$pack.region" }
+        after: "$pack.at"
+        within_param: detection.outage_during_pack.window
+    - absent:
+        event: pack_expired
+        where: { offering_id: "$pack.offering_id" }
+        before: "$outage.at"
+
+confidence_param: detection.outage_during_pack.confidence_base
+rules_out: [FUP_CAP_REACHED]
+category: outage_during_pack
+money_effect: { value: "$pack.amount" }
+allowed_actions: [REFUND, CREATE_SUPPORT_CASE]
+auto_fix_whitelisted: false
+disclosed_to_customer: false
+explanation_templates:
+  en: outage_during_pack_en_v1
+  si: outage_during_pack_si_v1
+  ta: outage_during_pack_ta_v1

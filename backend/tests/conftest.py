@@ -21,6 +21,7 @@ from clarity.kernel.common import Completeness, EventSource, money
 from clarity.modules.decision.policy import DecisionPolicy
 from clarity.modules.detection.engine import RuleEngine
 from clarity.modules.detection.pack import RulePack, load_packs
+from clarity.modules.detection.parameters import PolicyRuleParameters
 from clarity.modules.timeline.builder import TimelineBuilder, TimelineRequest
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.observability import configure_tracing
@@ -35,8 +36,11 @@ def packs() -> list[RulePack]:
 
 
 @pytest.fixture
-def engine(packs: list[RulePack]) -> RuleEngine:
-    return RuleEngine(packs)
+def engine(packs: list[RulePack], policies: PolicyResolver) -> RuleEngine:
+    return RuleEngine(
+        packs,
+        parameters=PolicyRuleParameters(policies, as_of=DEMO_NOW),
+    )
 
 
 @pytest.fixture
