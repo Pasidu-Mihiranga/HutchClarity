@@ -30,6 +30,20 @@ class ProviderError(RuntimeError):
     """The provider could not answer. The gateway falls back to a template."""
 
 
+class ProviderRateLimited(ProviderError):
+    """The provider refused for quota reasons (HTTP 429, or a quota message).
+
+    Separate from any other failure because the response differs: a rate limit
+    means try the next provider in the role's chain, where a malformed response
+    means this provider is misconfigured and the next one probably is too. On a
+    free tier this is the common case, not an exception.
+    """
+
+    def __init__(self, message: str, *, retry_after_seconds: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
+
 @dataclass
 class ProviderConfig:
     """Where the model lives. Read from the environment, never hard-coded."""
@@ -110,6 +124,12 @@ class OpenAICompatibleProvider:
                     "max_tokens": self.config.max_output_tokens,
                 },
             )
+            if response.status_code == 429:
+                retry_after = response.headers.get("retry-after")
+                raise ProviderRateLimited(
+                    f"{self.config.model} is rate limited",
+                    retry_after_seconds=float(retry_after) if retry_after else None,
+                )
             response.raise_for_status()
             body: dict[str, Any] = response.json()
         except httpx.HTTPError as error:

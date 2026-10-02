@@ -19,6 +19,10 @@ roles:
     fallback:
       - provider: gemini
         model: gemini-2.0-flash-lite
+      # Keyword rules. Real local capability, and the path C04 wants used first
+      # anyway: the model is only asked when the rules are unsure.
+      - provider: local-rules
+        model: keyword-intake
 
   reason:
     primary:
@@ -29,6 +33,10 @@ roles:
         model: openai/gpt-oss-120b
       - provider: gemini
         model: gemini-2.0-flash-lite
+      # The same approved wording the fast-text role ends with. An explanation
+      # from a template is shorter than a model's, and it is always correct.
+      - provider: template
+        model: local-template
 
   judge:
     primary:
@@ -37,6 +45,11 @@ roles:
     fallback:
       - provider: groq
         model: openai/gpt-oss-120b
+      # Returns "unscored", deterministically. There is no local way to judge
+      # an answer's quality, so this reports that the evaluation could not be
+      # made rather than inventing a score a release gate would then trust.
+      - provider: local-unscored
+        model: no-judgement
 
   guard:
     primary:
@@ -61,6 +74,12 @@ roles:
     fallback:
       - provider: groq
         model: whisper-large-v3-turbo
+      # Returns "transcription unavailable", never a guessed transcript. A
+      # fabricated transcript would be invented customer input, and the whole
+      # system treats customer text as a hint to be checked against records
+      # (I2). The conversation flow reads this as "no text" and hands off.
+      - provider: local-unavailable
+        model: no-transcription
 
   tts:
     primary:
