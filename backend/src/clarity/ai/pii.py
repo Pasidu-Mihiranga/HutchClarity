@@ -88,6 +88,116 @@ _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _PASSPORT = re.compile(r"\b[A-Z]\d{7}\b")
 _ACCOUNT = re.compile(r"\b\d{10,16}\b")
 
+# --------------------------------------------------------------------------- #
+# Names (A03)
+# --------------------------------------------------------------------------- #
+#
+# `PiiKind.NAME` existed with nothing behind it, so a customer's name went
+# straight to the model in every language while numbers and NICs were masked.
+#
+# Full name recognition needs a model, which is not available on the masking
+# path: masking has to happen *before* anything is sent anywhere (I13), so it
+# cannot itself depend on a provider. These are high-precision signals instead,
+# each one a case where the text says "this is a name" rather than a guess from
+# capitalisation. Over-masking is its own harm: a reply built from text with the
+# nouns removed is not an explanation anyone can read.
+
+#: "my name is X" in the four languages the deck promises, including Singlish,
+#: which is how people actually type. The customer is naming themselves here, so
+#: whatever follows is a name.
+#:
+#: Two things this deliberately does **not** do.
+#:
+#: It does not treat "I am" or "මම" as an introduction. They are far more often
+#: an ordinary sentence ("I am not happy", "I am still waiting"), and masking
+#: the words after them turns a complaint into nonsense. A name missed here is
+#: usually caught by the surname gazetteer below; a complaint mangled here is
+#: lost for good.
+#:
+#: And the case-insensitivity is scoped to the prefix with ``(?i:...)`` rather
+#: than applied to the whole pattern. A global ``IGNORECASE`` silently defeats
+#: the ``[A-Z]`` that makes the name group require a capital, which is how the
+#: first version of this read "I am not happy" as a name.
+_NAME_INTRODUCTION = re.compile(
+    r"(?i:"
+    r"my\s+name\s+is|name\s+is|this\s+is"  # English
+    r"|mage\s+nama|magee\s+nama"  # Singlish
+    r")"
+    r"\s+"
+    r"((?:[A-Z][a-z'\-]+(?:\s+[A-Z][a-z'\-]+){0,2}))",
+    re.UNICODE,
+)
+
+#: The same, for scripts that have no notion of case, so the capitalisation
+#: rule above cannot be used to tell a name from an ordinary word.
+_NAME_INTRODUCTION_LOCAL = re.compile(
+    # Written as codepoints, not as literal script, after a one-character
+    # corruption silently broke this pattern: the Tamil pulli (U+0BCD) had
+    # become the Sinhala al-lakuna (U+0DCA), which is indistinguishable by eye
+    # and made every Tamil name leak. A reviewer cannot check a virama visually,
+    # so the file says which one it means.
+    #
+    #   Sinhala: "mage nama" / "maage nama"      Tamil: "en peyar" / "enathu peyar"
+    r"(?:\u0db8\u0d9c\u0dda\s+\u0db1\u0db8|\u0db8\u0dcf\u0d9c\u0dda\s+\u0db1\u0db8|\u0b8e\u0ba9\u0bcd\s+\u0baa\u0bc6\u0baf\u0bb0\u0bcd|\u0b8e\u0ba9\u0ba4\u0bc1\s+\u0baa\u0bc6\u0baf\u0bb0\u0bcd)"
+    r"\s+"
+    r"((?:[\u0d80-\u0dff\u0b80-\u0bff]+(?:\s+[\u0d80-\u0dff\u0b80-\u0bff]+){0,2}))",
+    re.UNICODE,
+)
+
+#: An honorific is an explicit marker that a name follows.
+_NAME_HONORIFIC = re.compile(
+    r"(?:Mr|Mrs|Ms|Miss|Dr|Rev|Prof)\.?\s+"
+    r"((?:[A-Z][a-z'\-]+)(?:\s+[A-Z][a-z'\-]+){0,2})",
+    re.UNICODE,
+)
+
+#: Common Sri Lankan surnames. A gazetteer rather than a rule, because these
+#: are ordinary words in no other sense and catching them is high precision.
+#: Deliberately short and reviewable; it is not meant to be exhaustive, and the
+#: introduction patterns above carry most of the weight.
+SURNAMES = (
+    "perera",
+    "fernando",
+    "silva",
+    "de silva",
+    "jayawardena",
+    "bandara",
+    "rajapaksa",
+    "wickramasinghe",
+    "dissanayake",
+    "gunawardena",
+    "mendis",
+    "rathnayake",
+    "senanayake",
+    "herath",
+    "ekanayake",
+    "weerasinghe",
+    "kumara",
+    "chandrasiri",
+    "pathirana",
+    "wijesinghe",
+    "rajan",
+    "kumar",
+    "selvam",
+    "thangavel",
+    "balasubramaniam",
+)
+
+_NAME_SURNAME = re.compile(
+    # An optional given name before a known surname, so "Dilani Perera" masks as
+    # one name rather than leaving the given name behind.
+    r"\b(?:[A-Z][a-z'\-]+\s+)?(?:" + "|".join(re.escape(s) for s in SURNAMES) + r")\b",
+    re.IGNORECASE,
+)
+
+#: Sinhala and Tamil renderings of the same surnames, which the Latin pattern
+#: cannot reach.
+_NAME_LOCAL_SCRIPT = re.compile(
+    r"(?:පෙරේරා|ෆනාන්දෝ|සිල්වා|බණ්ඩාර|ජයවර්ධන|දිසානායක|විජේසිංහ"
+    r"|பெரேரா|பெர்னாண்டோ|சில்வா|ராஜன்|குமார்)",
+    re.UNICODE,
+)
+
 #: Forbidden. Deliberately broad: a false positive costs a refused message,
 #: a false negative leaks a credential.
 _OTP = re.compile(r"\b(?:otp|pin|code|කේතය|குறியீடு)\D{0,12}(\d{4,8})\b", re.IGNORECASE)
@@ -132,6 +242,22 @@ def find_forbidden(text: str) -> set[ForbiddenKind]:
     return found
 
 
+def _add_group(
+    matches: list[Match],
+    kind: PiiKind,
+    pattern: re.Pattern[str],
+    text: str,
+    *,
+    group: int,
+) -> None:
+    """Record only one capture group, leaving the surrounding phrase intact."""
+    for found in pattern.finditer(text):
+        value = found.group(group)
+        if not value or not value.strip():
+            continue
+        matches.append(Match(kind, found.start(group), found.end(group), value))
+
+
 def find_pii(text: str) -> list[Match]:
     """Find maskable personal data, longest matches first, without overlaps."""
     matches: list[Match] = []
@@ -152,6 +278,14 @@ def find_pii(text: str) -> list[Match]:
     add(PiiKind.NIC, _NIC_NEW, lambda m: _valid_new_nic(m.group(1)))
     add(PiiKind.PASSPORT, _PASSPORT)
     add(PiiKind.ACCOUNT, _ACCOUNT)
+    # Group 1 where the pattern has one, so the introduction or honorific stays
+    # readable and only the name is replaced: "my name is <NAME_1>" explains
+    # itself, where "<NAME_1>" alone does not.
+    _add_group(matches, PiiKind.NAME, _NAME_INTRODUCTION, text, group=1)
+    _add_group(matches, PiiKind.NAME, _NAME_INTRODUCTION_LOCAL, text, group=1)
+    _add_group(matches, PiiKind.NAME, _NAME_HONORIFIC, text, group=1)
+    add(PiiKind.NAME, _NAME_SURNAME)
+    add(PiiKind.NAME, _NAME_LOCAL_SCRIPT)
 
     # Longest first so a phone number inside a longer account string wins once.
     matches.sort(key=lambda m: (m.start, -(m.end - m.start)))
