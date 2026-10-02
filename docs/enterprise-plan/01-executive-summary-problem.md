@@ -68,6 +68,22 @@ This plan sizes **none** of these. KPIs and baselines are defined in [§40](15-c
 | Deployment | Docker, K8s, CI, OTel `[DECK S13]` | Six environments, GitOps, progressive delivery, feature flags and DR. |
 | Rollout | Shadow → Desk live → Customer launch → Foresight & scale `[DECK S17]` | Gated pilot with entry/exit criteria ([§34](14-risk-pilot-readiness-operations.md)) and a production readiness review ([§35](14-risk-pilot-readiness-operations.md)). |
 
+### 1.9 Prototype scope vs future production scope
+This repository holds no prototype code. The left column is the **recommended minimum prototype scope** for the hackathon; the team confirms what was actually built. The right column is the scope this plan takes to production.
+
+| Area | Hackathon prototype scope (recommended minimum) | Future production scope |
+|---|---|---|
+| Journeys | VAS without consent (one tap), duplicate reload (zero contact, simulated stream), FUP explain-only, high-risk case to staff approval | All 6 journeys in [§6](03-requirements-personas-journeys.md), plus proactive care and guardian mode |
+| Channels | Web/app Why? module. WhatsApp via test number or simulator. SMS/USSD simulator. | hutch.lk, Hutch app WebView, WhatsApp (text + voice), SMS/USSD short code, shops |
+| Data | Synthetic subscribers, packs, charges, payments, consents and complaints (labelled *simulated*) | Approved HUTCH interfaces and anonymized history |
+| Rules | 4–6 of the 16 candidate rules, with golden tests | Governed catalogue of 16+ rules with replay and four-eyes publishing |
+| AI | One model behind the gateway; templates; numeric verifier; masked prompts | Tiered routing, self-hosted primary, hosted fallback, continuous evaluation |
+| MCP | L1 read tools + `propose_action` with UI confirmation | Full catalogue, 3 profiles, OPA authorization, abuse monitoring |
+| Trust Receipt | Dev Ed25519 key, QR, public verify page | HSM/KMS keys, rotation, WORM anchoring |
+| Autopsy | Clustering a synthetic multilingual complaint set | Weekly production runs with approval workflow |
+| Foresight | One illustrative scenario, clearly marked as model-generated | Backtested service on aggregates only (2028) |
+| Out of prototype scope | Real HUTCH integration, real customer data, production security, guardian mode, postpaid | Postpaid and home broadband in Step 4 `[DECK S17]` |
+
 ---
 
 ## 2. Problem Analysis

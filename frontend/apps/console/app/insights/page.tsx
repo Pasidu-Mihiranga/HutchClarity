@@ -67,7 +67,7 @@ export default function InsightsPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="space-y-2">
           <p className="text-xs uppercase text-slate-500">Cases</p>
-          <p className="text-lg font-medium">{String(ops?.cases ?? "—")}</p>
+          <p className="text-lg font-medium">{String(ops?.cases ?? " - ")}</p>
           <Badge tone="neutral">Decided {String(ops?.decided ?? 0)}</Badge>
         </Card>
         <Card className="space-y-2">
@@ -80,7 +80,7 @@ export default function InsightsPage() {
         <Card className="space-y-2">
           <p className="text-xs uppercase text-slate-500">Top autopsy cluster</p>
           <p className="text-lg font-medium">
-            {clusters[0]?.label || "— pending seed"}
+            {clusters[0]?.label || " - pending seed"}
           </p>
           <Badge tone="warning">Hypothesis</Badge>
         </Card>
@@ -96,7 +96,7 @@ export default function InsightsPage() {
                 </li>
               ))
             : (
-              <li className="text-slate-500">None yet — create demo cases on Desk.</li>
+              <li className="text-slate-500">None yet - create demo cases on Desk.</li>
             )}
         </ul>
       </Card>
@@ -122,7 +122,7 @@ export default function InsightsPage() {
         <ul className="space-y-2 text-sm">
           {predictions.map((p, i) => (
             <li key={i}>
-              <strong>{p.band}</strong> · {p.segment} · {p.theme} — {p.mitigation}
+              <strong>{p.band}</strong> · {p.segment} · {p.theme} - {p.mitigation}
             </li>
           ))}
         </ul>

@@ -1,71 +1,76 @@
-# Hutch Clarity - development tasks.
-.PHONY: help dev dev-new up-lite up-full down db-reset keys check test test-g1 seed demo lint types imports tokens
+# Hutch Clarity - development tasks. Run from the repository root.
+#
+# The default `lite` profile needs only Python: no Docker, Kubernetes, Terraform,
+# database or broker (ADR-0027). The `full` profile (real infrastructure) is
+# added in migration step R2 (docs/enterprise-plan/21-migration-and-deployment-plan.md).
+
+PY      := $(CURDIR)/.venv/bin
+BACKEND := backend
+
+.PHONY: help setup dev check lint format types imports test demo tokens keys seed \
+        web-install web-build web-customer web-console web-verify
 
 help:
-	@echo "make dev       - run the old app (src/clarity) on http://localhost:8000"
-	@echo "make dev-new   - run the new backend entrypoint (backend/src/clarity)"
-	@echo "make up-lite   - docker compose profile lite (Postgres)"
-	@echo "make up-full   - docker compose profile full (Postgres + Kafka + …)"
-	@echo "make down      - stop all compose profiles"
-	@echo "make db-reset  - wipe Postgres volume and restart lite Postgres"
-	@echo "make keys      - generate Ed25519 signing keypair into .keys/"
-	@echo "make check     - lint, types, import contracts, tests (old tree)"
-	@echo "make test      - old-tree tests only"
-	@echo "make test-g1   - G1 baseline tests (backend/src, in-memory)"
-	@echo "make seed      - load synthetic world into DATABASE_URL"
-	@echo "make demo      - walk the four journeys in the terminal"
-	@echo "make lint      - ruff check + format --check"
-	@echo "make types     - mypy"
-	@echo "make tokens    - measured AI usage per journey"
+	@echo "make setup   - create .venv and install the backend with dev tools"
+	@echo "make dev     - run the app (UI + API) on http://localhost:8000 (lite profile)"
+	@echo "make check   - everything CI runs: lint, types, import contracts, tests"
+	@echo "make test    - tests only"
+	@echo "make format  - apply formatting and safe lint fixes"
+	@echo "make demo    - walk the four journeys in the terminal"
+	@echo "make tokens  - measured AI usage per journey"
+	@echo "make keys    - generate a local Ed25519 signing key into .keys/"
+	@echo "make seed    - load the synthetic world into DATABASE_URL (full profile)"
+	@echo "make web-install / web-build - frontend (Node 18+, npm workspaces)"
+	@echo "make web-customer | web-console | web-verify - run one Next.js app"
+
+setup:
+	python3 -m venv .venv
+	$(PY)/pip install -e "$(BACKEND)[dev]"
 
 dev:
-	.venv/bin/uvicorn clarity.api.main:app --reload
-
-dev-new:
-	PYTHONPATH=backend/src .venv/bin/uvicorn clarity.entrypoints.api:app --reload --port 8000
-
-up-lite:
-	docker compose --profile lite up -d
-
-up-full:
-	docker compose --profile full up -d
-
-down:
-	docker compose --profile lite --profile full down
-
-db-reset:
-	docker compose --profile lite --profile full down -v
-	docker compose --profile lite up -d postgres
-	@echo "Waiting for Postgres…"
-	@until docker compose --profile lite exec -T postgres pg_isready -U clarity -d clarity >/dev/null 2>&1; do sleep 1; done
-	@echo "Postgres ready (volume wiped)."
-
-keys:
-	.venv/bin/python scripts/keys.py
-
-seed:
-	.venv/bin/python scripts/seed.py
+	cd $(BACKEND) && $(PY)/uvicorn clarity.entrypoints.asgi:app --reload
 
 check: lint types imports test
 
 lint:
-	.venv/bin/ruff check .
-	.venv/bin/ruff format --check .
+	cd $(BACKEND) && $(PY)/ruff check . && $(PY)/ruff format --check .
+
+format:
+	cd $(BACKEND) && $(PY)/ruff check --fix . && $(PY)/ruff format .
 
 types:
-	.venv/bin/mypy
+	cd $(BACKEND) && $(PY)/mypy
 
 imports:
-	.venv/bin/lint-imports
+	cd $(BACKEND) && $(PY)/lint-imports
 
 test:
-	.venv/bin/pytest
-
-test-g1:
-	PYTHONPATH=backend/src .venv/bin/pytest backend/tests/g1 backend/tests/unit -q -o pythonpath=backend/src
+	cd $(BACKEND) && $(PY)/pytest
 
 demo:
-	.venv/bin/python scripts/demo.py
+	cd $(BACKEND) && $(PY)/python scripts/demo.py
 
 tokens:
-	.venv/bin/python scripts/measure_tokens.py
+	cd $(BACKEND) && $(PY)/python scripts/measure_tokens.py
+
+keys:
+	cd $(BACKEND) && $(PY)/python scripts/keys.py
+
+seed:
+	cd $(BACKEND) && $(PY)/python scripts/seed.py
+
+# Frontend (Next.js apps). Optional: the backend serves a static UI on its own.
+web-install:
+	cd frontend && npm install
+
+web-build:
+	cd frontend && npm run build
+
+web-customer:
+	cd frontend && npm run dev:customer
+
+web-console:
+	cd frontend && npm run dev:console
+
+web-verify:
+	cd frontend && npm run dev:verify

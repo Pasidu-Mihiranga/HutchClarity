@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 12. AI Architecture
 
@@ -40,7 +40,7 @@ flowchart TD
 
 | Role | Used for | Prototype (free tiers, synthetic data only) | Production (HUTCH's choice, by config) |
 |---|---|---|---|
-| `fast-text` (non-reasoning) | Customer explanations from FACTS (si/ta/en), short replies, agent reply drafts | Gemini Flash-Lite → Groq gpt-oss-20b (English) → template | Vertex AI / Azure / Bedrock small model, or self-hosted open-weight model on vLLM |
+| `fast-text` (non-reasoning) | Customer explanations from FACTS (si/ta/en), short replies, agent reply drafts | Gemini Flash-Lite → Groq gpt-oss-20b (English) → template | Managed small model, or a self-hosted open-weight model on vLLM |
 | `extract` | Intent + slots JSON from si/ta/en/Singlish | Gemini Flash-Lite → Groq gpt-oss-20b → keyword rules | Same family as `fast-text` |
 | `reason` | Complex cases, staff summaries, handover, cluster labels, rule-proposal drafts | Groq gpt-oss-120b → Gemini Flash → staff handoff | Managed reasoning model or self-hosted gpt-oss-120b class |
 | `judge` | Sampled faithfulness checks | Groq gpt-oss-20b | Small model |
@@ -49,7 +49,7 @@ flowchart TD
 | `stt` | Sinhala/Tamil voice notes | Groq Whisper large-v3 / Gemini Transcribe (per-language WER decides) | Best measured provider per language |
 | `tts` | Spoken replies | Gemini Flash-Lite TTS (si/ta voices to verify) | HUTCH-approved TTS |
 
-Full routing, quotas, fallbacks and the free-tier data rule are in [18 §4](18-tech-stack-and-ai.md). **Free-tier rule:** Gemini's unpaid tier may use prompts to improve Google products, so only synthetic, PII-masked data is ever sent during the prototype; Groq Zero Data Retention is enabled.
+Full routing, quotas, fallbacks and the free-tier data rule are in [19 §4](19-tech-stack-and-ai.md). **Free-tier rule:** Gemini's unpaid tier may use prompts to improve Google products, so only synthetic, PII-masked data is ever sent during the prototype; Groq Zero Data Retention is enabled. The default stays the template tier with no model (ADR-0009); a live model is opt-in.
 
 Model IDs, prompts and thresholds live in config `[DECK S13]` and are versioned. The AI gateway records the role, provider, model, version and token counts per call (Langfuse) in a usage ledger that produces the measured token figures for the AI disclosure.
 
@@ -119,7 +119,7 @@ flowchart LR
 | Prompt-injection defence | Delimited untrusted blocks, tool allowlist per profile, MCP subject binding, no tool can move money, injection classifier on input, denial spike alerts | `[DECK S8]` |
 | Safe fallback | Templates (works without the LLM) | `[DECK S7]` |
 | Human handoff | Missing log, fraud risk, low confidence, customer request, repeated verifier failure | `[DECK S7]` |
-| Free-tier data rule | Prototype sends only synthetic, PII-masked data to free-tier providers; Groq ZDR enabled; real data needs a paid/enterprise tier or HUTCH's own models | `[PROPOSED]` v1.1 |
+| Free-tier data rule | Prototype sends only synthetic, PII-masked data to free-tier providers; Groq ZDR enabled; real data needs a paid/enterprise tier or HUTCH's own models | `[PROPOSED]` v1.3 |
 
 ### 12.7 AI Evaluation
 Targets are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**.
@@ -150,6 +150,20 @@ The evaluation set is built from synthetic and consented/anonymized real phrases
 | Validation | Time-based split, AUC/PR-AUC, calibration (Brier), fairness by segment/region |
 | Use | Triggers only an *offer* (stop data / cap / top up), never an automatic charge change |
 | Example "78%" | Illustrative only `[DECK S6]` |
+
+### 12.9 Foresight, early-warning and merchant-risk disclosures (Guidelines §6.3)
+Guidelines §6.3 requires a disclosure for every forecasting or risk-scoring model. The bill-shock model is in §12.8. The others follow.
+
+| Item | Foresight (launch rehearsal) | Early-warning radar | Merchant risk score | Cause confidence |
+|---|---|---|---|---|
+| Purpose | Predict complaint themes per segment before a pack, price, policy or outage change `[DECK S11]` | Alert staff to live complaint spikes before the queue fills `[DECK S11]` | Rank VAS merchants for merchant watch `[DECK S9]` | Rank causes within a case `[DECK S7]` |
+| Inputs | Catalogue/policy diff; **aggregated** segment statistics; past launch complaint history; Autopsy cluster rates. No individual data `[DECK S8]`. | Complaint and contact counts per cluster, channel and region (Kafka) | Complaints per 1,000 subscriptions; VAS_NO_CONSENT hits; opt-outs after first charge; renewal disputes | Evidence weights defined in each rule |
+| Method | Agent-based simulation (OASIS-style LLM personas over rounds) **plus** a statistical baseline (historic complaint rate by segment × change type) | Seasonal baseline with an EWMA/z-score anomaly test (deterministic statistics, no LLM) | Weighted score; later a calibrated model | Deterministic formula (base + boosts − penalties). Not ML. |
+| Output | Complaint themes × segment × relative volume band (low/med/high) with an uncertainty band. **No absolute counts until calibrated.** | Alert with cluster, size and trend | Score + top reasons | 0–1 confidence + margin to the next cause |
+| Validation | Backtest on ≥ 3 past launches (theme recall; rank correlation of segment volumes) before any business use | Precision of alerts in shadow; tuned false-alarm rate | Review against VAS-ops judgement; stability over time | Golden tests and shadow agreement ([§13.5](09-rules-decision-receipts.md)) |
+| Use and limits | Advisory only; never triggers customer actions; "scenarios, not certainties" `[DECK S11]` | Informs staffing and Autopsy. No customer action. | Suspension is a **human L4 decision** | Feeds the decision policy. Thresholds are owned by Finance/CX. |
+| Prototype status | One illustrative scenario: **model-generated output on simulated personas** | Simulated spike | Simulated | Computed on synthetic cases |
+
 ---
 
 [← 07-mcp.md](07-mcp.md) · [← Plan index](README.md) · [09-rules-decision-receipts.md →](09-rules-decision-receipts.md)

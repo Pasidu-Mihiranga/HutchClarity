@@ -1,7 +1,9 @@
-# DEMO.md — How to record the Hutch Clarity demo video
+# DEMO.md - How to record the Hutch Clarity demo video
+
+> **Merged 2026-10-02:** imported from the team's `main` into the `dev` branch; paths updated to the R1 layout (see `2026-10-02-R1-dev-merge.md`).
 
 Target length: **5–7 minutes**. No production credentials; synthetic data only.
-You do not need to commit the video binary to git — host it where the
+You do not need to commit the video binary to git - host it where the
 hackathon submission asks and link it from the submission pack.
 
 ## Before you hit record
@@ -27,7 +29,7 @@ make dev          # legacy UI+API on :8000  (or make dev-new for new API)
 |---|---|---|
 | 0:00 | Title slide or README headline | "Hutch Clarity: explain every rupee, fix by rule, prove it." |
 | 0:20 | Open `/` Why? | "Customer Dilani sees a surprise VAS charge." |
-| 0:40 | Enter MSISDN / ask Why? | "She asks why — we never invent evidence." |
+| 0:40 | Enter MSISDN / ask Why? | "She asks why - we never invent evidence." |
 | 1:10 | Show cause + evidence list | "Detector vas_silent_renewal: charge without fresh OTP." |
 | 1:40 | Show ruled-out causes | "Ruled out list keeps trust high." |
 | 2:00 | Tap Confirm / propose | "Rules decide the amount; LLM only explains." |

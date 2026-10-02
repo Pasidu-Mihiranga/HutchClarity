@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 4. Requirements Engineering
 
@@ -27,16 +27,19 @@ Priority: **Must / Should / Could / Future**. Columns Prototype/Production: ✅ 
 | FR-COP-12 | Copilot | Proactive alerts: FUP 80/95%, VAS renewal, bill-shock risk, outage ETA | System | Should | ◐ | ✅ |
 | FR-COP-13 | Copilot | Family guardian for up to 10 numbers with consent of each member | Guardian | Could | - | ✅ (Phase 4) |
 | FR-COP-14 | Copilot | Customer preferences: language, answer length, large text | Customer | Should | ◐ | ✅ |
+| FR-COP-15 | Copilot | Spoken answer back (TTS) in Sinhala/Tamil for voice-note users `[DECK S5]` | Customer | Should | - | ✅ |
 | FR-CH-01 | Channels | Web (hutch.lk) and Hutch app WebView module | Customer | Must | ✅ | ✅ |
 | FR-CH-02 | Channels | WhatsApp text and voice notes | Customer | Must | ◐ sandbox | ✅ |
 | FR-CH-03 | Channels | SMS/USSD short code returns reason by SMS | Basic-phone customer | Should | ◐ simulator | ✅ |
 | FR-CH-04 | Channels | One case continues across channels and shops | Customer, agent | Must | ◐ | ✅ |
+| FR-CH-05 | Channels | Shop staff can open, continue and close a customer's case with the same trail and receipt `[DECK S5]` | Shop staff | Should | - | ✅ |
 | FR-TR-01 | Receipt | Issue a Trust Receipt for every action and explain-only decision | System | Must | ✅ | ✅ |
 | FR-TR-02 | Receipt | Ed25519 signature + hash chain | System | Must | ✅ (dev key) | ✅ (HSM/KMS) |
 | FR-TR-03 | Receipt | QR public verification page | Anyone | Must | ✅ | ✅ |
 | FR-TR-04 | Receipt | Render si/ta/en as PNG, PDF and SMS | System | Must | ◐ | ✅ |
 | FR-TR-05 | Receipt | Recurrence test result based on a post-action check | System | Should | ◐ | ✅ |
 | FR-TR-06 | Receipt | Replay the decision from the evidence snapshot | Staff, auditor | Should | ◐ | ✅ |
+| FR-TR-07 | Receipt | Agents, shop staff and authorised verifiers can look up and verify a receipt by ID (1788, WhatsApp, shop, TRCSL) `[DECK S6]` | Agent, shop staff, verifier | Must | ◐ | ✅ |
 | FR-AUT-01 | Autopsy | Ingest complaints from all contact channels | System | Must | ◐ synthetic | ✅ |
 | FR-AUT-02 | Autopsy | Dedupe, detect language and mask PII before AI | System | Must | ✅ | ✅ |
 | FR-AUT-03 | Autopsy | Canonical summary + multilingual embedding + UMAP/HDBSCAN clustering | System | Must | ✅ | ✅ |
@@ -62,13 +65,15 @@ Priority: **Must / Should / Could / Future**. Columns Prototype/Production: ✅ 
 | FR-GOV-01 | Governance | Rule/policy versions with four-eyes publishing and golden tests | CX engineer, approver | Must | ◐ | ✅ |
 | FR-GOV-02 | Governance | Refund budgets and daily reconciliation | Finance | Must | ◐ | ✅ |
 | FR-GOV-03 | Governance | Every customer- or money-affecting decision is auditable | Auditor | Must | ✅ | ✅ |
-| FR-GOV-04 | Governance | Every policy artefact (parameters, decision tables, detectors, templates, knowledge, catalogue mappings) is versioned, effective-dated, scoped, approved per change class and replayable ([19](19-policy-change-management.md)) | CX engineer, finance, compliance | Must | ✅ | ✅ |
-| FR-GOV-05 | Governance | Scheduled activation and instant rollback of policy versions; emergency change path with post-hoc review | Approvers | Must | ◐ | ✅ |
-| FR-GOV-06 | Governance | Impact preview before publish: replay of historic cases with outcome and money deltas | CX engineer, finance | Must | ✅ | ✅ |
-| FR-ADM-01 | Admin | Admin console: feature flags and kill switches, configuration, templates, MCP client registry, adapter health, signing-key status, audit viewer | Platform admin | Must | ✅ | ✅ |
+| FR-GOV-06 | Governance | Every policy artefact (parameters, decision tables, rule packs, templates, knowledge, catalogue mappings) is versioned, effective-dated, scoped, approved per change class and replayable ([20](20-policy-change-management.md)) | CX engineer, finance, compliance | Must | ✅ | ✅ |
+| FR-GOV-07 | Governance | Scheduled activation and instant rollback of policy versions; emergency change path with post-hoc review | Approvers | Must | ◐ | ✅ |
+| FR-GOV-08 | Governance | Impact preview before publish: replay of historic cases with outcome and money deltas | CX engineer, finance | Must | ✅ | ✅ |
+| FR-ADM-01 | Admin | Admin console: feature flags and kill switches, configuration, templates, MCP client registry, adapter health, signing-key status, audit viewer | Platform admin | Must | ◐ | ✅ |
 | FR-ADM-02 | Admin | Separation of duties: admins cannot approve money actions; a maker can never be the checker | System | Must | ✅ | ✅ |
+| FR-GOV-04 | Governance | Kill switches per rule, per channel, for auto-fix globally and for LLM explanations | Supervisor, SRE | Must | ◐ | ✅ |
+| FR-GOV-05 | Governance | Proactive messages respect consent, quiet hours and frequency caps ([§3.6](02-solution-capabilities.md)) | System | Must | ◐ | ✅ |
 | FR-MCP-01 | MCP | AI accesses capabilities only through the Clarity MCP server allowlist | System | Must | ✅ | ✅ |
-| FR-MCP-02 | MCP | Registered external MCP clients (e.g., HUTCH chatbot, agent assist) use profile-scoped tools via OAuth 2.1; Why? and receipt cards render as MCP Apps UI | HUTCH systems | Should | ✅ | ✅ |
+| FR-MCP-02 | MCP | Registered external MCP clients (e.g., HUTCH chatbot, agent assist) use profile-scoped tools via OAuth 2.1 over the MCP protocol; Why? and receipt cards render as MCP Apps UI | HUTCH systems | Should | ◐ | ✅ |
 | FR-FUT-01 | Scale | Postpaid and home broadband domains | - | Future | - | Step 4 `[DECK S17]` |
 
 ### 4.2 Non-Functional Requirements
@@ -81,12 +86,14 @@ All numeric values are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**.
 | | NFR-PERF-03 | Zero-contact duplicate-reload detection ≤ 5 min from `payment.recorded` to decision |
 | | NFR-PERF-04 | Desk case cockpit load p95 ≤ 2 s |
 | | NFR-PERF-05 | Receipt verification page p95 ≤ 800 ms |
+| | NFR-PERF-06 | Why? web module initial load ≤ 200 KB compressed and usable on 3G-class connections and older app WebViews `[DECK S15]` (supported versions **REQUIRE HUTCH CONFIRMATION**) |
 | Availability | NFR-AV-01 | Customer channels (Why?) 99.9% monthly. Tool layer 99.9%. Desk 99.9% in staffed hours. Verification page 99.95%. |
 | Scalability | NFR-SC-01 | Stateless services scale horizontally. Kafka partitioned by hashed MSISDN token `[DECK S14]`. Model tested to 10× pilot load. |
 | Security | NFR-SEC-01 | OWASP ASVS Level 2 for all services; Level 3 controls on tool layer, signing service and token vault |
 | | NFR-SEC-02 | No secrets in code; all keys in KMS/HSM; mTLS between all internal services and adapters |
 | Privacy | NFR-PRV-01 | No raw PII, OTP or card data leaves the HUTCH trust boundary to any external AI `[DECK S8]` |
 | | NFR-PRV-02 | PDPA No. 9 of 2022 compliant processing, DPIA completed, retention schedule enforced. **REQUIRES HUTCH legal confirmation.** |
+| | NFR-PRV-03 | Data residency: customer data, evidence and the token vault stay in HUTCH-approved locations. Only masked text may go to an approved hosted AI tier. **REQUIRES HUTCH CONFIRMATION.** |
 | Observability | NFR-OBS-01 | 100% of requests traced (OTel). 100% of decisions log rule and policy version. LLM calls traced in Langfuse (masked). |
 | Auditability | NFR-AUD-01 | Append-only hash-chained audit. Consent evidence kept ≥ 1 year `[DECK S8]`. Audit retention 7 years (**ASSUMPTION**; legal to confirm). |
 | Correctness | NFR-COR-01 | **Zero** duplicate financial executions (hard invariant, enforced by idempotency + DB uniqueness). Reconciliation of 100% of actions by T+1. |
@@ -96,6 +103,7 @@ All numeric values are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**.
 | Reliability | NFR-REL-01 | Graceful degradation per [§39](15-cost-scale-failure-kpi.md). No financial action without confirmed evidence completeness. |
 | DR | NFR-DR-01 | RPO ≤ 5 min (cases, actions, ledger), RTO ≤ 1 h. Restore tested quarterly. |
 | Efficiency | NFR-EFF-01 | ≥ 50% of interactions answered without any LLM call (rules/templates/cache) `[DECK S14]` (*target*) |
+| Cost | NFR-COST-01 | Average AI cost per interaction and a daily AI budget are tracked, with a per-session token cap ([§37](15-cost-scale-failure-kpi.md)) |
 
 ---
 
@@ -110,13 +118,15 @@ All numeric values are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**.
 | **Postpaid customer** | App/web | Understand bill line items | - | **Future** (Step 4) | `[DECK S17]` |
 | **Nadeesha - support agent** | Clarity Desk | Resolve quickly with evidence | Fragmented logs | Cockpit, one-click fix, multilingual reply | `[DECK S9]` |
 | **Ruwan - supervisor** | Desk + mobile | Approve, manage queue and shift | Backlog; handovers | Approvals, bulk fix, handover, second look | `[DECK S9]` |
+| **Hutch shop / retail staff** | Clarity Desk (shop view) | Finish a case started on WhatsApp or the app; verify a receipt in front of the customer | Customer arrives with no trail | Case lookup (number + customer OTP), receipt verification, handoff | `[DECK S5]` "finish … at a shop". Whether shops are owned or franchised **REQUIRES HUTCH CONFIRMATION**. |
 | **CX analyst / CX engineer** | Desk insights | Find gaps, write and test rules | Unknown root causes | Autopsy, teach once, what-if, funnels | `[DECK S10, S11]` |
 | **Finance / refund approver** | Desk | Control refund risk and budget | Large disputed charges | Caps, budgets, approvals, reconciliation | `[DECK S7, S10]` |
 | **VAS operations** | Desk | Clean merchants, consent compliance | Merchant abuse | Merchant watch, consent evidence | `[DECK S9, S10]` |
 | **Network operations** | Ticket integration | Get precise fault reports | Vague complaints | Auto ticket with cell, time, ETA | `[DECK S10]` |
 | **Product manager** | Foresight, insights | Launch without surprises | Launch complaint spikes | Foresight, product-fault alerts | `[DECK S10, S11]` |
 | **Compliance / regulatory** | Desk | Prove consent and fairness to TRCSL | Manual evidence | Regulator pack, audit ledger | `[DECK S8, S9]` |
-| **Platform admin / security admin** | Console `/admin` | Keep the platform configured, secure and auditable | - (enterprise need) | Flags and kill switches, config, templates, MCP clients, adapter health, key status, audit viewer | `[PROPOSED]` |
+| **Platform admin / security admin** | Console `/admin` | Keep the platform configured, secure and auditable | (enterprise need) | Flags and kill switches, config, templates, MCP clients, adapter health, key status, audit viewer | `[PROPOSED]` |
+| **External verifier** (TRCSL officer, auditor) | Public verify page, regulator pack | Confirm what happened and that consent rules were followed | Manual, slow evidence | QR verification, signed trail | `[DECK S6, S9]` |
 
 ---
 
@@ -211,6 +221,16 @@ Format: **User → Channel → Identity → Clarity → Timeline → Rule → De
 | Tool | Customer chooses "cap at 100" → `set_spend_cap` (L2, confirmed) |
 | Result | Safeguard active; tracked against next month's burn |
 | Trust Receipt | Safeguard receipt |
+
+### 6.7 Before → During → After (Guidelines §8)
+Summary of the change in experience, based on `[DECK S16]`. "After" effects are **expected effects to be measured in the pilot**, not claims.
+
+| | Before (today) | During (with Clarity) | After (expected, to be measured) |
+|---|---|---|---|
+| **Customer** | Money gone with no reason; days waiting on WhatsApp or 1788; a different answer each time; surprise burn when a pack ends `[DECK S2, S16]` | Taps Why? or sends a voice note; gets the reason with evidence in seconds; fixes in one tap or gets a person with the full trail; receives a receipt in si/ta/en | Answer and fix in minutes; proof kept and the same story everywhere; a safeguard prevents repeats |
+| **Agent / supervisor** | Checks several systems by hand; no safe automation; inconsistent outcomes | Case cockpit with evidence, ranked and ruled-out causes; one-click policy-checked fixes; replies in the customer's language | Lighter queue; Teach once improves rules; handovers and regulator packs are generated |
+| **HUTCH** | Quiet churn, repeat contacts, regulatory exposure, launch surprises | Rules decide, the LLM explains, everything is audited | Validate in pilot: fewer complaints, lower cost to serve, VAS consent proof, launch issues found early |
+
 ---
 
 [← 02-solution-capabilities.md](02-solution-capabilities.md) · [← Plan index](README.md) · [04-enterprise-architecture.md →](04-enterprise-architecture.md)

@@ -4,28 +4,28 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 21. Technology Stack
 
-> The authoritative stack, with selection criteria and AWS/Azure/on-prem equivalents, is [18 §2](18-tech-stack-and-ai.md). This table is kept in sync with it.
+> The authoritative stack, with selection criteria and AWS/Azure/on-prem equivalents, is [19 §2](19-tech-stack-and-ai.md); the runtime model (containers for the core, serverless at the edges) is [21 §5](21-migration-and-deployment-plan.md). This table is kept in sync with them.
 
 Classification: **P** = suitable for prototype · **PS** = production-suitable · **R** = replaceable according to HUTCH standards.
 
 | Layer | Technology | Deck | P | PS | R | Notes |
 |---|---|---|---|---|---|---|
 | Frontend | Next.js, TypeScript, Tailwind, PWA | `[DECK S13]` | ✅ | ✅ | - | One codebase for web, app WebView module and consoles. Lean module for older phones `[DECK S15]`. |
-| Backend | Python 3.14, FastAPI, Pydantic v2, SQLAlchemy 2 | `[DECK S13]` (version updated) | ✅ | ✅ | - | Async I/O suits adapter fan-out |
-| Async jobs | Postgres-backed job queue (Procrastinate) + Kafka consumers | `[DECK S13]` Celery refined (T1) | ✅ | ✅ | ◐ (Celery possible as a driver) | Workflow state in PG |
+| Backend | Python, FastAPI, Pydantic v2, SQLAlchemy 2 | `[DECK S13]` | ✅ | ✅ | - | Async I/O suits adapter fan-out |
+| Async jobs | Postgres-backed job queue + Kafka consumers | `[DECK S13]` Celery refined (T1) | ✅ | ✅ | ◐ (Celery possible as a driver) | Workflow state in PG |
 | Policy | OPA (Rego), bundles | `[DECK S13]` | ✅ | ✅ | - | Decision policy + authZ |
-| Rule engine | Python detector plugins + manifests; GoRules ZEN decision tables | `[PROPOSED]` refinement (T3) | ✅ | ✅ | - | Business-editable tables; replayable |
-| Database | PostgreSQL 18, schema per module | `[DECK S13]` (version updated) | ✅ | ✅ | ◐ (HUTCH DB standard) | HA: primary + sync replica + DR |
+| Rule engine | YAML rule packs + predicate engine; GoRules ZEN outcome tables | `[PROPOSED]` refinement (T3) | ✅ | ✅ | - | Rules are data; outcomes business-editable |
+| Database | PostgreSQL 18, schema per module (in-memory repositories in `lite`) | `[DECK S13]` (version updated) | ✅ | ✅ | ◐ (HUTCH DB standard) | HA: primary + sync replica + DR |
 | Vector | pgvector | `[DECK S12]` | ✅ | ✅ (to ~10s of millions vectors) | ◐ | HNSW indexes; dedicated vector DB only if scale demands |
 | Cache | Valkey (Redis protocol); semantic cache on pgvector | `[DECK S12, S14]` (T7, T12) | ✅ | ✅ | - | Sessions, exact cache, idempotency, rate limits |
-| Streaming | Apache Kafka 4 (KRaft) + Apicurio registry | `[DECK S12]` + T2 | ✅ (single broker in dev) | ✅ | ◐ (HUTCH's Kafka, MSK or Event Hubs) | |
+| Streaming | Apache Kafka 4 (KRaft) + Apicurio registry | `[DECK S12]` + T2 | ✅ (in-process bus in `lite`) | ✅ | ◐ (HUTCH's Kafka, MSK or Event Hubs) | |
 | Analytics | Snowflake | `[DECK S12]` | ◐ (DuckDB/PG locally) | ✅ | ✅ **REQUIRES HUTCH CONFIRMATION** | T5 |
-| Object storage | S3 API with object lock (`BlobStore` port) | `[PROPOSED]` | ✅ (SeaweedFS) | ✅ | ✅ | Receipts, exports, audit anchors |
-| AI serving | AI gateway with model roles; Gemini + Groq free tiers (prototype); HUTCH provider or vLLM (production) | `[PROPOSED]` (provider-agnostic `[DECK S13]`) | ✅ | ✅ | ✅ | GPU only if HUTCH self-hosts |
+| Object storage | S3 API with object lock (`BlobStore` port) | `[PROPOSED]` | ✅ (local folder in `lite`, SeaweedFS in `full`) | ✅ | ✅ | Receipts, exports, audit anchors |
+| AI serving | AI gateway with model roles; templates by default, Gemini + Groq free tiers opt-in (prototype); HUTCH provider or vLLM (production) | `[PROPOSED]` (provider-agnostic `[DECK S13]`) | ✅ | ✅ | ✅ | GPU only if HUTCH self-hosts |
 | LLM observability | Langfuse (self-hosted) | `[DECK S12]` | ✅ | ✅ | ◐ | Masked traces only |
 | PII | Microsoft Presidio + Sri Lankan recognizers | `[DECK S8]` | ✅ | ✅ | - | |
 | ML | UMAP, HDBSCAN, scikit-learn/LightGBM | `[DECK S13]` | ✅ | ✅ | - | |
@@ -35,7 +35,7 @@ Classification: **P** = suitable for prototype · **PS** = production-suitable �
 | MCP | Python MCP SDK (FastMCP) on FastAPI | `[DECK S13]` "MCP tools" | ✅ | ✅ | - | [§10](07-mcp.md) |
 | Containers | Docker (OCI) | `[DECK S13]` | ✅ | ✅ | - | Distroless/slim bases |
 | Orchestration | Kubernetes | `[DECK S13]` | ◐ (kind/k3d) | ✅ | ◐ (HUTCH platform: OpenShift/EKS/AKS/on-prem) | **REQUIRES HUTCH CONFIRMATION** |
-| IaC / GitOps | OpenTofu (Terraform-compatible), Helm, Argo CD or HUTCH's GitOps tool | `[PROPOSED]` | ◐ (reference artefacts, proven on `kind` in CI) | ✅ | ✅ | |
+| IaC / GitOps | OpenTofu (Terraform-compatible), Helm, Argo CD or HUTCH's GitOps tool | `[PROPOSED]` | ◐ (reference artefacts in hardening, proven on `kind` in CI) | ✅ | ✅ | Never required for development |
 | Observability | OpenTelemetry, Grafana (+ Prometheus, Loki, Tempo) | `[DECK S12]` | ✅ | ✅ | ◐ HUTCH APM | |
 | Security tooling | OpenBao/KMS, cosign, Trivy, Syft, Semgrep, CodeQL, gitleaks, ZAP | `[PROPOSED]` | ◐ | ✅ | ✅ | |
 | Feature flags | OpenFeature + flagd/Unleash | `[PROPOSED]` | ✅ | ✅ | ✅ | Per rule, channel, cohort |
@@ -49,8 +49,8 @@ Classification: **P** = suitable for prototype · **PS** = production-suitable �
 
 | Env | Purpose | Data | Integrations | AI | Access |
 |---|---|---|---|---|---|
-| **Local** | Developer loop | Synthetic fixtures | `lite` profile: in-process drivers + PostgreSQL; optional `full` Compose profile ([17 §2.3](17-build-blueprint.md)) | Recorded responses (cassettes); free tiers on synthetic data | Developers |
-| **Development** | Shared integration of main | Synthetic | Mocks | Gemini + Groq free tiers (synthetic data) | Team |
+| **Local** | Developer loop | Synthetic fixtures | Mock drivers (docker-compose) | Small local model or recorded responses | Developers |
+| **Development** | Shared integration of main | Synthetic | Mocks | Self-hosted dev model | Team |
 | **QA** | Automated API/MCP/E2E/contract tests | Synthetic + generated edge cases | Mocks + HUTCH sandbox where available | Eval model | QA |
 | **Staging / UAT** | Production-like; perf, DAST, UAT, migration rehearsal | Anonymized HUTCH extract (approved) | HUTCH non-prod interfaces | Production model config | QA, business UAT users |
 | **Pilot** | Production cluster, restricted cohort via flags | Real (shadow: read-only, anonymized first) | HUTCH production read; write per approved action types | Production | Pilot staff + cohort |
@@ -124,7 +124,7 @@ Pipeline: **Diagram 10**.
 | CI platform | **GitHub Actions** reusable workflows; OIDC federation to clouds; environments with required reviewers |
 | AI in CI | Record/replay cassettes on every PR (no live calls, no quota spend); nightly live smoke + full evaluation |
 | Artefacts | Signed images (cosign) with provenance (SLSA level target 2–3); Helm charts; signed rule/policy bundles |
-| Deployment | GitOps (Argo CD or HUTCH's tool) per environment; prototype uses Compose on one host; environment promotion by PR to an env repo |
+| Deployment | GitOps (Argo CD or HUTCH's tool) per environment; development needs none of it (`lite` profile); environment promotion by PR to an env repo |
 | Migrations | Expand → migrate → contract pattern; backward-compatible for one release; run as pre-deploy Job; rehearsed in staging on an anonymized copy; no destructive DDL without a backup checkpoint |
 | Rollback | Image rollback via GitOps revert. DB rollback by forward-fix (expand/contract makes old code compatible). Rule/policy rollback = re-activate the previous signed version (seconds). |
 | Feature flags | Per channel, per rule (auto-fix whitelist), per cohort, per model tier. Kill switches: `auto_fix_global`, `llm_explanations`, `customer_actions`, `hosted_llm`. |
@@ -167,6 +167,16 @@ flowchart LR
 | Chaos / resilience | Kill pods, Kafka broker loss, Valkey loss, adapter timeouts, LLM outage, receipt-signing outage | Chaos Mesh/Litmus | Degradation per [§39](15-cost-scale-failure-kpi.md); zero duplicate actions |
 | Shadow comparison | Clarity recommendations vs agent outcomes on live cases | Analytics | Agreement and false-positive targets ([§34](14-risk-pilot-readiness-operations.md)) |
 
+### 24.1 Test data management
+
+| Data set | Source | Rules |
+|---|---|---|
+| Synthetic generator | Code in `integrations/mocks`, seeded and reproducible | Subscribers, packs, charges, payments, consents, usage and complaints in si/ta/en/Singlish. A scenario library per rule (positive, negative, boundary). Available from week 3. |
+| Anonymized HUTCH extract | Approved by data governance (DEP-05) | MSISDN tokenized with an environment-specific HMAC key. Names, NIC and free-text PII removed or masked. Timelines shifted uniformly so intervals that rules depend on stay intact. Amounts kept. k-anonymity checks on aggregates used for Autopsy/Foresight. |
+| Golden sets | Repository (no PII) | Rule goldens, AI evaluation sets, MCP conversations and flow tests. Versioned with the code. |
+| Test MSISDNs | HUTCH non-prod | For contract and E2E tests against the HUTCH sandbox |
+| Environment policy | - | No production PII in local, DEV or QA. Staging uses approved anonymized data only. Data is refreshed per release. |
+
 ---
 
 ## 25. Observability
@@ -203,6 +213,22 @@ flowchart LR
 
 ### 25.3 Key alerts
 Reconciliation mismatch > 0 (page finance + on-call); refund value/hour above anomaly band (auto-pause auto-fix); verifier failure rate > X%; MCP denial spike; audit chain break (Sev-1); Kafka lag > threshold; adapter circuit open; DLQ non-empty; LLM provider error rate; signing failures.
+
+### 25.4 SLOs and error budgets
+All values are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**.
+
+| SLO | SLI | Target | Window | Error budget |
+|---|---|---|---|---|
+| Why? availability | Successful responses / valid requests | 99.9% | 30 days | ≈ 43 min/month |
+| Why? latency | p95 end-to-end | ≤ 2.5 s (template), ≤ 6 s (LLM) | 30 days | 5% of requests may exceed |
+| Zero-contact detection | Duplicate reloads decided ≤ 5 min after `payment.recorded` | 99% | 30 days | 1% |
+| Receipt issuance | Receipts issued ≤ 5 min after `action.completed` | 99.5% | 30 days | 0.5% |
+| Desk availability | Successful requests in staffed hours | 99.9% | 30 days | ≈ 43 min/month |
+| Verify page | Availability | 99.95% | 30 days | ≈ 22 min/month |
+| **Duplicate financial execution** | Count | **0** | Always | **No budget.** Any breach is Sev-1. |
+
+**Error-budget policy.** Fast and slow burn-rate alerts. More than 50% of the budget burned mid-window → freeze non-critical releases. Budget exhausted → only reliability fixes ship until it recovers.
+
 ---
 
 [← 11-security-privacy-audit.md](11-security-privacy-audit.md) · [← Plan index](README.md) · [13-delivery-plan.md →](13-delivery-plan.md)

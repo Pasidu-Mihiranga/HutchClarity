@@ -2,59 +2,59 @@ name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, dev]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  lint:
+  backend:
+    name: backend (lint, types, import contracts, tests)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
       - name: Install
         run: pip install -e ".[dev]"
       - name: Ruff
         run: |
           ruff check .
           ruff format --check .
-
-  types:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Mypy
+      - name: Mypy (strict)
         run: mypy
+      - name: Import contracts (layers, money boundary)
+        run: lint-imports
+      - name: Tests (unit, golden, property, contract, architecture)
+        run: pytest
 
-  test-legacy:
+  frontend:
+    name: frontend (build)
     runs-on: ubuntu-latest
+    # Reports without blocking until the Next.js build is verified on dev
+    # (docs/enterprise-plan/21 section 7, R5). Remove this line once green.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install
-        run: pip install -e ".[dev]"
-      - name: Pytest (legacy tree)
-        run: pytest tests/
-
-  test-new:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Pytest (backend / modular monolith)
-        run: PYTHONPATH=backend/src pytest backend/tests -q -o pythonpath=backend/src
+        run: npm ci
+      - name: Build
+        run: npm run build
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -65,9 +65,7 @@ jobs:
           fetch-depth: 0
       - name: Gitleaks (placeholder)
         run: |
-          echo "gitleaks placeholder — wire gitleaks/gitleaks-action when secrets scanning is enabled"
-          # Example (uncomment when ready):
-          # docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest detect --source=/path --verbose
+          echo "gitleaks placeholder - wire gitleaks/gitleaks-action when secrets scanning is enabled"
 
   sbom:
     runs-on: ubuntu-latest
@@ -76,9 +74,10 @@ jobs:
       - name: SBOM placeholder
         run: |
           mkdir -p artifacts
-          echo '{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"hutch-clarity","version":"0.2.0-baseline"}},"components":[]}' \
+          version="$(cat VERSION)"
+          echo "{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.5\",\"metadata\":{\"component\":{\"name\":\"hutch-clarity\",\"version\":\"${version}\"}},\"components\":[]}" \
             > artifacts/sbom-placeholder.json
-          echo "SBOM placeholder written to artifacts/sbom-placeholder.json"
+          echo "SBOM placeholder written for version ${version}"
       - uses: actions/upload-artifact@v4
         with:
           name: sbom-placeholder

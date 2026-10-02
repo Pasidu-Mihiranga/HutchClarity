@@ -5,7 +5,7 @@
 | Status | Proposed / Accepted / Rejected / Superseded by NNNN |
 | Date | YYYY-MM-DD |
 | Deciders | names / roles |
-| Plan references | e.g. enterprise-plan/17 §4 |
+| Plan references | e.g. enterprise-plan/21 §5 |
 
 ## Context
 What problem or force makes a decision necessary? Include constraints (HUTCH, licence, security, cost).

@@ -7,6 +7,8 @@
 | PR / commit | not yet committed |
 | Units touched | enterprise-plan, repository governance docs |
 
+> **Context:** recorded in the v1.2 plan line ("Plan v1"), before the merge. Its chapters 17-19 are chapters 18-20 of the merged plan, and its ADR-0001…0014 are ADR-0011…0024.
+
 ## What changed
 - Reviewed the 17-slide deck, the submission guidelines and enterprise plan v1.0 (chapters 01–16).
 - Added plan chapters 17 (build blueprint, module dependency graph, prototype Gantt), 18 (enterprise tech stack, Gemini + Groq AI strategy, AWS-style mapping) and 19 (policy & change management).

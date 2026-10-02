@@ -34,7 +34,7 @@ export default function LoginPage() {
     } catch (err) {
       setStatus(
         err instanceof Error
-          ? `${err.message} — demo mode: enter any 6-digit code`
+          ? `${err.message} - demo mode: enter any 6-digit code`
           : "Request failed",
       );
       setStep("verify");
@@ -53,12 +53,12 @@ export default function LoginPage() {
         window.sessionStorage.setItem("clarity_token", result.token);
       }
       client.setToken(result.token);
-      setStatus("Signed in — redirecting…");
+      setStatus("Signed in - redirecting…");
       window.location.href = "/";
     } catch (err) {
       setStatus(
         err instanceof Error
-          ? `${err.message} — placeholder login accepted locally`
+          ? `${err.message} - placeholder login accepted locally`
           : "Verify failed",
       );
       if (typeof window !== "undefined") {

@@ -1,5 +1,7 @@
 # 2026-10-02 - Kodee-style Clarity chat UI
 
+> **Merged 2026-10-02:** imported from the team's `main` into the `dev` branch; paths updated to the R1 layout (see `2026-10-02-R1-dev-merge.md`).
+
 ## Intent
 
 Redesign the Clarity conversation surface on the legacy self-care app into a

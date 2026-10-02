@@ -1,88 +1,169 @@
-"""Hash-chained audit ledger."""
+"""Append-only, hash-chained audit ledger (deck S8, plan §20.3-20.4).
+
+"Every decision affecting customers or money must be auditable." The ledger is
+what makes that checkable rather than asserted: each record is hashed, and each
+hash includes its predecessor's, so altering or removing an old record breaks
+every record after it. Verification needs nothing but the ledger itself.
+
+What gets recorded is listed in plan §20.4: input evidence, rule version,
+decision, approval, MCP tool call, staff action, system action, response,
+receipt and override.
+
+**Prototype note.** Append-only is enforced in code here. Production also
+removes UPDATE and DELETE grants from the writing role and anchors the chain
+head to WORM storage, so the guarantee survives a privileged insider
+(plan §7.2 T4).
+"""
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import dataclass, field
+import threading
+from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
-from clarity.kernel.common import utc_now
-from clarity.kernel.ids import new_id
+from pydantic import Field
+
+from clarity.kernel.canonical import chain_hash, hash_payload
+from clarity.kernel.common import ClarityModel, utc_now
 
 
-def _hash_entry(prev: str, payload: dict[str, Any]) -> str:
-    blob = prev + json.dumps(payload, sort_keys=True, default=str)
-    return hashlib.sha256(blob.encode()).hexdigest()
+class AuditEventType(StrEnum):
+    """The auditable moments (plan §20.4)."""
+
+    EVIDENCE_COLLECTED = "evidence.collected"
+    CAUSE_ASSESSED = "cause.assessed"
+    DECISION_MADE = "decision.made"
+    PLAN_PROPOSED = "plan.proposed"
+    APPROVAL_RECORDED = "approval.recorded"
+    ACTION_EXECUTED = "action.executed"
+    ACTION_COMPENSATED = "action.compensated"
+    RECEIPT_ISSUED = "receipt.issued"
+    MCP_INVOKED = "mcp.invoked"
+    STAFF_ACTION = "staff.action"
+    OVERRIDE_RECORDED = "override.recorded"
+    RULE_PUBLISHED = "rule.published"
 
 
-@dataclass
-class AuditEntry:
-    id: str
-    actor: str
-    action: str
-    subject: str
-    detail: dict[str, Any]
+class AuditRecord(ClarityModel):
+    """One immutable entry. ``chain_hash`` binds it to everything before it."""
+
+    seq: int
+    event_type: AuditEventType
+    actor_ref: str
+    object_ref: str
+    case_id: str | None = None
+    payload_hash: str
+    prev_hash: str | None
+    chain_hash: str
     at: datetime
-    prev_hash: str
-    hash: str
+
+    #: Masked detail for a human reading the trail. Never raw PII.
+    detail: dict[str, Any] = Field(default_factory=dict)
 
 
 @dataclass
-class AuditLedger:
-    """Append-only, hash-chained audit log. Tamper detection via verify()."""
+class ChainVerification:
+    intact: bool
+    length: int
+    broken_at: int | None = None
+    reason: str | None = None
 
-    entries: list[AuditEntry] = field(default_factory=list)
-    _last_hash: str = "0" * 64
+
+class AppendOnlyViolation(RuntimeError):
+    """Something tried to change or remove an existing record."""
+
+
+class AuditLedger:
+    """Append-only ledger with a verifiable hash chain."""
+
+    def __init__(self) -> None:
+        self._records: list[AuditRecord] = []
+        self._lock = threading.Lock()
 
     def append(
         self,
+        event_type: AuditEventType,
         *,
-        actor: str,
-        action: str,
-        subject: str,
+        actor_ref: str,
+        object_ref: str,
+        payload: dict[str, Any],
+        case_id: str | None = None,
         detail: dict[str, Any] | None = None,
-    ) -> AuditEntry:
-        at = utc_now()
-        payload = {
-            "actor": actor,
-            "action": action,
-            "subject": subject,
-            "detail": detail or {},
-            "at": at.isoformat(),
-        }
-        digest = _hash_entry(self._last_hash, payload)
-        entry = AuditEntry(
-            id=new_id("AUD"),
-            actor=actor,
-            action=action,
-            subject=subject,
-            detail=detail or {},
-            at=at,
-            prev_hash=self._last_hash,
-            hash=digest,
-        )
-        self.entries.append(entry)
-        self._last_hash = digest
-        return entry
+        now: datetime | None = None,
+    ) -> AuditRecord:
+        """Add a record. The payload is hashed, not stored in the clear."""
+        with self._lock:
+            previous = self._records[-1] if self._records else None
+            payload_hash = hash_payload(payload)
+            record = AuditRecord(
+                seq=len(self._records) + 1,
+                event_type=event_type,
+                actor_ref=actor_ref,
+                object_ref=object_ref,
+                case_id=case_id,
+                payload_hash=payload_hash,
+                prev_hash=previous.chain_hash if previous else None,
+                chain_hash=chain_hash(payload_hash, previous.chain_hash if previous else None),
+                at=now or utc_now(),
+                detail=detail or {},
+            )
+            self._records.append(record)
+            return record
 
-    def verify(self) -> bool:
-        prev = "0" * 64
-        for entry in self.entries:
-            payload_stored = {
-                "actor": entry.actor,
-                "action": entry.action,
-                "subject": entry.subject,
-                "detail": entry.detail,
-                "at": entry.at.isoformat(),
-            }
-            expected = _hash_entry(entry.prev_hash, payload_stored)
-            if entry.prev_hash != prev or entry.hash != expected:
-                return False
-            prev = entry.hash
-        return True
+    # ------------------------------------------------------------------ #
+    # Reading
+    # ------------------------------------------------------------------ #
 
-    def tamper(self, index: int, *, action: str) -> None:
-        """Test helper: mutate an entry without updating the chain."""
-        self.entries[index].action = action
+    def __len__(self) -> int:
+        return len(self._records)
+
+    @property
+    def records(self) -> list[AuditRecord]:
+        """A copy: callers cannot reach in and alter the ledger."""
+        return list(self._records)
+
+    @property
+    def head(self) -> str | None:
+        """Current chain head, anchored to WORM storage in production."""
+        return self._records[-1].chain_hash if self._records else None
+
+    def for_case(self, case_id: str) -> list[AuditRecord]:
+        """The full trail for one case - what a regulator pack exports."""
+        return [r for r in self._records if r.case_id == case_id]
+
+    def of_type(self, event_type: AuditEventType) -> list[AuditRecord]:
+        return [r for r in self._records if r.event_type is event_type]
+
+    # ------------------------------------------------------------------ #
+    # Verifying
+    # ------------------------------------------------------------------ #
+
+    def verify(self) -> ChainVerification:
+        """Recompute the whole chain. Any edit or deletion shows up here."""
+        previous_hash: str | None = None
+        for index, record in enumerate(self._records):
+            if record.seq != index + 1:
+                return ChainVerification(
+                    False, len(self._records), record.seq, "sequence numbers are not contiguous"
+                )
+            if record.prev_hash != previous_hash:
+                return ChainVerification(
+                    False, len(self._records), record.seq, "record does not follow its predecessor"
+                )
+            expected = chain_hash(record.payload_hash, previous_hash)
+            if record.chain_hash != expected:
+                return ChainVerification(
+                    False, len(self._records), record.seq, "chain hash does not match its contents"
+                )
+            previous_hash = record.chain_hash
+        return ChainVerification(True, len(self._records))
+
+    def proves(self, record: AuditRecord, payload: dict[str, Any]) -> bool:
+        """Does ``payload`` match what this record attests to?
+
+        Lets an auditor confirm that a document they were handed is the one the
+        ledger recorded, without the ledger holding the document.
+        """
+        return record.payload_hash == hash_payload(payload)
