@@ -7,7 +7,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | Item | Value |
 |---|---|
 | Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
-| Version / date | **v1.3 (merged)** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
+| Version / date | **v1.4** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
 | Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
 | Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
@@ -75,6 +75,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.1 | 2026-10-01 | **Plan audit.** The plan was checked against the 51-point brief, the Final Submission Guidelines and all 17 deck slides. Gaps found and added are listed below. |
 | v1.2 | 2026-10-01 | Parallel line ("Plan v1"): build blueprint, tech stack with AI roles, policy change management, runtime profiles. Kept as chapters 18–20. |
 | v1.3 | 2026-10-02 | **Merged plan.** v1.1 audit + the v1.2 line + chapter 21 (migration and runtime model). Details in [CHANGES.md](CHANGES.md). |
+| v1.4 | 2026-10-02 | Module interaction model (21 §11, ADR-0029); R0 acceptance suite; D7. |
 
 ### v1.1 audit: gaps found and added
 

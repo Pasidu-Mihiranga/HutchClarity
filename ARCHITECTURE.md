@@ -2,7 +2,7 @@
 
 > The [enterprise plan](docs/enterprise-plan/README.md) is the **intended** design, and [chapter 21](docs/enterprise-plan/21-migration-and-deployment-plan.md) is the plan for getting there. This file is the **as-built** state: what exists, how it is layered, what differs from the plan, and how far the migration has gone. It is updated in the same change as anything that affects it.
 >
-> **Last updated:** 2026-10-02 (branch `dev`) · **Migration:** R1 complete; D1-D4 and D6 fixed; team work from `main` merged (chat module, admin APIs, `full`-profile SQL store, Next.js apps) · **Tests:** 457 · `ruff`, `mypy --strict` (106 files), 3 import contracts and the module-boundary tests all clean
+> **Last updated:** 2026-10-02 (branch `dev`) · **Migration:** R1 complete; D1-D4 and D6 fixed; team work from `main` merged (chat module, admin APIs, `full`-profile SQL store, Next.js apps) · **Tests:** 546 · `ruff`, `mypy --strict` (106 files), 3 import contracts and the module-boundary tests all clean
 
 ---
 
@@ -63,6 +63,9 @@ Money protection:
 
 ## 3. Modules
 
+How modules talk (ADR-0029, plan 21 §11): they **call** each other's `public.py` only along declared edges (`case` → timeline, detection, decision, actions, receipts; `decision` → detection; `governance` → decision; `receipts` → actions), and **publish events** through the outbox for side effects. Today no module publishes events yet; the first event-driven flow (receipts on `action.completed`) follows the R2a platform work.
+
+
 Registry with status and next migration step: [docs/modules.md](docs/modules.md). Each module's `MODULE.md` lists its public surface, users, dependencies, invariants and tests.
 
 ## 4. Decisions
@@ -73,8 +76,8 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 
 | Step | Status |
 |---|---|
-| R0 Freeze behaviour | Partly: the existing 438 tests plus new concurrency regressions act as the safety net. Black-box `/v1` acceptance suite still to write. |
-| R0.5 Defects | **D1, D2, D3, D4, D6 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
+| R0 Freeze behaviour | **Done.** `backend/tests/acceptance`: route contract for all 66 routes (public, signed-in, synthetic-only), the four journeys plus subject binding over HTTP, and an OpenAPI snapshot of 54 operations. |
+| R0.5 Defects | **D1, D2, D3, D4, D6, D7, D8 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
 | R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
 | R2 Infrastructure drivers | **Started by the team:** the `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). Kafka, Keycloak, OPA and the per-module schemas are still to do. |
 | R3, R4, R6, R7 | Not started |
