@@ -19,3 +19,8 @@ export {
   type StaffSessionRequest,
   type RuledOutItem,
 } from "./client";
+
+// Generated from contracts/openapi.json by `npm run sdk:generate` (B09).
+// Checked in, and CI fails if it drifts from the backend's schema.
+export type { components, operations, paths } from "./generated/schema";
+export type { ApiPath, ResponseOf } from "./routes";

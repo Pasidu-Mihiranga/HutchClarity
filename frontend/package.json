@@ -10,9 +10,15 @@
     "dev:console": "npm run dev -w @clarity/console",
     "dev:verify": "npm run dev -w @clarity/verify",
     "build": "npm run build -w @clarity/customer-web -w @clarity/console -w @clarity/verify",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "sdk:generate": "openapi-typescript ../contracts/openapi.json -o packages/sdk/src/generated/schema.ts",
+    "sdk:check": "node scripts/check-sdk.mjs",
+    "typecheck": "tsc -p packages/sdk/tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0"
   }
 }
