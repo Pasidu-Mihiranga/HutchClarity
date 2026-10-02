@@ -68,6 +68,23 @@ Where a popular tool fails C2 or C3, the table names it and states why it was no
 ### 2.3 Runtime profiles
 Every component above is the **production** choice. Daily development runs the `lite` profile (Python only, in-memory and in-process drivers), and the real components run in the `full` profile and the CI integration lane. Driver matrix and rules: [18 §2.3](18-build-blueprint.md), ADR-0027.
 
+#### 2.3.1 Drivers built so far
+
+Each port below has one parity suite that every driver must pass unchanged, so a driver swap is a configuration change rather than a code change. The `lite` driver is the parity reference.
+
+| Port | `lite` / `demo` driver | `full` driver | Component | Parity suite | Issue |
+|---|---|---|---|---|---|
+| Persistence (unit of work, repositories) | in-memory store, versioned rows | *not built yet* | PostgreSQL 18 | `backend/tests/contract/test_repository_parity.py` | B02 done, B05 open |
+| Event bus | in-process, one queue per subject | **`KafkaEventBus`** | Apache Kafka 4 (KRaft) | `backend/tests/contract/test_bus_parity.py` | B03 done |
+
+**Running the `full` drivers.** `make up-full` starts the components from `deploy/compose/full.yml`; `make test-full` installs the extras and runs the parity suites against them. Each suite skips when its component is unreachable, so a green `make check` never implies a `full` driver was exercised. `make down-full` removes them.
+
+**The Kafka driver** (`clarity.platform.messaging.drivers.kafka`) uses one topic per event type, `subscriber_ref` as the message key and one consumer group per subscriber. Auto-commit is off: an offset moves only after a handler returns, and a failed handler pauses the partition and rewinds it, which is what makes delivery at-least-once rather than at-most-once. Subscribing blocks until the broker has assigned and positioned the consumer, because a consumer that joins lazily silently loses everything published while it was joining.
+
+One difference from the in-process driver is worth stating rather than hiding: Kafka's unit of blocking is a **partition**, and a partition carries many subjects, so one failing handler delays every customer on that partition. The in-process driver delays exactly one. Both honour the port's guarantees (order per subject, at least once, isolated consumer groups); narrowing Kafka's blast radius needs per-key retry topics, which is B04's dead-letter and backoff work.
+
+The Python client is **confluent-kafka** (Apache-2.0, over librdkafka under BSD-2-Clause: both OSI-approved and vendor-neutral, so it passes the §1 criteria). It is an optional extra (`backend[kafka]`), never a core dependency, so `lite` keeps needing only Python (ADR-0006, ADR-0027).
+
 ### 2.4 Delivery and supply chain (GitHub)
 
 | Concern | Choice |

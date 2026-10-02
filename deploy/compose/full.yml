@@ -1,0 +1,66 @@
+# The `full` profile's real components (ADR-0027, plan 19 section 2.3).
+#
+# Started by `make up-full`. Only what a work package needs is here: B03 added
+# Kafka and B05 added PostgreSQL. Valkey, Keycloak, OPA and the Grafana stack
+# arrive with their own issues, and the production-shaped artefacts (images,
+# Helm, OpenTofu) are X03's work, not this file's.
+#
+# Simulated: this is a development broker with one node, no auth and no TLS.
+# It is not a deployment reference.
+
+name: clarity-full
+
+services:
+  postgres:
+    # PostgreSQL 18 with pgvector (plan 19 section 2.1). One database; each
+    # module owns a schema and a role inside it (ADR-0013, B05).
+    image: pgvector/pgvector:pg18
+    container_name: clarity-postgres
+    ports:
+      # 5440 on the host: a developer machine often already runs PostgreSQL on
+      # 5432, and a local server bound to loopback wins over this container's
+      # wildcard bind, which fails with a confusing "role does not exist".
+      - "5440:5432"
+    environment:
+      POSTGRES_USER: clarity
+      POSTGRES_PASSWORD: clarity
+      POSTGRES_DB: clarity
+      # Deterministic collation, so an ORDER BY means the same thing everywhere.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clarity -d clarity"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  kafka:
+    # Apache Kafka 4 in KRaft mode: no ZooKeeper (ADR-0014, plan 19 section 2.1).
+    image: apache/kafka:4.0.0
+    container_name: clarity-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:19092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >-
+        CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      # Several partitions so a failing handler blocks fewer subjects. The
+      # in-process driver blocks exactly one; see the Kafka driver's docstring.
+      KAFKA_NUM_PARTITIONS: "6"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: clarity-dev-cluster-00001
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092
+      interval: 10s
+      timeout: 5s
+      retries: 10
