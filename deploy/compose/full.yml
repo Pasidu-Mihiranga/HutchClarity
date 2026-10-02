@@ -113,6 +113,10 @@ services:
       - "8200:8200"
     environment:
       BAO_DEV_ROOT_TOKEN_ID: clarity-development-only
+      # The CLI defaults to HTTPS, so without this `bao status` fails against a
+      # dev server speaking HTTP and the healthcheck reports a working service
+      # as unhealthy, which stalls `make up-full`.
+      BAO_ADDR: http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
     healthcheck:

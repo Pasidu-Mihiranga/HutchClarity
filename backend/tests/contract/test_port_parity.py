@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from collections.abc import Callable
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -292,7 +294,40 @@ class TestRecurrenceProbeParity:
 # --------------------------------------------------------------------------- #
 
 
+def _real_openbao_signer() -> OpenBaoSigningService:
+    """The driver against a real OpenBao Transit engine (M-RCPT).
+
+    Skipped unless one is configured. This is the lane that can catch a wrong
+    request shape, a misread response or a token header the service rejects,
+    none of which a hand-written stand-in of the API will ever disagree with.
+    The key is provisioned here rather than assumed, so the lane sets up the
+    state a deployment would.
+    """
+    address = os.environ.get("CLARITY_OPENBAO_URL")
+    token = os.environ.get("CLARITY_OPENBAO_TOKEN")
+    if not address or not token:
+        pytest.skip("set CLARITY_OPENBAO_URL and CLARITY_OPENBAO_TOKEN to use a real OpenBao")
+
+    headers = {"X-Vault-Token": token}
+    key_name = f"clarity-parity-{uuid4().hex[:10]}"
+    with httpx.Client(base_url=address.rstrip("/"), headers=headers, timeout=10) as client:
+        # Idempotent: a mount that already exists is not an error here.
+        client.post("/v1/sys/mounts/transit", json={"type": "transit"})
+        created = client.post(
+            f"/v1/transit/keys/{key_name}", json={"type": "ed25519", "exportable": True}
+        )
+        assert created.status_code < 300, f"could not create the key: {created.text}"
+
+    return OpenBaoSigningService(address, key_name=key_name, token=token)
+
+
 def _openbao_signer() -> OpenBaoSigningService:
+    """A stand-in for the Transit API, reimplemented in Python.
+
+    Keeps the ``demo`` profile free of infrastructure (ADR-0006). It cannot tell
+    that the driver and the real service disagree, because it is written to the
+    driver's expectations; ``_real_openbao_signer`` is the lane that can.
+    """
     private = Ed25519PrivateKey.generate()
     public = base64.b64encode(
         private.public_key().public_bytes(
@@ -322,7 +357,8 @@ def _openbao_signer() -> OpenBaoSigningService:
 
 SIGNING_DRIVERS: list[tuple[str, Callable[[], SigningService]]] = [
     ("dev", lambda: DevSigningService(kid="parity-key")),
-    ("openbao", _openbao_signer),
+    ("openbao-stand-in", _openbao_signer),
+    ("openbao-real", _real_openbao_signer),
 ]
 
 
@@ -392,3 +428,56 @@ def test_an_unavailable_source_raises_rather_than_returning_nothing(registry):
 
     with pytest.raises(AdapterError):
         port.read(ref_for(DILANI), DEMO_NOW - timedelta(days=1), DEMO_NOW)
+
+
+# --------------------------------------------------------------------------- #
+# Key rotation (M-RCPT acceptance 1)
+# --------------------------------------------------------------------------- #
+
+
+def test_rotating_the_signing_key_keeps_old_receipts_verifiable() -> None:
+    """A receipt signed before a rotation must still verify afterwards.
+
+    This is what a Trust Receipt promises: it proves what happened whenever it
+    is checked, not only until the next key rotation. So the signer has to keep
+    publishing every version's public key, and new receipts have to move to the
+    new one.
+
+    Run against a real OpenBao, because rotation is the service's behaviour, not
+    the driver's: a stand-in would be asserting that the test's own idea of
+    rotation matches itself.
+    """
+    address = os.environ.get("CLARITY_OPENBAO_URL")
+    token = os.environ.get("CLARITY_OPENBAO_TOKEN")
+    if not address or not token:
+        pytest.skip("set CLARITY_OPENBAO_URL and CLARITY_OPENBAO_TOKEN to use a real OpenBao")
+
+    key_name = f"clarity-rotation-{uuid4().hex[:10]}"
+    headers = {"X-Vault-Token": token}
+    with httpx.Client(base_url=address.rstrip("/"), headers=headers, timeout=10) as admin:
+        admin.post("/v1/sys/mounts/transit", json={"type": "transit"})
+        created = admin.post(
+            f"/v1/transit/keys/{key_name}", json={"type": "ed25519", "exportable": True}
+        )
+        assert created.status_code < 300, created.text
+
+        before_rotation = OpenBaoSigningService(address, key_name=key_name, token=token)
+        old_payload = "sha256:" + "11" * 32
+        old_kid, old_signature = before_rotation.sign(old_payload)
+
+        rotated = admin.post(f"/v1/transit/keys/{key_name}/rotate")
+        assert rotated.status_code < 300, rotated.text
+
+        # A fresh driver, as a restarted process would be.
+        after_rotation = OpenBaoSigningService(address, key_name=key_name, token=token)
+        new_kid, _ = after_rotation.sign("sha256:" + "22" * 32)
+        published = after_rotation.public_keys()
+
+    assert new_kid != old_kid, "new receipts must be signed with the new key"
+    assert old_kid in published, "the old key must still be published, or old receipts die"
+    assert verify_signature(
+        old_payload,
+        kid=old_kid,
+        signature_b64=old_signature,
+        public_keys=published,
+    ), "a receipt signed before the rotation no longer verifies"
