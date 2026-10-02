@@ -1,116 +1,113 @@
-# ARCHITECTURE.md - Hutch Clarity (living document)
+# ARCHITECTURE.md - what is actually built
 
-> **What this file is:** the *current* architecture and the status of every unit. The plan ([docs/enterprise-plan/](docs/enterprise-plan/README.md)) is the intended design; this file says what is actually true now. It is updated in the same PR as any change that affects it (see the sync matrix in [AGENTS.md §5](AGENTS.md)).
+> The [enterprise plan](docs/enterprise-plan/README.md) is the **intended** design, and [chapter 21](docs/enterprise-plan/21-migration-and-deployment-plan.md) is the plan for getting there. This file is the **as-built** state: what exists, how it is layered, what differs from the plan, and how far the migration has gone. It is updated in the same change as anything that affects it.
 >
-> **Last updated:** 2026-10-02 · **Plan baseline:** v1.1 (combined) · **Code status:** modular monolith in progress (backend/services/frontend; src/clarity strangler)
+> **Last updated:** 2026-10-02 (branch `dev`) · **Migration:** R1 complete; D1-D4 and D6 fixed; team work from `main` merged (chat module, admin APIs, `full`-profile SQL store, Next.js apps) · **Tests:** 457 · `ruff`, `mypy --strict` (106 files), 3 import contracts and the module-boundary tests all clean
 
 ---
 
-## 1. System in one picture
+## 1. The system today
 
 ```mermaid
 flowchart LR
     subgraph Users
-        C["Customers<br/>web · app WebView · WhatsApp · SMS/USSD"]
-        S["HUTCH staff + admins<br/>console"]
-        P["Public<br/>receipt verify"]
-        AG["AI agents<br/>HUTCH chatbot via MCP"]
+        C["Customer<br/>web page"]
+        S["Staff<br/>Clarity Desk"]
+        P["Public<br/>receipt check"]
+        AG["AI agent<br/>in-process MCP"]
     end
-    subgraph Clarity["Hutch Clarity"]
-        FE["customer-web · console · verify"]
-        API["clarity-api<br/>modular monolith"]
-        WK["clarity-worker / clarity-stream"]
-        MCP["clarity-mcp"]
-        AIG["clarity-ai-gateway"]
-        SIG["clarity-signer"]
-        CHG["clarity-channel-gateway"]
+    subgraph Process["One process (lite profile, Python only)"]
+        ENT["entrypoints.asgi"]
+        HTTP["interfaces.http<br/>/v1 · static UI"]
+        MCP["interfaces.mcp<br/>read + propose only"]
+        APP["app.container<br/>composition root"]
+        MOD["modules<br/>case · timeline · detection · decision ·<br/>actions · receipts · governance · iam ·<br/>autopsy · foresight"]
+        AI["ai<br/>gateway · masking · verifier"]
+        PLT["platform<br/>config · audit · messaging · content · security"]
+        INT["integration<br/>ports + mock drivers"]
     end
-    SIM["hutch-sim<br/>SIMULATED HUTCH systems"]
-    LLM["LLM providers by role<br/>Gemini · Groq (prototype)"]
-    C --> FE --> API
-    C --> CHG --> API
-    S --> FE
-    P --> FE
-    AG --> MCP --> API
-    API --> WK
-    API --> AIG --> LLM
-    WK --> SIG
-    API --> SIM
-    WK --> SIM
+    SIM["mock HUTCH systems<br/>SIMULATED"]
+    C --> HTTP
+    S --> HTTP
+    P --> HTTP
+    AG --> MCP
+    ENT --> HTTP
+    HTTP --> APP
+    MCP --> APP
+    APP --> MOD
+    MOD --> AI
+    MOD --> PLT
+    MOD --> INT --> SIM
 ```
 
-Layers, rules and the full module catalogue: [17 §2–§4](docs/enterprise-plan/17-build-blueprint.md). Stack: [18 §2](docs/enterprise-plan/18-tech-stack-and-ai.md).
+Everything runs in one process with no infrastructure (`lite` profile, ADR-0027). All HUTCH systems are **simulated and labelled as such**.
 
 ## 2. Layers
 
-| Layer | Contents | Rule |
+Enforced on every `make check` by import-linter (`backend/pyproject.toml`) and by `backend/tests/architecture/test_module_boundaries.py`.
+
+| Layer | Package | Rule |
 |---|---|---|
-| L7 Experience | `frontend/apps/*` | Talks only to BFF routes → `clarity-api` |
-| L6 Interfaces | REST routers, MCP server, channel webhooks, consumers | Thin; no business logic |
-| L5 Identity / AuthZ | `iam` module, Keycloak, OPA | Deny by default |
-| L4 Domain modules | `backend/src/clarity/modules/*` | Talk via `public.py` or events only |
-| L3 AI | AI gateway, PII, verifier, RAG | No authority over money |
-| L2 Platform | Module system, data access, outbox/bus, idempotency, audit, vault, config, flags, telemetry | Frozen at `baseline-v1` |
-| L1 Integration | Ports + drivers (mock / sandbox / hutch) | All HUTCH access goes through here |
-| L0 Kernel | Money, IDs, Clock, errors, contracts | No dependencies |
+| L7 Entry points | `clarity.entrypoints` | Start processes (`asgi.py`) |
+| L6 Interfaces | `clarity.interfaces.http`, `clarity.interfaces.mcp` | Thin; independent of each other; no business logic |
+| L5 Composition | `clarity.app` | Builds the object graph; the only reader of `CLARITY_PROFILE` |
+| L4 Domain | `clarity.modules.*` | Each module imported only through its `public.py` |
+| L3 AI | `clarity.ai` | Language only; no authority over money |
+| L2 Platform | `clarity.platform.*` | Config (policy resolver, switches), audit, messaging, content, security |
+| L1 Integration | `clarity.integration` | Every HUTCH access goes through a port |
+| L0 Vocabulary | `clarity.contracts`, `clarity.kernel` | Money, IDs, canonical hashing, canonical models |
 
-### Runtime profiles
+Money protection:
+- `clarity.ai`, `clarity.interfaces.mcp` and the MCP view cannot import the tool layer's capability modules (`layer`, `confirmation`, `budget`, `capability`).
+- `modules.actions` exposes two surfaces: `public.py` (vocabulary: errors and result types; it imports no executing code, test-enforced) and `capability.py` (`ToolLayer`, `ConfirmationService`, `RefundBudget`), which only `modules.case` and `app` may import.
 
-| Profile | Used for | Needs | Status |
+## 3. Modules
+
+Registry with status and next migration step: [docs/modules.md](docs/modules.md). Each module's `MODULE.md` lists its public surface, users, dependencies, invariants and tests.
+
+## 4. Decisions
+
+28 ADRs in [docs/adr/](docs/adr/README.md). The ones that shape the code today: rule packs as YAML (0001, amended by 0026), policy as scoped effective-dated data (0002), policy governance (0003), MCP holds no execute capability (0004), idempotency claimed before side effects (0005), confirmation tokens never leave the server (0007), risk from evidence (0008), no model by default (0009), own issuer behind a federation interface (0010), migration approach (0025), runtime profiles (0027), containers for the core and serverless at the edges (0028).
+
+## 5. Migration status (plan 21 §7)
+
+| Step | Status |
+|---|---|
+| R0 Freeze behaviour | Partly: the existing 438 tests plus new concurrency regressions act as the safety net. Black-box `/v1` acceptance suite still to write. |
+| R0.5 Defects | **D1, D2, D3, D4, D6 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
+| R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
+| R2 Infrastructure drivers | **Started by the team:** the `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). Kafka, Keycloak, OPA and the per-module schemas are still to do. |
+| R3, R4, R6, R7 | Not started |
+| R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
+
+## 6. Where this differs from the target
+
+| Area | Target (plan) | Built | Why / when |
 |---|---|---|---|
-| `lite` | Daily development and unit/contract tests | Python, Node, PostgreSQL | planned (A1) |
-| `full` | Integration checks locally, CI integration lane | Docker Compose | planned (I0) |
-| `prod` | HUTCH deployment | HUTCH platform | planned (F3) |
+| Persistence | PostgreSQL 18, schema per module, RLS | In memory | `lite` profile; PostgreSQL driver in R2, modules move in R3 |
+| Concurrency | Database unique keys and row locks | In-process locks; correct for **one** process only | R3. Do not run more than one replica until then (risk R28). |
+| Identity | Keycloak (staff, admins, MCP clients) + customer issuer + OPA | Own EdDSA issuer; Python permission checks; demo-only role picker | ADR-0010; Keycloak and OPA drivers in R2 |
+| Events | Outbox → Kafka + Apicurio | In-process relay over an outbox | R2 |
+| Decision outcomes | ZEN decision table | Python over a hashed input document | R3 (ADR-0026) |
+| Rule parameters | In the policy store | Inside the YAML packs | R3 (D5) |
+| MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | In-process class; tools listed at `/v1/mcp/tools` | R4. No external agent can connect yet. |
+| Signing key | `clarity-signer` with OpenBao/KMS | Generated in memory at startup | R4 |
+| Front end | Next.js 16 apps + shared packages (plan 19) | Static UI served by FastAPI **and** Next.js 14 apps in `frontend/` | R5: verify the build, retire the static UI, move to Next.js 16 |
+| Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
+| Channels | Web, app, WhatsApp, SMS/USSD | Web only | R4/R6 |
+| Rules | 16 candidates | 6 | Prototype scope |
 
-Driver matrix: [17 §2.3](docs/enterprise-plan/17-build-blueprint.md). Decision: ADR-0014.
+## 7. Known gaps
 
-## 3. Module map and status
+Full list in [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITATIONS.md). Most important:
 
-Status values: `planned` → `in-progress` → `built` → `integrated` → `verified`. Owners are assigned at kickoff. Details per unit: [docs/modules.md](docs/modules.md).
+1. **Single process only.** Correctness under concurrency holds inside one process (1,500 of 1,500 concurrent double confirms give one refund and one receipt); a second replica would not share that state until R3.
+2. **Identity is ours, not HUTCH's.** Permission checks are real; the issuer key is generated at startup, so a restart signs everyone out; no refresh, revocation or session store. Development sign-in routes return 404 in the `prod` profile.
+3. **No persistence.** A restart loses every case and receipt.
+4. **MCP has no network transport yet.**
+5. **Sinhala and Tamil wording is not native-speaker reviewed.**
+6. **Foresight is uncalibrated** and says so in every report.
 
-| Unit | Layer | Deployable | Depends on (calls / events) | Status |
-|---|---|---|---|---|
-| kernel | L0 | all | - | planned |
-| platform | L2 | all | kernel | planned |
-| integration (ports + drivers) | L1 | api, worker, stream | platform | planned |
-| iam | L5 | api | platform, Identity port, Keycloak | planned |
-| customer | L4 | api | platform, iam | planned |
-| case | L4 | api | platform | planned |
-| timeline | L4 | api | integration | planned |
-| detection | L4 | api | timeline (snapshot) | planned |
-| decision | L4 | api | detection, customer, config | planned |
-| actions | L4 | api | decision, integration (commands), customer | planned |
-| receipts | L4 | worker | `action.completed`, signer | planned |
-| reconciliation | L4 | worker | actions, integration | planned |
-| conversation | L4 | api | iam, case, timeline, detection, decision, knowledge, ai | planned |
-| notifications | L4 | worker | customer, channel-gateway, templates | planned |
-| knowledge | L4 | api, worker | ai, catalogue port | planned |
-| proactive | L4 | stream | ingest topics, case, notifications | planned |
-| governance | L4 | api | detection, decision, config | planned |
-| desk-ops | L4 | api, worker | actions, receipts, case | planned |
-| autopsy | L4 | worker | ai, knowledge, case | planned |
-| foresight | L4 | worker | ai, insights | planned |
-| insights | L4 | worker | all events (read-only) | planned |
-| ai-gateway | L3 | own service | providers, PII | planned |
-| mcp | L6 | own service | clarity-api | planned |
-| signer | L4 support | own service | KMS/key port | planned |
-| channel-gateway | L6 | own service | providers, conversation | planned |
-| hutch-sim | external (simulated) | own service | - | planned |
-| customer-web | L7 | own app | clarity-api | planned |
-| console | L7 | own app | clarity-api | planned |
-| verify | L7 | own app | clarity-api | planned |
+## 8. Keeping this file true
 
-## 4. Cross-cutting decisions (accepted ADRs)
-
-See [docs/adr/README.md](docs/adr/README.md). Summary: modular monolith with satellites (0002), schema per module (0003), outbox + Kafka (0004), detectors + ZEN tables + OPA (0005), deployment contract and infrastructure ports (0006), identity (0007), MCP (0008), AI roles and providers (0009), template-only notifications (0010), policy artefact lifecycle (0011), neutral-licence stack (0012), living documentation (0013), runtime profiles (0014).
-
-## 5. Deviations from the plan
-
-| Date | Deviation | ADR | Plan updated? |
-|---|---|---|---|
-| - | None yet | - | - |
-
-## 6. How to update this file
-- Status changes: when a work package reaches a gate (G1, M1–M4 in [17 §14](docs/enterprise-plan/17-build-blueprint.md)).
-- Module map: whenever a module or dependency is added/removed (with the `MODULE.md` of both sides).
-- Deviations: every accepted ADR that departs from the plan.
+Update it in the same change as: a new module or dependency, a migration step landing, a decision that differs from the plan (ADR first), or a change to what is built versus planned. History lives in [docs/devlog/](docs/devlog/README.md).

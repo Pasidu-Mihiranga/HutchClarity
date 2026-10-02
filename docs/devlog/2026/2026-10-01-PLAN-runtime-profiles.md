@@ -7,6 +7,8 @@
 | PR / commit | not yet committed |
 | Units touched | enterprise-plan 04, 12, 17, 18, CHANGES, README; ADR-0014; AGENTS.md; ARCHITECTURE.md |
 
+> **Context:** recorded in the v1.2 plan line ("Plan v1"), before the merge. Its chapters 17-19 are chapters 18-20 of the merged plan, and its ADR-0001…0014 are ADR-0011…0024.
+
 ## What changed
 - Added runtime profiles `lite`, `full`, `prod` with a driver matrix (17 §2.3)
 - Added local database workflow (17 §2.4) and configuration and secrets rules (17 §2.5)

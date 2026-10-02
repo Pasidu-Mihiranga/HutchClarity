@@ -4,66 +4,48 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 13. Rule Engine
 
-### 13.1 Concept (v1.1)
-A "rule" is three versioned artefacts that are released together as one **signed rule bundle**:
+### 13.1 Concept
+- Rules are **versioned deterministic policies** (rule packs) that map timeline evidence to a cause. They are data, not code.
+- A rule pack is signed when published and loaded by `rule-engine`. A change requires four-eyes approval and passing golden tests (no code deploy) `[DECK S7, S14]`.
+- Every decision records `rule_id@version` and `rule_pack_hash` `[DECK S7]`.
+- **v1.3:** packs hold *logic* (conditions); numeric *parameters* (confidence base and adjustments, lookback and match windows) move to the scoped policy store so they change under the [20](20-policy-change-management.md) lifecycle without editing a pack (ADR-0001, ADR-0026). The outcome matrix (§14.2) becomes a ZEN decision table.
 
-| Part | Form | Who edits | Why this form |
-|---|---|---|---|
-| **Manifest** | YAML: identity, owner, legal basis, required evidence, parameters, ruled-out list, allowed actions, templates, tests | CX engineer | Human-readable metadata and parameters |
-| **Detector** | Python plugin `clarity.detectors.<rule>:detect`, versioned with the manifest | Engineer | Temporal evidence logic is clearer, typed and testable in code than in a home-made DSL |
-| **Parameters** | Values in the config store with scoped, effective-dated overrides ([19](19-policy-change-management.md)) | CX engineer, approved by finance/compliance | Thresholds change often; they must not need a code release |
-
-- Every decision records `rule_id@version`, `bundle_hash` and the resolved `config_snapshot_hash` `[DECK S7]`.
-- Parameter and decision-table changes need no code deploy (four-eyes publish). Detector logic changes go through PR review + golden tests + shadow evaluation `[DECK S7, S14]`.
-- The lifecycle for all of these is defined once in [19](19-policy-change-management.md).
-
-### 13.2 Rule manifest and detector (illustrative)
+### 13.2 Conceptual rule structure (syntax illustrative)
 
 ```yaml
 rule_id: VAS_NO_CONSENT
 version: 4
-status: active                      # draft | in_review | approved | scheduled | active | superseded | retired
+status: active                      # draft | in_review | active | retired
 owner: vas-ops
 legal_basis: "Gazette 2316/14 - VAS requires consent + OTP"
 applies_to: { domain: prepaid, event_types: [vas_charge] }
-detector: clarity.detectors.vas_no_consent:detect     # Python plugin, same version
-required_evidence: [charging, vas_consent]            # missing -> evidence incomplete -> handoff, never a guess
-params:                                               # defaults; overridden by scoped config (see ch. 19)
-  consent_lookback: P400D
-  base_confidence: 0.90
-  high_risk_merchant_boost: 0.05
-  partial_consent_source_penalty: 0.30
-rules_out: [PACK_EXPIRY_BURN, LOAN_RECOVERY]
-allowed_actions: [REFUND, DEACTIVATE_VAS, BLOCK_MERCHANT_UNTIL_OPTIN]
+required_evidence:                  # missing -> evidence incomplete -> handoff, never a guess
+  - source: charging     # vas_charge event
+  - source: vas_consent  # consent log for the same subscription
+conditions:
+  all:
+    - exists: { event: vas_charge, as: c }
+    - absent: { event: consent_otp_verified, where: { subscription_id: "$c.subscription_id" }, before: "$c.at", lookback: P400D }
+    - absent: { event: second_confirmation, where: { subscription_id: "$c.subscription_id" }, before: "$c.at" }
+confidence:
+  base: 0.90
+  boosts: [ { when: { merchant_risk_band: high }, add: 0.05 } ]
+  penalties: [ { when: { source_completeness.vas_consent: partial }, sub: 0.30 } ]
+rules_out: [ PACK_EXPIRY_BURN, LOAN_RECOVERY ]   # compared and reported as "ruled out"
+decision:
+  category: unauthorized_vas
+  money_effect: "sum(c.amount)"
+allowed_actions: [ REFUND, DEACTIVATE_VAS, BLOCK_MERCHANT_UNTIL_OPTIN ]
 safeguard: BLOCK_MERCHANT_UNTIL_OPTIN
 recurrence_check: merchant_block_active
 explanation_template_ids: { si: vas_no_consent_si_v3, ta: vas_no_consent_ta_v3, en: vas_no_consent_en_v3 }
-decision_table: clarity.decision.vas                  # thresholds live in the ZEN table, not here
-tests_ref: rules/golden/VAS_NO_CONSENT/v4/
+approval_policy_ref: clarity.decision.vas      # thresholds live in OPA, not in the rule
+tests_ref: tests/rules/VAS_NO_CONSENT/v4/
 ```
-
-```python
-# rules/detectors/vas_no_consent.py  (sketch)
-def detect(tl: TimelineSnapshot, p: Params) -> list[CauseFinding]:
-    findings = []
-    for c in tl.events("vas_charge"):
-        otp = tl.last("consent_otp_verified", subscription_id=c.subscription_id,
-                      before=c.at, lookback=p.consent_lookback)
-        second = tl.last("second_confirmation", subscription_id=c.subscription_id, before=c.at)
-        if otp is None and second is None:
-            conf = p.base_confidence
-            conf += p.high_risk_merchant_boost if tl.merchant_risk(c.merchant_id) == "high" else 0
-            conf -= p.partial_consent_source_penalty if tl.completeness("vas_consent") == "partial" else 0
-            findings.append(CauseFinding("VAS_NO_CONSENT", confidence=conf,
-                                         money_effect=c.amount, evidence=[c.ref, tl.absence_ref("vas_consent")]))
-    return findings
-```
-
-Detectors are pure functions of `(snapshot, params)`. They have no I/O and no clock, so every result can be replayed exactly.
 
 ### 13.3 Candidate rule catalogue (16)
 **Inferred from deck causes - final list REQUIRES HUTCH product/CX confirmation.**
@@ -94,7 +76,7 @@ flowchart LR
     A["Agent correction<br/>Teach once"] --> B["Golden case created"]
     AU["Autopsy new cluster"] --> C["Rule proposal draft"]
     B --> C
-    C --> D["CX engineer edits detector, params or table"]
+    C --> D["CX engineer edits pack, params or table"]
     D --> E["Golden tests<br/>positive · negative · boundary"]
     E --> F["Replay on historic cases<br/>policy what-if"]
     F --> G{"Deltas acceptable?"}
@@ -127,12 +109,12 @@ Coverage gate: every condition branch is exercised (NFR-MNT-01). Replay snapshot
 Confidence of the top cause · margin to the second cause (conflict) · amount vs caps · evidence completeness · risk (SIM swap within N days, fraud flags, repeat-refund history) · action reversibility · customer request for a human · daily refund budget remaining · channel (the SMS/USSD channel supports only explain + simple confirm).
 
 ### 14.2 Outcome matrix (expands `[DECK S7]`)
-All thresholds are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION** (Finance/CX/Risk owners), configurable `[DECK S7]`. They are parameters in the config store; changing them follows [19](19-policy-change-management.md).
+All thresholds are **PROPOSED TARGET – REQUIRES HUTCH VALIDATION** (Finance/CX/Risk owners), configurable `[DECK S7]`.
 
 | Outcome | Conditions (all must hold) | Example |
 |---|---|---|
-| **Auto Fix** | Money back only (no service change) · confidence ≥ 0.95 · amount ≤ auto cap (e.g., LKR 1,000) · evidence complete · no SIM swap ≤ 7 days · no fraud flag · margin ≥ 0.20 · budget available · rule whitelisted for auto | Double reload refunded unasked `[DECK S5, S7]` |
-| **Fix with Confirmation** (one tap) | Confidence ≥ 0.90 · amount ≤ one-tap cap (e.g., LKR 5,000) · a service change is involved **or** the rule isn't auto-whitelisted · evidence complete · no risk flags | VAS without OTP; wrong pack `[DECK S7]` |
+| **Auto Fix** | Money back only (no service change) · confidence ≥ 0.95 · amount ≤ auto cap (e.g., LKR 5,000) · evidence complete · no SIM swap ≤ 7 days · no fraud flag · margin ≥ 0.20 · budget available · rule whitelisted for auto | Double reload refunded unasked `[DECK S5, S7]`. The cap must cover the deck's own example, a LKR 3,500 reload taken twice `[DECK S2]`. |
+| **Fix with Confirmation** (one tap) | Confidence ≥ 0.90 · amount ≤ one-tap cap (e.g., LKR 10,000) · a service change is involved **or** the rule isn't auto-whitelisted · evidence complete · no risk flags | VAS without OTP; wrong pack `[DECK S7]` |
 | **Staff Approval** | Above cap · recent SIM swap · fraud flag · two causes within margin · confidence 0.70–0.90 · reversibility low | Large disputed reload `[DECK S7]` |
 | **Explain Only** | Top cause is a rule the customer saw (disclosed) · no money owed | "Unlimited" hit a disclosed FUP `[DECK S7]` |
 | **Human Handoff** | Required log missing · fraud risk high · confidence < 0.70 · customer asks · verifier fails twice | Staff start with the full trail `[DECK S7]` |
@@ -141,18 +123,53 @@ Additional tiers: above a finance threshold (e.g., LKR 25,000, **ASSUMPTION**), 
 
 ### 14.3 Decision table sketch (GoRules ZEN, illustrative)
 
-The outcome matrix is a **ZEN decision table** (JSON Decision Model), editable in the Policy Studio, hit policy *first*. OPA/Rego is kept for **authorization** (who may approve, MCP access), not for outcomes.
+The outcome matrix becomes a **ZEN decision table** (JSON Decision Model), editable in the Policy Studio, hit policy *first* (ADR-0026). Until migration step R3 lands, the prototype evaluates the same ordered rules in Python over an OPA-shaped, hashed input document. OPA/Rego is kept for **authorization** (who may approve, MCP access), not for outcomes.
 
 | # | evidence_complete | risk_flag | confidence | margin | amount ≤ | money_back_only | rule in auto whitelist | budget ok | → outcome |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | false | – | – | – | – | – | – | – | HANDOFF |
-| 2 | – | high fraud | – | – | – | – | – | – | HANDOFF |
+| 1 | false | - | - | - | - | - | - | - | HANDOFF |
+| 2 | - | high fraud | - | - | - | - | - | - | HANDOFF |
 | 3 | true | none | ≥ `auto.confidence` | ≥ `conflict_margin` | `auto.cap_lkr` | true | true | true | AUTO_FIX |
-| 4 | true | none | ≥ `one_tap.confidence` | ≥ `conflict_margin` | `one_tap.cap_lkr` | – | – | true | ONE_TAP_FIX |
-| 5 | true | – | 0.70–0.90 or margin < `conflict_margin` or above cap or SIM swap | | | | | | STAFF_APPROVAL |
-| 6 | true | – | – | – | – | – | – | – | per rule: EXPLAIN_ONLY if `disclosed`, else HANDOFF |
+| 4 | true | none | ≥ `one_tap.confidence` | ≥ `conflict_margin` | `one_tap.cap_lkr` | - | - | true | ONE_TAP_FIX |
+| 5 | true | - | 0.70–0.90, or margin < `conflict_margin`, or above cap, or SIM swap | | | | | | STAFF_APPROVAL |
+| 6 | true | - | - | - | - | - | - | - | per rule: EXPLAIN_ONLY if `disclosed`, else HANDOFF |
 
-Cells in `backticks` are **parameters** resolved from the config store at `as_of = event time` ([19](19-policy-change-management.md)). Every evaluation stores the decision-table version, the config snapshot hash and the full input hash in `Decision`. That makes Policy what-if `[DECK S9]` an exact replay with a candidate table or parameter set.
+Cells in `backticks` are **parameters** resolved from the policy store at `as_of` = event time ([20](20-policy-change-management.md), ADR-0002). Every evaluation stores the table version, the config snapshot hash and the full input hash in `Decision`, so Policy what-if `[DECK S9]` is an exact replay with a candidate table or parameter set. **Every threshold the money path enforces (including four-eyes) must come from the same snapshot**; no constant in the tool layer may shadow a policy value.
+
+### 14.4 Financial controls and reconciliation `[DECK S7, S14]`
+The deck promises "refund budgets · daily reconciliation" `[DECK S7]` and "idempotency, caps, refund budget, reconciliation" `[DECK S14]`. This section designs those controls.
+
+| Control | Design |
+|---|---|
+| Caps | Separate caps per outcome (auto, one-tap, staff, four-eyes) and optional per-rule caps, all in the OPA data bundle |
+| Refund budgets | Global daily, per-rule daily, and per-customer velocity limits (e.g., more than N refunds in 30 days → staff). Counters live in PostgreSQL and are spent with an atomic conditional update, so concurrent decisions can't overspend. When a budget runs out, auto and one-tap fall back to staff approval. |
+| Segregation of duties | The maker can never be the checker. An agent can't approve their own proposal. The finance-approver role is separate. Bulk fixes need two distinct principals. |
+| Idempotency | One idempotency key per action (Redis + PG unique constraint). Status query before any retry ([§18.4](10-data-api-events.md)). |
+| Reconciliation | **Daily (T+1) plus intraday sweeps.** Compares the Clarity action ledger with adapter confirmations and HUTCH system-of-record state (balance adjustments, payment reversals, VAS status). |
+| Mismatch handling | *Recorded in Clarity, missing in HUTCH* → status query, then retry or investigate. *In HUTCH with no Clarity action* → security + finance alert. *Amount mismatch or duplicate* → Sev-2/Sev-1 and pause auto-fix for that rule. |
+| Anomaly detection | Refund value per hour against a baseline band → automatic pause of auto-fix ([§25.3](12-platform-devops-testing-observability.md)) |
+| Financial reporting | Daily refund report by rule, outcome and channel. Month-end reconciliation sign-off by Finance. Posting codes (balance-adjustment and reversal codes, GL mapping) **REQUIRE HUTCH Finance confirmation**. |
+
+#### Diagram 37 - Reconciliation
+
+```mermaid
+flowchart LR
+    LED[("Clarity action ledger")] --> MATCH["Reconciliation job<br/>T+1 daily + intraday sweep"]
+    ADC[("Adapter confirmations")] --> MATCH
+    SOR["HUTCH systems of record<br/>balance adjustments · reversals · VAS status"] --> MATCH
+    MATCH --> OK1["Matched"]
+    MATCH --> MISS["In Clarity, missing in HUTCH"]
+    MATCH --> UNEX["In HUTCH, no Clarity action"]
+    MATCH --> DIFF["Amount or duplicate mismatch"]
+    OK1 --> REP["Daily finance report"]
+    MISS --> INV["Status query, then retry or investigate"]
+    UNEX --> SECA["Security + finance alert"]
+    DIFF --> PAUSE["Sev-1 or Sev-2 · pause auto-fix for the rule"]
+    INV --> REP
+    SECA --> REP
+    PAUSE --> REP
+    REP --> SIGN["Month-end finance sign-off"]
+```
 
 ---
 

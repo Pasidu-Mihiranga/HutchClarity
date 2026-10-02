@@ -3,31 +3,43 @@
 | Field | Value |
 |---|---|
 | Kind | module |
-| Layer | L4 |
-| Deployable(s) | clarity-api / clarity-worker / clarity-stream |
-| Work package | phased |
-| Owner | @clarity |
-| Status | in-progress |
-| Postgres schema | `timeline` |
+| Layer | L4 domain (`clarity.modules.timeline`) |
+| Deployable | `clarity-api` today (modular monolith) |
+| Owner | TBD |
+| Status | built (`lite` profile); migration notes below |
+| Files | `builder.py`, `public.py` |
 
 ## 1. Purpose
-8-source timeline snapshots
+Timeline builder: joins the eight HUTCH evidence sources through integration ports into one hashed evidence snapshot with per-source completeness.
 
-## 2. Public interface (`public.py` facade)
-| Method | Input | Output | Errors | Notes |
-|---|---|---|---|---|
+## 2. Public surface (`public.py`)
+Other code imports only these names: `TimelineBuilder`, `TimelineRequest`.
 
-## 3. HTTP endpoints
-None yet.
+## 3. Used by
+`clarity.app`, `clarity.modules.case`
 
-## 4. Events
-None yet.
+## 4. Depends on
+| Package | Through |
+|---|---|
+| `clarity.contracts` | - |
+| `clarity.integration.ports` | - |
+| `clarity.kernel` | - |
 
 ## 5. Data owned
-None yet.
+In-memory structures in the `lite` profile. Target: one PostgreSQL schema `timeline` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
-## 6. Permissions declared
-None yet.
+## 6. Invariants
+- Missing or partial sources are flagged, never guessed.
 
-## 7. Config keys declared
-None yet.
+## 7. Migration status (enterprise-plan 21)
+Reads through in-process mock drivers (`lite`). R4 adds the `hutch-sim` HTTP drivers behind the same ports.
+
+## 8. Tests
+- `tests/unit/test_journeys.py`
+- `tests/unit/test_receipts.py`
+- `tests/unit/test_timeline_and_adapters.py`
+
+## 9. Change history
+| Date | Devlog entry | Summary |
+|---|---|---|
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.timeline` with a public surface (R1) |

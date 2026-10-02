@@ -7,7 +7,7 @@
 | Kind | module / service / app |
 | Layer | L0–L7 (see ARCHITECTURE.md §2) |
 | Deployable(s) | clarity-api / clarity-worker / clarity-stream / own service / own app |
-| Work package | e.g. C4 (enterprise-plan/17 §11.2) |
+| Work package | e.g. R3 (docs/enterprise-plan/21 §7) |
 | Owner | @github-handle |
 | Status | planned / in-progress / built / integrated / verified |
 | Postgres schema | `<schema>` (DB role `<role>`) |

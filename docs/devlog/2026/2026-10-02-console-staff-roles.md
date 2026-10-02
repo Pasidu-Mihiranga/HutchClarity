@@ -1,5 +1,7 @@
 # 2026-10-02 - Console staff roles
 
+> **Merged 2026-10-02:** imported from the team's `main` into the `dev` branch; paths updated to the R1 layout (see `2026-10-02-R1-dev-merge.md`).
+
 ## Intent
 
 Make every non-customer role usable in the Next.js console with one-tap

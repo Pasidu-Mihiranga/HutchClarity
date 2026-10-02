@@ -1,4 +1,4 @@
-# Known Limitations — Hutch Clarity prototype
+# Known Limitations - Hutch Clarity prototype
 
 Required by the HUTCH Hackathon Final Submission Guidelines (§1, §3, §6.4).
 
@@ -11,7 +11,7 @@ stops and where production design begins, without reading the code.
 
 | | |
 |---|---|
-| **HUTCH systems** | All eight sources are **mock drivers** over a synthetic world. No HUTCH API, credential, sandbox or production system was used — none was available (Guidelines §4). |
+| **HUTCH systems** | All eight sources are **mock drivers** over a synthetic world. No HUTCH API, credential, sandbox or production system was used - none was available (Guidelines §4). |
 | **Data** | Every subscriber, charge, payment, consent record and complaint is **generated**. Any resemblance to a real customer is coincidental. |
 | **Interfaces** | The real shape of HUTCH's charging, payments, catalogue, VAS/DCB, usage and CRM interfaces is **unknown**. The adapter layer is designed so each driver is swappable by config, but no mapping has been validated. |
 | **Proof** | `AdapterRegistry(mode=DriverMode.PRODUCTION)` deliberately raises `NotYetIntegrated` rather than pretending. |
@@ -27,9 +27,11 @@ stops and where production design begins, without reading the code.
 
 | Area | State |
 |---|---|
-| **Persistence** | Everything is in memory. **A restart loses all cases and receipts.** |
-| **Authentication** | Implemented, but the issuer is ours, not HUTCH's. Customers sign in by OTP and staff pick roles from a labelled simulated identity provider; the permission checks those feed are the production ones (deny by default, subject binding, step-up before money). The signing key is generated at startup, so a restart signs everyone out, and there is no refresh, revocation or session store. Production federates HUTCH SSO + MFA and the HUTCH OTP service (plan §19, ADR-0010). |
-| **Language model** | None configured. Explanations come from templates — see [AI_DISCLOSURE.md](AI_DISCLOSURE.md). |
+| **Persistence** | Everything is in memory. **A restart loses all cases and receipts.** PostgreSQL arrives in migration step R2/R3 (plan 21). |
+| **Single process** | Idempotency, confirmation tokens and plan status are protected by in-process locks: correct for one process (1,500 of 1,500 concurrent double confirms give one refund and one receipt), not across replicas. Run one instance until migration step R3 moves this into the database. |
+| **MCP transport** | The MCP tools, profiles, subject binding and audit are real, but there is no network endpoint yet, so an external AI agent cannot connect. Migration step R4 adds the MCP SDK server. |
+| **Authentication** | Implemented, but the issuer is ours, not HUTCH's. Customers sign in by OTP and staff pick roles from a labelled simulated identity provider that exists only in the synthetic profiles (404 in `prod`); the permission checks those feed are the production ones (deny by default, subject binding, step-up before money). The signing key is generated at startup, so a restart signs everyone out, and there is no refresh, revocation or session store. Production federates HUTCH SSO + MFA and the HUTCH OTP service (plan §19, ADR-0010). |
+| **Language model** | None configured. Explanations come from templates - see [AI_DISCLOSURE.md](AI_DISCLOSURE.md). |
 | **Retrieval (RAG)** | Designed, not implemented. Policy questions outside the rule set go to a human. |
 | **Events to Kafka** | The outbox and envelope exist; the relay is in-process. No broker. |
 | **Rules** | 6 of the 16 candidate rules in the plan. |
@@ -62,7 +64,7 @@ Each was a judgment call, with the production design noted:
 
 So the limitations above are not read as "nothing works":
 
-- The complete journey — evidence → cause → decision → confirmation → action → signed receipt → public verification — runs end to end.
+- The complete journey - evidence → cause → decision → confirmation → action → signed receipt → public verification - runs end to end.
 - Receipts are genuinely signed and genuinely verifiable; a tampered or forged one fails.
 - The recurrence test re-reads live state, so "PASSED" means the merchant block really is in place.
 - The LLM boundary is structural: there is no code path by which a model can execute a financial action, and tests assert it.

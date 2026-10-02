@@ -65,7 +65,7 @@ jobs:
           fetch-depth: 0
       - name: Gitleaks (placeholder)
         run: |
-          echo "gitleaks placeholder — wire gitleaks/gitleaks-action when secrets scanning is enabled"
+          echo "gitleaks placeholder - wire gitleaks/gitleaks-action when secrets scanning is enabled"
           # Example (uncomment when ready):
           # docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest detect --source=/path --verbose
 

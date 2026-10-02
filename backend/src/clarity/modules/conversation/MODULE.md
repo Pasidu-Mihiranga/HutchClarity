@@ -3,43 +3,41 @@
 | Field | Value |
 |---|---|
 | Kind | module |
-| Layer | L4 |
-| Deployable(s) | clarity-api (also mirrored in legacy `src/clarity` for demo) |
-| Work package | D1 / chat UX |
-| Owner | @clarity |
-| Status | built |
-| Postgres schema | `conversation` |
+| Layer | L4 domain (`clarity.modules.conversation`) |
+| Deployable | `clarity-api` today (modular monolith) |
+| Owner | TBD |
+| Status | built (`lite` profile); added by the team on 2026-10-02 (commit `2bd8fc9`), ported into the layered layout |
+| Files | `intents.py`, `intent_routes.py`, `service.py`, `suggestions.py`, `public.py` |
 
 ## 1. Purpose
-Customer chat brain: unified intent taxonomy, context-aware suggestion chips,
-template replies, handoff detection, and follow-up chip catalogues. Does **not**
-move money; account routes continue into case evaluate / tool layer.
+Customer chat intake for the immersive "Clarity chat": detect language (Sinhala, Tamil, English), classify intent with deterministic keyword rules, route each intent to the right journey (dispute, explain, safeguard, pack help, human handoff), and offer contextual suggestions from the case's evidence snapshot. No language model is involved.
 
-## 2. Public interface (`public.py` facade)
-| Method | Input | Output | Errors | Notes |
-|---|---|---|---|---|
-| `extract_intake` | text | IntakeResult | — | en/si/ta keywords |
-| `handle_turn` | text, optional intent | TurnResult | — | route + follow_ups |
-| `suggest_for_snapshot` | me/app snapshot | suggestions + more_topics | — | 4–6 chips |
+## 2. Public surface (`public.py`)
+`build_suggestions`, `extract_intake`, `handle_turn`, `signals_from_snapshot`, `suggest_for_snapshot`.
 
-## 3. HTTP endpoints
-| Method & path | Permission | Idempotent? | Contract |
-|---|---|---|---|
-| `POST /v1/conversation/turn` | public/customer | yes | turn |
-| `POST /v1/conversation/suggestions` | public/customer | yes | chips |
-| `GET /v1/conversation/suggestions` | public | yes | chips |
+## 3. Used by
+`clarity.interfaces.http` (chat routes and suggestions).
 
-## 4. Events
-None yet.
+## 4. Depends on
+| Package | Through |
+|---|---|
+| (standard library only) | - |
 
 ## 5. Data owned
-None (stateless).
+None. Turns are stateless; case state lives in `modules.case`.
 
-## 6. Permissions declared
-None yet (deny-by-default still applies on money paths downstream).
+## 6. Invariants
+- Customer text is a hint, never evidence (I2): intake only selects a route; causes and amounts still come from rule packs and the decision policy.
+- Handoff keywords always win, so a customer asking for a person is never kept in automation.
 
-## 7. Config keys declared
-| Key | Default | Notes |
+## 7. Migration status (enterprise-plan 21)
+Keyword rules in code. Target: intents and phrases as versioned content under the policy lifecycle (plan 20), and the `extract` model role behind the AI gateway as an optional assist (plan 19 §4), with the keyword rules as the fallback.
+
+## 8. Tests
+- `backend/tests/unit/test_conversation_chat.py`
+
+## 9. Change history
+| Date | Devlog entry | Summary |
 |---|---|---|
-| `conversation.handoff.confidence_floor` | 0.4 | clarify below |
-| `conversation.suggestions.limit` | 6 | max primary chips |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-kodee-clarity-chat.md` | Built by the team in the old layout |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Ported into `clarity.modules.conversation` with a public surface |

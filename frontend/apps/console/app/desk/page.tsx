@@ -16,7 +16,7 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
 const APPROVING_ROLES = ["supervisor", "finance", "agent"] as const;
 
 function money(value?: string | null) {
-  return value ? `LKR ${value}` : "—";
+  return value ? `LKR ${value}` : " - ";
 }
 
 export default function DeskPage() {
@@ -108,7 +108,7 @@ export default function DeskPage() {
       });
       if (body.status === "AWAITING_SECOND_APPROVAL" || body.detail) {
         setNote(
-          `${body.detail || "Awaiting second approval"} — sign in as a different user (e.g. finance) and approve again.`,
+          `${body.detail || "Awaiting second approval"} - sign in as a different user (e.g. finance) and approve again.`,
         );
         return;
       }
@@ -254,7 +254,7 @@ export default function DeskPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-mono text-xs text-slate-500">{item.case_no}</p>
-                      <p>{(item.cause || "—").replace(/_/g, " ")}</p>
+                      <p>{(item.cause || " - ").replace(/_/g, " ")}</p>
                       <p className="text-xs text-slate-500">{item.msisdn_masked}</p>
                     </div>
                     <div className="text-right">
@@ -309,7 +309,7 @@ export default function DeskPage() {
                 </p>
                 <p className="text-sm text-slate-600">
                   {decision.cause
-                    ? `version ${decision.cause.rule_version || "—"} · confidence ${Math.round((decision.cause.confidence || 0) * 100)}% · ${money(decision.amount_lkr)}`
+                    ? `version ${decision.cause.rule_version || " - "} · confidence ${Math.round((decision.cause.confidence || 0) * 100)}% · ${money(decision.amount_lkr)}`
                     : decision.handoff_reason || ""}
                 </p>
               </div>
@@ -405,7 +405,7 @@ export default function DeskPage() {
               <li key={i}>
                 {a.type.replace(/_/g, " ").toLowerCase()}
                 {a.before?.balance_lkr
-                  ? ` — balance ${a.before.balance_lkr} → ${a.after?.balance_lkr}`
+                  ? ` - balance ${a.before.balance_lkr} → ${a.after?.balance_lkr}`
                   : ""}
               </li>
             ))}

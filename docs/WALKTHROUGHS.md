@@ -1,20 +1,19 @@
 # Walkthroughs
 
-A walkthrough is a **verified, step-by-step tour of a real flow**: what you click, which API is called, which modules and events run, and what proves it worked. It is written when the flow is built and re-verified whenever the flow changes (AGENTS.md §8). Template: [templates/WALKTHROUGH.md](templates/WALKTHROUGH.md). Files live in [walkthroughs/](walkthroughs/).
+A walkthrough is a **verified, step-by-step tour of a real flow**: what you click, which API is called, which modules run, and what proves it worked. It records "last verified: date + commit" and is re-verified whenever the flow changes ([AGENTS.md §8](../AGENTS.md)). Template: [templates/WALKTHROUGH.md](templates/WALKTHROUGH.md). Files live in [walkthroughs/](walkthroughs/). The demo storyboard for judges is [submission/DEMO_SCRIPT.md](submission/DEMO_SCRIPT.md).
 
-| ID | Walkthrough | Journey / plan ref | Needed by | Status | Last verified |
-|---|---|---|---|---|---|
-| WT-01 | Local setup (`lite` and `full` profiles, `db-reset`, `.env`) and repository tour | AGENTS.md, ARCHITECTURE.md | G1 baseline | planned | - |
-| WT-02 | Adding a new module (from the `_example` template) | 17 §2.1 | G1 baseline | planned | - |
-| WT-03 | VAS charge without consent → one-tap fix → receipt | 03 §6.1 | M1 walking skeleton | planned | - |
-| WT-04 | Duplicate reload → zero-contact refund | 03 §6.2, 17 §7.3 | M3 | planned | - |
-| WT-05 | "Unlimited" data stopped → explain-only (FUP disclosed) | 03 §6.4 | M3 | planned | - |
-| WT-06 | Large disputed reload → staff approval with step-up MFA | 03 §6.5 | M3 | planned | - |
-| WT-07 | Proactive bill-shock warning → spend cap safeguard | 03 §6.6 | M3 | planned | - |
-| WT-08 | WhatsApp voice note in Tamil → one-tap fix | 03 §6.3 | M3 | planned | - |
-| WT-09 | Policy change: campaign cap override with replay and approval | 19 §14 A | M3 | planned | - |
-| WT-10 | External MCP client asks "why was I charged?" | 07 §10.7, 17 §10 | M3 | planned | - |
-| WT-11 | Receipt QR verification and decision replay | 09 §15 | M3 | planned | - |
-| WT-12 | Adding a new cause detector (teach once → golden tests → publish) | 09 §13.4, 19 | M3 | planned | - |
-| WT-13 | Deploying to a VPS, AWS, Azure and Kubernetes | 18 §2, deploy/ | M4 | planned | - |
-| WT-SC | Staff console roles (demo role switcher, desk, kill switches) — [WT-02-staff-console.md](walkthroughs/WT-02-staff-console.md) | 17 §5.4 | M1 staff surface | verified | 2026-10-02 |
+| ID | Walkthrough | Journey / plan ref | Status | Last verified |
+|---|---|---|---|---|
+| WT-01 | Local setup (`make setup`, `make dev`, `lite` profile) and repository tour | AGENTS.md §13 | to write (flow works) | - |
+| WT-02 | [VAS charge without consent → one-tap fix → receipt](walkthroughs/WT-02-vas-journey.md) | 03 §6.1 | verified by the team (old layout); re-verify on `dev` | 2026-10-02 |
+| WT-03 | Duplicate reload → zero-contact refund | 03 §6.2 | to write (flow works) | - |
+| WT-04 | "Unlimited" data stopped → explain-only (FUP disclosed) | 03 §6.4 | to write (flow works) | - |
+| WT-05 | Large disputed reload → staff approval with step-up, four-eyes above policy threshold | 03 §6.5 | to write (flow works) | - |
+| WT-06 | Policy change: scoped cap override with replay impact report and maker-checker | 20 §14 | to write (flow works) | - |
+| WT-07 | Receipt QR verification and decision replay | 09 §15 | to write (flow works) | - |
+| WT-08 | Adding a new rule pack (golden tests → publish) | 09 §13.4 | to write (flow works) | - |
+| WT-09 | Adding a new module (public surface, MODULE.md, boundary test) | 21 §4 | to write (flow works) | - |
+| WT-10 | External MCP client asks "why was I charged?" | 07 §10.7 | planned (R4) | - |
+| WT-11 | Running the `full` profile | 21 §9 | planned (R2) | - |
+| WT-12 | Deploying: containers for the core, serverless edges | 21 §5 | planned (R7) | - |
+| WT-13 | [Staff console roles: role switcher, desk, kill switches](walkthroughs/WT-13-staff-console.md) | 18 §5.4 | verified by the team (old layout); re-verify on `dev` | 2026-10-02 |

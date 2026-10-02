@@ -1,149 +1,166 @@
-"""Transactional outbox, relay and consumer framework."""
+"""Transactional outbox and in-process bus (plan §18.4).
+
+The rule this enforces: **never write to the database and publish to a broker
+as two separate acts.** If the publish fails after the write, the world and the
+event stream disagree; if the write fails after the publish, consumers act on
+something that did not happen. So events are appended to an outbox alongside
+the state change, and a relay publishes them afterwards, retrying until they
+land.
+
+Consumers are at-least-once, so each one records the event ids it has already
+processed and ignores repeats. That is what makes a redelivered
+``action.completed`` issue one receipt rather than two.
+
+**Prototype note.** The relay is in-process and the outbox is a list. Production
+puts the outbox in PostgreSQL in the same transaction as the state change, with
+Debezium or an app relay forwarding to Kafka (plan §18.4). The ordering and
+idempotency guarantees modelled here are the ones that matter.
+"""
 
 from __future__ import annotations
 
-import json
-from datetime import datetime
-from typing import Any
-from uuid import uuid4
+import threading
+from collections import defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass
 
-from sqlalchemy import DateTime, String, Text, select
-from sqlalchemy.orm import Mapped, mapped_column
+from clarity.platform.messaging.envelope import Event, EventType
 
-from clarity.kernel.common import utc_now
-from clarity.kernel.events import Event, EventType
-from clarity.platform.db.session import Base
+Handler = Callable[[Event], None]
 
 
-class OutboxRow(Base):
-    __tablename__ = "outbox"
-    __table_args__ = {"schema": "platform"}
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    event_type: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    subject: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
-    correlation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    causation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+@dataclass
+class _Delivery:
+    event: Event
+    attempts: int = 0
+    delivered: bool = False
+    dead_lettered: bool = False
+    last_error: str | None = None
 
 
-class ProcessedEvent(Base):
-    __tablename__ = "processed_event"
-    __table_args__ = {"schema": "platform"}
-
-    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    consumer: Mapped[str] = mapped_column(String(128), primary_key=True)
-    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class DeadLetter(Base):
-    __tablename__ = "dead_letter"
-    __table_args__ = {"schema": "platform"}
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    event_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    consumer: Mapped[str] = mapped_column(String(128), nullable=False)
-    error: Mapped[str] = mapped_column(Text, nullable=False)
-    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+@dataclass
+class ConsumerStats:
+    received: int = 0
+    duplicates: int = 0
+    failures: int = 0
 
 
 class Outbox:
-    """Write events in the same transaction as state changes."""
+    """Collects events produced during a state change, then publishes them."""
 
-    def __init__(self, session: Any) -> None:
-        self._session = session
-
-    async def publish(self, event: Event) -> None:
-        row = OutboxRow(
-            id=event.id,
-            event_type=event.type.value,
-            subject=event.subject,
-            payload_json=event.model_dump_json(),
-            correlation_id=event.correlation_id,
-            causation_id=event.causation_id,
-            created_at=utc_now(),
-            published_at=None,
-        )
-        self._session.add(row)
-
-    async def unpublished(self, *, limit: int = 100) -> list[OutboxRow]:
-        stmt = (
-            select(OutboxRow)
-            .where(OutboxRow.published_at.is_(None))
-            .order_by(OutboxRow.created_at)
-            .limit(limit)
-        )
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())
-
-    async def mark_published(self, row_id: str) -> None:
-        stmt = select(OutboxRow).where(OutboxRow.id == row_id)
-        result = await self._session.execute(stmt)
-        row = result.scalar_one()
-        row.published_at = utc_now()
-
-
-class InMemoryBus:
-    """Lite-profile in-process event bus (parity with Kafka in full)."""
-
-    def __init__(self) -> None:
-        self._handlers: dict[EventType, list[Any]] = {}
+    def __init__(self, *, max_attempts: int = 3) -> None:
+        self._pending: list[_Delivery] = []
         self._published: list[Event] = []
+        self._dlq: list[_Delivery] = []
+        self._handlers: dict[EventType, list[tuple[str, Handler]]] = defaultdict(list)
+        self._processed: dict[str, set[str]] = defaultdict(set)
+        self._stats: dict[str, ConsumerStats] = defaultdict(ConsumerStats)
+        self._max_attempts = max_attempts
+        self._lock = threading.Lock()
 
-    def subscribe(self, event_type: EventType, handler: Any) -> None:
-        self._handlers.setdefault(event_type, []).append(handler)
+    # ------------------------------------------------------------------ #
+    # Producing
+    # ------------------------------------------------------------------ #
 
-    async def publish(self, event: Event) -> None:
-        self._published.append(event)
-        for handler in self._handlers.get(event.type, []):
-            await handler(event) if _is_coro(handler) else handler(event)
+    def append(self, event: Event) -> Event:
+        """Record an event. Nothing is delivered until :meth:`relay` runs."""
+        with self._lock:
+            self._pending.append(_Delivery(event=event))
+        return event
+
+    def subscribe(self, event_type: EventType, name: str, handler: Handler) -> None:
+        """Register a named consumer. The name is its idempotency scope."""
+        self._handlers[event_type].append((name, handler))
+
+    # ------------------------------------------------------------------ #
+    # Relaying
+    # ------------------------------------------------------------------ #
+
+    def relay(self) -> int:
+        """Deliver pending events in order. Returns how many were published.
+
+        Per-subject ordering is preserved because the outbox is append-ordered
+        and this drains it sequentially.
+        """
+        with self._lock:
+            batch, self._pending = self._pending, []
+
+        published = 0
+        for delivery in batch:
+            if self._deliver(delivery):
+                published += 1
+            else:
+                with self._lock:
+                    if delivery.dead_lettered:
+                        self._dlq.append(delivery)
+                    else:
+                        self._pending.append(delivery)
+        return published
+
+    def _deliver(self, delivery: _Delivery) -> bool:
+        event = delivery.event
+        delivery.attempts += 1
+        failed = False
+
+        for name, handler in self._handlers.get(event.type, []):
+            seen = self._processed[name]
+            if event.id in seen:
+                self._stats[name].duplicates += 1
+                continue
+            try:
+                handler(event)
+            except Exception as error:
+                self._stats[name].failures += 1
+                delivery.last_error = f"{name}: {error}"
+                failed = True
+                continue
+            seen.add(event.id)
+            self._stats[name].received += 1
+
+        if failed:
+            if delivery.attempts >= self._max_attempts:
+                # Critical events must not disappear into a DLQ unnoticed.
+                delivery.dead_lettered = True
+            return False
+
+        delivery.delivered = True
+        with self._lock:
+            self._published.append(event)
+        return True
+
+    # ------------------------------------------------------------------ #
+    # Inspection
+    # ------------------------------------------------------------------ #
 
     @property
     def published(self) -> list[Event]:
         return list(self._published)
 
+    @property
+    def pending(self) -> list[Event]:
+        return [d.event for d in self._pending]
 
-def _is_coro(fn: Any) -> bool:
-    import asyncio
+    @property
+    def dead_letters(self) -> list[Event]:
+        """Non-empty is an alert condition (plan §18.4)."""
+        return [d.event for d in self._dlq]
 
-    return asyncio.iscoroutinefunction(fn)
+    @property
+    def undelivered_critical(self) -> list[Event]:
+        """Critical events stuck or dead-lettered - pages a human."""
+        return [d.event for d in (*self._pending, *self._dlq) if d.event.is_critical]
 
+    def stats(self, consumer: str) -> ConsumerStats:
+        return self._stats[consumer]
 
-class ConsumerGuard:
-    """Idempotent consumer via processed_event; DLQ on repeated failure."""
+    def events_for(self, subject: str) -> list[Event]:
+        """Everything published about one subscriber, in order."""
+        return [e for e in self._published if e.subject == subject]
 
-    def __init__(self, session: Any, *, consumer: str) -> None:
-        self._session = session
-        self._consumer = consumer
-
-    async def already_processed(self, event_id: str) -> bool:
-        stmt = select(ProcessedEvent).where(
-            ProcessedEvent.event_id == event_id,
-            ProcessedEvent.consumer == self._consumer,
-        )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none() is not None
-
-    async def mark_processed(self, event_id: str) -> None:
-        self._session.add(
-            ProcessedEvent(
-                event_id=event_id,
-                consumer=self._consumer,
-                processed_at=utc_now(),
-            )
-        )
-
-    async def dead_letter(self, event_id: str, *, error: str, payload: dict[str, Any]) -> None:
-        self._session.add(
-            DeadLetter(
-                id=str(uuid4()),
-                event_id=event_id,
-                consumer=self._consumer,
-                error=error,
-                payload_json=json.dumps(payload),
-                created_at=utc_now(),
-            )
-        )
+    def trace(self, correlation_id: str) -> list[Event]:
+        """Every event from one request, for end-to-end tracing."""
+        return [
+            e
+            for e in self._published
+            if e.correlation_id == correlation_id or e.id == correlation_id
+        ]

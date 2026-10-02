@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 37. AI Cost / Token Model
 
@@ -61,12 +61,11 @@ Worked example: 10,000 interactions/day ≈
 
 **Recommendation:** hybrid. The self-hosted small model is the default for all customer-facing explanation (data stays inside HUTCH). The hosted reasoning tier handles masked staff summaries and complex cases until volume justifies a self-hosted reasoning model. A per-session token cap and a daily budget alarm apply. **HUTCH data-residency policy decides the split (REQUIRES HUTCH CONFIRMATION).**
 
-### 37.5 Prototype: free-tier capacity and measured cost (v1.1)
-The prototype runs on **Gemini + Groq free tiers** with role-based routing ([18 §4](18-tech-stack-and-ai.md)):
-- **Cost:** USD 0 for model calls during the prototype. **Assumption:** free-tier terms stay as published on 2026-10-01.
-- **Capacity:** about 3–5K LLM calls/day across both providers; with 33–50% of interactions needing no LLM, about 2–4K interactions/day. Enough for development, demos and judging.
-- **Measured, not assumed:** the AI gateway's usage ledger records tokens per role, model and journey. Before submission, the per-journey table in §37.2 is replaced with measured values.
-- **Production cost formula:** `monthly cost = Σ_roles (input_tokens × input_price + output_tokens × output_price)` using HUTCH's chosen provider price sheet at purchase time, or GPU-hours for self-hosting (§37.4).
+### 37.5 Prototype: model-free default, free-tier option (v1.3)
+- **Default:** no model configured (ADR-0009); explanations come from CX-approved templates; **measured token use is 0**.
+- **Opt-in live model:** Gemini + Groq free tiers by role ([19 §4](19-tech-stack-and-ai.md)), synthetic data only. Capacity about 3–5K LLM calls/day across both providers.
+- **Measured, not assumed:** the AI gateway's usage ledger records tokens per role, model and journey (`scripts/measure_tokens.py`).
+- **Production cost formula:** `monthly cost = Σ roles (input_tokens × input_price + output_tokens × output_price)` at HUTCH's chosen provider price, or GPU-hours for self-hosting (§37.4).
 
 ---
 
@@ -108,7 +107,6 @@ HUTCH-originated event ingestion (charging/payment streams for zero-contact dete
 | Kafka delayed | Stream detectors lag → zero-contact fixes delayed; on-demand requests use direct adapter reads; proactive messages suppressed when stale; reconciliation sweeps catch missed duplicates | Normal on-demand service | Consumers catch up; lag alert |
 | Receipt service / signing fails | Action + audit already committed; receipt issued from outbox retry; customer told the receipt will follow | "Receipt will arrive shortly" | Retry; alert if > N min |
 | Valkey fails | Cache off (more LLM calls); sessions re-auth; idempotency falls back to PG constraint | Possible re-login | Valkey failover |
-| Free-tier quota exhausted (prototype) | Gateway queues batch work, routes live turns down the role chain, then templates | Template answer | Quota resets; alert at 80% of daily budget |
 | PostgreSQL primary fails | Failover to sync standby; writes paused seconds | Brief retry | Automatic failover |
 | OPA unavailable | **Fail closed:** no actions; explain-only + handoff | Explanation, fix pending | Restart; bundles cached locally |
 | Token vault unavailable | No LLM path (can't mask/restore) → templates | Template | Vault failover |
@@ -156,6 +154,17 @@ Baselines are measured in shadow mode and the first pilot weeks. **All commercia
 | Business | Engagement | Use of Why?, safeguards, pack truth label | Analytics | Validate |
 | Business | Customer satisfaction | CSAT/NPS per journey | Surveys | Validate |
 | Sustainability | Model calls avoided; shop visits avoided; energy per case `[DECK S15]` | - | Gateway + CRM | Report |
+
+### 40.1 Benefits measurement methodology
+Business outcomes count as **measured** only if they come from this method (Guidelines §6.5).
+
+1. **Baseline:** 8–12 weeks of pre-pilot data (contacts per cause, resolution time, refunds, repeats, CSAT) from CRM, 1788 and WhatsApp. **Depends on HUTCH data access.**
+2. **Shadow comparison:** Clarity's recommendation vs the actual agent outcome on the same cases (Step 1).
+3. **Control cohort:** a randomised or matched holdout (e.g., ~10% of eligible customers by region or segment, **ASSUMPTION**) that doesn't get *proactive and self-service features*. **A holdout never withholds a refund owed.** Legal and compliance review the design.
+4. **Pre-registered metric definitions**, reported with confidence intervals. Measured, estimated and assumed values are labelled separately.
+5. **Confounders:** seasonality (festivals, school terms), concurrent campaigns and network events are tracked and noted.
+6. **Cadence:** weekly operational review, monthly business review, final pilot report at P2 exit.
+
 ---
 
 [← 14-risk-pilot-readiness-operations.md](14-risk-pilot-readiness-operations.md) · [← Plan index](README.md) · [16-gap-submission-repo-docs.md →](16-gap-submission-repo-docs.md)

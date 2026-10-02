@@ -2,7 +2,7 @@
 #
 # Gazette 2316/14 requires consent + OTP for VAS, and requires that the logs be
 # producible (deck S3). So the absence of an OTP in the consent log is itself
-# the evidence — provided the consent source actually answered, which
+# the evidence - provided the consent source actually answered, which
 # `required_evidence` enforces.
 rule_id: VAS_NO_CONSENT
 version: 4

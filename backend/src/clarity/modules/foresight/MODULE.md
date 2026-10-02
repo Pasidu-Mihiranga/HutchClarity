@@ -3,31 +3,39 @@
 | Field | Value |
 |---|---|
 | Kind | module |
-| Layer | L4 |
-| Deployable(s) | clarity-api / clarity-worker / clarity-stream |
-| Work package | phased |
-| Owner | @clarity |
-| Status | in-progress |
-| Postgres schema | `foresight` |
+| Layer | L4 domain (`clarity.modules.foresight`) |
+| Deployable | `clarity-api` today (modular monolith) |
+| Owner | TBD |
+| Status | built (`lite` profile); migration notes below |
+| Files | `public.py`, `simulation.py` |
 
 ## 1. Purpose
-Scenario APIs, spike radar, backtest
+Foresight: scenario simulation over aggregates only, reported as relative bands, not counts.
 
-## 2. Public interface (`public.py` facade)
-| Method | Input | Output | Errors | Notes |
-|---|---|---|---|---|
+## 2. Public surface (`public.py`)
+Other code imports only these names: `ChangeType`, `Foresight`, `ForesightReport`, `Prediction`, `Scenario`, `Segment`, `VolumeBand`.
 
-## 3. HTTP endpoints
-None yet.
+## 3. Used by
+Tests only (no runtime caller yet).
 
-## 4. Events
-None yet.
+## 4. Depends on
+| Package | Through |
+|---|---|
+| `clarity.kernel` | - |
 
 ## 5. Data owned
-None yet.
+In-memory structures in the `lite` profile. Target: one PostgreSQL schema `foresight` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
-## 6. Permissions declared
-None yet.
+## 6. Invariants
+- Never uses individual customer data; not decision-ready until backtested.
 
-## 7. Config keys declared
-None yet.
+## 7. Migration status (enterprise-plan 21)
+Uncalibrated by design (states so in every report). Runtime target: serverless batch job.
+
+## 8. Tests
+- `tests/unit/test_autopsy_foresight.py`
+
+## 9. Change history
+| Date | Devlog entry | Summary |
+|---|---|---|
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.foresight` with a public surface (R1) |

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clarity Desk</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="desk">
+
+<div class="demo-banner">
+  Staff console · synthetic cases. Roles are <strong>picked, not proven</strong> - production federates HUTCH SSO + MFA; permission checks below are the real ones.
+</div>
+
+<header class="site">
+  <div class="inner">
+    <div>
+      <div class="brand">Clarity <span>Desk</span></div>
+      <div class="tagline">Every conflict on one screen</div>
+    </div>
+    <div class="header-links">
+      <a class="header-link switch" href="/">Customer app</a>
+      <a class="header-link" href="/docs">API</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap wrap--wide">
+  <div id="error"></div>
+
+  <section class="card" id="staff-signin">
+    <h2>Sign in</h2>
+    <p class="sub">
+      Pick the roles to act with. In production these come from HUTCH SSO and
+      cannot be chosen; the permissions they grant are enforced the same way
+      either way.
+    </p>
+    <div class="sim-inbox">
+      <div class="sim-label">Simulated identity provider - roles are asserted, not verified</div>
+      <div class="sim-body">
+        <label class="otp-label" for="userRef">Signed in as</label>
+        <input id="userRef" class="user-input" value="sup-1" maxlength="40"
+               aria-describedby="userRef-hint">
+        <p class="small muted" id="userRef-hint" style="margin:6px 0 14px">
+          Approvals are recorded against this name. A four-eyes case needs a
+          second approval from a <em>different</em> name, so sign out and back
+          in as, say, <span class="mono">fin-1</span> to complete one.
+        </p>
+        <div class="role-grid" id="roles"></div>
+        <label class="step-up">
+          <input type="checkbox" id="stepUp">
+          Re-authenticated just now (step-up), needed to approve above the cap
+        </label>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-why" id="staffSignIn">Start shift</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="whoami">
+    <h2>Signed in</h2>
+    <p class="sub" id="whoami-sub"></p>
+    <div id="whoami-perms"></div>
+    <div class="btn-row"><button class="btn-ghost" id="staffSignOut">Sign out</button></div>
+  </section>
+
+  <section class="card hidden" id="queue-card">
+    <h2>Queue</h2>
+    <p class="sub">Cases that need a person, biggest money at stake first.</p>
+    <div id="queue"><div class="spinner">Loading…</div></div>
+    <div class="btn-row">
+      <button class="btn-ghost" id="refresh">Refresh</button>
+      <button class="btn-ghost" id="seed">Create demo cases</button>
+      <button class="btn-ghost" id="reset">Reset demo data</button>
+    </div>
+  </section>
+
+  <section class="card rule-card hidden" id="cockpit"></section>
+  <section class="card proof-card hidden" id="receipt"></section>
+
+  <section class="card hidden" id="ops-card">
+    <h2>Insights</h2>
+    <p class="sub">Counts from cases already in this process.</p>
+    <div id="ops-body"><div class="spinner">Loading…</div></div>
+    <div class="note" style="margin-top:16px">
+      <strong>Designed, not executed here.</strong>
+      Fix-all, policy what-if, merchant suspend, shift handover and the regulator pack
+      do not move money from this screen.
+    </div>
+  </section>
+  <section class="card hidden" id="autopsy-card">
+    <h2>Complaint Autopsy</h2>
+    <p class="sub">Hypotheses until a person reviews them.</p>
+    <div id="autopsy-body"><div class="spinner">Loading…</div></div>
+  </section>
+  <section class="card hidden" id="foresight-card">
+    <h2>Foresight</h2>
+    <p class="sub">Scenarios, not certainties. Nothing here changes a customer.</p>
+    <div id="foresight-body"><div class="spinner">Loading…</div></div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+<script>
+const el = id => document.getElementById(id);
+let current = null;
+
+async function loadQueue() {
+  clearError();
+  try {
+    const items = await api('/v1/desk/queue');
+    if (!items.length) {
+      el('queue').innerHTML = `<p class="muted small">
+        Nothing waiting. Use <strong>Create demo cases</strong>, or raise one from
+        <a href="/">My Hutch</a>.</p>`;
+      return;
+    }
+    el('queue').innerHTML = `
+      <div class="queue-scroll">
+      <table class="queue">
+        <thead><tr>
+          <th>Case</th><th>Customer</th><th>Cause</th><th>Why it is here</th>
+          <th style="text-align:right">At stake</th><th></th>
+        </tr></thead>
+        <tbody>${items.map(i => `
+          <tr>
+            <td><span class="mono">${esc(i.case_no)}</span><br><span class="muted small">${esc(i.channel)}</span></td>
+            <td>${esc(i.msisdn_masked)}</td>
+            <td>${esc((i.cause || ' - ').replace(/_/g, ' '))}</td>
+            <td class="small">${esc(i.reason || '')}</td>
+            <td class="money">${i.money_at_stake_lkr ? 'LKR ' + esc(i.money_at_stake_lkr) : ' - '}</td>
+            <td><button data-case="${esc(i.case_id)}">Open</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>`;
+    el('queue').querySelectorAll('button[data-case]').forEach(b =>
+      b.onclick = () => openCase(b.dataset.case));
+  } catch (e) { showError(e); }
+}
+
+async function openCase(caseId) {
+  clearError();
+  hide('receipt');
+  current = caseId;
+  try {
+    const [summary, decision, timeline] = await Promise.all([
+      api(`/v1/cases/${caseId}`),
+      api(`/v1/cases/${caseId}/evaluate`, 'POST'),
+      api(`/v1/cases/${caseId}/timeline`)
+    ]);
+    renderCockpit(summary, decision, timeline);
+  } catch (e) { showError(e); }
+}
+
+function renderCockpit(summary, d, timeline) {
+  const ruledOut = d.ruled_out.map(r => `<span class="chip">${esc(r.rule_id.replace(/_/g,' '))}</span>`).join('');
+  const unknown = d.unknown.map(r => `<span class="chip unknown">${esc(r.rule_id.replace(/_/g,' '))} - evidence missing</span>`).join('');
+
+  el('cockpit').innerHTML = `
+    <div class="receipt-head">
+      <div>
+        <h2>${esc(summary.case_no)}</h2>
+        <p class="sub">${esc(summary.msisdn_masked)} · ${esc(summary.channel)} · state ${esc(summary.state)}</p>
+      </div>
+      <span class="verdict v-${esc(d.outcome)}">${esc(d.outcome.replace(/_/g,' '))}</span>
+    </div>
+
+    <h3>Ranked cause</h3>
+    <div class="headline">${d.cause ? esc(d.cause.rule_id.replace(/_/g,' ')) : 'No cause confirmed'}</div>
+    <div class="confidence">${d.cause
+      ? `version ${esc(d.cause.rule_version)} · confidence ${Math.round(d.cause.confidence*100)}% · LKR ${esc(d.amount_lkr || '0.00')}`
+      : esc(d.handoff_reason || '')}</div>
+
+    <h3>Policy said</h3>
+    <ul class="why-list">${d.rationale.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+
+    <h3>Evidence</h3>
+    <ul class="evidence">${timeline.events.map(e => `
+      <li><span class="src">${esc(e.source.replace(/_/g,' '))}</span>
+          <span>${esc(e.event_type.replace(/_/g,' '))}${e.amount_lkr ? ' · LKR ' + esc(e.amount_lkr) : ''}</span>
+          <time>${fmtDate(e.occurred_at)}</time></li>`).join('')}</ul>
+    <div class="sources">${timeline.sources.map(s =>
+      `<span class="src-pill ${s.completeness}">${esc(s.source)}: ${esc(s.completeness)}</span>`).join('')}</div>
+
+    <h3>Ruled out</h3>
+    <div class="ruled-out">${ruledOut + unknown || '<span class="muted small"> - </span>'}</div>
+
+    <div id="actions"></div>`;
+  show('cockpit');
+
+  const actions = el('actions');
+  if (d.outcome === 'STAFF_APPROVAL') {
+    actions.innerHTML = `
+      <h3>Approve</h3>
+      <p class="small muted" style="margin:0 0 10px">
+        The recommended fix is already policy-checked. Your approval is recorded against
+        the signed-in user, you cannot approve a plan you raised, and a second approval
+        has to come from a different person signed in separately.</p>
+      <ul class="why-list">${d.allowed_actions.map(a => `<li>${esc(a.replace(/_/g,' ').toLowerCase())}</li>`).join('')}</ul>
+      <div class="btn-row">${approvalRoles().map((role, i) => `
+        <button class="${i === 0 ? 'btn-primary' : 'btn-ghost'}" data-approve-role="${esc(role)}">
+          Approve as ${esc(role)}</button>`).join('')}
+      </div>
+      ${approvalRoles().length ? '' : `<div class="note" style="margin-top:12px">
+        This session holds no role that may approve. Sign in as a supervisor or finance.</div>`}`;
+    actions.querySelectorAll('button[data-approve-role]').forEach(b =>
+      b.onclick = () => approve(b.dataset.approveRole));
+  } else {
+    actions.innerHTML = `<div class="note" style="margin-top:18px">
+      This case does not need an approval: the outcome is <strong>${esc(d.outcome.replace(/_/g,' '))}</strong>.</div>`;
+  }
+}
+
+async function approve(role) {
+  clearError();
+  const buttons = document.querySelectorAll('#actions button');
+  buttons.forEach(b => b.disabled = true);
+  try {
+    let planId = window._planId;
+    if (!planId) {
+      const plan = await api(`/v1/cases/${current}/proposals`, 'POST', { created_by: 'desk:agent-7' });
+      planId = window._planId = plan.plan_id;
+    }
+    // Through api(), so the session token travels with it. The approver and
+    // whether they stepped up are read from that token server-side, which is
+    // why neither is sent here.
+    const body = await api(`/v1/cases/${current}/approve`, 'POST', {
+      plan_id: planId, role
+    });
+
+    if (body.status === 'AWAITING_SECOND_APPROVAL') {
+      el('actions').insertAdjacentHTML('beforeend',
+        `<div class="note" style="margin-top:14px">${esc(body.detail)} - approve again with the other role.</div>`);
+      buttons.forEach(b => b.disabled = false);
+      return;
+    }
+    window._planId = null;
+    const verified = await api(`/v1/receipts/${body.receipt_id}/verify`, 'POST');
+    renderReceipt(body, verified);
+    loadQueue();
+  } catch (e) {
+    showError(e);
+    buttons.forEach(b => b.disabled = false);
+  }
+}
+
+function renderReceipt(execution, v) {
+  el('receipt').innerHTML = `
+    <div class="receipt-head">
+      <div><h2>Trust Receipt issued</h2><div class="receipt-id">${esc(v.receipt_id)}</div></div>
+      <span class="stamp ${v.valid ? 'ok' : 'bad'}">${esc(v.status)}</span>
+    </div>
+    <ul class="why-list">${execution.actions.map(a =>
+      `<li>${esc(a.type.replace(/_/g,' ').toLowerCase())}${
+        a.before && a.before.balance_lkr
+          ? ` - balance ${esc(a.before.balance_lkr)} → <strong>${esc(a.after.balance_lkr)}</strong>` : ''}</li>`).join('')}</ul>
+    <dl class="kv">
+      <dt>Authorised by</dt><dd>${esc(execution.confirmed_by.replace(/_/g,' '))}</dd>
+      <dt>Returned</dt><dd>LKR ${esc(v.corrected_lkr)}</dd>
+      <dt>Signed with</dt><dd class="mono">${esc(v.key_id || '')}</dd>
+    </dl>
+    <p class="small muted" style="margin:0">
+      The customer can check this at <a href="/v/${esc(v.receipt_id)}">/v/${esc(v.receipt_id)}</a>:
+      the same record you are looking at.</p>`;
+  show('receipt');
+}
+
+async function seed() {
+  clearError();
+  const button = el('seed');
+  button.disabled = true; button.textContent = 'Creating…';
+  try {
+    const people = await api('/v1/demo/subscribers');
+    for (const person of people) {
+      const c = await api('/v1/cases', 'POST', { msisdn: person.msisdn, channel: 'whatsapp' });
+      await api(`/v1/cases/${c.case_id}/evaluate`, 'POST');
+    }
+    await loadQueue();
+  } catch (e) { showError(e); }
+  button.disabled = false; button.textContent = 'Create demo cases';
+}
+
+el('reset').onclick = async () => {
+  clearError();
+  const button = el('reset');
+  button.disabled = true; button.textContent = 'Resetting…';
+  try {
+    await api('/v1/demo/reset', 'POST');
+    window._planId = null;
+    hide('cockpit'); hide('receipt');
+    await loadQueue();
+  } catch (e) { showError(e); }
+  button.disabled = false; button.textContent = 'Reset demo data';
+};
+
+/* Staff sign-in.
+
+   The roles offered here mirror ROLE_PERMISSIONS in core/iam/principal.py.
+   Picking them is the simulated part; what they let you do is not. */
+const STAFF_ROLES = [
+  ['agent', 'Agent - read any case, approve within the cap'],
+  ['supervisor', 'Supervisor - approve above the cap, flip kill switches'],
+  ['finance', 'Finance - approve high value, approve config'],
+  ['vas_ops', 'VAS ops - suspend merchants'],
+  ['cx_engineer', 'CX engineer - draft rules and config'],
+  ['compliance', 'Compliance - publish rules, export the regulator pack'],
+  ['auditor', 'Auditor - read cases, receipts and the audit trail'],
+  ['platform_admin', 'Platform admin - runs the platform, cannot approve money'],
+];
+
+function renderRoles() {
+  el('roles').innerHTML = STAFF_ROLES.map(([role, label]) => `
+    <label class="role">
+      <input type="checkbox" name="role" value="${esc(role)}"
+             ${role === 'agent' ? 'checked' : ''}>
+      <span>${esc(label)}</span>
+    </label>`).join('');
+}
+
+/* The roles in this session that the approve endpoint will accept.
+   Read from /v1/auth/me, not from the checkboxes, so it reflects the
+   permissions the server actually granted. */
+let sessionRoles = [];
+const APPROVING_ROLES = ['supervisor', 'finance', 'agent'];
+function approvalRoles() {
+  return APPROVING_ROLES.filter(r => sessionRoles.includes(r));
+}
+
+function chosenRoles() {
+  return [...document.querySelectorAll('input[name="role"]:checked')].map(i => i.value);
+}
+
+async function staffSignIn() {
+  clearError();
+  const roles = chosenRoles();
+  if (!roles.length) {
+    showError(new Error('Pick at least one role.'));
+    return;
+  }
+  const button = el('staffSignIn');
+  button.disabled = true; button.textContent = 'Signing in…';
+  try {
+    const userRef = el('userRef').value.trim() || 'desk-demo';
+    const started = await api('/v1/auth/staff/session', 'POST', {
+      user_ref: userRef, roles, step_up: el('stepUp').checked
+    });
+    signIn(started.token, started.subject);
+
+    // Show what this session can actually do, read back from the server
+    // rather than from the roles that were ticked.
+    const me = await api('/v1/auth/me');
+    sessionRoles = me.roles;
+    el('whoami-sub').textContent =
+      `${me.subject} · ${me.roles.join(', ')} · assurance ${me.assurance}`;
+    el('whoami-perms').innerHTML = me.permissions.length
+      ? `<ul class="perms">${me.permissions.map(p => `<li class="mono">${esc(p)}</li>`).join('')}</ul>`
+      : '<p class="muted small">No permissions.</p>';
+
+    hide('staff-signin'); show('whoami');
+    await loadQueue();
+    showDesk(viewFromPath());
+  } catch (e) { showError(e); }
+  button.disabled = false; button.textContent = 'Start shift';
+}
+
+el('refresh').onclick = loadQueue;
+el('seed').onclick = seed;
+el('staffSignIn').onclick = staffSignIn;
+el('staffSignOut').onclick = () => {
+  signOut();
+  sessionRoles = [];
+  hide('whoami'); hide('queue-card'); hide('cockpit'); hide('receipt');
+  hide('ops-card'); hide('autopsy-card'); hide('foresight-card');
+  show('staff-signin'); clearError();
+};
+
+function viewFromPath() {
+  if (location.pathname === '/ops') return 'ops';
+  if (location.pathname === '/autopsy') return 'autopsy';
+  if (location.pathname === '/foresight') return 'foresight';
+  return 'queue';
+}
+
+function showDesk(view) {
+  hide('queue-card'); hide('cockpit'); hide('receipt');
+  hide('ops-card'); hide('autopsy-card'); hide('foresight-card');
+  const panel = { queue: 'queue-card', ops: 'ops-card', autopsy: 'autopsy-card', foresight: 'foresight-card' }[view] || 'queue-card';
+  show(panel);
+  const path = { queue: '/desk', ops: '/ops', autopsy: '/autopsy', foresight: '/foresight' }[view] || '/desk';
+  if (location.pathname !== path) history.pushState({}, '', path);
+  document.querySelectorAll('.bottom-nav button').forEach(button => {
+    const on = button.dataset.view === view;
+    button.classList.toggle('active', on);
+  });
+  if (view === 'ops') loadOps();
+  if (view === 'autopsy') loadAutopsy();
+  if (view === 'foresight') loadForesight();
+}
+
+async function loadOps() {
+  try {
+    const data = await api('/v1/demo/ops');
+    const outcomes = Object.entries(data.by_outcome || {}).map(([k, v]) => `<li>${esc(k)} · ${v}</li>`).join('');
+    const reasons = Object.entries(data.handoff_reasons || {}).map(([k, v]) => `<li>${esc(k)} · ${v}</li>`).join('');
+    el('ops-body').innerHTML = data.cases
+      ? `<dl class="kv">
+          <dt>Cases</dt><dd>${data.cases}</dd>
+          <dt>Decided</dt><dd>${data.decided}</dd>
+          <dt>Money at stake</dt><dd>LKR ${esc(data.money_at_stake_lkr)}</dd>
+        </dl>
+        <h3>Outcomes</h3>
+        <ul class="why-list">${outcomes || '<li>None yet</li>'}</ul>
+        <h3>Handoff reasons</h3>
+        <ul class="why-list">${reasons || '<li>None yet</li>'}</ul>`
+      : `<p class="muted small">${esc(data.note)}</p>`;
+  } catch (e) { showError(e); }
+}
+
+async function loadAutopsy() {
+  try {
+    const data = await api('/v1/demo/autopsy');
+    el('autopsy-body').innerHTML = `
+      <p class="small muted">${esc(data.note)}</p>
+      <ul class="why-list">${data.clusters.map(c =>
+        `<li>${esc(c.label)} · ${c.size} · ${esc(c.status)}${c.suggested_rule_id ? ' · ' + esc(c.suggested_rule_id) : ''}</li>`
+      ).join('') || '<li>No cluster</li>'}</ul>
+      <p class="small muted">Noise: ${data.noise}</p>`;
+  } catch (e) { showError(e); }
+}
+
+async function loadForesight() {
+  try {
+    const data = await api('/v1/demo/foresight');
+    el('foresight-body').innerHTML = `
+      <p class="sub">${esc(data.scenario)}. ${esc(data.note)}</p>
+      <ul class="why-list">${data.predictions.map(p =>
+        `<li><strong>${esc(p.band)}</strong> · ${esc(p.segment)} · ${esc(p.theme)} - ${esc(p.mitigation)}</li>`
+      ).join('')}</ul>
+      <p class="small muted">${data.caveats.map(esc).join(' ')}</p>`;
+  } catch (e) { showError(e); }
+}
+
+document.querySelectorAll('.bottom-nav button').forEach(button => {
+  button.onclick = () => { if (signedIn()) showDesk(button.dataset.view); };
+});
+renderRoles();
+</script>
+
+<nav class="bottom-nav tabs-4" aria-label="Staff">
+  <button type="button" data-view="queue" class="active">Queue</button>
+  <button type="button" data-view="ops">Insights</button>
+  <button type="button" data-view="autopsy">Autopsy</button>
+  <button type="button" data-view="foresight">Foresight</button>
+</nav>
+</body>
+</html>

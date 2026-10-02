@@ -352,6 +352,10 @@ export class ClarityClient {
     });
   }
 
+  /**
+   * Not served yet: `/v1/detect` existed only in the retired parallel backend.
+   * Use the case flow (`/v1/cases/{id}/evaluate`) until migration step R3 exposes it.
+   */
   detect(body: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.request("/v1/detect", {
       method: "POST",
@@ -359,6 +363,10 @@ export class ClarityClient {
     });
   }
 
+  /**
+   * Not served yet: `/v1/decide` existed only in the retired parallel backend.
+   * Use the case flow (`/v1/cases/{id}/evaluate`) until migration step R3 exposes it.
+   */
   decide(body: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.request("/v1/decide", {
       method: "POST",
