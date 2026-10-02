@@ -7,13 +7,13 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `assessor.py`, `policy.py`, `public.py` |
+| Files | `assessor.py`, `policy.py`, `public.py`, `zen.py` |
 
 ## 1. Purpose
 Decision policy: turns ranked causes, evidence completeness and risk signals into an outcome (AUTO_FIX, ONE_TAP_FIX, STAFF_APPROVAL, EXPLAIN_ONLY, HANDOFF) with caps, budgets and a hashed input document.
 
 ## 2. Public surface (`public.py`)
-Other code imports only these names: `DecisionPolicy`, `PolicyThresholds`, `build_decision_input`, `build_risk_signals`.
+Other code imports only `public.py`, including `ZenDecisionPolicy` and the parsed decision-table types.
 
 ## 3. Used by
 `clarity.app`, `clarity.modules.case`, `clarity.modules.governance`
@@ -34,14 +34,16 @@ In-memory structures in the `lite` profile. Target: one PostgreSQL schema `decis
 - Incomplete evidence never auto-fixes.
 
 ## 7. Migration status (enterprise-plan 21)
-Outcome rules are Python over an OPA-shaped input. R3 replaces them with a ZEN decision table (ADR-0026).
+M-DEC complete: production wiring loads `config/policy/decision-table.json` through the GoRules ZEN-compatible driver. A 1,000-input parity suite pins it to the reference Python policy. Resolution publishes `decision.generated@v1`.
 
 ## 8. Tests
 - `tests/unit/test_decision_policy.py`
 - `tests/unit/test_journeys.py`
 - `tests/unit/test_policy.py`
+- `tests/unit/test_decision_parity.py`
 
 ## 9. Change history
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.decision` with a public surface (R1) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-M-DEC-zen-decision-table.md` | ZEN decision table and reference parity (M-DEC, #36) |

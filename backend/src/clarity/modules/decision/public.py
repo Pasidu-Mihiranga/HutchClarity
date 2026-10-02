@@ -15,10 +15,18 @@ from clarity.modules.decision.policy import (
     DecisionPolicy,
     PolicyThresholds,
 )
+from clarity.modules.decision.zen import (
+    DecisionTable,
+    DecisionTableInvalid,
+    ZenDecisionPolicy,
+)
 
 __all__ = [
     "DecisionPolicy",
+    "DecisionTable",
+    "DecisionTableInvalid",
     "PolicyThresholds",
+    "ZenDecisionPolicy",
     "build_decision_input",
     "build_risk_signals",
 ]
