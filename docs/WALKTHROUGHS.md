@@ -17,3 +17,4 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | WT-11 | Receipt QR verification and decision replay | 09 §15 | M3 | planned | - |
 | WT-12 | Adding a new cause detector (teach once → golden tests → publish) | 09 §13.4, 19 | M3 | planned | - |
 | WT-13 | Deploying to a VPS, AWS, Azure and Kubernetes | 18 §2, deploy/ | M4 | planned | - |
+| WT-SC | Staff console roles (demo role switcher, desk, kill switches) — [WT-02-staff-console.md](walkthroughs/WT-02-staff-console.md) | 17 §5.4 | M1 staff surface | verified | 2026-10-02 |

@@ -146,6 +146,7 @@ def customer_can_act(principal: Principal) -> None:
 
 
 __all__ = [
+    "ANONYMOUS",
     "Assurance",
     "CurrentPrincipal",
     "Permission",

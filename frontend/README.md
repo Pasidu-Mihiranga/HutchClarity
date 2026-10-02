@@ -63,10 +63,14 @@ npm run dev -w @clarity/customer-web
 
 **console**
 
-- `/desk` — queue + cockpit
-- `/insights` — KPI placeholders
-- `/studio` — teach once / what-if / publish
-- `/admin` — flags, kill switches, MCP clients, templates
+- Bottom **role switcher** (agent … security_admin) + step-up MFA toggle
+- `/` — home with permission-aware section cards
+- `/desk` — live queue + cockpit + approve (via `@clarity/sdk`)
+- `/insights` — `/v1/demo/ops`, autopsy, foresight
+- `/studio` — role-aware draft / publish stub / regulator export stub
+- `/admin` — kill switches (`/v1/admin/switches`)
+
+Walkthrough: [docs/walkthroughs/WT-02-staff-console.md](../docs/walkthroughs/WT-02-staff-console.md)
 
 **verify**
 

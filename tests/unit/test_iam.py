@@ -524,6 +524,82 @@ def test_the_qr_stays_public(client: TestClient):
     assert client.get(f"/v1/receipts/{receipt_id}/qr.svg").status_code == 200
 
 
+def test_supervisor_can_read_and_flip_kill_switches(client: TestClient):
+    headers = auth(staff_token(client, ["supervisor"], step_up=True))
+
+    listed = client.get("/v1/admin/switches", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert any(s["key"] == "auto_fix_global" for s in listed.json()["switches"])
+
+    flipped = client.post(
+        "/v1/admin/switches",
+        json={"key": "auto_fix_global", "enabled": False, "reason": "demo drill"},
+        headers=headers,
+    )
+    assert flipped.status_code == 200, flipped.text
+    assert "auto_fix_global" in flipped.json()["disabled"]
+
+
+def test_a_customer_cannot_read_kill_switches(client: TestClient):
+    headers = auth(customer_token(client, DILANI))
+    assert client.get("/v1/admin/switches", headers=headers).status_code == 403
+
+
+def test_security_admin_can_read_switches_but_not_flip_without_kill_switch(
+    client: TestClient,
+):
+    headers = auth(staff_token(client, ["security_admin"], step_up=True))
+    assert client.get("/v1/admin/switches", headers=headers).status_code == 200
+    response = client.post(
+        "/v1/admin/switches",
+        json={"key": "auto_fix_global", "enabled": False, "reason": "try"},
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
+def test_supervisor_can_flip_kill_switches_without_step_up(client: TestClient):
+    """flags:kill_switch is not a step-up permission (unlike merchant:suspend)."""
+    headers = auth(staff_token(client, ["supervisor"], step_up=False))
+    response = client.post(
+        "/v1/admin/switches",
+        json={"key": "llm_explanations", "enabled": False, "reason": "incident"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert "llm_explanations" in response.json()["disabled"]
+
+
+def test_vas_ops_can_suspend_merchant_with_step_up(client: TestClient):
+    headers = auth(staff_token(client, ["vas_ops"], step_up=True))
+    response = client.post(
+        "/v1/admin/merchants/suspend",
+        json={
+            "merchant_id": "merchant-gamezone",
+            "reason": "demo suspend",
+            "subscriber_msisdn": DILANI,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["blocked"] is True
+    assert response.json()["simulated"] is True
+
+
+def test_vas_ops_cannot_suspend_without_step_up(client: TestClient):
+    headers = auth(staff_token(client, ["vas_ops"], step_up=False))
+    response = client.post(
+        "/v1/admin/merchants/suspend",
+        json={
+            "merchant_id": "merchant-gamezone",
+            "reason": "demo suspend",
+            "subscriber_msisdn": DILANI,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
 def test_the_otp_inbox_is_a_demo_only_route():
     """It hands out codes, so it must not exist where subscribers are real."""
     from clarity.api.container import Profile

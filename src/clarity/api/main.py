@@ -31,6 +31,7 @@ from fastapi.responses import Response as RawResponse
 from fastapi.staticfiles import StaticFiles
 
 from clarity.api.auth import (
+    ANONYMOUS,
     CurrentPrincipal,
     Permission,
     Principal,
@@ -64,10 +65,13 @@ from clarity.api.schemas import (
     SessionView,
     SourceStatusView,
     StaffSignIn,
+    SwitchFlipRequest,
+    MerchantSuspendRequest,
     TimelineEventView,
     TimelineView,
     VerificationView,
 )
+from clarity.core.policy.switches import Switch
 from clarity.core.cases.service import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.core.iam.otp import OtpRefused, SimulatedInbox
 from clarity.core.iam.principal import Assurance, Role
@@ -800,6 +804,91 @@ def _register_routes(app: FastAPI) -> None:
             )
             for r in waiting
         ]
+
+    @app.get("/v1/admin/switches", tags=["admin"])
+    def list_switches(
+        clarity: ClarityDep,
+        principal: CurrentPrincipal,
+    ) -> dict[str, Any]:
+        """Kill-switch state. Readable with kill_switch or admin:manage."""
+        if principal is ANONYMOUS or not principal.roles:
+            raise HTTPException(status_code=401, detail="sign in to continue")
+        if not (
+            principal.has(Permission.KILL_SWITCH) or principal.has(Permission.ADMIN_MANAGE)
+        ):
+            raise HTTPException(status_code=403, detail="this account may not read switches")
+        named = [s.value for s in Switch]
+        disabled = set(clarity.switches.disabled)
+        return {
+            "switches": [{"key": key, "enabled": key not in disabled} for key in named]
+            + [{"key": key, "enabled": False} for key in sorted(disabled) if key not in named],
+            "disabled": list(clarity.switches.disabled),
+            "history": [
+                {
+                    "name": flip.name,
+                    "enabled": flip.enabled,
+                    "actor_ref": flip.actor_ref,
+                    "reason": flip.reason,
+                    "at": flip.at.isoformat(),
+                }
+                for flip in clarity.switches.history[-20:]
+            ],
+        }
+
+    @app.post("/v1/admin/switches", tags=["admin"])
+    def flip_switch(
+        body: SwitchFlipRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.KILL_SWITCH))],
+    ) -> dict[str, Any]:
+        """Flip a kill switch. Audited. Needs ``flags:kill_switch`` (+ step-up)."""
+        if body.enabled:
+            clarity.switches.turn_on(body.key, actor_ref=principal.ref, reason=body.reason)
+        else:
+            clarity.switches.turn_off(body.key, actor_ref=principal.ref, reason=body.reason)
+        named = [s.value for s in Switch]
+        disabled = set(clarity.switches.disabled)
+        return {
+            "switches": [{"key": key, "enabled": key not in disabled} for key in named]
+            + [{"key": key, "enabled": False} for key in sorted(disabled) if key not in named],
+            "disabled": list(clarity.switches.disabled),
+            "history": [
+                {
+                    "name": flip.name,
+                    "enabled": flip.enabled,
+                    "actor_ref": flip.actor_ref,
+                    "reason": flip.reason,
+                    "at": flip.at.isoformat(),
+                }
+                for flip in clarity.switches.history[-20:]
+            ],
+        }
+
+    @app.post("/v1/admin/merchants/suspend", tags=["admin"])
+    def suspend_merchant(
+        body: MerchantSuspendRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.MERCHANT_SUSPEND))],
+    ) -> dict[str, Any]:
+        """Block a merchant on a demo subscriber (simulated). Needs step-up."""
+        msisdn = body.subscriber_msisdn or "0771234567"
+        try:
+            normalised = normalise_msisdn(msisdn)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        account = clarity.world.account_by_msisdn(normalised)
+        if account is None:
+            raise HTTPException(status_code=404, detail="subscriber not found")
+        newly = clarity.world.block_merchant(account.ref, body.merchant_id)
+        return {
+            "merchant_id": body.merchant_id,
+            "subscriber_ref": account.ref,
+            "blocked": True,
+            "newly_blocked": newly,
+            "reason": body.reason,
+            "actor_ref": principal.ref,
+            "simulated": True,
+        }
 
     @app.get("/v1/me/home", tags=["customer"])
     def my_home(clarity: ClarityDep, principal: CurrentPrincipal) -> dict[str, Any]:

@@ -287,3 +287,19 @@ class SessionView(ApiModel):
     roles: list[str] = Field(default_factory=list)
     assurance: str
     permissions: list[str] = Field(default_factory=list)
+
+
+class SwitchFlipRequest(ApiModel):
+    """Flip a kill switch. Requires ``flags:kill_switch``."""
+
+    key: str
+    enabled: bool
+    reason: str = Field(min_length=1)
+
+
+class MerchantSuspendRequest(ApiModel):
+    """Demo merchant block for VAS ops / compliance. Simulated world only."""
+
+    merchant_id: str
+    reason: str = Field(min_length=1)
+    subscriber_msisdn: str | None = None
