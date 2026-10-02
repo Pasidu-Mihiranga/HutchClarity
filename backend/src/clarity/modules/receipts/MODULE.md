@@ -7,7 +7,7 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `public.py`, `recurrence.py`, `render.py`, `service.py`, `signing.py` |
+| Files | `public.py`, `recurrence.py`, `render.py`, `repository.py`, `service.py`, `signing.py` |
 
 ## 1. Purpose
 Trust Receipts: build the canonical payload, chain to the previous receipt, sign with Ed25519, verify (hash, signature, ledger, chain), run the recurrence test, render PNG/PDF/SMS in si/ta/en.
@@ -26,7 +26,7 @@ Other code imports only these names: `DevSigningService`, `ReceiptService`, `Ren
 | `clarity.modules.actions` | public |
 
 ## 5. Data owned
-In-memory structures in the `lite` profile. Target: one PostgreSQL schema `receipts` with its own role (ADR-0013), same repository interfaces, same parity suite.
+The hash-chained receipt ledger in issue order, what each receipt supersedes, which subscriber each is about, and the receipt-number sequence, behind `ReceiptRepository` (B02). Collections: `receipts.chain`, `receipts.superseded`, `receipts.subscriber`, `receipts.sequence`, `receipts.by_plan` (one plan, one receipt: the index that makes issuance idempotent, B06). Order is part of the data: the repository preserves issue order, which is what the chain walk relies on. The `demo` profile binds the in-memory driver, `full` binds PostgreSQL schema `receipts` with its own role (ADR-0013); both pass `tests/contract/test_repository_parity.py`.
 
 ## 6. Invariants
 - Receipts are never edited; a correction supersedes.
@@ -44,3 +44,5 @@ Signing key generated in memory (`lite`). R4: `clarity-signer` with OpenBao/KMS.
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.receipts` with a public surface (R1) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-B02-unit-of-work-and-repositories.md` | The receipt chain, supersession map, subscriber map and sequence moved behind `ReceiptRepository` (B02, #5) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-B06-receipts-on-action-completed.md` | `issue(plan_id=...)` is idempotent per plan via a plan index; `for_plan()` added (B06, #14) |

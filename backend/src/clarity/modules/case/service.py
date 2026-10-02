@@ -13,24 +13,33 @@ identical no matter where the customer started.
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field, replace
+from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
+from time import monotonic, sleep
 
 from clarity.contracts.case import Case, CaseState, CaseTrigger, CustomerReference
 from clarity.contracts.decision import (
     ActionPlan,
     ActionType,
     Decision,
-    DecisionInput,
     Outcome,
 )
+from clarity.contracts.events import ActionCompletedV1
 from clarity.contracts.receipt import TrustReceipt
 from clarity.contracts.timeline import EvidenceSnapshot
 from clarity.kernel.common import Channel, Language, utc_now
 from clarity.kernel.ids import case_no as make_case_no
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.capability import ToolLayer
-from clarity.modules.actions.public import EXECUTABLE_OUTCOMES, ConfirmationToken, ExecutionResult
+from clarity.modules.actions.public import (
+    EXECUTABLE_OUTCOMES,
+    ConfirmationToken,
+    ExecutionResult,
+    PlanNotPending,
+)
+from clarity.modules.case.records import CaseNotFound, CaseNotReady, CaseRecord
+from clarity.modules.case.repository import CaseRepository
 from clarity.modules.decision.public import (
     DecisionPolicy,
     PolicyThresholds,
@@ -43,42 +52,13 @@ from clarity.modules.timeline.public import TimelineBuilder, TimelineRequest
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard, SwitchState
 from clarity.platform.content.templates import explanation as customer_explanation
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.observability import span
+from clarity.platform.persistence import ConcurrentUpdate
 
 #: Channels that cannot capture a reliable confirmation for a service change
 #: (plan §9.7). The decision policy uses this to route them to staff.
 _NO_CONFIRMATION_CHANNELS = frozenset({Channel.SMS, Channel.USSD})
-
-
-class CaseNotFound(KeyError):
-    pass
-
-
-class CaseNotReady(RuntimeError):
-    """An operation was attempted before the case reached the needed state."""
-
-
-@dataclass
-class CaseRecord:
-    """Everything known about one case, in one place."""
-
-    case: Case
-    subscriber_ref: str
-    snapshot: EvidenceSnapshot | None = None
-    evaluation: RuleEvaluation | None = None
-    decision: Decision | None = None
-    decision_input: DecisionInput | None = None
-    """Kept so the case can be re-decided under a candidate policy (§19 4.1)."""
-    plans: dict[str, ActionPlan] = field(default_factory=dict)
-    execution: ExecutionResult | None = None
-    receipt: TrustReceipt | None = None
-    receipts_by_plan: dict[str, TrustReceipt] = field(default_factory=dict)
-    """The one receipt each executed plan produced; replays return it (D1)."""
-    thresholds: PolicyThresholds | None = None
-    """The thresholds the decision used, so execution enforces the same values (D2)."""
-
-    @property
-    def case_id(self) -> str:
-        return self.case.case_id
 
 
 class CaseService:
@@ -92,6 +72,8 @@ class CaseService:
         policy: DecisionPolicy,
         tools: ToolLayer,
         receipts: ReceiptService,
+        cases: CaseRepository,
+        deliver_events: Callable[[], None],
         policies: PolicyResolver | None = None,
         switches: SwitchBoard | None = None,
         clock: datetime | None = None,
@@ -101,13 +83,16 @@ class CaseService:
         self._policy = policy
         self._tools = tools
         self._receipts = receipts
+        # All case state lives in the repository (B02): the service keeps none.
+        self._cases = cases
+        # Runs the relay and the bus, so an event this call produced is acted on
+        # before the call returns. The composition root binds it; the case module
+        # does not know which bus is behind it.
+        self._deliver_events = deliver_events
         self._policies = policies
         self._switches = switches or SwitchBoard()
         self._clock = clock
-        self._cases: dict[str, CaseRecord] = {}
-        self._sequence = 0
         self._lock = threading.Lock()
-        self._plan_locks: dict[str, threading.Lock] = {}
 
     @property
     def switches(self) -> SwitchBoard:
@@ -144,10 +129,10 @@ class CaseService:
         charge_ref: str | None = None,
     ) -> Case:
         with self._lock:
-            self._sequence += 1
+            sequence = self._cases.next_case_number()
             case = Case(
                 case_id=new_id("CASE"),
-                case_no=make_case_no(self._sequence, year=self._now().year),
+                case_no=make_case_no(sequence, year=self._now().year),
                 customer=CustomerReference(
                     subscriber_ref=subscriber_ref,
                     msisdn_masked=msisdn_masked,
@@ -159,7 +144,7 @@ class CaseService:
                 charge_ref=charge_ref,
                 opened_at=self._now(),
             )
-            self._cases[case.case_id] = CaseRecord(case=case, subscriber_ref=subscriber_ref)
+            self._cases.save(CaseRecord(case=case, subscriber_ref=subscriber_ref))
             return case
 
     def get(self, case_id: str) -> CaseRecord:
@@ -168,8 +153,36 @@ class CaseService:
             raise CaseNotFound(case_id)
         return record
 
+    def save(self, record: CaseRecord) -> None:
+        """Persist a record the caller mutated.
+
+        The service mutates a record in place and then writes it back, so a
+        driver that stores a copy (B05) sees every change. Strict: a conflict
+        here means two callers changed one case differently, and silently
+        dropping one of those changes is how a case loses its decision.
+        """
+        self._cases.save(record)
+
+    def _cache_outcome(self, record: CaseRecord) -> None:
+        """Write back the outcome facts that other modules own.
+
+        ``execution`` and ``receipts_by_plan`` are this module's read cache of
+        state the actions and receipts modules are authoritative for. Two
+        confirmations of one plan necessarily produce the same values: the tool
+        layer's idempotency key gives one execution result, and the receipt's
+        plan index gives one receipt. So a conflict means another thread already
+        wrote the identical cache, and standing down loses nothing.
+
+        Unlike :meth:`save`, which stays strict, because a conflict there is a
+        genuine lost update.
+        """
+        try:
+            self._cases.save(record)
+        except ConcurrentUpdate:
+            return
+
     def all_cases(self) -> list[CaseRecord]:
-        return list(self._cases.values())
+        return self._cases.all_records()
 
     # ------------------------------------------------------------------ #
     # Evidence and decision
@@ -177,9 +190,22 @@ class CaseService:
 
     def build_timeline(self, case_id: str) -> EvidenceSnapshot:
         record = self.get(case_id)
+        snapshot = self._collect_evidence(record)
+        self.save(record)
+        return snapshot
+
+    def _collect_evidence(self, record: CaseRecord) -> EvidenceSnapshot:
+        """Collect evidence onto a record the caller holds and will save.
+
+        Separate from ``build_timeline`` so a caller that already has the record
+        works on that instance. Calling the public method instead would load a
+        second copy, and on a driver that stores copies (B05) the caller's
+        instance would then be stale: it would still be OPEN while the stored
+        one had moved on.
+        """
         self._advance(record, CaseState.COLLECTING_EVIDENCE)
         snapshot = self._timeline.build(
-            TimelineRequest.for_case(case_id, record.subscriber_ref, now=self._now())
+            TimelineRequest.for_case(record.case_id, record.subscriber_ref, now=self._now())
         )
         record.snapshot = snapshot
         return snapshot
@@ -206,11 +232,15 @@ class CaseService:
         a case in the Desk must not change its outcome by looking at it, and a
         receipt already references the original decision.
         """
+        with span("case.evaluate", case_id=case_id):
+            return self._evaluate(case_id, customer_requested_human=customer_requested_human)
+
+    def _evaluate(self, case_id: str, *, customer_requested_human: bool = False) -> Decision:
         record = self.get(case_id)
         if record.decision is not None and record.case.state in self._DECIDED_STATES:
             return record.decision
 
-        snapshot = record.snapshot or self.build_timeline(case_id)
+        snapshot = record.snapshot or self._collect_evidence(record)
 
         evaluation = self._rules.evaluate(snapshot)
         record.evaluation = evaluation
@@ -256,6 +286,7 @@ class CaseService:
 
         self._advance(record, CaseState.EVALUATED)
         self._advance(record, self._state_for(decision.outcome))
+        self.save(record)
         return decision
 
     def _as_of(self, record: CaseRecord, evaluation: RuleEvaluation) -> datetime:
@@ -337,6 +368,7 @@ class CaseService:
             now=self._now(),
         )
         record.plans[plan.plan_id] = plan
+        self.save(record)
         return plan
 
     def confirm_and_execute(
@@ -350,13 +382,16 @@ class CaseService:
         same moment or later, returns the original result and receipt.
         """
         record = self.get(case_id)
-        with self._plan_lock(plan_id):
+        with span("case.confirm_and_execute", case_id=case_id, plan_id=plan_id):
             done = self._already_done(record, plan_id)
             if done is not None:
                 return done
-            token = self._tools.confirm_by_customer(
-                plan_id, subscriber_ref=record.subscriber_ref, now=self._now()
-            )
+            try:
+                token = self._tools.confirm_by_customer(
+                    plan_id, subscriber_ref=record.subscriber_ref, now=self._now()
+                )
+            except PlanNotPending:
+                return self._join_original(record, plan_id)
             return self._execute(record, plan_id, token)
 
     def approve_and_execute(
@@ -364,10 +399,10 @@ class CaseService:
     ) -> tuple[ExecutionResult, TrustReceipt] | None:
         """A staff member approved. Returns ``None`` if more approval is needed."""
         record = self.get(case_id)
-        with self._plan_lock(plan_id):
-            done = self._already_done(record, plan_id)
-            if done is not None:
-                return done
+        done = self._already_done(record, plan_id)
+        if done is not None:
+            return done
+        try:
             token = self._tools.approve_by_staff(
                 plan_id,
                 approver_ref=approver_ref,
@@ -375,34 +410,103 @@ class CaseService:
                 mfa_step_up=mfa_step_up,
                 now=self._now(),
             )
-            if token is None:
-                return None
-            return self._execute(record, plan_id, token)
+        except PlanNotPending:
+            return self._join_original(record, plan_id)
+        if token is None:
+            return None
+        return self._execute(record, plan_id, token)
 
     def auto_fix(
         self, case_id: str, plan_id: str, *, triggered_by: str = "clarity-stream-detector"
     ) -> tuple[ExecutionResult, TrustReceipt]:
         """Zero-contact execution of a whitelisted AUTO_FIX (deck S5)."""
         record = self.get(case_id)
-        with self._plan_lock(plan_id):
-            done = self._already_done(record, plan_id)
-            if done is not None:
-                return done
+        done = self._already_done(record, plan_id)
+        if done is not None:
+            return done
+        try:
             token = self._tools.authorise_auto_fix(
                 plan_id, triggered_by=triggered_by, now=self._now()
             )
-            return self._execute(record, plan_id, token)
+        except PlanNotPending:
+            return self._join_original(record, plan_id)
+        return self._execute(record, plan_id, token)
 
-    def _plan_lock(self, plan_id: str) -> threading.Lock:
-        """One lock per plan: execution and its receipt happen exactly once."""
-        with self._lock:
-            return self._plan_locks.setdefault(plan_id, threading.Lock())
+    def on_action_completed(self, event: Event) -> None:
+        """Issue the receipt for a plan the tool layer completed.
+
+        The consumer for ``action.completed`` (B06). Registered by the
+        composition root, which is also what makes this the first flow where a
+        side effect is the consequence of a fact rather than a second call
+        inside the money path.
+
+        Idempotent by plan id: delivery is at-least-once, so this runs again on
+        a redelivery and must not chain a second receipt (D1).
+        """
+        payload = event.payload()
+        if not isinstance(payload, ActionCompletedV1):  # pragma: no cover - type guard
+            return
+        with span(
+            "receipts.on_action_completed",
+            case_id=payload.case_id,
+            plan_id=payload.plan_id,
+            event_id=event.id,
+        ):
+            if self._receipts.for_plan(payload.plan_id) is not None:
+                return
+            record = self._cases.get(payload.case_id)
+            if record is None:
+                raise CaseNotFound(payload.case_id)
+            receipt = self._issue_receipt(record, plan_id=payload.plan_id)
+            record.receipts_by_plan[payload.plan_id] = receipt
+            self._cache_outcome(record)
+
+    def _join_original(
+        self, record: CaseRecord, plan_id: str, *, timeout_seconds: float = 10.0
+    ) -> tuple[ExecutionResult, TrustReceipt]:
+        """Return the outcome of a plan another caller is already executing.
+
+        This is what replaced the per-plan lock (D1, B06). Two taps on one plan
+        no longer queue behind a lock: the first one wins the plan, and the
+        second finds it is no longer pending and joins that outcome instead of
+        failing or acting again. One tap, one refund, one receipt.
+
+        Draining blocks on the partition the event is on, so in the common case
+        this returns as soon as the winner's receipt is issued rather than
+        polling. The wait exists because the winner may not have committed its
+        event yet when this call arrives. A durable claim that removes the wait
+        entirely needs database row locks, which is M-ACT.
+        """
+        deadline = monotonic() + timeout_seconds
+        while True:
+            self._drain()
+            done = self._already_done(record, plan_id)
+            if done is not None:
+                return done
+            if monotonic() >= deadline:
+                raise CaseNotReady(
+                    f"plan {plan_id} is being executed by another request and its "
+                    f"outcome did not arrive within {timeout_seconds:.0f}s"
+                )
+            sleep(0.001)
+
+    def _drain(self) -> None:
+        """Let the relay publish and the consumers run."""
+        self._deliver_events()
+
+    def _receipt_for_plan(self, plan_id: str) -> TrustReceipt | None:
+        """The one receipt a completed plan produced, from the receipts module."""
+        return self._receipts.for_plan(plan_id)
 
     def _already_done(
         self, record: CaseRecord, plan_id: str
     ) -> tuple[ExecutionResult, TrustReceipt] | None:
-        """The original outcome of a plan that has already run, marked as a replay."""
-        receipt = record.receipts_by_plan.get(plan_id)
+        """The original outcome of a plan that has already run, marked as a replay.
+
+        The receipt comes from the receipts module rather than this record,
+        because that index is what makes one plan have one receipt.
+        """
+        receipt = self._receipt_for_plan(plan_id)
         result = self._tools.result_for(plan_id)
         if receipt is None or result is None:
             return None
@@ -413,6 +517,10 @@ class CaseService:
     ) -> tuple[ExecutionResult, TrustReceipt]:
         if record.case.state is not CaseState.EXECUTING:
             self._advance(record, CaseState.EXECUTING)
+            # Tolerant, like the other outcome writes: two confirmations of one
+            # plan both move the case to EXECUTING, so a conflict here is the
+            # other request having written the identical state.
+            self._cache_outcome(record)
 
         result = self._tools.execute(
             plan_id,
@@ -422,9 +530,24 @@ class CaseService:
         )
         record.execution = result
         self._advance(record, CaseState.ACTIONED)
+        # Saved before the drain: the consumer reads this record to build the
+        # receipt, and a driver that stores a copy would otherwise show it the
+        # state from before the execution.
+        self._cache_outcome(record)
 
-        receipt = self._issue_receipt(record, self._tools.plan(plan_id))
+        # The tool layer wrote action.completed in the same transaction as the
+        # plan (B04). Draining it here is what turns the receipt into the
+        # consequence of the event rather than a second call on the money path:
+        # if this process dies first, the relay issues the receipt on restart.
+        self._drain()
+        receipt = self._receipt_for_plan(plan_id)
+        if receipt is None:
+            raise CaseNotReady(
+                f"plan {plan_id} completed but its receipt has not been issued; "
+                "the relay or the receipts consumer is not running"
+            )
         record.receipts_by_plan[plan_id] = receipt
+        self._cache_outcome(record)
         return result, receipt
 
     # ------------------------------------------------------------------ #
@@ -435,9 +558,9 @@ class CaseService:
         """A receipt for an explain-only outcome: nothing moved, and that is the proof."""
         record = self.get(case_id)
         self._require_decision(record)
-        return self._issue_receipt(record, None)
+        return self._issue_receipt(record, plan_id=None)
 
-    def _issue_receipt(self, record: CaseRecord, plan: ActionPlan | None) -> TrustReceipt:
+    def _issue_receipt(self, record: CaseRecord, *, plan_id: str | None) -> TrustReceipt:
         decision = self._require_decision(record)
         cause = (
             record.evaluation.top.assessment
@@ -466,10 +589,12 @@ class CaseService:
             ),
             subscriber_ref=record.subscriber_ref,
             safeguard_params=self._flat_safeguard_params(record),
+            plan_id=plan_id,
             now=self._now(),
         )
         record.receipt = receipt
         self._advance(record, CaseState.RECEIPTED)
+        self.save(record)
         return receipt
 
     # ------------------------------------------------------------------ #
@@ -512,7 +637,12 @@ class CaseService:
         return params
 
     def _advance(self, record: CaseRecord, target: CaseState) -> None:
-        """Move the case on, tolerating a no-op when it is already there."""
+        """Move the case on, tolerating a no-op when it is already there.
+
+        Does not persist: a public method advances the case through several
+        states in one go, and the enclosing method writes the record back once
+        it is finished.
+        """
         if record.case.state is target:
             return
         record.case = record.case.with_state(target)

@@ -7,13 +7,13 @@ this package is internal and may change without notice.
 
 from __future__ import annotations
 
-from clarity.modules.governance.governance import (
+from clarity.modules.governance.artefacts import (
     Approval,
     ChangeRefused,
     ChangeState,
     PolicyChange,
-    PolicyGovernance,
 )
+from clarity.modules.governance.governance import PolicyGovernance
 from clarity.modules.governance.replay import (
     ImpactReport,
     OutcomeChange,
@@ -21,16 +21,24 @@ from clarity.modules.governance.replay import (
     ReplayCase,
     cases_from,
 )
+from clarity.modules.governance.repository import (
+    CHANGES,
+    PolicyChangeRepository,
+    StoredPolicyChangeRepository,
+)
 
 __all__ = [
+    "CHANGES",
     "Approval",
     "ChangeRefused",
     "ChangeState",
     "ImpactReport",
     "OutcomeChange",
     "PolicyChange",
+    "PolicyChangeRepository",
     "PolicyGovernance",
     "PolicyReplay",
     "ReplayCase",
+    "StoredPolicyChangeRepository",
     "cases_from",
 ]

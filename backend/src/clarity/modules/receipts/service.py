@@ -18,7 +18,8 @@ Three properties this service is responsible for:
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from contextlib import suppress
+from dataclasses import dataclass
 from datetime import datetime
 
 from clarity.contracts.case import Case
@@ -44,6 +45,7 @@ from clarity.kernel.common import Language, utc_now
 from clarity.kernel.ids import receipt_id as make_receipt_id
 from clarity.modules.actions.public import ConfirmedBy, ExecutionResult
 from clarity.modules.receipts.recurrence import CHECK_FOR_ACTION, RecurrenceProbe, run_check
+from clarity.modules.receipts.repository import ReceiptRepository
 from clarity.modules.receipts.signing import SigningService, UnknownKeyId, verify_signature
 
 #: Where the public verification page lives. Configured per environment;
@@ -73,15 +75,6 @@ class VerificationResult:
         return "VERIFIED" if self.valid else "NOT VALID"
 
 
-@dataclass
-class _Ledger:
-    """Append-only store of issued receipts, in issue order."""
-
-    receipts: dict[str, TrustReceipt] = field(default_factory=dict)
-    order: list[str] = field(default_factory=list)
-    superseded_by: dict[str, str] = field(default_factory=dict)
-
-
 class ReceiptService:
     """Issues receipts and verifies them."""
 
@@ -89,6 +82,7 @@ class ReceiptService:
         self,
         signing: SigningService,
         *,
+        ledger: ReceiptRepository,
         probe: RecurrenceProbe | None = None,
         verify_base: str = DEFAULT_VERIFY_BASE,
         persist: bool = False,
@@ -96,11 +90,10 @@ class ReceiptService:
         self._signing = signing
         self._probe = probe
         self._verify_base = verify_base.rstrip("/")
-        self._ledger = _Ledger()
+        # The chain lives in the repository (B02); the service keeps no copy.
+        self._ledger = ledger
         self._lock = threading.Lock()
-        self._sequence = 0
         self._persist = persist
-        self._subscriber_by_receipt: dict[str, str] = {}
         if persist:
             self._hydrate()
 
@@ -109,21 +102,23 @@ class ReceiptService:
 
         with session_scope() as session:
             for receipt, subscriber_ref in list_receipts(session):
-                self._ledger.receipts[receipt.receipt_id] = receipt
-                self._ledger.order.append(receipt.receipt_id)
-                self._subscriber_by_receipt[receipt.receipt_id] = subscriber_ref
+                self._ledger.append(receipt, subscriber_ref=subscriber_ref)
                 if receipt.payload.supersedes:
-                    self._ledger.superseded_by[receipt.payload.supersedes] = receipt.receipt_id
-                # Keep sequence ahead of any restored receipt number.
-                try:
-                    # RCP-2027-000042 → 42
-                    num = int(receipt.receipt_id.rsplit("-", 1)[-1])
-                    self._sequence = max(self._sequence, num)
-                except ValueError:
-                    pass
+                    self._ledger.mark_superseded(
+                        receipt.payload.supersedes, by_receipt_id=receipt.receipt_id
+                    )
+                # Keep the sequence ahead of any restored receipt number.
+                with suppress(ValueError):
+                    # RCP-2027-000042 -> 42
+                    self._ledger.bump_sequence_to(int(receipt.receipt_id.rsplit("-", 1)[-1]))
 
     def subscriber_ref_for(self, receipt_id: str) -> str | None:
-        return self._subscriber_by_receipt.get(receipt_id)
+        return self._ledger.subscriber_ref_for(receipt_id)
+
+    def for_plan(self, plan_id: str) -> TrustReceipt | None:
+        """The receipt issued for one executed plan, if it has been issued."""
+        receipt_id = self._ledger.receipt_id_for_plan(plan_id)
+        return None if receipt_id is None else self._ledger.get(receipt_id)
 
     # ------------------------------------------------------------------ #
     # Issuing
@@ -141,6 +136,7 @@ class ReceiptService:
         subscriber_ref: str,
         safeguard_params: dict[str, object] | None = None,
         supersedes: str | None = None,
+        plan_id: str | None = None,
         now: datetime | None = None,
     ) -> TrustReceipt:
         """Issue a receipt for a completed case.
@@ -148,6 +144,11 @@ class ReceiptService:
         Called for an executed remedy and for an explain-only outcome alike:
         the deck promises a receipt for what was decided, not only for money
         that moved.
+
+        With a ``plan_id`` this is idempotent: one executed plan has exactly one
+        receipt, however many times the event that triggered it is delivered
+        (D1). Without one (an explain-only outcome) every call issues a receipt,
+        because there is no plan to key it to.
         """
         issued_at = now or utc_now()
         actions = self._receipt_actions(execution)
@@ -156,9 +157,18 @@ class ReceiptService:
         )
 
         with self._lock:
-            self._sequence += 1
+            # Inside the lock, so two deliveries of one action.completed cannot
+            # both pass the check and chain two receipts for the same plan.
+            if plan_id is not None:
+                existing = self._ledger.receipt_id_for_plan(plan_id)
+                if existing is not None:
+                    already = self._ledger.get(existing)
+                    if already is not None:
+                        return already
+
+            sequence = self._ledger.next_receipt_number()
             payload = ReceiptPayload(
-                receipt_id=make_receipt_id(self._sequence, year=issued_at.year),
+                receipt_id=make_receipt_id(sequence, year=issued_at.year),
                 case_id=case.case_id,
                 issued_at=issued_at,
                 subject=ReceiptSubject(
@@ -195,11 +205,11 @@ class ReceiptService:
                 verify_url=f"{self._verify_base}/{payload.receipt_id}",
             )
 
-            self._ledger.receipts[receipt.receipt_id] = receipt
-            self._ledger.order.append(receipt.receipt_id)
-            self._subscriber_by_receipt[receipt.receipt_id] = subscriber_ref
+            self._ledger.append(receipt, subscriber_ref=subscriber_ref)
+            if plan_id is not None:
+                self._ledger.link_plan(plan_id, receipt_id=receipt.receipt_id)
             if supersedes:
-                self._ledger.superseded_by[supersedes] = receipt.receipt_id
+                self._ledger.mark_superseded(supersedes, by_receipt_id=receipt.receipt_id)
             if self._persist:
                 from clarity.integration.drivers.mock.store import save_receipt, session_scope
 
@@ -208,9 +218,8 @@ class ReceiptService:
             return receipt
 
     def _chain_head(self) -> str | None:
-        if not self._ledger.order:
-            return None
-        return self._ledger.receipts[self._ledger.order[-1]].payload_hash
+        chain = self._ledger.in_order()
+        return chain[-1].payload_hash if chain else None
 
     @staticmethod
     def _receipt_actions(execution: ExecutionResult | None) -> list[ReceiptAction]:
@@ -301,15 +310,15 @@ class ReceiptService:
     # ------------------------------------------------------------------ #
 
     def get(self, receipt_id: str) -> TrustReceipt | None:
-        return self._ledger.receipts.get(receipt_id)
+        return self._ledger.get(receipt_id)
 
     def issued(self) -> list[TrustReceipt]:
         """Every receipt in issue order."""
-        return [self._ledger.receipts[receipt_id] for receipt_id in self._ledger.order]
+        return self._ledger.in_order()
 
     def verify(self, receipt_id: str) -> VerificationResult:
         """Verify a receipt we issued, by id (what the QR code resolves to)."""
-        receipt = self._ledger.receipts.get(receipt_id)
+        receipt = self._ledger.get(receipt_id)
         if receipt is None:
             return VerificationResult(
                 receipt_id=receipt_id, valid=False, reason="no such receipt was ever issued"
@@ -322,7 +331,7 @@ class ReceiptService:
         Checks the hash, the signature, and the chain. A document that looks
         right but was never issued fails on the ledger lookup.
         """
-        superseded_by = self._ledger.superseded_by.get(receipt.receipt_id)
+        superseded_by = self._ledger.superseded_by(receipt.receipt_id)
 
         recomputed = receipt.payload.compute_hash()
         if recomputed != receipt.payload_hash:
@@ -359,7 +368,7 @@ class ReceiptService:
                 superseded_by=superseded_by,
             )
 
-        issued = self._ledger.receipts.get(receipt.receipt_id)
+        issued = self._ledger.get(receipt.receipt_id)
         if issued is None or issued.payload_hash != receipt.payload_hash:
             return VerificationResult(
                 receipt_id=receipt.receipt_id,
@@ -381,16 +390,16 @@ class ReceiptService:
 
     def _chain_is_intact(self, receipt_id: str) -> bool:
         """Does this receipt still point at the receipt issued before it?"""
-        position = self._ledger.order.index(receipt_id)
-        receipt = self._ledger.receipts[receipt_id]
+        chain = self._ledger.in_order()
+        position = [r.receipt_id for r in chain].index(receipt_id)
+        receipt = chain[position]
         if position == 0:
             return receipt.payload.prev_receipt_hash is None
-        previous = self._ledger.receipts[self._ledger.order[position - 1]]
-        return receipt.payload.prev_receipt_hash == previous.payload_hash
+        return receipt.payload.prev_receipt_hash == chain[position - 1].payload_hash
 
     def verify_chain(self) -> bool:
         """Verify the whole ledger, as a tamper check would (plan §20.3)."""
-        return all(self._chain_is_intact(receipt_id) for receipt_id in self._ledger.order)
+        return all(self._chain_is_intact(receipt_id) for receipt_id in self._ledger.ids_in_order())
 
     # ------------------------------------------------------------------ #
     # Presentation

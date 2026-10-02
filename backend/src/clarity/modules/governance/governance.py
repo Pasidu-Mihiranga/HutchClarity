@@ -14,63 +14,19 @@ production is not the editor but the lifecycle around it:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
 
 from clarity.kernel.common import utc_now
 from clarity.kernel.ids import new_id
+from clarity.modules.governance.artefacts import (
+    Approval,
+    ChangeRefused,
+    ChangeState,
+    PolicyChange,
+)
 from clarity.modules.governance.replay import ImpactReport
+from clarity.modules.governance.repository import PolicyChangeRepository
 from clarity.platform.config.artefacts import ChangeClass, PolicyValue
-
-
-class ChangeState(StrEnum):
-    DRAFT = "draft"
-    IN_REVIEW = "in_review"
-    APPROVED = "approved"
-    ACTIVE = "active"
-    REJECTED = "rejected"
-
-
-class ChangeRefused(PermissionError):
-    """A change cannot move forward. The reason is stable and auditable."""
-
-    def __init__(self, code: str, detail: str) -> None:
-        super().__init__(detail)
-        self.code = code
-
-
-@dataclass(frozen=True)
-class Approval:
-    approver_ref: str
-    role: str
-    at: datetime
-    mfa_step_up: bool
-
-
-@dataclass
-class PolicyChange:
-    """One proposed change, from draft to active."""
-
-    change_id: str
-    key: str
-    candidate: PolicyValue
-    change_class: ChangeClass
-    maker_ref: str
-    state: ChangeState = ChangeState.DRAFT
-    approvals: list[Approval] = field(default_factory=list)
-    impact: ImpactReport | None = None
-    reason: str = ""
-    created_at: datetime = field(default_factory=utc_now)
-    activated_at: datetime | None = None
-
-    @property
-    def approvals_needed(self) -> int:
-        return 2 if self.change_class.needs_second_approver else 1
-
-    @property
-    def is_approved(self) -> bool:
-        return len(self.approvals) >= self.approvals_needed
 
 
 class PolicyGovernance:
@@ -85,8 +41,9 @@ class PolicyGovernance:
         }
     )
 
-    def __init__(self, *, audit: object | None = None) -> None:
-        self._changes: dict[str, PolicyChange] = {}
+    def __init__(self, changes: PolicyChangeRepository, *, audit: object | None = None) -> None:
+        # Policy changes live in the repository (B02); the gate keeps none.
+        self._changes = changes
         self._audit = audit
 
     def draft(
@@ -125,13 +82,14 @@ class PolicyGovernance:
             maker_ref=maker_ref,
             reason=reason,
         )
-        self._changes[change.change_id] = change
+        self._changes.save(change)
         return change
 
     def attach_impact(self, change_id: str, report: ImpactReport) -> PolicyChange:
         change = self.get(change_id)
         change.impact = report
         change.state = ChangeState.IN_REVIEW
+        self._changes.save(change)
         return change
 
     def approve(
@@ -170,10 +128,8 @@ class PolicyGovernance:
                 mfa_step_up=mfa_step_up,
             )
         )
-        if change.is_approved:
-            change.state = ChangeState.APPROVED
-        else:
-            change.state = ChangeState.IN_REVIEW
+        change.state = ChangeState.APPROVED if change.is_approved else ChangeState.IN_REVIEW
+        self._changes.save(change)
         return change
 
     def activate(self, change_id: str, *, now: datetime | None = None) -> PolicyChange:
@@ -187,17 +143,18 @@ class PolicyGovernance:
             )
         change.state = ChangeState.ACTIVE
         change.activated_at = now or utc_now()
+        self._changes.save(change)
         self._record(change)
         return change
 
     def get(self, change_id: str) -> PolicyChange:
-        try:
-            return self._changes[change_id]
-        except KeyError as error:
-            raise ChangeRefused("UNKNOWN_CHANGE", f"no change {change_id}") from error
+        change = self._changes.get(change_id)
+        if change is None:
+            raise ChangeRefused("UNKNOWN_CHANGE", f"no change {change_id}")
+        return change
 
     def pending(self) -> list[PolicyChange]:
-        return [c for c in self._changes.values() if c.state is not ChangeState.ACTIVE]
+        return [c for c in self._changes.all_changes() if c.state is not ChangeState.ACTIVE]
 
     def _record(self, change: PolicyChange) -> None:
         if self._audit is None:

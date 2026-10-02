@@ -12,6 +12,15 @@ from clarity.modules.receipts.render import (
     RenderFormat,
     render,
 )
+from clarity.modules.receipts.repository import (
+    BY_PLAN,
+    RECEIPT_SEQUENCE,
+    RECEIPTS,
+    SUBSCRIBERS,
+    SUPERSEDED,
+    ReceiptRepository,
+    StoredReceiptRepository,
+)
 from clarity.modules.receipts.service import (
     ReceiptService,
 )
@@ -22,11 +31,18 @@ from clarity.modules.receipts.signing import (
 )
 
 __all__ = [
+    "BY_PLAN",
+    "RECEIPTS",
+    "RECEIPT_SEQUENCE",
+    "SUBSCRIBERS",
+    "SUPERSEDED",
     "DevSigningService",
+    "ReceiptRepository",
     "ReceiptService",
     "RenderFormat",
     "RendererUnavailable",
     "SigningService",
+    "StoredReceiptRepository",
     "UnknownKeyId",
     "render",
 ]

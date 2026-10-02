@@ -7,16 +7,26 @@ this package is internal and may change without notice.
 
 from __future__ import annotations
 
-from clarity.modules.case.service import (
+from clarity.modules.case.records import (
     CaseNotFound,
     CaseNotReady,
     CaseRecord,
-    CaseService,
 )
+from clarity.modules.case.repository import (
+    CASE_SEQUENCE,
+    CASES,
+    CaseRepository,
+    StoredCaseRepository,
+)
+from clarity.modules.case.service import CaseService
 
 __all__ = [
+    "CASES",
+    "CASE_SEQUENCE",
     "CaseNotFound",
     "CaseNotReady",
     "CaseRecord",
+    "CaseRepository",
     "CaseService",
+    "StoredCaseRepository",
 ]

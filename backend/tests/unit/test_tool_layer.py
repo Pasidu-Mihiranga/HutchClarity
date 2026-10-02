@@ -39,6 +39,8 @@ from clarity.modules.actions.errors import (
 )
 from clarity.modules.actions.layer import ToolLayer
 
+from ..support.repositories import tool_layer
+
 DILANI = "+94771234567"
 SUBSCRIBER = ref_for(DILANI)
 
@@ -70,7 +72,10 @@ def a_decision(
 
 @pytest.fixture
 def tools(registry) -> ToolLayer:
-    return ToolLayer(registry.command_port, budget=RefundBudget(daily_limit_lkr="100000"))
+    return tool_layer(
+        registry.command_port,
+        budget=RefundBudget(daily_limit_lkr="100000"),
+    )
 
 
 def vas_params() -> dict[ActionType, dict]:
@@ -188,8 +193,9 @@ def test_a_token_is_single_use(tools: ToolLayer):
 
 
 def test_an_expired_token_is_refused(registry):
-    tools = ToolLayer(
-        registry.command_port, confirmations=ConfirmationService(ttl=timedelta(minutes=15))
+    tools = tool_layer(
+        registry.command_port,
+        confirmations=ConfirmationService(ttl=timedelta(minutes=15)),
     )
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
@@ -251,7 +257,7 @@ def test_executed_actions_record_before_and_after_for_the_receipt(tools: ToolLay
 
 def test_auto_fix_runs_with_no_human_in_the_loop(registry, world):
     """Deck S5: refunded before the customer even notices."""
-    tools = ToolLayer(registry.command_port)
+    tools = tool_layer(registry.command_port)
     plan = tools.propose(
         a_decision(outcome=Outcome.AUTO_FIX, actions=[ActionType.REFUND], amount="3500.00"),
         subscriber_ref=SUBSCRIBER,
@@ -373,7 +379,7 @@ def test_a_completed_plan_cannot_be_run_again(tools: ToolLayer):
 
 
 def test_budget_blocks_execution_it_cannot_cover(registry, world):
-    tools = ToolLayer(registry.command_port, budget=RefundBudget(daily_limit_lkr="10.00"))
+    tools = tool_layer(registry.command_port, budget=RefundBudget(daily_limit_lkr="10.00"))
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
     opening = world.account(SUBSCRIBER).balance_lkr
@@ -431,7 +437,9 @@ class _FailingPort(CommandPort):
 
 
 def test_a_failed_step_compensates_and_escalates(registry, world):
-    tools = ToolLayer(_FailingPort(registry.command_port, ActionType.BLOCK_MERCHANT_UNTIL_OPTIN))
+    tools = tool_layer(
+        _FailingPort(registry.command_port, ActionType.BLOCK_MERCHANT_UNTIL_OPTIN),
+    )
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
 
@@ -443,7 +451,9 @@ def test_a_failed_step_compensates_and_escalates(registry, world):
 
 def test_a_refund_is_never_clawed_back_to_tidy_up(registry, world):
     """Reversing our own refund would be a second wrong against the customer."""
-    tools = ToolLayer(_FailingPort(registry.command_port, ActionType.BLOCK_MERCHANT_UNTIL_OPTIN))
+    tools = tool_layer(
+        _FailingPort(registry.command_port, ActionType.BLOCK_MERCHANT_UNTIL_OPTIN),
+    )
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
 
@@ -454,7 +464,7 @@ def test_a_refund_is_never_clawed_back_to_tidy_up(registry, world):
 
 
 def test_a_failed_execution_releases_the_budget_it_reserved(registry):
-    tools = ToolLayer(
+    tools = tool_layer(
         _FailingPort(registry.command_port, ActionType.BLOCK_MERCHANT_UNTIL_OPTIN),
         budget=RefundBudget(daily_limit_lkr="1000.00"),
     )
@@ -468,7 +478,7 @@ def test_a_failed_execution_releases_the_budget_it_reserved(registry):
 
 
 def test_failed_steps_are_recorded_with_their_error_code(registry):
-    tools = ToolLayer(_FailingPort(registry.command_port, ActionType.DEACTIVATE_VAS))
+    tools = tool_layer(_FailingPort(registry.command_port, ActionType.DEACTIVATE_VAS))
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
 
@@ -524,7 +534,7 @@ def test_fifty_concurrent_identical_calls_execute_exactly_once(registry, world):
     """
     for _ in range(12):
         fresh_registry = AdapterRegistry(world=build_demo_world())
-        tools = ToolLayer(fresh_registry.command_port)
+        tools = tool_layer(fresh_registry.command_port)
         subscriber = ref_for(DILANI)
         opening = fresh_registry.world.account(subscriber).balance_lkr
 
@@ -545,7 +555,7 @@ def test_fifty_concurrent_identical_calls_execute_exactly_once(registry, world):
 
 def test_concurrent_duplicates_all_see_the_same_failure(registry):
     """A failing call must not hand duplicates a different, confusing error."""
-    tools = ToolLayer(_FailingPort(registry.command_port, ActionType.REFUND))
+    tools = tool_layer(_FailingPort(registry.command_port, ActionType.REFUND))
     plan = tools.propose(
         a_decision(outcome=Outcome.AUTO_FIX, actions=[ActionType.REFUND]),
         subscriber_ref=ref_for(DILANI),
@@ -600,7 +610,7 @@ def test_the_outcome_of_a_key_is_final(registry, world):
     would let a duplicate arriving moments later get a different error for the
     same request.
     """
-    tools = ToolLayer(registry.command_port, budget=RefundBudget(daily_limit_lkr="10.00"))
+    tools = tool_layer(registry.command_port, budget=RefundBudget(daily_limit_lkr="10.00"))
     plan = tools.propose(
         a_decision(), subscriber_ref=SUBSCRIBER, created_by="agent-1", params=vas_params()
     )

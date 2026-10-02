@@ -36,8 +36,9 @@ from clarity.contracts.decision import (
     PlanStatus,
     PlanStep,
 )
+from clarity.contracts.events import ActionCompletedV1, ActionStepV1
 from clarity.integration.ports import AdapterError, Command, CommandPort, CommandResult
-from clarity.kernel.common import ActionSafetyLevel, money, utc_now
+from clarity.kernel.common import ActionSafetyLevel, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.budget import RefundBudget, Reservation
 from clarity.modules.actions.confirmation import ConfirmationService
@@ -52,16 +53,18 @@ from clarity.modules.actions.errors import (
     PlanNotFound,
     PlanNotPending,
 )
+from clarity.modules.actions.records import FOUR_EYES_THRESHOLD_LKR, PlanRecord
+from clarity.modules.actions.repository import PLANS, PlanRepository, StoredPlanRepository
 from clarity.modules.actions.results import (
     EXECUTABLE_OUTCOMES,
     ConfirmationToken,
     ConfirmedBy,
     ExecutionResult,
 )
-
-#: Above this, one approver is not enough (plan §14.2 four-eyes).
-#: PROPOSED TARGET - REQUIRES HUTCH VALIDATION.
-FOUR_EYES_THRESHOLD_LKR = money("25000.00")
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
+from clarity.platform.observability import span
+from clarity.platform.persistence import UnitOfWorkFactory
 
 #: Actions whose effect can be undone if a later step in the plan fails.
 _COMPENSATIONS: dict[ActionType, ActionType | None] = {
@@ -84,19 +87,6 @@ class _Attempt:
     error: BaseException | None = None
 
 
-@dataclass
-class _PlanRecord:
-    plan: ActionPlan
-    decision: Decision
-    rule_id: str | None
-    approvals: list[Approval] = field(default_factory=list)
-    reservation: Reservation | None = None
-    result: ExecutionResult | None = None
-    idempotency_key: str | None = None
-    four_eyes_threshold_lkr: Decimal = FOUR_EYES_THRESHOLD_LKR
-    """Resolved from the decision's policy snapshot, so a policy change is enforced here too."""
-
-
 class ToolLayer:
     """Holds the only reference to a command port (plan §9.1 principle 2)."""
 
@@ -105,13 +95,22 @@ class ToolLayer:
         command_port: CommandPort,
         *,
         budget: RefundBudget | None = None,
+        plans: PlanRepository,
+        open_unit: UnitOfWorkFactory,
         confirmations: ConfirmationService | None = None,
         duplicate_wait_seconds: float = 10.0,
     ) -> None:
         self._commands = command_port
         self._budget = budget or RefundBudget()
         self._confirmations = confirmations or ConfirmationService()
-        self._plans: dict[str, _PlanRecord] = {}
+        # Plans live in the repository (B02); the layer keeps no business state.
+        self._plans = plans
+        # Completing a plan writes the plan and its event in one transaction
+        # (I7, B04), so nobody can observe a completed plan with no event.
+        self._open_unit = open_unit
+        # In-flight coordination, not business state: one event per key so a
+        # duplicate call waits for the original instead of acting again. The
+        # durable idempotency record is M-ACT's work.
         self._attempts: dict[str, _Attempt] = {}
         self._lock = threading.Lock()
         self._duplicate_wait_seconds = duplicate_wait_seconds
@@ -179,15 +178,17 @@ class ToolLayer:
             display_summary=self._summarise(decision, wanted),
             created_at=now or utc_now(),
         )
-        self._plans[plan.plan_id] = _PlanRecord(
-            plan=plan,
-            decision=decision,
-            rule_id=rule_id,
-            four_eyes_threshold_lkr=(
-                four_eyes_threshold_lkr
-                if four_eyes_threshold_lkr is not None
-                else FOUR_EYES_THRESHOLD_LKR
-            ),
+        self._plans.save(
+            PlanRecord(
+                plan=plan,
+                decision=decision,
+                rule_id=rule_id,
+                four_eyes_threshold_lkr=(
+                    four_eyes_threshold_lkr
+                    if four_eyes_threshold_lkr is not None
+                    else FOUR_EYES_THRESHOLD_LKR
+                ),
+            )
         )
         return plan
 
@@ -273,6 +274,7 @@ class ToolLayer:
                 at=now or utc_now(),
             )
         )
+        self._save(record)
 
         if len(record.approvals) < self._approvals_needed(record):
             return None
@@ -288,7 +290,7 @@ class ToolLayer:
         )
 
     @staticmethod
-    def _approvals_needed(record: _PlanRecord) -> int:
+    def _approvals_needed(record: PlanRecord) -> int:
         return 2 if record.plan.total_amount_lkr > record.four_eyes_threshold_lkr else 1
 
     def authorise_auto_fix(
@@ -404,9 +406,27 @@ class ToolLayer:
         value = confirmation.value if isinstance(confirmation, ConfirmationToken) else confirmation
         token = self._confirmations.redeem(value, plan_id=plan_id, now=now)
 
+        span_scope = span(
+            "actions.execute",
+            plan_id=plan_id,
+            case_id=record.plan.case_id,
+            amount_lkr=str(record.plan.total_amount_lkr),
+            idempotency_key=idempotency_key,
+        )
+        with span_scope:
+            return self._execute_steps(record, plan_id, token, idempotency_key)
+
+    def _execute_steps(
+        self,
+        record: PlanRecord,
+        plan_id: str,
+        token: ConfirmationToken,
+        idempotency_key: str,
+    ) -> ExecutionResult:
         reservation = self._reserve(record)
         record.reservation = reservation
         record.idempotency_key = idempotency_key
+        self._save(record)
 
         actions, failure = self._run_steps(record, idempotency_key)
 
@@ -422,6 +442,7 @@ class ToolLayer:
                 approver_roles=tuple(approval.role for approval in record.approvals),
             )
             record.result = result
+            self._complete(record, result)
             return result
 
         self._compensate(record, actions, idempotency_key)
@@ -434,6 +455,7 @@ class ToolLayer:
             status=PlanStatus.COMPENSATED,
             confirmed_by=token.confirmed_by,
         )
+        self._save(record)
         raise ExecutionFailed(
             f"step {failure} could not be applied; applied steps were reversed "
             "and the case needs a person"
@@ -441,7 +463,7 @@ class ToolLayer:
 
     # -- execution internals ------------------------------------------- #
 
-    def _reserve(self, record: _PlanRecord) -> Reservation | None:
+    def _reserve(self, record: PlanRecord) -> Reservation | None:
         amount = record.plan.total_amount_lkr
         if amount <= Decimal("0.00"):
             return None
@@ -451,7 +473,7 @@ class ToolLayer:
             raise BudgetExhausted(str(error)) from error
 
     def _run_steps(
-        self, record: _PlanRecord, idempotency_key: str
+        self, record: PlanRecord, idempotency_key: str
     ) -> tuple[list[Action], str | None]:
         actions: list[Action] = []
         for index, step in enumerate(record.plan.steps):
@@ -478,7 +500,7 @@ class ToolLayer:
             actions.append(self._completed_action(record, step, key, outcome))
         return actions, None
 
-    def _compensate(self, record: _PlanRecord, actions: list[Action], idempotency_key: str) -> None:
+    def _compensate(self, record: PlanRecord, actions: list[Action], idempotency_key: str) -> None:
         """Undo what was applied, newest first.
 
         A refund is never "un-refunded": taking money back from a customer
@@ -506,7 +528,7 @@ class ToolLayer:
             actions[position] = action.model_copy(update={"status": ActionStatus.COMPENSATED})
 
     def _completed_action(
-        self, record: _PlanRecord, step: PlanStep, key: str, outcome: CommandResult
+        self, record: PlanRecord, step: PlanStep, key: str, outcome: CommandResult
     ) -> Action:
         return Action(
             action_id=new_id("ACT"),
@@ -524,7 +546,7 @@ class ToolLayer:
         )
 
     @staticmethod
-    def _failed_action(record: _PlanRecord, step: PlanStep, key: str, error_code: str) -> Action:
+    def _failed_action(record: PlanRecord, step: PlanStep, key: str, error_code: str) -> Action:
         return Action(
             action_id=new_id("ACT"),
             decision_id=record.plan.decision_id,
@@ -540,13 +562,69 @@ class ToolLayer:
 
     # -- lookups -------------------------------------------------------- #
 
-    def _record(self, plan_id: str) -> _PlanRecord:
+    def _record(self, plan_id: str) -> PlanRecord:
         record = self._plans.get(plan_id)
         if record is None:
             raise PlanNotFound(f"no such plan: {plan_id}")
         return record
 
-    def _pending(self, plan_id: str) -> _PlanRecord:
+    def _save(self, record: PlanRecord) -> None:
+        """Write a record back after mutating it, so a storing driver sees it."""
+        self._plans.save(record)
+
+    def _complete(self, record: PlanRecord, result: ExecutionResult) -> None:
+        """Store the completed plan and its ``action.completed`` event atomically.
+
+        One transaction, so there is no interleaving in which the money moved
+        and no event was ever written. The relay publishes it afterwards (B04).
+        """
+        with self._open_unit() as unit:
+            StoredPlanRepository(unit.repository(PLANS)).save(record)
+            outbox_in(unit).append(
+                Event.of(
+                    self._completed_payload(record, result),
+                    subject=self._subscriber_of(record),
+                )
+            )
+            unit.commit()
+
+    @staticmethod
+    def _completed_payload(record: PlanRecord, result: ExecutionResult) -> ActionCompletedV1:
+        return ActionCompletedV1(
+            case_id=record.plan.case_id,
+            plan_id=record.plan.plan_id,
+            decision_id=record.decision.decision_id,
+            steps=[
+                ActionStepV1(
+                    action_id=action.action_id,
+                    action_type=action.type,
+                    amount_lkr=action.amount_lkr,
+                    status=action.status.value,
+                )
+                for action in result.actions
+            ],
+            confirmed_by=result.confirmed_by.value,
+            approver_roles=list(result.approver_roles),
+            total_amount_lkr=record.plan.total_amount_lkr,
+            config_snapshot_hash=record.decision.input_hash,
+        )
+
+    @staticmethod
+    def _subscriber_of(record: PlanRecord) -> str:
+        """The partition key: everything about one customer stays in order.
+
+        Every step carries the subscriber_ref, put there by the case module from
+        evidence rather than by a caller.
+        """
+        for step in record.plan.steps:
+            found = step.params.get("subscriber_ref")
+            if isinstance(found, str) and found:
+                return found
+        # A plan with no subscriber would be unroutable, and the case module
+        # always sets it, so this is a bug rather than a condition to handle.
+        raise ExecutionFailed(f"plan {record.plan.plan_id} carries no subscriber_ref")
+
+    def _pending(self, plan_id: str) -> PlanRecord:
         record = self._record(plan_id)
         if record.plan.status is not PlanStatus.PENDING_CONFIRMATION:
             raise PlanNotPending(

@@ -29,6 +29,8 @@ from clarity.platform.config.artefacts import (
 from clarity.platform.config.resolver import PolicyResolver, UnknownPolicyKey
 from clarity.platform.config.switches import Switch, SwitchBoard, SwitchState, auto_fix_switch
 
+from ..support.repositories import change_repository
+
 JAN = datetime(2027, 1, 1, tzinfo=UTC)
 APR = datetime(2027, 4, 15, tzinfo=UTC)
 JUL = datetime(2027, 7, 1, tzinfo=UTC)
@@ -316,7 +318,7 @@ def test_the_class_follows_what_the_change_touches(tags, expected):
 
 
 def test_a_money_change_needs_two_approvers():
-    governance = PolicyGovernance()
+    governance = PolicyGovernance(change_repository())
     change = governance.draft(
         key="decision.auto_fix.cap_lkr",
         candidate=PolicyValue(value=money("2000.00")),
@@ -335,7 +337,7 @@ def test_a_money_change_needs_two_approvers():
 
 
 def test_the_maker_cannot_approve_their_own_change():
-    governance = PolicyGovernance()
+    governance = PolicyGovernance(change_repository())
     change = governance.draft(
         key="decision.auto_fix.cap_lkr",
         candidate=PolicyValue(value=money("2000.00")),
@@ -350,7 +352,7 @@ def test_the_maker_cannot_approve_their_own_change():
 
 def test_a_money_change_cannot_be_approved_without_an_impact_report():
     """Plan §19: no money-affecting change without evidence of its impact."""
-    governance = PolicyGovernance()
+    governance = PolicyGovernance(change_repository())
     change = governance.draft(
         key="decision.auto_fix.cap_lkr",
         candidate=PolicyValue(value=money("2000.00")),
@@ -364,7 +366,7 @@ def test_a_money_change_cannot_be_approved_without_an_impact_report():
 
 
 def test_a_class_cannot_be_lowered_to_dodge_an_approver():
-    governance = PolicyGovernance()
+    governance = PolicyGovernance(change_repository())
 
     with pytest.raises(ChangeRefused, match="cannot be lowered"):
         governance.draft(
@@ -378,7 +380,7 @@ def test_a_class_cannot_be_lowered_to_dodge_an_approver():
 
 
 def test_a_change_must_record_why():
-    governance = PolicyGovernance()
+    governance = PolicyGovernance(change_repository())
 
     with pytest.raises(ChangeRefused, match="why"):
         governance.draft(
@@ -392,7 +394,7 @@ def test_a_change_must_record_why():
 
 def test_activating_a_change_is_audited():
     ledger = AuditLedger()
-    governance = PolicyGovernance(audit=ledger)
+    governance = PolicyGovernance(change_repository(), audit=ledger)
     change = governance.draft(
         key="decision.conflict_margin",
         candidate=PolicyValue(value="0.25"),

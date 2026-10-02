@@ -7,13 +7,13 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `public.py`, `service.py` |
+| Files | `public.py`, `records.py`, `repository.py`, `service.py` |
 
 ## 1. Purpose
 Case aggregate and the orchestration every channel shares: open a case, build the timeline, evaluate rules and policy, propose, confirm or approve, execute and issue the receipt.
 
 ## 2. Public surface (`public.py`)
-Other code imports only these names: `CaseNotFound`, `CaseNotReady`, `CaseRecord`, `CaseService`.
+Other code imports only these names: `CASES`, `CASE_SEQUENCE`, `CaseNotFound`, `CaseNotReady`, `CaseRecord`, `CaseRepository`, `CaseService`, `StoredCaseRepository`.
 
 ## 3. Used by
 `clarity.app`, `clarity.interfaces.http`, `clarity.interfaces.mcp`
@@ -32,7 +32,13 @@ Other code imports only these names: `CaseNotFound`, `CaseNotReady`, `CaseRecord
 | `clarity.platform.content` | - |
 
 ## 5. Data owned
-In-memory structures in the `lite` profile. Target: one PostgreSQL schema `case` with its own role (ADR-0013), same repository interfaces, same parity suite.
+Case records and the per-year case-number sequence, behind `CaseRepository` (B02). Collections: `case.records`, `case.sequence`. The `demo` profile binds the in-memory driver, `full` binds PostgreSQL schema `case` with its own role (ADR-0013); both pass `tests/contract/test_repository_parity.py`. The service holds no state of its own.
+
+## 5a. Events
+
+| Event | Direction | Notes |
+|---|---|---|
+| `action.completed@v1` | **consumes** (group `receipts`) | `on_action_completed` issues the one receipt for the completed plan, then caches it on the case record. Idempotent by plan id: delivery is at-least-once (B06, plan 21 section 11.5). |
 
 ## 6. Invariants
 - The money path is identical whichever channel the customer starts from.
@@ -49,3 +55,5 @@ In-memory structures in the `lite` profile. Target: one PostgreSQL schema `case`
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.case` with a public surface (R1) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-B02-unit-of-work-and-repositories.md` | Case records and the case-number sequence moved behind `CaseRepository`; `CaseRecord` extracted to `records.py` (B02, #5) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-B06-receipts-on-action-completed.md` | Consumes `action.completed` and issues the receipt from it; per-plan lock removed, replaced by joining the winner's outcome (B06, #14) |

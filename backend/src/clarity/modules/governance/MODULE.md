@@ -7,7 +7,7 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `governance.py`, `public.py`, `replay.py` |
+| Files | `artefacts.py`, `governance.py`, `public.py`, `replay.py`, `repository.py` |
 
 ## 1. Purpose
 Policy change governance: change classes, maker-checker publication, replay impact reports for candidate policy before it is activated.
@@ -28,7 +28,7 @@ Tests only (no runtime caller yet).
 | `clarity.platform.config` | - |
 
 ## 5. Data owned
-In-memory structures in the `lite` profile. Target: one PostgreSQL schema `governance` with its own role (ADR-0013), same repository interfaces, same parity suite.
+Policy change artefacts from draft to active, behind `PolicyChangeRepository` (B02). Collection: `governance.changes`. The `demo` profile binds the in-memory driver, `full` binds PostgreSQL schema `governance` with its own role (ADR-0013); both pass `tests/contract/test_repository_parity.py`.
 
 ## 6. Invariants
 - A money-affecting change needs a second approver and an impact report.
@@ -44,3 +44,4 @@ In memory. R2/R3 persist artefacts, approvals and activations (enterprise-plan 2
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.governance` with a public surface (R1) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-B02-unit-of-work-and-repositories.md` | Policy changes moved behind `PolicyChangeRepository`; `PolicyChange` and its vocabulary extracted to `artefacts.py` (B02, #5) |

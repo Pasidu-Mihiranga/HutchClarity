@@ -25,10 +25,11 @@ from clarity.integration.drivers.mock.world import DEMO_NOW, ref_for
 from clarity.kernel.common import Channel, Language, mask_msisdn
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.budget import RefundBudget
-from clarity.modules.actions.layer import ToolLayer
 from clarity.modules.receipts.service import ReceiptService, explain_summary
 from clarity.modules.receipts.signing import DevSigningService, verify_signature
 from clarity.modules.timeline.builder import TimelineRequest
+
+from ..support.repositories import receipt_repository, tool_layer
 
 DILANI = "+94771234567"
 SUBSCRIBER = ref_for(DILANI)
@@ -41,7 +42,7 @@ def signing() -> DevSigningService:
 
 @pytest.fixture
 def receipts(signing: DevSigningService, world) -> ReceiptService:
-    return ReceiptService(signing, probe=MockRecurrenceProbe(world))
+    return ReceiptService(signing, ledger=receipt_repository(), probe=MockRecurrenceProbe(world))
 
 
 @pytest.fixture
@@ -94,7 +95,10 @@ def a_cause(evidence_refs: list[str] | None = None) -> CauseAssessment:
 @pytest.fixture
 def executed(registry, builder):
     """Run the VAS remedy for real, so the receipt describes true state."""
-    tools = ToolLayer(registry.command_port, budget=RefundBudget(daily_limit_lkr="100000"))
+    tools = tool_layer(
+        registry.command_port,
+        budget=RefundBudget(daily_limit_lkr="100000"),
+    )
     decision = a_decision()
     plan = tools.propose(
         decision,
@@ -191,7 +195,9 @@ def test_recurrence_passes_only_when_the_block_is_really_in_place(receipts, case
 
 def test_recurrence_fails_when_the_safeguard_is_not_really_in_force(signing, case, executed, world):
     """A probe that reports 'not blocked' must produce FAILED, not PASSED."""
-    receipts = ReceiptService(signing, probe=MockRecurrenceProbe(world))
+    receipts = ReceiptService(
+        signing, ledger=receipt_repository(), probe=MockRecurrenceProbe(world)
+    )
 
     receipt = receipts.issue(
         case=case,
@@ -209,7 +215,7 @@ def test_recurrence_fails_when_the_safeguard_is_not_really_in_force(signing, cas
 
 def test_recurrence_is_unavailable_rather_than_optimistic(signing, case, executed):
     """With no probe, the receipt says so instead of claiming a pass."""
-    receipts = ReceiptService(signing, probe=None)
+    receipts = ReceiptService(signing, ledger=receipt_repository(), probe=None)
 
     receipt = receipts.issue(
         case=case,
