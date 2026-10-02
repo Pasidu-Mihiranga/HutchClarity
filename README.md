@@ -6,10 +6,10 @@ One platform for HUTCH customers and staff — website, Hutch app, WhatsApp, SMS
 
 > **Hackathon prototype.** All HUTCH systems are **mocked** and all data is **synthetic**. No HUTCH APIs, credentials or production data are used. See [Known limitations](#known-limitations).
 
-## Modular monolith (HutchClarity-new alignment)
+## Modular monolith
 
 The repo now carries a second code tree that matches the enterprise modular
-monolith plan (see `HutchClarity-new/` and `docs/adr/`). Business code never
+monolith plan (see [`docs/enterprise-plan/`](docs/enterprise-plan/README.md) and [`docs/adr/`](docs/adr/README.md)). Business code never
 reads the runtime profile; only the composition root binds drivers.
 
 | Profile | Command | What runs |

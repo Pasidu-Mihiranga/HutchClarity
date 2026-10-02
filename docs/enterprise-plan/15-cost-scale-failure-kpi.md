@@ -1,31 +1,33 @@
-# Hutch Clarity — AI Cost, Scalability, Failure Handling & KPIs
+# Hutch Clarity - AI Cost, Scalability, Failure Handling & KPIs
 
 [← 14-risk-pilot-readiness-operations.md](14-risk-pilot-readiness-operations.md) · [← Plan index](README.md) · [16-gap-submission-repo-docs.md →](16-gap-submission-repo-docs.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 37. AI Cost / Token Model
 
 **All values are ASSUMPTIONS for planning, not measurements.** Replace them with prototype-measured Langfuse data before submission (Guidelines §6.2).
 
 ### 37.1 Routing (preserved from `[DECK S14]`)
-Rule/template (0 tokens) → Redis cache (exact → meaning; 0 tokens) → small/non-reasoning model (few tokens) → reasoning model (most tokens). See Diagram 21.
+Rule/template (0 tokens) → answer cache (exact in Valkey → meaning on pgvector; 0 tokens) → small/non-reasoning model (few tokens) → reasoning model (most tokens). See Diagram 21.
 
 ### 37.2 Per-journey token estimates
 Sinhala/Tamil text typically tokenizes into more tokens than English on many tokenizers. An inflation factor of ~2.5× on generated si/ta text is assumed and must be measured per model.
 
 | Journey | Calls | Avg input tok/call | Avg output tok/call | Total tokens | Tier |
 |---|---|---|---|---|---|
-| Simple question (cache miss, RAG) — en | 1 | 1,500 | 150 | ~1,650 | Small |
-| Simple question — si/ta | 1 | 1,500 | 375 | ~1,875 | Small |
-| Dispute via Why? tap (structured) — en | 1 + 0.2 judge | 1,200 (+1,400) | 220 (+40) | ~1,710 | Small |
-| Dispute via free text/voice — en | 2 + 0.2 judge | 600 / 1,200 | 80 / 220 | ~2,390 | Small |
+| Simple question (cache miss, RAG) - en | 1 | 1,500 | 150 | ~1,650 | Small |
+| Simple question - si/ta | 1 | 1,500 | 375 | ~1,875 | Small |
+| Dispute via Why? tap (structured) - en | 1 + 0.2 judge | 1,200 (+1,400) | 220 (+40) | ~1,710 | Small |
+| Dispute via free text/voice - en | 2 + 0.2 judge | 600 / 1,200 | 80 / 220 | ~2,390 | Small |
 | Multilingual dispute explanation (si/ta, free text) | 2 + 0.2 judge | 700 / 1,500 | 100 / 550 | ~3,200 | Small |
 | Staff case summary + reply draft | 2 | 4,000 / 1,500 | 1,400 (incl. ~1,000 reasoning) / 550 | ~7,450 | Reasoning + small |
 | Shift handover summary | 1 per shift per team | 6,000 | 1,600 | ~7,600 | Reasoning |
 | Complaint Autopsy (per complaint) | 1 + embedding | 450 | 80 | ~530 (+150 embedding tokens) | Small + embedding |
 | Autopsy cluster labelling | 1 per cluster per run | 3,000 | 200 | ~3,200 | Small |
-| Proactive alert / zero-contact refund | 0 | — | — | 0 | Template |
+| Proactive alert / zero-contact refund | 0 | - | - | 0 | Template |
 
 ### 37.3 Traffic mix (ASSUMPTION)
 - 35% structured Why? disputes (30% answered by template only).
@@ -41,7 +43,7 @@ Worked example: 10,000 interactions/day ≈
 - 5.2M (structured disputes) + 4.3M (free-text disputes) + 3.2M (simple) + 7.45M (staff) + 0.8M (Autopsy);
 - **≈ 21M tokens/day** (~78% input / 22% output).
 
-### 37.4 Indicative cost (illustrative unit prices — ASSUMPTION, not vendor quotes)
+### 37.4 Indicative cost (illustrative unit prices - ASSUMPTION, not vendor quotes)
 
 | Assumption | Value |
 |---|---|
@@ -58,6 +60,13 @@ Worked example: 10,000 interactions/day ≈
 | 1M/day | 2.1B | ~USD 130K | ~55 GPUs ≈ USD 99K | Self-host cheaper |
 
 **Recommendation:** hybrid. The self-hosted small model is the default for all customer-facing explanation (data stays inside HUTCH). The hosted reasoning tier handles masked staff summaries and complex cases until volume justifies a self-hosted reasoning model. A per-session token cap and a daily budget alarm apply. **HUTCH data-residency policy decides the split (REQUIRES HUTCH CONFIRMATION).**
+
+### 37.5 Prototype: free-tier capacity and measured cost (v1.1)
+The prototype runs on **Gemini + Groq free tiers** with role-based routing ([18 §4](18-tech-stack-and-ai.md)):
+- **Cost:** USD 0 for model calls during the prototype. **Assumption:** free-tier terms stay as published on 2026-10-01.
+- **Capacity:** about 3–5K LLM calls/day across both providers; with 33–50% of interactions needing no LLM, about 2–4K interactions/day. Enough for development, demos and judging.
+- **Measured, not assumed:** the AI gateway's usage ledger records tokens per role, model and journey. Before submission, the per-journey table in §37.2 is replaced with measured values.
+- **Production cost formula:** `monthly cost = Σ_roles (input_tokens × input_price + output_tokens × output_price)` using HUTCH's chosen provider price sheet at purchase time, or GPU-hours for self-hosting (§37.4).
 
 ---
 
@@ -79,7 +88,7 @@ HUTCH-originated event ingestion (charging/payment streams for zero-contact dete
 | LLM calls/day (peak/s) | 230 | 2.3K | 11.5K (0.7) | 115K (7) | 1.15M (67) |
 | MCP calls/day | 200 | 2K | 10K | 100K | 1M |
 | Generative tokens/day | 0.42M | 4.2M | 21M | 210M | 2.1B |
-| Redis memory (sessions + cache + idempotency) | 256 MB | 512 MB | 1 GB | 2 GB | 4–8 GB |
+| Valkey memory (sessions + cache + idempotency) | 256 MB | 512 MB | 1 GB | 2 GB | 4–8 GB |
 | PG growth/day (~50 KB/interaction) | 10 MB | 100 MB | 0.5 GB | 5 GB | 50 GB (partition + archive) |
 | Indicative compute | docker-compose | 1 small cluster | 3-node app pool | 6–10 nodes + Kafka 3 | 20+ nodes, Kafka 6+, PG read replicas, sharded consumers |
 
@@ -92,18 +101,19 @@ HUTCH-originated event ingestion (charging/payment streams for zero-contact dete
 | Failure | Behaviour | Customer sees | Recovery |
 |---|---|---|---|
 | LLM (all tiers) fails | Rules + templates `[DECK S7]` | Template explanation in their language | Auto when healthy |
-| External/hosted AI provider fails | Fall back to the self-hosted tier, else templates | Same, possibly shorter | Gateway health checks |
+| External/hosted AI provider fails | Fall back down the role chain (other provider or model), else templates | Same, possibly shorter | Gateway health checks |
 | MCP server fails | No AI-initiated proposals; **no financial action via AI**; Desk/staff workflow continues; structured Why? still works (doesn't need MCP) | "We're checking; an agent will confirm" when needed | Restart; replay pending proposals |
 | Charging (or any evidence) source fails | Case **held for evidence**; no decision on incomplete evidence | Honest status + ETA; notified when resolved | Re-run timeline on recovery |
 | Write adapter fails / ambiguous | Query status before any retry; compensation if partial; handoff | "Fix in progress" | Reconciliation confirms |
 | Kafka delayed | Stream detectors lag → zero-contact fixes delayed; on-demand requests use direct adapter reads; proactive messages suppressed when stale; reconciliation sweeps catch missed duplicates | Normal on-demand service | Consumers catch up; lag alert |
 | Receipt service / signing fails | Action + audit already committed; receipt issued from outbox retry; customer told the receipt will follow | "Receipt will arrive shortly" | Retry; alert if > N min |
-| Redis fails | Cache off (more LLM calls); sessions re-auth; idempotency falls back to PG constraint | Possible re-login | Redis failover |
+| Valkey fails | Cache off (more LLM calls); sessions re-auth; idempotency falls back to PG constraint | Possible re-login | Valkey failover |
+| Free-tier quota exhausted (prototype) | Gateway queues batch work, routes live turns down the role chain, then templates | Template answer | Quota resets; alert at 80% of daily budget |
 | PostgreSQL primary fails | Failover to sync standby; writes paused seconds | Brief retry | Automatic failover |
 | OPA unavailable | **Fail closed:** no actions; explain-only + handoff | Explanation, fix pending | Restart; bundles cached locally |
 | Token vault unavailable | No LLM path (can't mask/restore) → templates | Template | Vault failover |
 
-### Diagram 34 — Degradation ladder
+### Diagram 34 - Degradation ladder
 
 ```mermaid
 flowchart TD
@@ -145,18 +155,7 @@ Baselines are measured in shadow mode and the first pilot weeks. **All commercia
 | Business | Retention | Churn of customers with resolved disputes vs matched control | Warehouse | **Validate in pilot** |
 | Business | Engagement | Use of Why?, safeguards, pack truth label | Analytics | Validate |
 | Business | Customer satisfaction | CSAT/NPS per journey | Surveys | Validate |
-| Sustainability | Model calls avoided; shop visits avoided; energy per case `[DECK S15]` | — | Gateway + CRM | Report |
-
-### 40.1 Benefits measurement methodology
-Business outcomes count as **measured** only if they come from this method (Guidelines §6.5).
-
-1. **Baseline:** 8–12 weeks of pre-pilot data (contacts per cause, resolution time, refunds, repeats, CSAT) from CRM, 1788 and WhatsApp. **Depends on HUTCH data access.**
-2. **Shadow comparison:** Clarity's recommendation vs the actual agent outcome on the same cases (Step 1).
-3. **Control cohort:** a randomised or matched holdout (e.g., ~10% of eligible customers by region or segment, **ASSUMPTION**) that doesn't get *proactive and self-service features*. **A holdout never withholds a refund owed.** Legal and compliance review the design.
-4. **Pre-registered metric definitions**, reported with confidence intervals. Measured, estimated and assumed values are labelled separately.
-5. **Confounders:** seasonality (festivals, school terms), concurrent campaigns and network events are tracked and noted.
-6. **Cadence:** weekly operational review, monthly business review, final pilot report at P2 exit.
-
+| Sustainability | Model calls avoided; shop visits avoided; energy per case `[DECK S15]` | - | Gateway + CRM | Report |
 ---
 
 [← 14-risk-pilot-readiness-operations.md](14-risk-pilot-readiness-operations.md) · [← Plan index](README.md) · [16-gap-submission-repo-docs.md →](16-gap-submission-repo-docs.md)

@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.1); team to ratify at kickoff |
-| Plan references | enterprise-plan/17 §5 |
+| Plan references | docs/enterprise-plan/17 §5 |
 
 ## Context
 Customers authenticate by OTP, app token exchange, WhatsApp step-up or network MSISDN; staff need SSO + MFA; machines and MCP clients need OAuth 2.1.
@@ -20,7 +20,7 @@ Keycloak realm `clarity-staff` (federates HUTCH AD/Entra in production) for staf
 | SaaS IdP | Data residency |
 
 ## Consequences
-Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `enterprise-plan/CHANGES.md`.
+Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `docs/enterprise-plan/CHANGES.md`.
 
 ## Compliance
 Permission matrix tests in OPA; step-up required for approvals above threshold.

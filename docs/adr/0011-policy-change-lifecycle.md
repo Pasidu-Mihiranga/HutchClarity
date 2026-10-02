@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.1); team to ratify at kickoff |
-| Plan references | enterprise-plan/19 |
+| Plan references | docs/enterprise-plan/19 |
 
 ## Context
 Packs, prices, caps, regulations and wording change constantly; changes must not need code deploys and must be explainable later.
@@ -20,7 +20,7 @@ All changeable policy (K1–K8) is versioned, effective-dated, scoped with guard
 | Code changes for thresholds | Slow; risky |
 
 ## Consequences
-Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `enterprise-plan/CHANGES.md`.
+Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `docs/enterprise-plan/CHANGES.md`.
 
 ## Compliance
 No hard-coded policy values in code (review rule + tests); governance audit events for every activation.

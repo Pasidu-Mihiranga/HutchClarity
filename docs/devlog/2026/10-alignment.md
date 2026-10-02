@@ -1,27 +1,18 @@
-# 2026-10 - Alignment with HutchClarity-new baseline
+# 2026-10 - Alignment with combined enterprise plan
 
 | Field | Value |
 |---|---|
 | Date | 2026-10-02 |
-| Authors | Hutch Clarity team |
-| Related | ADR-0006 lite/full profiles, Phase I infra parity, Phase F hardening |
+| Work package | docs consolidation |
+| Author | Thanoj Buddhima |
 
-## Summary
+## What changed
 
-Brought the main repo toward the HutchClarity-new architecture baseline:
+- Deleted the side folder `HutchClarity-new/`.
+- Made [`docs/enterprise-plan/`](../enterprise-plan/README.md) the single combined plan (chapters 01–19 + CHANGES).
+- Installed ADR-0001…0014 as the canonical set; moved older ADRs to [`docs/adr/legacy/`](../adr/legacy/).
+- Promoted living docs (`AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md`) to the repo root from the combined version (paths retargeted to `docs/enterprise-plan/`).
 
-- Docker Compose `lite` / `full` profiles (Postgres always; Kafka, Valkey,
-  SeaweedFS, Keycloak, OPA, OTel/LGTM, Langfuse on `full`).
-- Integration driver parity kit (mock bus/cache/blob + Kafka / Valkey /
-  Seaweed stubs) with contract tests.
-- Thin `clarity-worker` and `clarity-stream` entrypoints.
-- OPA authz stubs, Alembic-per-module notes, Helm / OpenTofu placeholders.
-- CI split (lint, test-legacy, test-new, gitleaks, SBOM placeholder).
-- Docs: SECURITY, CONTRIBUTING, CHANGELOG, AGENTS, walkthrough WT-01,
-  demo recording guide, architecture mermaid, VERSION `0.2.0-baseline`.
+## Next
 
-## Follow-ups
-
-- Wire real Kafka/Valkey clients in CI with `CLARITY_FULL=1`.
-- Per-module Alembic trees beyond the template.
-- Replace SBOM / gitleaks placeholders with production scanners.
+Keep `ARCHITECTURE.md` status rows in sync as modules move from planned to built.

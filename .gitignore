@@ -13,4 +13,3 @@ build/
 .keys/
 cassettes/
 clarity_world.db
-HutchClarity-new/*.pdf

@@ -1,8 +1,10 @@
-# Hutch Clarity — MCP Architecture & Tool Catalogue
+# Hutch Clarity - MCP Architecture & Tool Catalogue
 
 [← 06-integration-tmf.md](06-integration-tmf.md) · [← Plan index](README.md) · [08-ai-architecture.md →](08-ai-architecture.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 10. MCP Architecture
 
@@ -23,29 +25,29 @@
 |---|---|
 | Tool allowlists | Per **profile**: `customer-assist`, `staff-assist`, `analytics`. A profile is fixed at session creation by the orchestrator, never by the model. |
 | Schema validation | Pydantic v2 models with `extra="forbid"` and strict types. Enums for action types. Amount fields are **not accepted** from the LLM for L3 proposals: the amount is taken from the decision record. |
-| AuthN | OAuth 2.1 bearer token (short-lived, audience = mcp-server) over mTLS, minted by the orchestrator for the session principal (customer or staff) + agent identity |
+| AuthN | The MCP server is an **OAuth 2.1 resource server only** (2026-07-28 specification). Tokens come from Keycloak or HUTCH's IdP: the orchestrator's session token for Clarity's own agent, or a registered client's token for external MCP clients ([§10.7](#107-external-mcp-clients-mcp-apps-and-the-2026-07-28-specification)). `iss`, audience and scopes are validated; clients use resource indicators (RFC 8707). Downstream calls use **token exchange (RFC 8693)**, never passthrough. mTLS between services in production. |
 | AuthZ | OPA per call: `{principal, profile, tool, args, case.owner, safety_level}` → allow/deny + obligations (e.g., `mask_fields`) |
 | Subject binding | Customer-profile calls can only reference the case and subscriber bound to the session. Cross-subscriber access is denied (except guardian links with consent). |
 | Audit | `MCPInvocation` row per call: tool, args hash, masked args, principal, decision, latency, result hash, correlation ID |
-| Rate limiting | Per session, per principal, per tool (token bucket in Redis). Lower limits for expensive tools (`run_policy_replay`). |
+| Rate limiting | Per session, per principal, per tool (token bucket in Valkey). Lower limits for expensive tools (`run_policy_replay`). |
 | Confirmation | L2 proposals and above need confirmation via a **UI-minted, single-use, action-bound token** that the LLM never sees |
 | Tool failures | Typed errors (`EVIDENCE_UNAVAILABLE`, `NOT_AUTHORIZED`, `RATE_LIMITED`, `CONFLICT`, `UPSTREAM_TIMEOUT`). The orchestrator maps errors to templates or a handoff, never a retry loop by the model. |
 | Transaction IDs | `correlation_id` (W3C traceparent) on every call. `proposal_id` and `action_id` (ULID) for writes. |
-| Idempotency | Required `idempotency_key` on write-capable tools; stored with the result for 24 h+ (Redis) and as a unique constraint in PG |
+| Idempotency | Required `idempotency_key` on write-capable tools; stored with the result for 24 h+ (Valkey) and as a unique constraint in PG |
 | Least privilege | The MCP server's own credentials can read core APIs and create proposals. It **cannot** call the tool layer's execute endpoint. |
 
 ### 10.4 Safety levels
 
 | Level | Definition | Examples (action types) | Who may initiate | Approval requirement | Via MCP? |
 |---|---|---|---|---|---|
-| **L1 — Read-only** | No state change | timeline, causes, usage, pack, receipt, knowledge search | LLM (bound to principal) | None; OPA scope check | ✅ |
-| **L2 — Low-risk reversible** | Changes a customer setting or creates a record; no money moves | create handoff/ticket, send templated notification, *set_spend_cap*, *enable_data_stop*, *enable_fup_alerts* | LLM may **propose**; handoff and templated notification may execute directly | Handoff/notification: policy allow. Setting changes: **customer one-tap confirmation**. | ✅ (propose) |
-| **L3 — Financial / service-changing** | Moves money or changes a paid service | refund/balance credit, payment reversal, VAS deactivation, merchant block for subscriber | LLM may only **propose**; deterministic decision must already allow it | Per decision matrix: customer confirmation (one-tap) **or** staff approval (MFA step-up; four-eyes above finance threshold). **Auto-fix only from the deterministic stream path, never from an LLM.** | Propose only |
-| **L4 — Bulk / high-impact admin** | Affects many customers, policy or regulator data | fix-all-like-this, rule/policy publish, refund budget change, global merchant suspension, regulator pack export | Staff in Desk only | Four-eyes (maker + checker, different roles), change ticket, dry-run replay required | ❌ never |
+| **L1 - Read-only** | No state change | timeline, causes, usage, pack, receipt, knowledge search | LLM (bound to principal) | None; OPA scope check | ✅ |
+| **L2 - Low-risk reversible** | Changes a customer setting or creates a record; no money moves | create handoff/ticket, send templated notification, *set_spend_cap*, *enable_data_stop*, *enable_fup_alerts* | LLM may **propose**; handoff and templated notification may execute directly | Handoff/notification: policy allow. Setting changes: **customer one-tap confirmation**. | ✅ (propose) |
+| **L3 - Financial / service-changing** | Moves money or changes a paid service | refund/balance credit, payment reversal, VAS deactivation, merchant block for subscriber | LLM may only **propose**; deterministic decision must already allow it | Per decision matrix: customer confirmation (one-tap) **or** staff approval (MFA step-up; four-eyes above finance threshold). **Auto-fix only from the deterministic stream path, never from an LLM.** | Propose only |
+| **L4 - Bulk / high-impact admin** | Affects many customers, policy or regulator data | fix-all-like-this, rule/policy publish, refund budget change, global merchant suspension, regulator pack export | Staff in Desk only | Four-eyes (maker + checker, different roles), change ticket, dry-run replay required | ❌ never |
 
 **The LLM never independently executes Level 3 or Level 4 operations.**
 
-### 10.5 Propose → confirm → execute sequence — Diagram 20
+### 10.5 Propose → confirm → execute sequence - Diagram 20
 
 ```mermaid
 sequenceDiagram
@@ -75,7 +77,7 @@ sequenceDiagram
 
 ### 10.6 MCP server implementation
 
-**Technology:** Python 3.12 with the official MCP Python SDK (`mcp`, FastMCP server API), Streamable HTTP transport, mounted inside a FastAPI app. Same stack as the core `[DECK S13]`, so there is no compelling reason to diverge.
+**Technology:** Python 3.14 with the official MCP Python SDK and Streamable HTTP transport, implementing the **2026-07-28 specification** (stateless core). It runs as its own deployable (`clarity-mcp`) with **no database access**: every tool calls `clarity-api` through the generated client, so authorization, row-level security and audit are reused ([17 §10](17-build-blueprint.md)).
 
 ```text
 mcp/server/
@@ -92,7 +94,7 @@ mcp/server/
 ├── schemas/               # Pydantic v2 input/output models generated from packages/schemas
 ├── adapters/              # thin clients to Clarity Core APIs (never HUTCH systems directly)
 ├── audit/                 # MCPInvocation writer, args hashing/masking, outbox publish
-├── idempotency/           # Redis + PG idempotency store
+├── idempotency/           # Valkey + PG idempotency store
 ├── errors.py              # typed error taxonomy -> MCP error results
 └── tests/                 # unit, contract, OPA policy tests, injection/abuse tests, golden tool-selection tests
 ```
@@ -112,12 +114,9 @@ Illustrative tool definition (design sketch, not final code):
 class ProposeActionIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     case_id: CaseId
-    action_type: Literal[
-        "REFUND", "DEACTIVATE_VAS", "BLOCK_MERCHANT", "SET_SPEND_CAP", "ENABLE_DATA_STOP"
-    ]
+    action_type: Literal["REFUND", "DEACTIVATE_VAS", "BLOCK_MERCHANT", "SET_SPEND_CAP", "ENABLE_DATA_STOP"]
     idempotency_key: constr(min_length=16, max_length=64)
     # NOTE: no amount field - amounts come only from the deterministic Decision record
-
 
 @mcp.tool()
 @guarded(level=SafetyLevel.L3_PROPOSE, resource="case")
@@ -125,10 +124,29 @@ async def propose_action(inp: ProposeActionIn, ctx: ToolContext) -> ProposalOut:
     decision = await core.get_decision(inp.case_id, principal=ctx.principal)
     if inp.action_type not in decision.allowed_actions:
         raise ToolError("ACTION_NOT_ALLOWED_BY_POLICY")
-    return await core.create_proposal(
-        decision, inp.action_type, inp.idempotency_key, ctx.correlation_id
-    )
+    return await core.create_proposal(decision, inp.action_type, inp.idempotency_key, ctx.correlation_id)
 ```
+
+### 10.7 External MCP clients, MCP Apps and the 2026-07-28 specification
+
+The MCP server serves **two kinds of client** with the same tools and the same controls:
+
+| Client | Example | Token | Profile |
+|---|---|---|---|
+| Clarity's own agent loop | Orchestrator explaining a case | Session principal token minted by the orchestrator | `customer-assist` or `staff-assist` |
+| **Registered external MCP client** | HUTCH's existing chatbot, agent-assist tool, an approved AI assistant | OAuth 2.1 token from Keycloak / HUTCH IdP for a registered client, with scopes | Scope → profile (`clarity.customer-assist`, `clarity.staff-assist`, `clarity.analytics`) |
+
+HUTCH's websites and apps integrate through **REST plus the embeddable `<clarity-why>` widget**, not MCP. MCP is the surface for **AI agents**. The three integration surfaces are described in [17 §6 and §10](17-build-blueprint.md).
+
+| 2026-07-28 spec topic | Hutch Clarity design |
+|---|---|
+| Stateless protocol core | `clarity-mcp` keeps no session state; case context is passed by ID and re-authorized on every call. It scales horizontally. |
+| Authorization | OAuth 2.1 **resource server only**; validates `iss`, audience and scopes; clients send resource indicators (RFC 8707) |
+| Token passthrough | **Forbidden.** Downstream calls to `clarity-api` use token exchange (RFC 8693) with a narrowed audience. |
+| Extensions | **MCP Apps** (`io.modelcontextprotocol/ui`): `ui://clarity/why-card` and `ui://clarity/receipt`, built from `packages/widget`, rendered sandboxed by the host |
+| Client registry | Admin console registers clients, scopes, rate limits and an owner; every client can be suspended instantly |
+
+**MCP-specific threats** (added to [§19.2](11-security-privacy-audit.md)): tool-description poisoning (descriptions are versioned and code-reviewed; served only from the signed release), confused deputy (subject binding + token exchange), scope creep (scopes reviewed per client, least privilege), malicious external client (per-client quotas, denial-spike alerts, kill switch).
 
 ---
 

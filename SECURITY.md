@@ -11,4 +11,4 @@ Do not open a public issue. Contact the team security owner privately (see CODEO
 - New runtime dependencies must have an OSI licence and pass the dependency scan.
 
 ## Security design
-See [enterprise-plan/11-security-privacy-audit.md](enterprise-plan/11-security-privacy-audit.md) and [enterprise-plan/17-build-blueprint.md §5](enterprise-plan/17-build-blueprint.md).
+See [docs/enterprise-plan/11-security-privacy-audit.md](docs/enterprise-plan/11-security-privacy-audit.md) and [docs/enterprise-plan/17-build-blueprint.md §5](docs/enterprise-plan/17-build-blueprint.md).

@@ -1,8 +1,10 @@
-# Hutch Clarity — Data, API & Event Architecture
+# Hutch Clarity - Data, API & Event Architecture
 
 [← 09-rules-decision-receipts.md](09-rules-decision-receipts.md) · [← Plan index](README.md) · [11-security-privacy-audit.md →](11-security-privacy-audit.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 16. Data Architecture
 
@@ -10,9 +12,10 @@
 - **System-of-record stays with HUTCH.** Clarity stores *references*, evidence snapshots (minimal fields + hashes), decisions, actions, receipts and audit.
 - **Pseudonymous keys.** Customers are identified by `subscriber_ref` (a keyed HMAC of the MSISDN). The raw MSISDN is held only in the token vault.
 - **Partitioning.** High-volume tables (`timeline_event`, `audit_event`, `mcp_invocation`) are partitioned by month and sharded logically by `subscriber_ref` hash `[DECK S14]` ("scales out by phone number").
+- **Schema per module.** Each module owns one PostgreSQL schema and one DB role ([17 §2](17-build-blueprint.md)). Application code never joins across schemas; the ERD below is the *logical* model across modules.
 - **Retention** per [§20.6](11-security-privacy-audit.md).
 
-### 16.2 Entity-Relationship Diagram — Diagram 24
+### 16.2 Entity-Relationship Diagram - Diagram 24
 
 ```mermaid
 erDiagram
@@ -198,20 +201,7 @@ erDiagram
     }
 ```
 
-(Snapshot attributes are minimal; raw PII lives only in the token vault.) Supporting stores outside this ERD: `knowledge_chunk` (pgvector), `complaint_embedding` (pgvector), `proposal`, `refund_budget_counter`, and `outbox`.
-
-### 16.3 Data governance and data quality
-
-| Topic | Design |
-|---|---|
-| Ownership | Each HUTCH source has a named data owner (the system owner). Clarity has a data steward for its own entities. Recorded in the field registry ([§9.1](06-integration-tmf.md)). |
-| Data contracts | Each source has a contract: schema, freshness SLA, completeness expectations and change notice. These are part of the ICDs. |
-| Quality dimensions | **Completeness:** required fields present, as a share of events per source. **Timeliness:** event lag against the freshness SLA. **Validity:** formats such as MSISDN, amounts and timestamps. **Uniqueness:** duplicate `source_event_id`. **Consistency:** the same customer resolved across sources. |
-| Use in decisions | Quality results feed the per-source completeness flags. Rules with missing required evidence hand off ("missing log → a human" `[DECK S7]`). |
-| Monitoring | DQ dashboard per adapter, with alerts when a dimension breaches its threshold. A weekly report goes to source owners ("add the field" actions `[DECK S10]`). |
-| Lineage | Every `TimelineEvent` carries source, `source_event_id`, adapter version and ingestion time. OpenLineage events for warehouse pipelines are optional. |
-| Classification | Each field is classified as public, internal, confidential or restricted (PII). Masking, retention and access follow the class. |
-| Access governance | Quarterly access reviews. Analytics and Foresight use only masked or aggregated data. |
+(Snapshot attributes are minimal; raw PII lives only in the token vault.) Supporting stores outside this ERD: `knowledge_chunk` (pgvector), `complaint_embedding` (pgvector), `proposal`, `refund_budget_counter`, `outbox`, and the policy tables (`policy_artefact`, `policy_version`, `policy_approval`, `policy_activation`) defined in [19](19-policy-change-management.md).
 
 ---
 
@@ -276,7 +266,7 @@ traceparent: 00-4bf9...-01
 ## 18. Event Architecture
 
 ### 18.1 Envelope (CloudEvents-style, TMF688-inspired)
-`{id, type, source, subject (subscriber_ref), time, schema_version, correlation_id, causation_id, data}`. The Kafka key is `subscriber_ref`, so per-customer ordering holds `[DECK S14]`. Schemas live in the Schema Registry with BACKWARD compatibility. Breaking changes become a new type version (`.v2`).
+`{id, type, source, subject (subscriber_ref), time, schema_version, correlation_id, causation_id, data}`. The Kafka key is `subscriber_ref`, so per-customer ordering holds `[DECK S14]`. Schemas live in the schema registry (Apicurio) with BACKWARD compatibility. Breaking changes become a new type version (`.v2`).
 
 ### 18.2 Event catalogue
 
@@ -299,7 +289,7 @@ traceparent: 00-4bf9...-01
 | `rule.published` / `policy.published` | Governance service | Rule engine, OPA bundle server, audit | |
 | `reconciliation.mismatch` | Reconciliation | Finance queue, alerting | |
 
-### 18.3 Event topology — Diagram 25
+### 18.3 Event topology - Diagram 25
 
 ```mermaid
 flowchart LR

@@ -1,8 +1,10 @@
-# Hutch Clarity — Security, Privacy & Audit
+# Hutch Clarity - Security, Privacy & Audit
 
 [← 10-data-api-events.md](10-data-api-events.md) · [← Plan index](README.md) · [12-platform-devops-testing-observability.md →](12-platform-devops-testing-observability.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 19. Security Architecture
 
@@ -13,12 +15,13 @@
 | Edge | CDN + WAF (OWASP CRS), bot management, rate limits per IP/MSISDN token/device, geo and velocity rules on OTP endpoints |
 | Customer identity | App token exchange or OTP via HUTCH OTP service. Short-lived signed JWT (≤ 15 min, **PROPOSED**), refresh bound to device. **Step-up OTP before any L2+ confirmation on WhatsApp/SMS** (**REQUIRES HUTCH CONFIRMATION** of identity policy). |
 | Staff identity | HUTCH SSO (OIDC/SAML) + MFA. Step-up MFA for approvals above threshold. Session timeout. Phishing-resistant MFA for admin roles (**PROPOSED**). |
-| RBAC/ABAC | Roles: agent, supervisor, finance-approver, cx-engineer, vas-ops, compliance, auditor, admin. ABAC attributes (team, region, amount) evaluated in OPA. Four-eyes for L4 and high-value L3. |
+| RBAC/ABAC | Roles: agent, supervisor, finance-approver, cx-engineer, vas-ops, compliance, auditor, platform-admin, security-admin. The full permission matrix and separation-of-duties rules are in [17 §5.4](17-build-blueprint.md). ABAC attributes (team, region, amount) evaluated in OPA. Four-eyes for L4 and high-value L3. |
 | Service identity | Workload identities (SPIFFE/SPIRE or mesh-issued certs); **mTLS** everywhere; per-service DB users |
+| Data-level isolation | One PostgreSQL schema and DB role per module. **Row-level security** on customer-scoped tables keyed by `subscriber_ref` (set per request), so an application bug cannot return another subscriber's rows. |
 | Network segmentation | Zones per Diagram 8 / Diagram 28. K8s NetworkPolicies default-deny. Adapters in an integration namespace with egress allowlists. AI zone egress only to an approved hosted endpoint. |
 | Encryption | TLS 1.2+ (1.3 preferred) in transit. AES-256 at rest (DB, object storage, Kafka). Field-level encryption for vault entries. Keys in KMS/HSM with rotation. |
 | Token vault | Separate service + DB. Stores the PII ↔ token mapping, encrypted with KMS data keys. TTL tied to case `[DECK S8]`. Access audited. |
-| Secrets | Vault/KMS; no secrets in code or images; short-lived DB credentials; secret scanning in CI |
+| Secrets | OpenBao (or the cloud secrets manager) + KMS; no secrets in code or images; short-lived DB credentials; secret scanning in CI |
 | MCP restrictions | Profile allowlists, subject binding, no L3/L4 execution, rate limits, denial-spike alerts ([§10](07-mcp.md)) |
 | Financial safeguards | Caps, refund budgets, idempotency, reconciliation, refund-anomaly detection `[DECK S8]` |
 | Audit ledger | Hash-chained append-only + WORM anchoring (§20.7) |
@@ -35,20 +38,24 @@
 | TH3 | Prompt injection | Malicious text in a message, voice note or retrieved document | Tool misuse, data leak | Untrusted delimiting, MCP allowlist + subject binding, LLM cannot execute L3/L4, verifier, injection classifier | Low |
 | TH4 | Data leakage | LLM output containing other customers' data; logs with PII | PDPA breach | Masking, subject binding, output PII scan, masked logs/traces `[DECK S8]`, DLP on exports | Low |
 | TH5 | Replay attacks | Re-submitting confirmation tokens or webhook payloads | Duplicate actions | Single-use, action-bound, short-TTL tokens; webhook signature + timestamp + nonce; idempotency keys | Low |
-| TH6 | Duplicate actions | Retries, double taps, consumer redelivery | Double refunds | Idempotency (Redis + PG unique), outbox, status-query-before-retry, reconciliation | Very low |
+| TH6 | Duplicate actions | Retries, double taps, consumer redelivery | Double refunds | Idempotency (Valkey + PG unique), outbox, status-query-before-retry, reconciliation | Very low |
 | TH7 | Privilege escalation | Agent self-approves; role misconfiguration | Unauthorized refunds | Four-eyes with distinct principals, OPA tests, access reviews, UEBA | Low |
 | TH8 | Malicious MCP calls | Compromised agent/orchestrator calling tools | Data exfiltration | mTLS + OAuth audience, per-profile allowlist, rate limits, denial alerts, no execute path | Low |
-| TH9 | Compromised API keys | Leaked adapter or hosted LLM key | Upstream abuse | Short-lived creds, Vault dynamic secrets, egress allowlists, key rotation, anomaly alerts | Low–Med |
+| TH9 | Compromised API keys | Leaked adapter or hosted LLM key | Upstream abuse | Short-lived creds, OpenBao dynamic secrets, egress allowlists, key rotation, anomaly alerts | Low–Med |
 | TH10 | Fake receipts | Forged PDF/QR shown to staff or TRCSL | Fraudulent claims | Signature + ledger lookup, verify page, staff tool verifies before honouring | Very low |
 | TH11 | Insider tampering with audit | DB admin edits ledger | Loss of evidence | Hash chain + WORM anchors + SIEM copies; separation of duties | Very low |
 | TH12 | Denial of service | Floods on OTP, webhook, LLM-cost exhaustion | Outage/cost | WAF, rate limits, token budgets per session, queue back-pressure, cache | Medium |
 | TH13 | Malicious VAS merchant | Charging without consent | Customer harm | VAS_NO_CONSENT, merchant watch scoring, suspension workflow | Low |
+| TH14 | MCP tool poisoning / malicious external MCP client | Altered tool descriptions; registered client abusing scopes | Data exfiltration, misleading agents | Tool descriptions served only from the signed release; per-client registry, scopes, quotas and kill switch; denial-spike alerts | Low |
+| TH15 | Confused deputy via token passthrough | MCP forwarding a client token downstream | Privilege misuse | Passthrough forbidden; RFC 8693 token exchange with narrowed audience; subject binding | Very low |
+| TH16 | Data exposure through free-tier AI providers (prototype) | Real customer data sent to an unpaid tier that may use prompts for product improvement | PDPA breach | Synthetic data only in the prototype; masking enforced in the AI gateway; Groq ZDR; paid/enterprise tier or HUTCH models before real data | Very low |
+| TH17 | Unauthorized or faulty policy change | Insider edits a cap; wrong effective date; bad decision table | Over-refunding, unfair outcomes, regulatory breach | Maker-checker by change class, guardrail ceilings, mandatory replay impact report, signed bundles, scheduled activation, instant rollback, audit ([19](19-policy-change-management.md)) | Low |
 
 ---
 
 ## 20. Privacy, PII Masking and Audit
 
-### 20.1 PII masking pipeline — Diagram 26
+### 20.1 PII masking pipeline - Diagram 26
 
 ```mermaid
 flowchart LR
@@ -79,7 +86,7 @@ flowchart LR
 ### 20.2 PDPA alignment (REQUIRES HUTCH legal confirmation)
 Lawful basis per processing purpose, a DPIA before pilot, purpose limitation (Foresight on aggregates only `[DECK S8]`), data-subject rights (access to receipts, correction), cross-border transfer assessment for any hosted LLM tier, breach notification runbook ([§36](14-risk-pilot-readiness-operations.md)), and retention schedule (§20.6).
 
-### 20.3 Audit architecture — Diagram 27
+### 20.3 Audit architecture - Diagram 27
 
 ```mermaid
 flowchart LR
@@ -114,16 +121,16 @@ Append-only is enforced by: DB role with INSERT only, no UPDATE/DELETE grants, t
 ### 20.5 Consent records
 Notification consent, guardian links (each family member consents), voice processing consent, and marketing vs service messages are separated. VAS consent evidence is read from HUTCH systems and **kept ≥ 1 year** `[DECK S8]`.
 
-### 20.6 Retention (ASSUMPTION — legal to confirm)
+### 20.6 Retention (ASSUMPTION - legal to confirm)
 
 | Data | Hot | Archive |
 |---|---|---|
 | Masked conversation text | 90 days | 1 year (masked) |
-| Token vault entries | Case close + 30 days | — (deleted) |
+| Token vault entries | Case close + 30 days | - (deleted) |
 | Evidence snapshots, decisions, actions, receipts | 2 years | 7 years WORM |
 | Audit events | 1 year | 7 years WORM |
 | VAS consent evidence references | ≥ 1 year `[DECK S8]` | per HUTCH policy |
-| LLM traces (Langfuse, masked) | 30 days | — |
+| LLM traces (Langfuse, masked) | 30 days | - |
 ---
 
 [← 10-data-api-events.md](10-data-api-events.md) · [← Plan index](README.md) · [12-platform-devops-testing-observability.md →](12-platform-devops-testing-observability.md)

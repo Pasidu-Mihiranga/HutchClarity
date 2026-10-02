@@ -1,14 +1,16 @@
-# Hutch Clarity — Architecture Diagrams
+# Hutch Clarity - Architecture Diagrams
 
 [← 04-enterprise-architecture.md](04-enterprise-architecture.md) · [← Plan index](README.md) · [06-integration-tmf.md →](06-integration-tmf.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+
 ## 8. Architecture Diagrams
 
 All diagrams are created for this plan (`[PROPOSED]`), based on deck slides 4, 7, 8, 11, 12 and 14.
 
-### Diagram 1 — High-Level Solution Architecture
+### Diagram 1 - High-Level Solution Architecture
 
 ```mermaid
 flowchart TB
@@ -36,7 +38,7 @@ flowchart TB
     end
     ADP["Integration Adapters<br/>TM Forum-shaped · read-first"]
     HS["HUTCH Systems<br/>Payments · Charging · Catalogue · VAS · Usage · CRM"]
-    DATA["Data Platform<br/>PostgreSQL+pgvector · Redis · Kafka · Warehouse"]
+    DATA["Data Platform<br/>PostgreSQL+pgvector · Valkey · Kafka · Warehouse"]
 
     CH --> ORCH --> TL --> CD --> DP --> TOOL --> TR
     ORCH <--> LLM
@@ -58,7 +60,7 @@ flowchart TB
     class TR proof
 ```
 
-### Diagram 2 — Detailed Enterprise Architecture
+### Diagram 2 - Detailed Enterprise Architecture
 
 ```mermaid
 flowchart LR
@@ -92,16 +94,16 @@ flowchart LR
         AIGW["AI gateway<br/>router · quota · masking check"]
         PII["PII masking + token vault"]
         VER["Output verifier"]
-        SLM["Self-hosted LLM - vLLM"]
+        SLM["LLM providers by role<br/>Gemini · Groq · HUTCH models"]
         RAG["RAG retriever"]
         STT["STT / TTS"]
         AUT["Autopsy workers"]
         FOR["Foresight sandbox"]
     end
     subgraph DATAZ["Data zone"]
-        PG[("PostgreSQL 16<br/>cases · ledger · pgvector")]
-        RD[("Redis<br/>sessions · cache · idempotency")]
-        KF[("Kafka + Schema Registry")]
+        PG[("PostgreSQL 18<br/>schema per module · ledger · pgvector")]
+        RD[("Valkey<br/>sessions · cache · idempotency")]
+        KF[("Kafka + Apicurio registry")]
         OBJ[("Object storage WORM")]
         WH2[("Analytics warehouse")]
     end
@@ -147,7 +149,7 @@ flowchart LR
     REC --> ADP
 ```
 
-### Diagram 3 — Customer Dispute Request Flow
+### Diagram 3 - Customer Dispute Request Flow
 
 ```mermaid
 sequenceDiagram
@@ -174,7 +176,7 @@ sequenceDiagram
     end
     Ad-->>Tl: normalized events + completeness flags
     Tl-->>Ca: timeline snapshot (hash)
-    Ca->>Ru: evaluate active rule pack
+    Ca->>Ru: evaluate active rule bundle
     Ru-->>Ca: ranked causes + ruled-out + evidence refs
     Ca->>Po: decide(causes, amount, risk, completeness)
     Po-->>Ca: ONE_TAP_FIX, allowed actions
@@ -190,7 +192,7 @@ sequenceDiagram
     Rc-->>Ch: Trust Receipt (signed, QR)
 ```
 
-### Diagram 4 — Decision Engine Flow
+### Diagram 4 - Decision Engine Flow
 
 ```mermaid
 flowchart TD
@@ -215,7 +217,7 @@ flowchart TD
     Q["Customer asks for a person"] --> H2["HAND-OFF"]
 ```
 
-### Diagram 5 — AI + Deterministic Rule Boundary
+### Diagram 5 - AI + Deterministic Rule Boundary
 
 ```mermaid
 flowchart LR
@@ -246,7 +248,7 @@ flowchart LR
     classDef note fill:#fff,stroke:#C2410C,stroke-dasharray: 4 4
 ```
 
-### Diagram 6 — MCP Architecture
+### Diagram 6 - MCP Architecture
 
 ```mermaid
 flowchart TB
@@ -281,7 +283,7 @@ flowchart TB
     T3 -.-> AUD
 ```
 
-### Diagram 7 — HUTCH Integration Architecture
+### Diagram 7 - HUTCH Integration Architecture
 
 ```mermaid
 flowchart LR
@@ -324,7 +326,7 @@ flowchart LR
     PAY & CHG & CAT & VAS & USE & CRM & NOT & IDA -.->|"prototype profile"| MOCK
 ```
 
-### Diagram 8 — Security Trust Boundaries
+### Diagram 8 - Security Trust Boundaries
 
 ```mermaid
 flowchart LR
@@ -372,7 +374,7 @@ flowchart LR
     TOOL --> SIEM
 ```
 
-### Diagram 9 — Deployment Architecture (Production)
+### Diagram 9 - Deployment Architecture (Production)
 
 ```mermaid
 flowchart TB
@@ -394,7 +396,7 @@ flowchart TB
             SIGN["signing-service x2"]
         end
         subgraph NSW["ns: clarity-workers"]
-            CEL["celery workers"]
+            CEL["job workers - Postgres queue"]
             KC["kafka consumers"]
             REND["playwright render pool - no egress"]
             REC["reconciliation cron"]
@@ -403,7 +405,7 @@ flowchart TB
             AIGW["ai-gateway x2"]
             MCP["mcp-server x2"]
             PII["pii-masking x3"]
-            VLLM["vLLM GPU node pool"]
+            VLLM["vLLM GPU pool - optional, HUTCH models"]
             AUT["autopsy batch"]
             FOR["foresight sandbox"]
         end
@@ -417,11 +419,11 @@ flowchart TB
     end
     subgraph DATA["Managed/HA data services"]
         PG[("PostgreSQL primary + sync replica + async DR")]
-        RD[("Redis HA")]
-        KF[("Kafka 3+ brokers + Schema Registry")]
+        RD[("Valkey HA")]
+        KF[("Kafka 3+ brokers + Apicurio registry")]
         OBJ[("Object storage WORM")]
     end
-    SEC["Secrets: Vault / KMS / HSM"]
+    SEC["Secrets: OpenBao / KMS / HSM"]
     GRAF["Grafana · SIEM"]
     HUTCH["HUTCH integration boundary"]
     ING --> FE
@@ -435,7 +437,7 @@ flowchart TB
     OTEL --> GRAF
 ```
 
-### Diagram 10 — CI/CD Pipeline
+### Diagram 10 - CI/CD Pipeline
 
 ```mermaid
 flowchart LR
@@ -462,7 +464,7 @@ flowchart LR
     MON -- Yes --> DONE["Full rollout"]
 ```
 
-### Diagram 11 — Data Flow
+### Diagram 11 - Data Flow
 
 ```mermaid
 flowchart LR
@@ -493,7 +495,7 @@ flowchart LR
     WH --> DASH["Grafana / Desk insights"]
 ```
 
-### Diagram 12 — Complaint Autopsy Pipeline
+### Diagram 12 - Complaint Autopsy Pipeline
 
 ```mermaid
 flowchart LR
@@ -517,7 +519,7 @@ flowchart LR
     MEAS --> IN
 ```
 
-### Diagram 13 — Foresight Pipeline
+### Diagram 13 - Foresight Pipeline
 
 ```mermaid
 flowchart LR
@@ -537,7 +539,7 @@ flowchart LR
     BT --> CAL
 ```
 
-### Diagram 14 — Trust Receipt Generation & Verification Flow
+### Diagram 14 - Trust Receipt Generation & Verification Flow
 
 ```mermaid
 sequenceDiagram
@@ -571,7 +573,7 @@ sequenceDiagram
     Vp-->>Cu: VERIFIED + masked essentials or INVALID
 ```
 
-### Diagram 15 — System Context (C4 Level 1)
+### Diagram 15 - System Context (C4 Level 1)
 
 ```mermaid
 flowchart TB
@@ -602,7 +604,7 @@ flowchart TB
     COMP --> TRCSL
 ```
 
-### Diagram 16 — Container View (C4 Level 2)
+### Diagram 16 - Container View (C4 Level 2)
 
 ```mermaid
 flowchart LR
@@ -612,7 +614,7 @@ flowchart LR
         F3["Ops / insights console"]
         F4["Public receipt verify page"]
     end
-    subgraph SVC["Python 3.12 / FastAPI services"]
+    subgraph SVC["Python 3.14 / FastAPI - logical services, deployed per 17 §4"]
         B1["bff-api"]
         B2["orchestrator"]
         B3["case-service"]
@@ -634,7 +636,7 @@ flowchart LR
     end
     subgraph ST["Stores"]
         D1[("PostgreSQL + pgvector")]
-        D2[("Redis")]
+        D2[("Valkey")]
         D3[("Kafka")]
         D4[("Object storage")]
         D5[("Warehouse")]
@@ -657,7 +659,7 @@ flowchart LR
     SVC --- ST
 ```
 
-### Diagram 17 — Clarity Core Component Design
+### Diagram 17 - Clarity Core Component Design
 
 ```mermaid
 flowchart TB
@@ -689,7 +691,7 @@ flowchart TB
     subgraph TL["Tool layer"]
         A1["Action registry + safety level"]
         A2["Confirmation / approval token check"]
-        A3["Idempotency guard - Redis + PG unique"]
+        A3["Idempotency guard - Valkey + PG unique"]
         A4["Adapter command + compensation"]
         A5["Post-action verification"]
     end
@@ -699,7 +701,7 @@ flowchart TB
     A1 --> A2 --> A3 --> A4 --> A5 --> CS3
 ```
 
-### Diagram 18 — Case Lifecycle State Machine
+### Diagram 18 - Case Lifecycle State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -731,7 +733,7 @@ stateDiagram-v2
     CLOSED --> [*]
 ```
 
-### 8.1 Diagram Index (all 39 architecture diagrams in this plan)
+### 8.1 Diagram Index (all 34 architecture diagrams in this plan)
 
 | # | Diagram | Type | Location |
 |---|---|---|---|
@@ -769,11 +771,6 @@ stateDiagram-v2
 | 32 | Critical Path Network | flowchart | [§29](13-delivery-plan.md) |
 | 33 | Rollout Path (Steps 1–4) | flowchart | [§34](14-risk-pilot-readiness-operations.md) |
 | 34 | Degradation Ladder | flowchart | [§39](15-cost-scale-failure-kpi.md) |
-| 35 | Governance Structure | flowchart | [§46](17-governance-compliance-change-cost.md) |
-| 36 | Release Roadmap | flowchart | [§47](17-governance-compliance-change-cost.md) |
-| 37 | Reconciliation | flowchart | [§14.4](09-rules-decision-receipts.md) |
-| 38 | Proactive Care Engine | flowchart | [§3.6](02-solution-capabilities.md) |
-| 39 | Continuous Improvement Loop | flowchart | [§52](17-governance-compliance-change-cost.md) |
 
 When split into files ([§43](16-gap-submission-repo-docs.md)), Diagrams 1–18 go to `05-architecture-diagrams.md`. The others stay with their chapters.
 ---

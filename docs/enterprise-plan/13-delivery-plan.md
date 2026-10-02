@@ -1,8 +1,12 @@
-# Hutch Clarity — Delivery Plan: Phases, WBS, Gantt, Critical Path, Team, RACI, Dependencies
+# Hutch Clarity - Delivery Plan: Phases, WBS, Gantt, Critical Path, Team, RACI, Dependencies
 
 [← 12-platform-devops-testing-observability.md](12-platform-devops-testing-observability.md) · [← Plan index](README.md) · [14-risk-pilot-readiness-operations.md →](14-risk-pilot-readiness-operations.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+
+> **Scope of this chapter.** This is the **HUTCH production programme**, from selection to production, assumed to start 2027-01-04. The **prototype build** (baseline → modules → release v1.0) is scheduled in [17 §14](17-build-blueprint.md); its output is the input to P0 below.
 
 ## 26. Implementation Phases
 
@@ -13,9 +17,9 @@
 | **A. Mobilise & define** | P0 Architecture/Prototype Assessment | Jan 4 – Jan 17 | Review prototype code, deck, demo; gap analysis vs this plan; ADR backlog | Assessment report, ADR-000 list | Sponsor kick-off |
 | | P1 Requirements Discovery | Jan 11 – Feb 14 | Stakeholder interviews (CX, finance, VAS, network, compliance, IT); data-source discovery; refund/action policy workshops | SRS (FR/NFR), personas, journey maps, rule catalogue v0, action policy draft | **M1 Requirements Sign-Off (Feb 15)** |
 | | P2 Architecture & Security Design | Feb 1 – Mar 14 | Solution/data/integration/AI/MCP architecture; threat model; DPIA; licence reviews | SAD, ICDs per adapter, MCP spec, threat model, DPIA draft | **M2 Architecture Sign-Off (Mar 15)** |
-| **B. Foundation & core** | P3 Platform Foundation | Feb 22 – Mar 28 | Envs, K8s, CI/CD, secrets, observability, Kafka/PG/Redis/WORM | Running DEV/QA, pipelines, golden-signal dashboards | Platform smoke test |
+| **B. Foundation & core** | P3 Platform Foundation | Feb 22 – Mar 28 | Envs, K8s, CI/CD, secrets, observability, Kafka/PG/Valkey/WORM | Running DEV/QA, pipelines, golden-signal dashboards | Platform smoke test |
 | | P4 Timeline + Case Core | Mar 15 – May 2 | Case service, canonical model, timeline builder, snapshots | Case + timeline APIs on mocks | Contract tests green |
-| | P5 Rule/Decision Engine + Tool Layer | Mar 22 – May 30 | Rule engine, 16 rules + golden tests, OPA policy, caps/budgets, tool layer, reconciliation | Rule pack v1, policy bundle v1, tool layer | **M3 Core Complete (May 31)** |
+| | P5 Rule/Decision Engine + Tool Layer | Mar 22 – May 30 | Rule engine, 16 rules + golden tests, OPA policy, caps/budgets, tool layer, reconciliation | Rule bundle v1 (detectors + decision tables), policy artefacts v1, tool layer | **M3 Core Complete (May 31)** |
 | | P6 AI + RAG | Mar 8 – May 30 | Model selection eval, AI gateway, PII masking, extraction/explanation/verifier, RAG, eval harness | AI services + eval report v1 | AI eval gates met on golden sets |
 | | P7 MCP Server | Apr 19 – Jun 13 | Tools L1/L2, propose/confirm, OPA authZ, audit | MCP server + tool spec | MCP abuse tests pass |
 | **C. Integrate & build experience** | P8 HUTCH Integration Adapters | Mar 29 – Jul 4 | Read adapters → HUTCH non-prod; event ingestion; write adapters per approved action | Adapters + contract tests | **M4 Integration Complete (Jul 5)** |
@@ -61,20 +65,20 @@
 | **3.0 Platform foundation** | | DevOps |
 | 3.1 | Environments, K8s namespaces, network policies | DevOps |
 | 3.2 | CI/CD, GitOps, signing, scanning | DevOps |
-| 3.3 | Data services (PG, Redis, Kafka + registry, object storage) | DevOps + Data Eng |
+| 3.3 | Data services (PG, Valkey, Kafka + registry, object storage) | DevOps + Data Eng |
 | 3.4 | Observability stack, Langfuse | SRE |
 | 3.5 | Secrets/KMS/HSM integration | DevOps + Security |
 | **4.0 Clarity core** | | Tech Lead |
 | 4.1 | Case service + state machine + outbox | Backend |
 | 4.2 | Timeline builder + snapshots | Backend |
 | 4.3 | Rule engine + predicate library | Backend |
-| 4.4 | Rule pack v1 (16 rules) + golden tests | CX Engineer + Backend |
+| 4.4 | Rule bundle v1 (16 detectors + decision tables) + golden tests | CX Engineer + Backend |
 | 4.5 | Decision policy (OPA) + caps/budgets | Backend |
 | 4.6 | Tool layer + idempotency + compensations | Backend |
 | 4.7 | Reconciliation service | Backend + Finance |
 | 4.8 | Governance: rule/policy publish, four-eyes, replay | Backend |
 | **5.0 AI & MCP** | | AI Lead |
-| 5.1 | AI gateway + model serving (vLLM) + fallback tier | AI/ML Eng + DevOps |
+| 5.1 | AI gateway + HUTCH model provider (managed or vLLM) + fallback roles | AI/ML Eng + DevOps |
 | 5.2 | PII masking + token vault | AI/ML Eng + Security |
 | 5.3 | Intake extraction, explanation, verifier, templates | AI/ML Eng |
 | 5.4 | RAG ingestion, index, retrieval, citations | AI/ML Eng |
@@ -127,28 +131,28 @@
 
 | ID | Activity | Start | Duration | End (excl.) | Dependency | Team |
 |---|---|---|---|---|---|---|
-| A1 | Prototype & architecture assessment | 2027-01-04 | 2w | 01-18 | — | SA, TL |
+| A1 | Prototype & architecture assessment | 2027-01-04 | 2w | 01-18 | - | SA, TL |
 | A2 | Stakeholder discovery & SRS | 2027-01-11 | 5w | 02-15 | A1 (SS+1w) | PO, BA, SA |
 | A3 | Data-source & interface discovery | 2027-01-11 | 6w | 02-22 | A1 (SS+1w) | Integration, Data, HUTCH IT |
 | A4 | Refund/action policy & thresholds | 2027-01-25 | 6w | 03-08 | A2 (SS+2w) | Finance, CX, Compliance, PO |
-| M1 | **Requirements Sign-Off** | 2027-02-15 | — | — | A2 | Sponsor |
+| M1 | **Requirements Sign-Off** | 2027-02-15 | - | - | A2 | Sponsor |
 | B1 | Solution/data/integration architecture | 2027-02-01 | 5w | 03-08 | A1 | SA |
 | B2 | AI & MCP architecture | 2027-02-08 | 4w | 03-08 | A1 | AI Lead |
 | B3 | Security architecture, threat model, DPIA | 2027-02-01 | 6w | 03-15 | A2 (SS) | Security |
 | B4 | Licence & vendor review | 2027-02-15 | 4w | 03-15 | B2 (SS) | PM, Legal |
-| M2 | **Architecture Sign-Off** | 2027-03-15 | — | — | B1, B2, B3 | ARB |
+| M2 | **Architecture Sign-Off** | 2027-03-15 | - | - | B1, B2, B3 | ARB |
 | C1 | Data access approval + anonymized extract | 2027-02-01 | 8w | 03-29 | A3 (SS+3w) | HUTCH Data, Security |
 | C2 | Read-interface agreements + non-prod access | 2027-02-15 | 10w | 04-26 | A3 | HUTCH IT, Integration |
 | C3 | Write-interface + action-policy approvals | 2027-03-15 | 10w | 05-24 | A4, B3 | HUTCH IT, Finance, Security |
 | C4 | WhatsApp business verification + templates | 2027-04-05 | 8w | 05-31 | M2 | HUTCH Digital, Meta |
 | D1 | Environments, K8s, CI/CD, observability | 2027-02-22 | 5w | 03-29 | B1 (SS+3w) | DevOps |
-| D2 | Kafka/PG/Redis/WORM services | 2027-03-01 | 4w | 03-29 | D1 (SS+1w) | DevOps, Data |
+| D2 | Kafka/PG/Valkey/WORM services | 2027-03-01 | 4w | 03-29 | D1 (SS+1w) | DevOps, Data |
 | U1 | UX research & design system | 2027-02-15 | 8w | 04-12 | A2 (SS+5w) | UX |
 | E1 | Case service + timeline builder | 2027-03-15 | 7w | 05-03 | M2, D1 | Backend |
 | E2 | Rule engine + 16 rules + golden tests | 2027-03-22 | 9w | 05-24 | M2, A4 | Backend, CX Eng |
 | E3 | Decision policy (OPA), caps, budgets, reconciliation | 2027-04-05 | 7w | 05-24 | E2 (SS+2w), A4 | Backend |
 | E4 | Tool layer (idempotency, outbox, compensation) | 2027-04-19 | 6w | 05-31 | E1 (SS+5w) | Backend |
-| M3 | **Core Complete** | 2027-05-31 | — | — | E1–E4 | TL |
+| M3 | **Core Complete** | 2027-05-31 | - | - | E1–E4 | TL |
 | F1 | AI gateway + model selection eval | 2027-03-08 | 6w | 04-19 | B2 | AI/ML |
 | F2 | PII masking + token vault | 2027-03-15 | 6w | 04-26 | B3 | AI/ML, Security |
 | F4 | RAG (catalogue, T&C, Gazette, KB) | 2027-04-05 | 6w | 05-17 | F1 (SS+4w) | AI/ML |
@@ -159,7 +163,7 @@
 | H1 | Read adapters → HUTCH non-prod | 2027-03-29 | 10w | 06-07 | C2 (SS+6w), E1 (SS) | Integration |
 | H3 | Event ingestion connectors | 2027-04-26 | 8w | 06-21 | C2, D2 | Data Eng |
 | H2 | Write adapters (approved actions) | 2027-05-24 | 6w | 07-05 | C3, E4 (SS) | Integration |
-| M4 | **Integration Complete** | 2027-07-05 | — | — | H1, H2, H3 | Integration Lead |
+| M4 | **Integration Complete** | 2027-07-05 | - | - | H1, H2, H3 | Integration Lead |
 | I1 | Clarity Desk core | 2027-04-05 | 10w | 06-14 | U1 (SS+7w), E1 (SS) | Frontend |
 | I3 | Trust Receipt service + verify page | 2027-04-26 | 6w | 06-07 | E4 (SS), B3 | Backend |
 | I2 | Desk advanced features | 2027-06-07 | 8w | 08-02 | I1, E3 | Frontend, Backend |
@@ -176,29 +180,29 @@
 | L4 | AI red-team (si/ta/en/Singlish) | 2027-07-05 | 4w | 08-02 | F5, G2 | Security, AI |
 | L3 | External pen test + DAST | 2027-07-12 | 4w | 08-09 | L1 (SS+4w), H2 | Security (3rd party) |
 | L5 | Remediation | 2027-08-09 | 1w | 08-16 | L2, L3, L4 | All |
-| M5 | **Security Gate** | 2027-08-16 | — | — | L5 | CISO |
-| L6 | UAT — Desk & staff-approved flows | 2027-08-16 | 3w | 09-06 | M5, I2 | Business, QA |
-| M6 | **UAT Sign-Off** | 2027-09-06 | — | — | L6, S1 exit | Business owners |
+| M5 | **Security Gate** | 2027-08-16 | - | - | L5 | CISO |
+| L6 | UAT - Desk & staff-approved flows | 2027-08-16 | 3w | 09-06 | M5, I2 | Business, QA |
+| M6 | **UAT Sign-Off** | 2027-09-06 | - | - | L6, S1 exit | Business owners |
 | P1 | Desk-live pilot (Step 2) | 2027-09-06 | 8w | 11-01 | M6 | PO, CX Ops |
-| M7 | **Pilot Go-Live** | 2027-09-06 | — | — | M6 | Steering |
-| L7 | UAT — customer channels | 2027-09-13 | 3w | 10-04 | J1, J2, J3, M5 | Business, QA |
+| M7 | **Pilot Go-Live** | 2027-09-06 | - | - | M6 | Steering |
+| L7 | UAT - customer channels | 2027-09-13 | 3w | 10-04 | J1, J2, J3, M5 | Business, QA |
 | P2 | Customer pilot (Step 3) | 2027-10-04 | 6w | 11-15 | L7, P1 (SS+4w) | PO |
 | K4 | Foresight build + backtest | 2027-10-04 | 10w | 12-13 | K3 | AI/ML |
 | R1 | Production readiness review | 2027-11-15 | 1w | 11-22 | P2 | PM, SRE, Security |
-| M8 | **Production Go-Live** | 2027-11-22 | — | — | R1 | Steering, CAB |
+| M8 | **Production Go-Live** | 2027-11-22 | - | - | R1 | Steering, CAB |
 | R2 | Progressive rollout | 2027-11-22 | 3w | 12-13 | M8 | SRE, PO |
 | R3 | Hypercare | 2027-11-22 | 8w | 2028-01-17 | M8 | All |
-| Z0 | Change freeze (ASSUMPTION) | 2027-12-13 | 3w | 2028-01-03 | — | — |
+| Z0 | Change freeze (ASSUMPTION) | 2027-12-13 | 3w | 2028-01-03 | - | - |
 | K5 | Foresight pilot on 1–2 launches | 2028-01-10 | 8w | 2028-03-06 | K4 | AI, Product |
 | Z1 | Scale: postpaid / home broadband discovery | 2028-01-17 | 8w | 2028-03-13 | R3 | PO, SA |
 
-### 28.2 Mermaid Gantt — Diagram 31
+### 28.2 Mermaid Gantt - Diagram 31
 
 ```mermaid
 gantt
     title Hutch Clarity - Prototype to Production (assumed start 2027-01-04)
     dateFormat YYYY-MM-DD
-    axisFormat %b %Y
+    axisFormat %b %y
     todayMarker off
 
     section Mobilise and define
@@ -221,7 +225,7 @@ gantt
 
     section Platform
     Environments CI-CD observability          :d1, 2027-02-22, 35d
-    Kafka PG Redis WORM                       :d2, 2027-03-01, 28d
+    Kafka PG Valkey WORM                       :d2, 2027-03-01, 28d
 
     section Clarity core
     Case service and timeline builder         :e1, 2027-03-15, 49d
@@ -299,7 +303,7 @@ A3 Data/interface discovery → **C2 Read-interface agreements (HUTCH)** → H1 
 - C4 WhatsApp business verification → J2 WhatsApp → L7 customer-channel UAT → P2.
 - C1 Anonymized data extract → K1 Autopsy / S1 Shadow mode (shadow needs real anonymized logs).
 
-### Diagram 32 — Critical path network
+### Diagram 32 - Critical path network
 
 ```mermaid
 flowchart LR
@@ -360,7 +364,7 @@ flowchart LR
 ### 30.2 Shared HUTCH functions (part-time, **REQUIRES HUTCH CONFIRMATION**)
 Security/CISO office, Finance (refund policy, reconciliation), Customer care/CX operations (agents, supervisors, training), VAS team, Network operations, Compliance/Regulatory (TRCSL, PDPA), Data governance, Enterprise architecture/ARB, IT system owners (OCS, payments, CRM, DCB, SMSC/USSD), Legal (licences, DPA with any hosted AI provider), Digital channels (app, website, WhatsApp account).
 
-### 30.3 Team size by phase (FTE, core team — **ASSUMPTION**)
+### 30.3 Team size by phase (FTE, core team - **ASSUMPTION**)
 
 | Stage | Months (2027) | FTE |
 |---|---|---|

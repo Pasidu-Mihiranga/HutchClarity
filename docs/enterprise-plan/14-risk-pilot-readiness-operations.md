@@ -1,8 +1,10 @@
-# Hutch Clarity — Risks, Pilot, Production Readiness & Operations
+# Hutch Clarity - Risks, Pilot, Production Readiness & Operations
 
 [← 13-delivery-plan.md](13-delivery-plan.md) · [← Plan index](README.md) · [15-cost-scale-failure-kpi.md →](15-cost-scale-failure-kpi.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 33. Risk Register
 P = Probability, I = Impact (H/M/L).
@@ -14,7 +16,7 @@ P = Probability, I = Impact (H/M/L).
 | R03 | Inconsistent identifiers across systems (MSISDN formats, txn refs) | H | M | Canonical ID mapping service; normalization; probabilistic join only for *display*, never for decisions | Ambiguous joins → staff review |
 | R04 | Data latency (CDR batches, settlement delays) | M | M | Per-source freshness SLAs; `PAYMENT_PENDING_SETTLEMENT` rule; hold-for-evidence state | Explain "pending" + scheduled re-check + notify |
 | R05 | Wrong rule logic (false positives/negatives) | M | H | Golden tests, replay, four-eyes publish, shadow comparison, staff override tracking | Kill switch per rule; revert to previous version in seconds; remediation via bulk correction with receipts |
-| R06 | Duplicate refunds | L | H | Idempotency (Redis + PG unique), status-query-before-retry, budgets, reconciliation | Auto-pause auto-fix on anomaly; recovery per finance policy; receipt supersede |
+| R06 | Duplicate refunds | L | H | Idempotency (Valkey + PG unique), status-query-before-retry, budgets, reconciliation | Auto-pause auto-fix on anomaly; recovery per finance policy; receipt supersede |
 | R07 | AI hallucination in explanations | M | M | Facts-only prompting, numeric verifier, citations, templates | Disable LLM explanations via flag → templates only |
 | R08 | Poor Sinhala/Tamil/Singlish quality | H | M | Native-speaker eval, curated phrases `[DECK S10]`, model selection by eval, structured-first UX | Template-only for affected language; earlier offer of a human |
 | R09 | Prompt injection | M | M | [§12.6](08-ai-architecture.md) controls; no money-moving tools for the LLM | Disable affected tool/profile; review MCP logs |
@@ -32,6 +34,9 @@ P = Probability, I = Impact (H/M/L).
 | R21 | Agent adoption / change resistance | M | M | Co-design with agents, training, "teach once" credit, supervisor dashboards | Additional coaching; adjust UI |
 | R22 | Third-party licence constraints (Foresight stack, models) | M | M | Licence review gate (B4) | Replace components behind interfaces |
 | R23 | Refund fraud rings exploiting auto-fix | L | H | Velocity limits, SIM-swap checks, graph anomaly detection, whitelisted rules only | Disable auto-fix; staff approval for all |
+| R24 | Free-tier LLM quotas or terms change during the prototype | M | M | Role chains across two providers, quota-aware gateway, cassettes in CI, template fallback | Switch role mapping in config; paid tier for demo day if needed |
+| R25 | Faulty or unauthorized policy change in production | M | H | Change classes, maker-checker, guardrail ceilings, replay impact report, scheduled activation ([19](19-policy-change-management.md)) | Instant rollback to previous version; incident review |
+| R26 | Documentation drifts from code across parallel developers | H | M | AGENTS.md rules, MODULE.md per module, review checklist, devlog per change, ADRs | Doc-debt sprint; block merges until fixed |
 
 ---
 
@@ -39,7 +44,7 @@ P = Probability, I = Impact (H/M/L).
 
 The deck's 4 steps are preserved `[DECK S17]` and made gated.
 
-### Diagram 33 — Rollout path
+### Diagram 33 - Rollout path
 
 ```mermaid
 flowchart LR
@@ -50,7 +55,7 @@ flowchart LR
     S3 -.->|"kill switch"| S2
 ```
 
-| | **Step 1 — Shadow Mode** | **Step 2 — Clarity Desk Live** | **Step 3 — Customer Launch** | **Step 4 — Foresight & Scale** |
+| | **Step 1 - Shadow Mode** | **Step 2 - Clarity Desk Live** | **Step 3 - Customer Launch** | **Step 4 - Foresight & Scale** |
 |---|---|---|---|---|
 | Window | Jul 19 – Aug 29, 2027 | Sep 6 – Nov 1, 2027 | Oct 4 – Nov 14 (pilot) → GA Nov 22 | 2028 Q1+ |
 | Scope | Read-only on anonymized logs; rules + decisions computed; recommendations shown to a small agent group; **no customer-impacting actions** | Agents/supervisors use Desk; fixes **staff-approved**; receipts issued; weekly Autopsy; Teach once | Why? in app, web, WhatsApp (SMS/USSD to follow); **whitelisted auto-fix** only (e.g., DUPLICATE_RELOAD, DUPLICATE_VAS_CHARGE); one-tap fixes | Foresight on 1–2 launches; more rules; postpaid, home broadband; voice + guardian |
@@ -59,7 +64,7 @@ flowchart LR
 | Exit / success criteria (**PROPOSED TARGET – REQUIRES HUTCH VALIDATION**) | Agreement with agent outcomes ≥ 85% on covered causes; rule false-positive rate ≤ 5% for auto-candidate rules; evidence completeness measured per source; 0 PII leaks | Median resolution time reduced vs baseline; override rate ≤ 10%; 0 duplicate/wrong refunds unrecovered; reconciliation 100% T+1; agent satisfaction ≥ baseline | Self-service completion ≥ target; handoff accuracy ≥ 98% (must-handoff); CSAT ≥ baseline; 0 Sev-1; refund anomaly alerts all explained | Backtest accuracy acceptable; product teams adopt |
 | Monitoring | Shadow dashboard: recommendation vs outcome | All dashboards ([§25](12-platform-devops-testing-observability.md)) daily review | + customer funnels, CSAT, verification | Quarterly review |
 | Rollback | n/a (no actions) | Disable Desk actions → recommendations only | Kill switch per channel / per rule / auto-fix global | Feature flags per domain |
-| Comms | Internal only | Internal + agent training | Customer comms, FAQ, regulator informed (**compliance decides**) | — |
+| Comms | Internal only | Internal + agent training | Customer comms, FAQ, regulator informed (**compliance decides**) | - |
 
 ---
 
@@ -71,7 +76,7 @@ flowchart LR
 | Data | ☐ DPIA approved ☐ Retention jobs active ☐ Token vault TTL verified ☐ Data quality per source within SLA ☐ Anonymization verified for analytics | Data Gov |
 | Integrations | ☐ All adapters contract-tested vs HUTCH prod config ☐ Circuit breakers/timeouts tuned ☐ Write actions approved per type ☐ Status-query endpoints for ambiguous results | Integration |
 | Observability | ☐ Dashboards ([§25](12-platform-devops-testing-observability.md)) live ☐ SLOs defined ☐ Traces end-to-end ☐ Langfuse masked ☐ SIEM feeds | SRE |
-| Backup | ☐ PITR tested ☐ Object storage versioning/lock ☐ Vault backups | SRE |
+| Backup | ☐ PITR tested ☐ Object storage versioning/lock ☐ Token vault + OpenBao backups | SRE |
 | DR | ☐ DR failover rehearsed (RTO/RPO met) ☐ Runbook signed | SRE |
 | Rate limits | ☐ Edge, OTP, per-session token budgets, MCP per-tool limits configured | SRE/Security |
 | AI fallback | ☐ Template-only mode tested ☐ Hosted/self-hosted failover tested ☐ Verifier blocking tested | AI |

@@ -1,17 +1,19 @@
-# Hutch Clarity — Enterprise Project Plan
+# Hutch Clarity - Enterprise Project Plan
 
-This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade technical and implementation plan, from hackathon prototype to HUTCH production. The plan follows the HUTCH Hackathon Final Submission Guidelines. Source documents are in [`documents/`](../../documents/).
+**Explain every rupee. Fix it by rule. Prove it won't happen again.**
+
+This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade technical and implementation plan, from hackathon prototype to HUTCH production. The plan follows the HUTCH Hackathon Final Submission Guidelines. The source documents (deck PDF and guidelines DOCX) are in the repository root. **Changes to this plan follow the process in [CHANGES.md](CHANGES.md).**
 
 **Explain every rupee. Fix it by rule. Prove it won't happen again.** `[DECK S1]`
 
 | Item | Value |
 |---|---|
-| Document | Enterprise Project Plan — Hackathon Prototype → HUTCH Production |
-| Version / date | v1.1 draft (audited) · 2026-10-01 |
-| Sources | (1) *Hutch Clarity* 17-slide deck — authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
+| Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
+| Version / date | **v1.2** · 2026-10-01 (see [CHANGES.md](CHANGES.md)) |
+| Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
-| Planning start | **2027-01-04 — Assumed project start date for planning purposes.** |
-| LLM stance | Provider-agnostic AI gateway. Self-hosted open-weight model inside HUTCH is the primary tier; a hosted API tier is fallback/escalation. Model IDs live in config `[DECK S13]`. |
+| Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
+| LLM stance | Provider-neutral AI gateway with logical model **roles** (`fast-text`, `extract`, `reason`, …). Prototype: Gemini + Groq free tiers on synthetic, masked data only. Production: HUTCH's chosen provider or self-hosted models, by config. Model IDs live in config `[DECK S13]`; see [18 §4](18-tech-stack-and-ai.md). |
 
 ### Labelling legend (used everywhere)
 
@@ -46,55 +48,21 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | [14-risk-pilot-readiness-operations.md](14-risk-pilot-readiness-operations.md) | Risks, Pilot, Production Readiness & Operations | §33, §34, §35, §36 |
 | [15-cost-scale-failure-kpi.md](15-cost-scale-failure-kpi.md) | AI Cost, Scalability, Failure Handling & KPIs | §37, §38, §39, §40 |
 | [16-gap-submission-repo-docs.md](16-gap-submission-repo-docs.md) | Prototype Gap, Hackathon Mapping, Repository, Documentation & Recommendations | §41, §42, §43, §44, §45 |
-| [17-governance-compliance-change-cost.md](17-governance-compliance-change-cost.md) | Governance & Stage Gates, Release Plan & Traceability, Compliance, Change Management, Effort & TCO, Assumptions Register, Post-Production Support | §46, §47, §48, §49, §50, §51, §52 |
+| [17-build-blueprint.md](17-build-blueprint.md) | Build Blueprint: baseline, modules, identity, data flow, notifications, MCP, module dependency graph, prototype Gantt | - |
+| [18-tech-stack-and-ai.md](18-tech-stack-and-ai.md) | Enterprise tech stack, LLM providers (Gemini + Groq), AWS-style mapping, alignment of chapters 01–16 | - |
+| [19-policy-change-management.md](19-policy-change-management.md) | Enterprise policy & change management: how packages, prices, regulations, caps, rules and wording change safely | - |
+| [CHANGES.md](CHANGES.md) | Plan change record and the process for changing this plan | - |
 
 ## Reading paths
 
 | Audience | Start with |
 |---|---|
-| Hackathon judges | [01](01-executive-summary-problem.md) → [05](05-architecture-diagrams.md) → [06](06-integration-tmf.md) → [13](13-delivery-plan.md) → [15](15-cost-scale-failure-kpi.md) → [16](16-gap-submission-repo-docs.md) → [17](17-governance-compliance-change-cost.md) |
-| Solution architects / engineering | [04](04-enterprise-architecture.md), [05](05-architecture-diagrams.md), [09](09-rules-decision-receipts.md), [10](10-data-api-events.md), [12](12-platform-devops-testing-observability.md) |
+| Hackathon judges | [01](01-executive-summary-problem.md) → [05](05-architecture-diagrams.md) → [06](06-integration-tmf.md) → [13](13-delivery-plan.md) → [15](15-cost-scale-failure-kpi.md) → [16](16-gap-submission-repo-docs.md) |
+| Solution architects / engineering | [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md), [19](19-policy-change-management.md), [04](04-enterprise-architecture.md), [05](05-architecture-diagrams.md), [09](09-rules-decision-receipts.md), [10](10-data-api-events.md), [12](12-platform-devops-testing-observability.md) |
 | AI / MCP teams | [07](07-mcp.md), [08](08-ai-architecture.md), [15](15-cost-scale-failure-kpi.md) |
-| Security & compliance | [11](11-security-privacy-audit.md), [17 §48](17-governance-compliance-change-cost.md), [07](07-mcp.md), [14](14-risk-pilot-readiness-operations.md) |
-| CX, product, finance, business | [01](01-executive-summary-problem.md), [02](02-solution-capabilities.md), [03](03-requirements-personas-journeys.md), [09](09-rules-decision-receipts.md), [14](14-risk-pilot-readiness-operations.md), [17](17-governance-compliance-change-cost.md) |
-| Project management / DevOps / SRE | [13](13-delivery-plan.md), [17](17-governance-compliance-change-cost.md), [12](12-platform-devops-testing-observability.md), [14](14-risk-pilot-readiness-operations.md) |
+| Security & compliance | [11](11-security-privacy-audit.md), [07](07-mcp.md), [14](14-risk-pilot-readiness-operations.md) |
+| CX, product, finance, business | [01](01-executive-summary-problem.md), [02](02-solution-capabilities.md), [03](03-requirements-personas-journeys.md), [09](09-rules-decision-receipts.md), [14](14-risk-pilot-readiness-operations.md) |
+| Project management / DevOps / SRE | [13](13-delivery-plan.md), [12](12-platform-devops-testing-observability.md), [14](14-risk-pilot-readiness-operations.md) |
 
 ## Diagrams
-All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown viewers render. The full index of all 39 diagrams is in [05-architecture-diagrams.md § 8.1](05-architecture-diagrams.md#81-diagram-index-all-39-architecture-diagrams-in-this-plan).
-
-## Revision history
-
-| Version | Date | Change |
-|---|---|---|
-| v1.0 | 2026-10-01 | First complete plan: 45 sections, 34 diagrams, built from the deck and the submission guidelines |
-| v1.1 | 2026-10-01 | **Plan audit.** The plan was checked against the 51-point brief, the Final Submission Guidelines and all 17 deck slides. Gaps found and added are listed below. |
-
-### v1.1 audit: gaps found and added
-
-| # | Gap found | Basis | Added in |
-|---|---|---|---|
-| 1 | Prototype scope was implicit | Brief §1 "prototype scope" | [§1.9](01-executive-summary-problem.md) |
-| 2 | Proactive care had no consent, quiet-hours or frequency controls | Deck S5–S6 | [§3.6](02-solution-capabilities.md) + Diagram 38 |
-| 3 | Personalization and family guardian not designed | Deck S5–S6 | [§3.7](02-solution-capabilities.md) |
-| 4 | "Flow DSL" named but not designed | Deck S11, S15 | [§3.8](02-solution-capabilities.md) |
-| 5 | FRs missing: TTS reply, shop channel, receipt lookup by ID, kill switches, proactive pacing | Deck S5, S6 | [§4.1](03-requirements-personas-journeys.md) FR-COP-15, FR-CH-05, FR-TR-07, FR-GOV-04/05 |
-| 6 | NFRs missing: low-bandwidth/older devices, data residency, AI cost budget | Deck S15; S8 | [§4.2](03-requirements-personas-journeys.md) NFR-PERF-06, NFR-PRV-03, NFR-COST-01 |
-| 7 | Personas missing: shop staff, external verifier (TRCSL/auditor) | Deck S5, S6, S9 | [§5](03-requirements-personas-journeys.md) |
-| 8 | No Before → During → After journey summary | Guidelines §8; Deck S16 | [§6.7](03-requirements-personas-journeys.md) |
-| 9 | Channel limits (WhatsApp 24-h window/templates, SMS UCS-2, USSD) not addressed | Channel specs | [§9.7](06-integration-tmf.md) |
-| 10 | Forecast/risk-model disclosure only for bill-shock | Guidelines §6.3 | [§12.9](08-ai-architecture.md) |
-| 11 | Reconciliation and financial controls named but not designed | Deck S7, S14 | [§14.4](09-rules-decision-receipts.md) + Diagram 37 |
-| 12 | No data governance / data quality design | Enterprise practice | [§16.3](10-data-api-events.md) |
-| 13 | No test data management | Enterprise practice | [§24.1](12-platform-devops-testing-observability.md) |
-| 14 | No SLOs / error budgets | Enterprise practice | [§25.4](12-platform-devops-testing-observability.md) |
-| 15 | No benefits measurement method (baseline, control, attribution) | Guidelines §6.5 | [§40.1](15-cost-scale-failure-kpi.md) |
-| 16 | AI/LLM disclosure not consolidated into the required template | Guidelines §6.1 | [§42.3](16-gap-submission-repo-docs.md) |
-| 17 | Deck not mapped to the 10 recommended slides; no demo storyboard; no demo-readiness checklist | Guidelines §9–§11 | [§42.4–42.6](16-gap-submission-repo-docs.md) |
-| 18 | No project governance or stage gates | Enterprise practice | [§46](17-governance-compliance-change-cost.md) + Diagram 35 |
-| 19 | No release plan or requirements traceability | Enterprise practice | [§47](17-governance-compliance-change-cost.md) + Diagram 36 |
-| 20 | No regulatory/compliance mapping (Gazette, TRCSL, PDPA, PCI scope) | Deck S3, S8 | [§48](17-governance-compliance-change-cost.md) |
-| 21 | No change management, training or communications plan | Enterprise practice | [§49](17-governance-compliance-change-cost.md) |
-| 22 | Cost model covered AI only (no delivery effort or TCO) | Brief: "Cost model" missing | [§50](17-governance-compliance-change-cost.md) |
-| 23 | No assumptions register or data-provenance classification | Guidelines §6.4 | [§51](17-governance-compliance-change-cost.md) |
-| 24 | Post-production support, hypercare, warranty, knowledge transfer not defined | Guidelines §5.1 | [§52](17-governance-compliance-change-cost.md) + Diagram 39 |
-| 25 | README tagline duplicated; diagrams not render-checked | Housekeeping | Fixed; all Mermaid blocks render-validated |
+All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown viewers render. The full index of all 34 diagrams is in [05-architecture-diagrams.md § 8.1](05-architecture-diagrams.md#81-diagram-index-all-34-architecture-diagrams-in-this-plan).

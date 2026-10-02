@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.1); team to ratify at kickoff |
-| Plan references | enterprise-plan/09 §13–14; 04 T3 |
+| Plan references | docs/enterprise-plan/09 §13–14; 04 T3 |
 
 ## Context
 Cause detection is temporal evidence logic; outcome thresholds change often and must be business-editable; authorization needs a policy engine. A custom YAML DSL would be costly and still not editable by business users.
@@ -21,7 +21,7 @@ Cause logic = versioned Python detector plugins with manifests (pure functions o
 | Drools | JVM dependency |
 
 ## Consequences
-Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `enterprise-plan/CHANGES.md`.
+Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `docs/enterprise-plan/CHANGES.md`.
 
 ## Compliance
 Golden tests per rule version; replay must reproduce a decision exactly from snapshot + versions.

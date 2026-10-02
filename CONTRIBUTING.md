@@ -3,7 +3,7 @@
 Read [AGENTS.md](AGENTS.md) first. It holds the invariants, the documentation sync matrix and the glossary that every contributor (human or AI agent) follows. This file covers the day-to-day workflow.
 
 ## 1. Before you start a task
-1. Pick a work package from [17 §11.2](enterprise-plan/17-build-blueprint.md) and check its dependencies in [17 §13.1](enterprise-plan/17-build-blueprint.md).
+1. Pick a work package from [17 §11.2](docs/enterprise-plan/17-build-blueprint.md) and check its dependencies in [17 §13.1](docs/enterprise-plan/17-build-blueprint.md).
 2. Read the unit's `MODULE.md` and the contracts it uses.
 3. If the task needs a contract change, a new dependency between modules, or a decision not covered by an ADR, **raise it first** (contract PR or ADR). Don't change another team's module silently.
 
@@ -24,8 +24,8 @@ Read [AGENTS.md](AGENTS.md) first. It holds the invariants, the documentation sy
 |---|---|
 | Contract (`contracts/`) | Contract PR → consumers approve → semver bump → `CHANGELOG.md` → regenerate types → implement |
 | Architecture or technology decision | ADR (Proposed) → review → Accepted → then code |
-| The plan (`enterprise-plan/`) | ADR if it's a decision → edit chapters → entry in [`enterprise-plan/CHANGES.md`](enterprise-plan/CHANGES.md) → bump the plan version |
-| Policy artefact (detector, decision table, parameter, template) | Lifecycle in [19](enterprise-plan/19-policy-change-management.md): golden tests + replay report + approvals for its change class |
+| The plan (`docs/enterprise-plan/`) | ADR if it's a decision → edit chapters → entry in [`docs/enterprise-plan/CHANGES.md`](docs/enterprise-plan/CHANGES.md) → bump the plan version |
+| Policy artefact (detector, decision table, parameter, template) | Lifecycle in [19](docs/enterprise-plan/19-policy-change-management.md): golden tests + replay report + approvals for its change class |
 | New module / service / app | Copy [`docs/templates/MODULE.md`](docs/templates/MODULE.md); register in [`docs/modules.md`](docs/modules.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 
 ## 5. Documentation every PR
@@ -35,5 +35,5 @@ The sync matrix in [AGENTS.md §5](AGENTS.md) is mandatory. Reviewers reject PRs
 See [AGENTS.md §11](AGENTS.md).
 
 ## 7. Releases
-- Semantic Versioning: `v0.x` during the build, `v1.0.0` at milestone M4 ([17 §14](enterprise-plan/17-build-blueprint.md)).
+- Semantic Versioning: `v0.x` during the build, `v1.0.0` at milestone M4 ([17 §14](docs/enterprise-plan/17-build-blueprint.md)).
 - The **final hackathon submission** is a signed annotated tag (e.g. `v1.0.0-submission`) whose commit matches the demo and the submitted documents.

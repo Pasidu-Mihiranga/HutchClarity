@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.1); team to ratify at kickoff |
-| Plan references | enterprise-plan/10 §18; 04 T1, T2 |
+| Plan references | docs/enterprise-plan/10 §18; 04 T1, T2 |
 
 ## Context
 Money-moving side effects (receipts, notifications, reconciliation) must not be lost or duplicated, and dual writes to DB + bus are unsafe.
@@ -20,7 +20,7 @@ State change and event are written in the same Postgres transaction (outbox); a 
 | Redpanda | BSL licence (ADR-0012) |
 
 ## Consequences
-Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `enterprise-plan/CHANGES.md`.
+Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `docs/enterprise-plan/CHANGES.md`.
 
 ## Compliance
 Chaos test in the baseline gate: kill the relay mid-flight → no lost or duplicate side effects.

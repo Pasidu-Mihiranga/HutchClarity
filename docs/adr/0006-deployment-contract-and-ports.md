@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.1); team to ratify at kickoff |
-| Plan references | enterprise-plan/18 §2, §3; 04 T14 |
+| Plan references | docs/enterprise-plan/18 §2, §3; 04 T14 |
 
 ## Context
 HUTCH must be able to deploy the prototype on AWS, Azure, a VPS or Kubernetes without rewriting code.
@@ -20,7 +20,7 @@ Every deployable follows the deployment contract: one OCI image, config via env/
 | Cloud-specific SDKs in domain code | Lock-in |
 
 ## Consequences
-Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `enterprise-plan/CHANGES.md`.
+Builds follow this decision from the baseline onward. Changing it requires a new ADR that supersedes this one and a plan update via `docs/enterprise-plan/CHANGES.md`.
 
 ## Compliance
 Domain code may not import cloud SDKs (import-linter); CI installs the Helm chart on `kind` and runs smoke tests.

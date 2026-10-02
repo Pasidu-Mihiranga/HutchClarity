@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-01 |
 | Deciders | Architecture planning (plan v1.2); team to ratify at kickoff |
-| Plan references | enterprise-plan/17 §2.3 to §2.5, §14 |
+| Plan references | docs/enterprise-plan/17 §2.3 to §2.5, §14 |
 
 ## Context
 The production stack (Kafka, Valkey, Keycloak, OPA, SeaweedFS, Grafana, Kubernetes, OpenTofu) would block daily development and testing if every developer had to run it locally. Enterprise teams separate a fast inner loop from a complete outer loop.

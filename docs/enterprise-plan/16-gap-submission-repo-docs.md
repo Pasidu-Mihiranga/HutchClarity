@@ -1,8 +1,10 @@
-# Hutch Clarity — Prototype Gap, Hackathon Mapping, Repository, Documentation & Recommendations
+# Hutch Clarity - Prototype Gap, Hackathon Mapping, Repository, Documentation & Recommendations
 
-[← 15-cost-scale-failure-kpi.md](15-cost-scale-failure-kpi.md) · [← Plan index](README.md) · [17-governance-compliance-change-cost.md →](17-governance-compliance-change-cost.md)
+[← 15-cost-scale-failure-kpi.md](15-cost-scale-failure-kpi.md) · [← Plan index](README.md)
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
+
+> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 41. Prototype-to-Production Gap
 
@@ -29,33 +31,32 @@ Status reflects **this repository**, which currently contains only the two sourc
 
 | Requirement (Guidelines) | Hutch Clarity Artifact | Status | Remaining Work |
 |---|---|---|---|
-| Final solution / prototype | Working Why? journey + Desk + receipt verify (mocked integrations) | Team to confirm — not in this repo | Ensure end-to-end VAS_NO_CONSENT + duplicate-reload journeys run; label mocks clearly |
+| Final solution / prototype | Working Why? journey + Desk + receipt verify (mocked integrations) | Team to confirm - not in this repo | Ensure end-to-end VAS_NO_CONSENT + duplicate-reload journeys run; label mocks clearly |
 | Source code repository | Monorepo (§43) | Not in repo | Push code; tag final commit; no secrets |
 | README | `README.md` with all mandated sections | Not started | Use the Guidelines §3 list: team, problem, features, stack, architecture, setup, run/test, APIs, limitations, third parties, AI models |
 | Solution / technical document (PDF) | This plan, condensed to the Guidelines §8 structure | **Drafted (this plan)** | Export a concise PDF (exec summary → limitations) |
 | Architecture diagram | Diagrams 1, 2, 7 (+ index [§8.1](05-architecture-diagrams.md)) | **Drafted (Mermaid)** | Render to PNG/PDF |
 | HUTCH integration demonstration | Adapter layer with mock drivers + data-flow diagrams (7, 11) | Design drafted; demo team to confirm | Show the adapter switch (mock ↔ "HUTCH" stub) in the demo |
-| Integration feasibility (5 items) | [§9.5](06-integration-tmf.md) table | **Drafted** | — |
-| Implementation plan | [§26](13-delivery-plan.md)–[§32](13-delivery-plan.md) | **Drafted** | — |
+| Integration feasibility (5 items) | [§9.5](06-integration-tmf.md) table | **Drafted** | - |
+| Implementation plan | [§26](13-delivery-plan.md)–[§32](13-delivery-plan.md) | **Drafted** | - |
 | Gantt chart | Diagram 31 + [§28.1](13-delivery-plan.md) | **Drafted** | Render to image for PDF |
 | AI usage declaration | §42.1 below | Draft | Team to fill actual models and coding assistants |
-| AI / token / forecast assumptions | [§37](15-cost-scale-failure-kpi.md), [§38](15-cost-scale-failure-kpi.md), [§12.8–12.9](08-ai-architecture.md), §42.3 disclosure template, [§51](17-governance-compliance-change-cost.md) provenance | Draft (assumed values) | Replace with measured prototype numbers |
-| Presentation deck | 17-slide deck exists; slide mapping in §42.4 | **Exists** | Add team name + track to the title; add a live-demo cue slide; optional appendix with Gantt + integration diagrams |
-| Demo video (3–7 min) | Storyboard in §42.5 | Team to confirm | Record per storyboard: problem in the first 60 s, complete journeys, mocks labelled on screen |
+| AI / token / forecast assumptions | [§37](15-cost-scale-failure-kpi.md), [§38](15-cost-scale-failure-kpi.md), [§12.8](08-ai-architecture.md) | Draft (assumed values) | Replace with measured prototype numbers |
+| Presentation deck | 17-slide deck exists | **Exists** | Ensure slide order covers the Guidelines' 10 slides (title needs team name + track) |
+| Demo video (3–7 min) | - | Team to confirm | Problem in the first 60 s; one complete journey |
 | Test credentials / demo access | Demo URL + test users (customer OTP stub, agent, supervisor) | Team to confirm | Share separately, not in the repo |
 | Known limitations | §42.2 below | Draft | Copy into README |
 | Third-party disclosure | [§21](12-platform-devops-testing-observability.md) stack table | Draft | Add versions + licences to README |
-| Final checklist | Guidelines §15 | — | Team name, track, university/batch, links tested |
-| Testing & demonstration readiness | Checklist in §42.6 | Not started | Run the checklist before submission and before the live demo |
+| Final checklist | Guidelines §15 | - | Team name, track, university/batch, links tested |
 
 ### 42.1 AI usage declaration (draft for the team to complete)
 
 | Item | Response (draft) |
 |---|---|
-| AI model / platform(s) used | **[Team to complete]** Prototype model(s) and provider(s). Production design: provider-agnostic gateway; self-hosted open-weight tier + optional hosted tier. |
+| AI model / platform(s) used | **Prototype:** Google Gemini API (free tier): Flash-Lite for fast text and extraction, Flash as reasoning fallback, Flash-Lite TTS. Groq (free tier): gpt-oss-120b (reasoning), gpt-oss-20b (fast fallback, judge), Whisper large-v3 (STT), Prompt Guard (preview). Self-hosted BGE-M3 embeddings. Exact IDs in `config/ai/models.yaml` ([18 §4](18-tech-stack-and-ai.md)). **Production:** provider chosen by HUTCH, by config. |
 | Purpose of AI usage | Multilingual intake extraction, explanation, staff summaries, RAG answers, complaint clustering summaries, Foresight personas. **Not** used for decisions, amounts or actions. |
-| AI-generated code used? | **[Team to complete: Yes/No + which assistants]** |
-| External AI APIs used? | **[Team to complete]** |
+| AI-generated code used? | **[Team to complete: Yes/No + which assistants]** Note: plan chapters 17–19 and the repository governance files were drafted with Claude Code (Anthropic) and reviewed by the team. |
+| External AI APIs used? | Yes: Gemini API and GroqCloud, free tiers, with **synthetic, PII-masked data only**; Groq Zero Data Retention enabled. |
 | RAG / external knowledge? | Yes: catalogue, T&C, Gazette 2316/14, help content (prototype: sample documents) |
 | Prompting approach | System + FACTS + CONTEXT + USER blocks; JSON output; verifier ([§12.4](08-ai-architecture.md)) |
 | AI vs rule-based | Rule-based: timeline, causes, decisions, actions, receipts. AI: language, retrieval, clustering, simulation. |
@@ -71,130 +72,43 @@ Status reflects **this repository**, which currently contains only the two sourc
 6. The bill-shock model has no training data; prototype values are simulated.
 7. Customer quotes in the deck are paraphrased public posts ("patterns, not statistics").
 8. Impact figures are expected effects to be measured in a pilot.
-
-### 42.3 AI / LLM disclosure template (Guidelines §6.1), completed with plan values
-Prototype values must be **measured** (Langfuse/gateway logs) and replace the assumed values below before submission.
-
-| Disclosure item | Response |
-|---|---|
-| AI/LLM provider | **[Team to complete for prototype]**. Production: provider-agnostic gateway. Self-hosted open-weight tier first; optional hosted tier on masked text ([§12.2](08-ai-architecture.md)). |
-| Model name & version | **[Team to complete]**. Production candidates are chosen by evaluation; model IDs live in config `[DECK S13]`. |
-| Purpose | Intake extraction, explanation in si/ta/en, staff summaries, cited RAG answers, Autopsy canonical summaries and labels, Foresight personas |
-| LLM calls per journey | Structured Why? dispute: 1 (+0.2 judge). Free-text dispute: 2 (+0.2). Simple question: 0–1. Staff case: 2. Proactive or zero-contact: 0 ([§37.2](15-cost-scale-failure-kpi.md)) |
-| Avg input tokens per request | ≈ 600–1,500 (small tier); ≈ 4,000–6,000 (reasoning tier) — **ASSUMPTION** |
-| Avg output tokens per request | ≈ 80–550 (small; si/ta higher); ≈ 1,400–1,600 incl. reasoning — **ASSUMPTION** |
-| Avg total tokens per request / interaction | ≈ 1,650–3,200 per customer journey; ≈ 2,100 average per interaction across the assumed mix — **ASSUMPTION** |
-| Scalability example | 2,100 tokens × 10,000 interactions/day ≈ 21M tokens/day ([§38](15-cost-scale-failure-kpi.md)) |
-| RAG / external knowledge | Yes: catalogue, T&C, Gazette 2316/14, help content, CX-approved answers; cited by source ID and version ([§12.5](08-ai-architecture.md)) |
-| Prompting approach | Versioned system prompt + FACTS JSON + delimited CONTEXT and USER blocks; JSON output; few-shot per language ([§12.4](08-ai-architecture.md)) |
-| AI-generated vs rule-based | **Rules:** timeline, causes, confidence, decisions, amounts, actions, receipts, reconciliation. **AI:** language, retrieval, clustering, simulation. |
-| Fallback | Templates (works without the LLM `[DECK S7]`), fallback tier, human handoff ([§39](15-cost-scale-failure-kpi.md)) |
-| Known limitations | si/ta/Singlish quality varies; hallucination is controlled by the verifier but not impossible; STT accuracy; PII name detection in si/ta script; Foresight is unvalidated until backtested |
-| Indicative cost | [§37.4](15-cost-scale-failure-kpi.md) (illustrative unit prices) |
-
-### 42.4 Presentation mapping (Guidelines §9: 10 recommended slides)
-
-| Recommended slide | Deck slide(s) | Gap |
-|---|---|---|
-| 1. Title (solution, team, track) | S1 | **Add team name and selected track** |
-| 2. The Problem | S2 | — |
-| 3. The Insight | S3 | — |
-| 4. The Solution | S3, S5, S6 | — |
-| 5. How It Works | S4, S7, S12 | — |
-| 6. Technology & AI | S13, S14, S8 | Add the AI/LLM disclosure summary (§42.3) |
-| 7. Customer Journey | S5, S16 | Optionally add Before → During → After ([§6.7](03-requirements-personas-journeys.md)) |
-| 8. Live Demo | S4 (animated walkthrough) | **Add a live-demo cue slide** that marks mocked integrations |
-| 9. Impact | S16, S15 | Keep the "expected, measured in a pilot" label |
-| 10. Future Vision | S17 | Optional appendix: Gantt (Diagram 31), integration (Diagram 7) |
-
-### 42.5 Demo video storyboard (target 5–6 min; Guidelines §10: 3–7 min)
-
-| Time | Scene | What to show |
-|---|---|---|
-| 0:00–0:45 | Problem + one-line solution | S2 quotes → "Explain every rupee. Fix it by rule. Prove it won't happen again." |
-| 0:45–2:15 | Journey 1: VAS without consent | App Why? on −LKR 49 → evidence + ruled-out causes → one-tap fix → balance updated → Trust Receipt → scan QR → **Verified** |
-| 2:15–3:00 | Journey 2: zero-contact duplicate reload | Simulated payment stream → auto-refund → SMS receipt (simulator). Label: *simulated stream*. |
-| 3:00–4:00 | Clarity Desk | High-risk case → staff approval with MFA step-up → Teach once |
-| 4:00–4:45 | Rules decide, the LLM explains | Rule version on the decision; verifier blocks a wrong number; switch the LLM off → template answer; MCP audit log shows `propose_action` only |
-| 4:45–5:30 | Autopsy + integration | Clusters from multilingual complaints; adapter switch from mock to "HUTCH" stub |
-| 5:30–6:00 | Roadmap + close | Shadow → Desk → Customer → Foresight; Gantt milestones |
-
-On-screen labels throughout: **"Mocked HUTCH systems · synthetic data"**.
-
-### 42.6 Testing & demonstration readiness checklist (Guidelines §11)
-- ☐ Application starts from a clean clone using README steps (tested on a second machine)
-- ☐ Main journey works end-to-end (Journey 1); Journey 2 and the Desk flow work
-- ☐ All buttons and links in the demo path work; QR verify page reachable
-- ☐ Mock services and demo data load automatically; reset script restores the demo state
-- ☐ Test credentials (customer OTP stub, agent, supervisor) valid and **shared separately**
-- ☐ No production or confidential data; no secrets committed (secret scan clean)
-- ☐ Source code matches the submitted prototype (final commit tagged)
-- ☐ LLM-off fallback works live (in case of network issues at the venue)
-- ☐ Presentation and demo video links accessible to judges
+9. The prototype uses free-tier LLM APIs: rate limits apply, and Gemini's free tier may use prompts for product improvement, so only synthetic data is used.
 
 ---
 
-## 43. Repository Structure
+## 43. Repository Structure (v1.1)
+
+Aligned with the build blueprint ([17 §2, §4](17-build-blueprint.md)). The planning folder lives at `docs/enterprise-plan/`.
 
 ```text
 hutch-clarity/
-├── apps/
-│   ├── web/                    # Next.js PWA: customer Why? module (web + app WebView), verify page
-│   └── desk/                   # Next.js: Clarity Desk + Ops/insights console
-├── services/
-│   ├── bff-api/                # Edge-facing API for frontends
-│   ├── orchestrator/           # Sessions, language, routing, handoff, confirmation tokens
-│   ├── case-service/           # Case aggregate, state machine, outbox
-│   ├── timeline-builder/
-│   ├── rule-engine/            # Evaluator + predicate library + replay
-│   ├── decision-policy/        # OPA bundles (rego) + policy tests
-│   ├── tool-layer/             # Action registry, idempotency, compensations
-│   ├── receipts/               # Receipt builder, signing client, render pool, verify API
-│   ├── desk-api/               # Approvals, bulk fix, what-if, regulator pack
-│   ├── reconciliation/
-│   ├── channels/               # whatsapp/, sms/, ussd/ connectors
-│   ├── autopsy/
-│   └── foresight/              # Sandboxed; aggregates only
-├── ai/
-│   ├── gateway/                # Model router, quotas, provider clients
-│   ├── pii/                    # Presidio + Sri Lankan recognizers, token vault client
-│   ├── verifier/
-│   ├── prompts/                # Versioned prompts per language
-│   ├── retrieval/              # RAG ingestion + retriever
-│   ├── models/                 # Bill-shock, merchant risk
-│   └── evaluation/             # Golden sets si/ta/en/Singlish, harness, red-team
-├── mcp/
-│   └── server/                 # tools/ resources/ prompts/ auth/ policy/ schemas/ adapters/ audit/ idempotency/ tests/
-├── rules/
-│   ├── packs/                  # VAS_NO_CONSENT/v4.yaml ...
-│   └── golden/                 # positive/negative/boundary/replay fixtures per rule version
-├── integrations/
-│   ├── framework/              # Adapter base, resilience, driver selection
-│   ├── payments/  charging/  catalogue/  vas-consent/  usage-fup/  loans/  crm/  identity/  notifications/
-│   └── mocks/                  # Mock HUTCH services + synthetic stream generators
-├── packages/
-│   ├── schemas/                # JSON Schema (TMF-shaped) → Pydantic + TS codegen
-│   ├── events/                 # Event schemas (Avro/Protobuf) + registry config
-│   └── ui/                     # Shared design system (si/ta/en, accessibility)
-├── infra/
-│   ├── terraform/
-│   ├── helm/
-│   ├── argocd/
-│   └── docker-compose/         # Local stack
-├── tests/
-│   ├── e2e/  contract/  load/  chaos/  security/
-├── docs/
-│   ├── enterprise-plan/        # This plan, split by chapter
-│   ├── adr/                    # Architecture Decision Records
-│   ├── api/                    # OpenAPI specs
-│   ├── mcp/                    # Tool specification
-│   ├── runbooks/
-│   └── submission/             # Tech doc PDF, AI declaration, token disclosure, diagrams PNG
-├── .github/workflows/          # or .gitlab-ci.yml
-├── CODEOWNERS
-├── SECURITY.md
-└── README.md
+├── AGENTS.md  CLAUDE.md  ARCHITECTURE.md  CONTRIBUTING.md  CHANGELOG.md  SECURITY.md  README.md
+├── docs/enterprise-plan/              # This plan (versioned; changes via enterprise-plan/CHANGES.md)
+├── backend/                      # Python, uv workspace
+│   ├── src/clarity/
+│   │   ├── kernel/               # L0 shared kernel
+│   │   ├── platform/             # L2 module system, db, outbox, bus, idempotency, audit, vault, config, flags, authz, telemetry
+│   │   ├── integration/          # L1 ports/ + drivers/{mock,sandbox,hutch}/
+│   │   ├── ai/                   # L3 gateway client, pii, verifier, prompts, rag
+│   │   ├── modules/<module>/     # L4 domain/ application/ infrastructure/ api/ public.py events.py MODULE.md tests/
+│   │   └── entrypoints/          # api, worker, stream, migrate
+│   └── tests/                    # cross-module integration + architecture (import-linter) tests
+├── services/                     # separately deployed: mcp/ signer/ ai-gateway/ channel-gateway/ hutch-sim/
+├── frontend/
+│   ├── apps/                     # customer-web/ console/ verify/
+│   └── packages/                 # ui/ sdk/ i18n/ widget/
+├── contracts/                    # openapi/ asyncapi/ jsonschema/ -> generated Pydantic + TypeScript
+├── rules/                        # manifests/ detectors/ tables/ (ZEN JDM) golden/
+├── config/                       # non-secret defaults, ai/models.yaml, policy defaults
+├── templates/                    # notification + explanation templates (si/ta/en)
+├── deploy/                       # compose/ helm/ opentofu/ docs/
+├── tests/                        # e2e/ contract/ load/ security/ chaos/
+├── docs/                         # adr/ devlog/ walkthroughs/ templates/ modules.md WALKTHROUGHS.md api/ runbooks/ submission/
+├── scripts/                      # codegen and dev helpers
+└── .github/                      # workflows/ CODEOWNERS pull_request_template.md
 ```
+
+Every unit under `modules/`, `services/` and `frontend/apps/` has a `MODULE.md`. The documentation rules are in the root [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
@@ -202,6 +116,7 @@ hutch-clarity/
 
 | Document | Owner | When |
 |---|---|---|
+| **Living docs (from day 1):** `AGENTS.md`, `ARCHITECTURE.md`, `MODULE.md` per module, walkthroughs, devlog entries, ADRs, `CHANGELOG.md`, plan `CHANGES.md` | Every developer; Tech Lead reviews | Every PR (checked in review) |
 | Architecture Decision Records (ADR-001 … e.g., rule/OPA split, outbox, AI gateway, pilot-in-prod) | SA | From Phase 0, continuous |
 | Software Requirements Specification | BA/PO | M1 |
 | Solution Architecture Document | SA | M2 |
@@ -223,14 +138,6 @@ hutch-clarity/
 | Pilot report + Production Readiness Review pack | PM | P18, R1 |
 | Regulator pack specification (with TRCSL expectations) | Compliance | Phase 10 |
 | Hackathon submission set (README, tech PDF, AI declaration, token disclosure) | Team | Now |
-| Governance charter & stage-gate criteria | PM | G0 ([§46](17-governance-compliance-change-cost.md)) |
-| Release plan & requirements traceability matrix | PO / BA | M1, maintained ([§47](17-governance-compliance-change-cost.md)) |
-| Regulatory & compliance matrix | Compliance | M2 ([§48](17-governance-compliance-change-cost.md)) |
-| Change management, training & communications plan | CX Ops | Before shadow ([§49](17-governance-compliance-change-cost.md)) |
-| Effort & TCO model | PM + Finance | G0, refreshed per gate ([§50](17-governance-compliance-change-cost.md)) |
-| Assumptions register & data provenance | PM | Continuous ([§51](17-governance-compliance-change-cost.md)) |
-| Support model, hypercare & knowledge transfer plan | SRE + PO | Before G8 ([§52](17-governance-compliance-change-cost.md)) |
-| Flow catalogue (self-service flows, versions, owners) | CX Eng | R2 ([§3.8](02-solution-capabilities.md)) |
 
 ---
 
@@ -246,9 +153,8 @@ hutch-clarity/
 8. **Position Foresight as advisory.** Licence review plus a backtest gate before any business use. "Scenarios, not certainties."
 9. **Govern rules like code.** Golden tests, replay, four-eyes, signed bundles, and teach-once feeding the backlog.
 10. **For the hackathon:** turn the prototype status rows in §42 into done items, fill in the AI declaration with real models, measure tokens in the prototype, and export Diagrams 1, 2, 7 and 31 as images for the technical PDF.
-11. **Run the project through formal governance.** Stage gates G0–G9, a living assumptions register and requirements traceability ([§46–§51](17-governance-compliance-change-cost.md)). Proactive care stays consent-, quiet-hours- and frequency-capped ([§3.6](02-solution-capabilities.md)), and reconciliation is a finance-owned daily control ([§14.4](09-rules-decision-receipts.md)).
 
-### 45.1 Assumptions & HUTCH confirmations (consolidated; the full register with owners and dates is in [§51](17-governance-compliance-change-cost.md))
+### 45.1 Assumptions & HUTCH confirmations (consolidated)
 - **ASSUMPTION:** start date 2027-01-04; change freezes; cohort sizes; retention periods; token/traffic mix; unit prices; GPU throughput; thresholds and caps; candidate rule list.
 - **REQUIRES HUTCH CONFIRMATION:**
   - existence, owners and interfaces of every HUTCH system category;
@@ -259,4 +165,4 @@ hutch-clarity/
   - TRCSL reporting expectations; pilot-in-production acceptability.
 ---
 
-[← 15-cost-scale-failure-kpi.md](15-cost-scale-failure-kpi.md) · [← Plan index](README.md) · [17-governance-compliance-change-cost.md →](17-governance-compliance-change-cost.md)
+[← 15-cost-scale-failure-kpi.md](15-cost-scale-failure-kpi.md) · [← Plan index](README.md)
