@@ -16,7 +16,19 @@ from typing import Any
 
 from sqlalchemy import create_engine
 
-from clarity.ai.gateway import AIGateway, ModelProvider
+from clarity.ai.buckets import TokenBuckets
+from clarity.ai.cassettes import CassetteLibrary, RecordedProvider
+from clarity.ai.gateway import (
+    AIGateway,
+    ModelProvider,
+    Prompt,
+    TemplateProvider,
+    Usage,
+)
+from clarity.ai.guard import Guard
+from clarity.ai.local import LOCAL_IMPLEMENTATIONS
+from clarity.ai.roles import ModelCatalogue, ModelRole
+from clarity.ai.routing import RoleRouter
 from clarity.app.mcp_view import ResolutionServiceMCPView
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
@@ -210,6 +222,71 @@ _Persistence = tuple[
 ]
 
 
+def default_models_file(configured: Path | None = None) -> Path:
+    """Where the model roles are declared. Data, not code (I12)."""
+    return _shared_dir(configured, "config", "ai") / "models.yaml"
+
+
+def _ai_providers(configured: ModelProvider | None, settings: Settings) -> dict[str, ModelProvider]:
+    """Bind each provider name in the catalogue to something that can answer.
+
+    The local ones always exist, which is what makes "no model configured" a
+    supported state rather than an outage (ADR-0009). A remote name is bound
+    only when this deployment actually has that provider, and an unbound name
+    is skipped by the router rather than being an error.
+
+    In replay mode every remote provider is wrapped in a cassette, so a test
+    cannot reach the network even when a key is present (A02).
+    """
+    providers: dict[str, ModelProvider] = {
+        "template": TemplateProvider(),
+        # Embeddings have no local model in the prototype; the template
+        # provider stands in so the chain terminates (plan 19 section 2.1
+        # names BGE-M3 for production).
+        "local-bge": TemplateProvider(),
+    }
+    for name, implementation in LOCAL_IMPLEMENTATIONS.items():
+        providers[name] = implementation()
+
+    if configured is None:
+        return providers
+
+    library = CassetteLibrary(settings.cassette_dir, recording=settings.record_cassettes)
+    # One configured provider stands behind every remote name: the prototype
+    # has a single endpoint, and the catalogue decides which role reaches it.
+    for remote in ("groq", "gemini"):
+        providers[remote] = RecordedProvider(
+            configured,
+            library=library,
+            role="shared",
+            provider=remote,
+            model=settings.model_name,
+        )
+    return providers
+
+
+def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | None:
+    """The guard role's provider, when one is configured for it."""
+    chain = catalogue.routing(ModelRole.GUARD).chain
+    for step in chain:
+        if not step.is_local and step.provider in router.configured:
+            return _RoleProvider(router, ModelRole.GUARD)
+    return None
+
+
+class _RoleProvider:
+    """Adapts a role to the provider interface the guard expects."""
+
+    def __init__(self, router: RoleRouter, role: ModelRole) -> None:
+        self._router = router
+        self._role = role
+        self.name = f"role:{role.value}"
+
+    def complete(self, prompt: Prompt) -> tuple[str, Usage]:
+        answer = self._router.invoke(self._role, prompt)
+        return answer.text, answer.usage
+
+
 def _persistence_for_profile(profile: Profile, settings: Settings) -> _Persistence:
     """Bind the persistence driver this profile runs with (ADR-0014, B05).
 
@@ -369,6 +446,18 @@ class Clarity:
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
         self.ai = AIGateway(provider=provider, prefer_templates=provider is None)
+        # Roles, not models (A01, I12). The catalogue is the only place a model
+        # ID appears; code asks for a role and this walks the chain it declares.
+        self.models = ModelCatalogue.from_file(default_models_file(self.settings.models_file))
+        self.ai_quotas = TokenBuckets()
+        self.roles = RoleRouter(
+            self.models,
+            providers=_ai_providers(provider, self.settings),
+            buckets=self.ai_quotas,
+        )
+        # Heuristics always; the guard role assists when a provider is set. It
+        # can only ever add a refusal, never clear one (A03).
+        self.guard = Guard(assist=_guard_assist(self.roles, self.models))
         self.policies = PolicyResolver.from_directory(
             policy_dir or default_policy_dir(self.settings.policy_dir)
         )
@@ -460,7 +549,7 @@ class Clarity:
         )
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
-        self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts)
+        self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
 
     def _open_zero_contact_case(self, event: Event) -> None:
         payload = event.payload()

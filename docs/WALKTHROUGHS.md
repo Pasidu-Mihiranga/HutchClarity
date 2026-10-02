@@ -13,7 +13,7 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | WT-07 | Receipt QR verification and decision replay | 09 §15 | to write (flow works) | - |
 | WT-08 | Adding a new rule pack (golden tests → publish) | 09 §13.4 | to write (flow works) | - |
 | WT-09 | Adding a new module (public surface, MODULE.md, boundary test) | 21 §4 | to write (flow works) | - |
-| WT-10 | External MCP client asks "why was I charged?" | 07 §10.7 | planned (R4) | - |
+| WT-10 | [External MCP client asks "why was I charged?"](walkthroughs/WT-10-external-mcp-client.md) | 07 §10.7 | verified | 2026-10-03 |
 | WT-11 | Running the `full` profile | 21 §9 | planned (R2) | - |
 | WT-12 | Deploying: containers for the core, serverless edges | 21 §5 | planned (R7) | - |
 | WT-13 | [Staff console roles: role switcher, desk, kill switches](walkthroughs/WT-13-staff-console.md) | 18 §5.4 | verified by the team (old layout); re-verify on `dev` | 2026-10-02 |

@@ -242,12 +242,19 @@ Linked to the 42 open issues in the repo. Check off each item as it is merged. I
 - [x] #37 `[M-RCPT]` Receipts: signer service port with OpenBao/KMS driver, isolated rendering `p1`
 - [x] #38 `[M-REC]` Reconciliation module: daily match of actions against adapter confirmations `p2`
 
+Driver verification (all five done, 2026-10-03): each acceptance test was
+re-run against the real component rather than a stand-in, and proven able to
+fail first. This found 4 Kafka defects, an OPA policy that was never
+evaluated, a wrong OpenBao Transit path, and a Keycloak JWKS bug that
+rejected every real token. See the M-GOV, M-DEC, M-RCPT, M-REC and M-IAM
+devlogs.
+
 ### Wave 2 - AI layer (gateway, safety, MCP, evaluation)
 
-- [ ] #2 `[A01]` AI gateway: model roles, config/ai/models.yaml, fallback chains, quota-aware buckets `p0`
-- [ ] #3 `[A02]` Recorded responses (cassettes): no live model calls in CI `p0`
-- [ ] #4 `[A03]` Safety: PII masking coverage per language and the guard role `p0`
-- [ ] #8 `[A04]` MCP server over the network: SDK, Streamable HTTP, OAuth 2.1 resource server, new tools `p0`
+- [x] #2 `[A01]` AI gateway: model roles, config/ai/models.yaml, fallback chains, quota-aware buckets `p0`
+- [x] #3 `[A02]` Recorded responses (cassettes): no live model calls in CI `p0`
+- [x] #4 `[A03]` Safety: PII masking coverage per language and the guard role `p0`
+- [x] #8 `[A04]` MCP server over the network: SDK, Streamable HTTP, OAuth 2.1 resource server, new tools `p0`
 - [ ] #9 `[A05]` Evaluation harness: per-language golden sets, metrics and release gates `p1`
 
 ### Wave 3 - Conversation and knowledge (RAG, flows, chat UI)

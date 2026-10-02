@@ -232,6 +232,34 @@ class SyntheticWorld:
     def account_by_msisdn(self, msisdn: str) -> Account | None:
         return self._accounts.get(ref_for(normalise_msisdn(msisdn)))
 
+    def network_for(self, subscriber_ref: str) -> dict[str, object]:
+        """Simulated coverage and outage state for one subscriber (`hutch-sim`).
+
+        The `_network` key is private to the synthetic world: the underscore
+        keeps it out of the safeguard list the customer and MCP are shown, so
+        adding it here did not change what `get_customer_safeguards` returns.
+        A real deployment reads the network assurance system
+        (**REQUIRES HUTCH CONFIRMATION**).
+        """
+        clear: dict[str, object] = {
+            "status": "clear",
+            "text": "No outage in your area.",
+            "eta": None,
+            "simulated": True,
+        }
+        account = self._accounts.get(subscriber_ref)
+        if account is None:
+            return clear
+        network = account.safeguards.get("_network")
+        if not isinstance(network, dict):
+            return clear
+        return {
+            "status": network.get("status") or "clear",
+            "text": network.get("text") or "No outage in your area.",
+            "eta": network.get("eta"),
+            "simulated": True,
+        }
+
     def accounts(self) -> list[Account]:
         return list(self._accounts.values())
 

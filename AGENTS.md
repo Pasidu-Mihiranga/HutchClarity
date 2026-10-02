@@ -170,6 +170,7 @@ Run from the repository root. The default `lite` profile needs only Python.
 |---|---|
 | Create `.venv` and install | `make setup` |
 | Run UI + API on http://localhost:8000 | `make dev` |
+| Run `clarity-mcp` (MCP over Streamable HTTP) on :8099 | `make mcp` |
 | Lint, types, import contracts, tests | `make check` |
 | Apply formatting and safe fixes | `make format` |
 | Walk the four journeys in the terminal | `make demo` |

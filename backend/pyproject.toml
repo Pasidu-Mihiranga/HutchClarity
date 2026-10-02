@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "hutch-clarity[mcp]",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "hypothesis>=6.112",
@@ -34,6 +35,14 @@ dev = [
     "types-PyYAML>=6.0",
     "types-qrcode>=8.0",
     "import-linter>=2.0",
+]
+# The clarity-mcp deployable: MCP SDK over Streamable HTTP as an OAuth 2.1
+# resource server (A04, ADR-0018). Installed by the dev extra as well, because
+# the transport and resource-server tests run under `make check`.
+# Licence: the MCP Python SDK is MIT, OSI-approved and neutral (I17, plan 19
+# section 1).
+mcp = [
+    "mcp>=2.2",
 ]
 # Receipt PNG/PDF rendering. Optional: the core, the demo and `make check`
 # run without a browser, and render() reports clearly when it is missing.

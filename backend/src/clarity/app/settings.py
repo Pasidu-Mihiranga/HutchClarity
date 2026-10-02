@@ -91,6 +91,29 @@ class Settings(BaseSettings):
     keycloak_audience: str = Field(default="clarity-api", alias="CLARITY_KEYCLOAK_AUDIENCE")
     keycloak_jwks_url: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_JWKS_URL")
     opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
+    # The clarity-mcp deployable (A04, ADR-0018).
+    mcp_resource_url: str = Field(
+        default="http://localhost:8081/mcp",
+        alias="CLARITY_MCP_RESOURCE_URL",
+        description="This MCP server's own identifier (RFC 8707 resource indicator).",
+    )
+    mcp_allowed_hosts: str = Field(
+        default="",
+        alias="CLARITY_MCP_ALLOWED_HOSTS",
+        description="Comma-separated Host headers the MCP server answers to. "
+        "Empty: the host in CLARITY_MCP_RESOURCE_URL. Never a wildcard.",
+    )
+    mcp_api_url: str = Field(
+        default="http://localhost:8000",
+        alias="CLARITY_MCP_API_URL",
+        description="Base URL of clarity-api, which clarity-mcp calls for every tool.",
+    )
+    mcp_exchange_url: str | None = Field(
+        default=None,
+        alias="CLARITY_MCP_EXCHANGE_URL",
+        description="RFC 8693 token-exchange endpoint. Unset: downstream calls are "
+        "refused rather than forwarding the client's token (ADR-0018).",
+    )
     auth_timeout_seconds: float = Field(default=3.0, alias="CLARITY_AUTH_TIMEOUT", gt=0)
     signer_url: str | None = Field(default=None, alias="CLARITY_SIGNER_URL")
     signer_token: str | None = Field(default=None, alias="CLARITY_SIGNER_TOKEN")
@@ -116,6 +139,16 @@ class Settings(BaseSettings):
     model_timeout_seconds: float = Field(default=20.0, alias="CLARITY_MODEL_TIMEOUT", gt=0)
     prefer_templates: bool = Field(default=True, alias="AI_PREFER_TEMPLATES")
     cassette_dir: Path = Field(default=Path("cassettes"), alias="AI_CASSETTE_DIR")
+    record_cassettes: bool = Field(
+        default=False,
+        alias="CLARITY_RECORD_CASSETTES",
+        description="Record model responses instead of replaying them (A02). Needs a provider.",
+    )
+    models_file: Path | None = Field(
+        default=None,
+        alias="CLARITY_MODELS_FILE",
+        description="Model roles and provider chains. Unset: config/ai/models.yaml.",
+    )
 
     # -- interfaces ------------------------------------------------------- #
 

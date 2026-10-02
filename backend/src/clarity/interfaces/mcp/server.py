@@ -28,12 +28,14 @@ the authorization ones, which is where the risk actually sits.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from clarity.ai.pii import Masker
 from clarity.app.mcp_view import MCPCaseView
 from clarity.contracts.decision import ActionType
 from clarity.kernel.canonical import hash_payload
@@ -41,6 +43,10 @@ from clarity.kernel.common import ActionSafetyLevel, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[\w\u0D80-\u0DFF\u0B80-\u0BFF]+", text)
 
 
 class Profile(StrEnum):
@@ -156,6 +162,25 @@ class ClarityMCPServer:
             {"case_id"},
         )
         self._add(
+            "get_network_status",
+            read,
+            everyone,
+            "Coverage and outage state for the case's subscriber (simulated).",
+            self._get_network_status,
+            {"case_id"},
+        )
+        self._add(
+            "search_knowledge",
+            read,
+            everyone | {Profile.ANALYTICS},
+            (
+                "Cited answers from the published rule catalogue. Every chunk "
+                "carries its source and version, so an answer can be checked."
+            ),
+            self._search_knowledge,
+            {"query"},
+        )
+        self._add(
             "request_handoff",
             ActionSafetyLevel.L2_LOW_RISK,
             everyone,
@@ -256,14 +281,23 @@ class ClarityMCPServer:
             raise ToolDenied("LEVEL_NOT_EXPOSED", "bulk actions are never available over MCP")
 
         # Subject binding: a customer session may only touch its own case.
+        #
+        # The binding is required, not merely compared. An earlier version only
+        # compared when `principal.case_id` was set, so a customer principal
+        # with no binding passed straight through and could read every case in
+        # the system. In-process that shape never arose, because the
+        # orchestrator set the case on every principal it built; over the
+        # network the binding comes from the token, so an external client can
+        # present exactly that shape (A04, #8). Deny by default (I9).
         case_id = args.get("case_id")
-        if (
-            principal.profile is Profile.CUSTOMER_ASSIST
-            and case_id is not None
-            and principal.case_id is not None
-            and case_id != principal.case_id
-        ):
-            raise ToolDenied("NOT_AUTHORISED_FOR_CASE", "this session is bound to another case")
+        if principal.profile is Profile.CUSTOMER_ASSIST and case_id is not None:
+            if principal.case_id is None:
+                raise ToolDenied(
+                    "SESSION_NOT_BOUND",
+                    "a customer session must be bound to the case it is asking about",
+                )
+            if case_id != principal.case_id:
+                raise ToolDenied("NOT_AUTHORISED_FOR_CASE", "this session is bound to another case")
 
         # An amount must never arrive from the model.
         if "amount" in args or "amount_lkr" in args:
@@ -384,6 +418,73 @@ class ClarityMCPServer:
                     ActionType.ENABLE_FUP_ALERTS,
                 }
             ],
+        }
+
+    def _get_network_status(self, _: Principal, args: dict[str, Any]) -> dict[str, Any]:
+        """Coverage and outage state. Simulated and labelled as such (I16)."""
+        case_id = str(args["case_id"])
+        status = dict(self._cases.network_status(case_id))
+        return {"case_id": case_id, **status}
+
+    def _search_knowledge(self, _: Principal, args: dict[str, Any]) -> dict[str, Any]:
+        """Cited answers from the published rule catalogue.
+
+        **Interim retrieval source.** The tool contract here is the final one
+        from plan 07 section 11.1 (query in, cited chunks out), but the corpus
+        is today's rule catalogue rather than the RAG service: catalogue, T&C,
+        Gazette and help content land with K01-K03. Keeping the contract stable
+        now means the backend can be swapped without touching this surface or
+        any client.
+
+        Two properties hold whatever the corpus is:
+
+        * **Every chunk is cited.** The citation is the governed artefact,
+          `rule_id@version`, which a reader can look up and check the text
+          against. A rule's `legal_basis` rides along when the rule states one
+          and is ``None`` otherwise, because a legal basis is quoted, never
+          inferred (I16). K03 adds the citation verifier.
+        * **The query is masked before it is recorded.** The query is text from
+          a model, which may carry whatever the customer typed. Masking it here
+          keeps an MSISDN or an NIC out of the audit row (I13).
+        """
+        raw = str(args["query"])
+        masked = Masker().mask(raw)
+        terms = [term for term in _words(masked.text.casefold()) if len(term) > 2]
+
+        chunks: list[dict[str, Any]] = []
+        for pack in self._cases.rule_packs():
+            # Only published rules are public text. `load_packs` filters to
+            # active, and this re-checks rather than trusting the caller's
+            # loader flag, because a draft rule's text is not something to
+            # quote to a customer.
+            if pack.status.value != "active":
+                continue
+            if not pack.description:
+                continue
+            haystack = f"{pack.rule_id} {pack.description} {pack.category}".casefold()
+            score = sum(1 for term in terms if term in haystack)
+            if not score:
+                continue
+            chunks.append(
+                {
+                    "text": pack.description,
+                    # The governed artefact is the citation: a reader can pull
+                    # `rule_id@version` out of the catalogue and check the text
+                    # against it. `legal_basis` is carried through when the rule
+                    # states one, and is absent otherwise - a legal basis is
+                    # never inferred or filled in (I16).
+                    "source_id": f"{pack.rule_id}@{pack.version}",
+                    "version": str(pack.version),
+                    "legal_basis": pack.legal_basis,
+                    "score": score,
+                }
+            )
+
+        chunks.sort(key=lambda chunk: (-int(chunk["score"]), str(chunk["source_id"])))
+        return {
+            "query": masked.text,
+            "chunks": chunks[:5],
+            "corpus": "rule-catalogue",
         }
 
     def _request_handoff(self, principal: Principal, args: dict[str, Any]) -> dict[str, Any]:

@@ -97,7 +97,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Decision outcomes | ZEN decision table | Versioned ZEN-compatible JSON table with Python parity oracle | Complete (M-DEC) |
 | Rule parameters | In the policy store | Confidence and time windows resolve effective-dated policy values | Complete (M-DET) |
 | Simulated HUTCH | Separate `hutch-sim` HTTP service in `full` | `lite` keeps in-process mock drivers; `full` selects HTTP read and command drivers; the Clarity API exposes no `/mock/*` routes | Complete (H01); deployment image belongs to X03 |
-| MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | In-process class; tools listed at `/v1/mcp/tools` | R4. No external agent can connect yet. |
+| MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | `clarity.entrypoints.mcp_asgi` serves MCP at `/mcp` (stateless), OAuth 2.1 resource server, scope to profile, MCP Apps cards | A04 done. Token exchange is implemented and refuses rather than forwarding when unconfigured; `clarity-mcp` still reads through the in-process narrow view instead of calling `/v1` over HTTP. |
 | Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js 16 apps + shared packages (plan 19) | Static UI served by FastAPI **and** Next.js 14 apps in `frontend/` | R5: verify the build, retire the static UI, move to Next.js 16 |
 | Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |

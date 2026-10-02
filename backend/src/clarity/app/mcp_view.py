@@ -28,6 +28,13 @@ from clarity.modules.resolution.public import ResolutionService
 
 
 @runtime_checkable
+class NetworkStatusSource(Protocol):
+    """Where coverage and outage state comes from, keyed by `subscriber_ref`."""
+
+    def network_for(self, subscriber_ref: str) -> dict[str, object]: ...
+
+
+@runtime_checkable
 class MCPCaseView(Protocol):
     """Everything MCP may do. Deliberately has no execute or confirm method."""
 
@@ -41,6 +48,8 @@ class MCPCaseView(Protocol):
 
     def receipt_public_view(self, record: CaseRecord) -> dict[str, object]: ...
 
+    def network_status(self, case_id: str) -> dict[str, object]: ...
+
     def propose(
         self, case_id: str, *, created_by: str, action_types: list[ActionType] | None = None
     ) -> ActionPlan: ...
@@ -53,9 +62,15 @@ class ResolutionServiceMCPView:
     the execute methods are not reachable through the object MCP is given.
     """
 
-    def __init__(self, cases: ResolutionService, receipts: ReceiptService) -> None:
+    def __init__(
+        self,
+        cases: ResolutionService,
+        receipts: ReceiptService,
+        network: NetworkStatusSource | None = None,
+    ) -> None:
         self.__cases = cases
         self.__receipts = receipts
+        self.__network = network
 
     def get(self, case_id: str) -> CaseRecord:
         return self.__cases.get(case_id)
@@ -73,6 +88,21 @@ class ResolutionServiceMCPView:
         if record.receipt is None:
             raise ValueError("no receipt has been issued for this case")
         return self.__receipts.public_view(record.receipt)
+
+    def network_status(self, case_id: str) -> dict[str, object]:
+        """Coverage and outage state for the case's subscriber.
+
+        **Simulated** (I16): served by `hutch-sim`. A real deployment reads the
+        network assurance system, which is not confirmed
+        (**REQUIRES HUTCH CONFIRMATION**).
+
+        Read-only, and the shape is the same one `/v1` already serves to the
+        customer app, so the MCP answer and the app's answer cannot drift.
+        """
+        record = self.__cases.get(case_id)
+        if self.__network is None:
+            return {"status": "unknown", "text": "Network status is unavailable.", "eta": None}
+        return self.__network.network_for(record.case.customer.subscriber_ref)
 
     def propose(
         self, case_id: str, *, created_by: str, action_types: list[ActionType] | None = None

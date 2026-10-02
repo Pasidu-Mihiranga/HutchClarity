@@ -11,7 +11,7 @@ COMPOSE := deploy/compose/full.yml
 # 5440, not 5432: a developer machine usually already runs PostgreSQL there.
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
-.PHONY: help setup dev check lint format types imports test demo tokens keys seed \
+.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed \
         up-full down-full test-full contracts contracts-check \
         licences secrets \
         web-install web-build web-customer web-console web-verify
@@ -19,6 +19,7 @@ FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 help:
 	@echo "make setup   - create .venv and install the backend with dev tools"
 	@echo "make dev     - run the app (UI + API) on http://localhost:8000 (lite profile)"
+	@echo "make mcp     - run clarity-mcp (MCP over Streamable HTTP) on :8099"
 	@echo "make check   - everything CI runs: lint, types, import contracts, tests"
 	@echo "make test    - tests only"
 	@echo "make format  - apply formatting and safe lint fixes"
@@ -46,6 +47,17 @@ setup:
 
 dev:
 	cd $(BACKEND) && $(PY)/uvicorn clarity.entrypoints.asgi:app --reload
+
+# The clarity-mcp deployable (A04, ADR-0018), on :8099. Needs the simulated
+# Keycloak realm for tokens: `docker compose -f deploy/compose/full.yml up -d
+# --wait keycloak`. Walkthrough: docs/walkthroughs/WT-10-external-mcp-client.md
+mcp:
+	cd $(BACKEND) && \
+		CLARITY_KEYCLOAK_ISSUER=http://localhost:8081/realms/clarity \
+		CLARITY_KEYCLOAK_AUDIENCE=clarity-api \
+		CLARITY_MCP_RESOURCE_URL=http://127.0.0.1:8099/mcp \
+		CLARITY_MCP_ALLOWED_HOSTS=127.0.0.1:8099 \
+		$(PY)/uvicorn clarity.entrypoints.mcp_asgi:app --host 127.0.0.1 --port 8099
 
 check: lint types imports test
 
@@ -91,6 +103,10 @@ test-full:
 	cd $(BACKEND) && \
 		CLARITY_KAFKA_BOOTSTRAP=localhost:9092 \
 		CLARITY_TEST_DATABASE_URL=$(FULL_DATABASE_URL) \
+		CLARITY_OPA_URL=http://localhost:8181 \
+		CLARITY_OPENBAO_URL=http://localhost:8200 \
+		CLARITY_OPENBAO_TOKEN=clarity-development-only \
+		CLARITY_KEYCLOAK_URL=http://localhost:8081 \
 		$(PY)/pytest tests/contract tests/integration -v
 
 # Contracts: the OpenAPI schema is committed, so a change shows up in a diff and

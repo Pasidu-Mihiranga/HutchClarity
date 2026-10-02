@@ -150,6 +150,53 @@ def test_a_session_cannot_read_another_customers_case(
     assert error.value.code == "NOT_AUTHORISED_FOR_CASE"
 
 
+def test_an_unbound_customer_session_cannot_read_any_case(server: ClarityMCPServer, case_id: str):
+    """A customer profile with no case binding must reach nothing (A04, #8).
+
+    While MCP was in-process this could not happen: the orchestrator set
+    ``case_id`` on every customer principal it built. Over the network the
+    binding arrives in the *token*, so "customer-assist with no case claim" is
+    a shape an external client can actually present, and the old comparison
+    (`principal.case_id is not None and case_id != principal.case_id`) skipped
+    the check entirely for it. That made an unbound customer token a universal
+    read over every case in the system.
+
+    Deny by default (I9): a customer session is bound or it is refused.
+    """
+    unbound = Principal(ref="attacker", profile=Profile.CUSTOMER_ASSIST, case_id=None)
+
+    with pytest.raises(ToolDenied) as error:
+        server.call(unbound, "get_case_timeline", {"case_id": case_id})
+
+    assert error.value.code == "SESSION_NOT_BOUND"
+
+
+def test_an_unbound_customer_denial_is_audited(server: ClarityMCPServer, case_id: str):
+    """Acceptance test 1 of A04: "denied **and audited**"."""
+    unbound = Principal(ref="attacker", profile=Profile.CUSTOMER_ASSIST, case_id=None)
+
+    with pytest.raises(ToolDenied):
+        server.call(unbound, "get_case_timeline", {"case_id": case_id})
+
+    assert [row.error_code for row in server.denials] == ["SESSION_NOT_BOUND"]
+    assert server.denials[0].principal_ref == "attacker"
+
+
+def test_staff_sessions_are_not_required_to_be_bound(
+    server: ClarityMCPServer, clarity: Clarity, case_id: str
+):
+    """The binding rule must not break the staff profile.
+
+    An agent works a queue, so a staff session is deliberately unbound. If the
+    fix for the customer hole were "every session must carry a case", the desk
+    would stop working and the test above would still pass.
+    """
+    other = open_and_evaluate(clarity, PRIYA)
+
+    assert server.call(staff(), "get_case_timeline", {"case_id": case_id})
+    assert server.call(staff(), "get_case_timeline", {"case_id": other})
+
+
 def test_an_unknown_tool_is_denied(server: ClarityMCPServer, case_id: str):
     with pytest.raises(ToolDenied) as error:
         server.call(customer(case_id), "execute_refund", {"case_id": case_id})

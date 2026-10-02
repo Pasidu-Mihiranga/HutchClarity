@@ -4,6 +4,40 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (A04, #8)
+
+- `clarity-mcp`, a second deployable: MCP over Streamable HTTP at `/mcp`,
+  stateless, run with `uvicorn clarity.entrypoints.mcp_asgi:app` or `make mcp`.
+- OAuth 2.1 resource server. A scope selects the tool profile
+  (`clarity.customer-assist`, `clarity.staff-assist`, `clarity.analytics`);
+  exactly one is required and two are refused rather than narrowed.
+- Tool listings are filtered by the token's profile, as well as refused on call.
+- RFC 8693 token exchange for downstream calls. With no exchange endpoint
+  configured a downstream call is refused, never made with the inbound token
+  (ADR-0018 forbids passthrough).
+- New MCP tools `search_knowledge` (cited from the published rule catalogue,
+  with the query PII-masked) and `get_network_status` (simulated, labelled).
+- MCP Apps UI cards `ui://clarity/why-card` and `ui://clarity/receipt`.
+- Keycloak realm: the three profile client scopes, and a realm-roles protocol
+  mapper on each client.
+- Walkthrough [WT-10](docs/walkthroughs/WT-10-external-mcp-client.md), verified.
+
+### Changed (A04, #8)
+
+- **`MCPCaseView` gained `network_status(case_id)`.** Consumers of
+  `clarity.app.mcp_view` must provide it. `ResolutionServiceMCPView` takes an
+  optional network source and returns an "unknown" status without one, so an
+  existing two-argument construction still works.
+
+### Fixed (A04, #8)
+
+- **A customer MCP session with no case binding could read every case.** The
+  binding was only compared when present, so a principal with
+  `profile=customer-assist` and no `case_id` passed the check entirely. In
+  process the orchestrator always set it; over the network the binding comes
+  from the token, so an external client could present that shape. A customer
+  session is now bound or refused (`SESSION_NOT_BOUND`).
+
 ### Added (P01, #41)
 
 - Proactive consumers for `payment.recorded@v1`,
