@@ -288,10 +288,10 @@ Source of truth: `backend/tests/architecture/test_module_dependencies.py`. A new
 
 | Module | May call (public surface) | Why |
 |---|---|---|
-| `case` | `timeline`, `detection`, `decision`, `actions`, `receipts` | Orchestrates the resolution of one case |
+| `case` | `timeline`, `detection`, `decision`, `actions`, `receipts` | Orchestrates the resolution of one case. Also the **consumer** of `action.completed` (§11.5): it keeps the `receipts` edge, and the edge is what the consumer uses to ask for the receipt. |
 | `decision` | `detection` | Decides on the ranked causes |
 | `governance` | `decision` | Replays decisions under candidate policy |
-| `receipts` | `actions` | Reads result types (vocabulary only); moves to the `action.completed` event in §11.5 |
+| `receipts` | `actions` | Reads result types (vocabulary only) |
 | `timeline`, `detection`, `actions`, `iam`, `conversation`, `autopsy`, `foresight` | none | Leaf modules |
 
 ```mermaid
@@ -316,7 +316,7 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `cause.detected` | detection | insights, autopsy | exists |
 | `decision.generated` | decision | insights, desk queue projection | exists |
 | `action.requested` | actions | audit | exists |
-| `action.completed` | actions | **receipts** (issue proof), reconciliation, insights, audit | exists |
+| `action.completed` | actions | **case** (issues the proof through `receipts`, §11.5), reconciliation, insights, audit | exists |
 | `action.failed` | actions | case (hand off), notifications, audit | exists |
 | `approval.requested` | actions | notifications (supervisor push), desk queue projection | planned |
 | `receipt.issued` | receipts | notifications (send link), insights, audit | exists |
@@ -340,13 +340,24 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | Profiles | `lite`: in-process bus dispatching after commit; `full`/`prod`: Kafka; one parity suite for both |
 | Tests | Producer contract test per event type; consumer tests feed recorded events through the in-process bus |
 
-### 11.5 First event-driven flow: receipts on `action.completed`
+### 11.5 First event-driven flow: receipts on `action.completed` (built, issue #14)
 1. `actions` writes `action.completed` (plan, actions, approver roles, policy snapshot hash) to the outbox in the same unit of work as the plan status change.
-2. `receipts` consumes it and issues **one** receipt per plan; a repeated event finds the receipt already issued and does nothing.
-3. `case` stops calling `receipts` directly for executed plans; it reads the receipt for the response (and returns the original on a replay).
-4. The per-plan lock added for D1 is removed; the R0 acceptance suite and the D1 regression tests must stay green.
+2. The event is consumed and **one** receipt is issued per plan; a repeated event finds the receipt already issued and does nothing.
+3. `case` no longer issues the receipt inside the money path. It reads the receipt for the response, and returns the original on a replay.
+4. The per-plan lock added for D1 is removed; the R0 acceptance suite and the D1 regression tests stay green.
 
-Done when: 1,500 concurrent double confirms give one refund and one receipt, the `case → receipts` call edge is removed from §11.2 for this path, and the flow passes in `lite` and `full`.
+**Where the consumer lives, and why it is not inside `receipts`.** The original wording put the consumer in `receipts`. That cannot be built as written. `ActionCompletedV1` carries identifiers and amounts only, as §11.1 and ADR-0029 §4 require, so a consumer in `receipts` would have to ask `case` for the evidence snapshot, the decision and the cause. That adds `receipts → case` while `case → receipts` already exists, which is a cycle, and §11.2 is required to be acyclic. The alternative, fattening the event with the snapshot, is what §11.1 forbids.
+
+So the consumer is `case.on_action_completed`, registered by the composition root. The flow is event-driven as intended: the receipt is the consequence of a published fact, not a second call inside the money path, and if the issuing process dies the relay issues the receipt on restart. Orchestration stays in `case`, which is where §11.2 says it belongs, and no new call edge is needed. The `case → receipts` edge is therefore **kept**, not removed.
+
+**Done:** 1,500 concurrent double confirms give one refund and one receipt (`backend/tests/unit/test_migration_defects.py`), a twice-delivered `action.completed` issues one receipt (`backend/tests/unit/test_receipts_consumer.py`), and the R0 acceptance suite passes unchanged. Verified in `lite`; `full` needs the Kafka relay process, which is B10 and X03.
+
+Idempotency now rests on three mechanisms instead of one lock, each independently sufficient on the receipt:
+- the tool layer's idempotency key, so one plan executes once;
+- the receipt's plan index, so one plan has one receipt;
+- `processed_event`, so a redelivered event is not reprocessed.
+
+A caller that loses the race to confirm no longer queues behind a lock: it finds the plan is no longer pending and joins the winner's outcome. Removing the wait in that join entirely needs database row locks, which is M-ACT.
 
 ### 11.6 Work packages before §11.5 (R2a, platform baseline)
 | # | Work | Done when |

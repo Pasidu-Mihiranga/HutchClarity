@@ -27,7 +27,9 @@ After R1 every module has a `public.py`, but modules interact only through direc
 | Shared database between modules | Hidden coupling; breaks schema-per-module (ADR-0013) and independent deployment |
 
 ## Consequences
-The first migrated flow is receipts consuming `action.completed` (plan 21 §11.5), which also replaces the per-plan lock added for D1 with idempotent consumption. Every new module states in its `MODULE.md` which events it publishes and consumes. Tests for a consumer use the in-process bus with recorded events.
+The first migrated flow is the receipt being issued from `action.completed` (plan 21 §11.5), which also replaces the per-plan lock added for D1 with idempotent consumption.
+
+**Clarification added when that flow was built (issue #14).** Decision 4 ("a consumer that needs more asks the owning module") and an acyclic §11.2 together decide *where* a consumer may live. A receipt needs the evidence snapshot, the decision and the cause, none of which belong on the wire under decision 4. A consumer inside `receipts` would therefore have to call `case`, and `case → receipts` already exists, so that is a cycle. The consumer is consequently `case.on_action_completed`, registered by the composition root: `case` is the orchestrator, so it is also the module allowed to react to a fact and then ask `receipts` to issue. The general rule this sets: **a consumer belongs in the module that already orchestrates the reaction, not necessarily in the module that owns the side effect.** Decision 4 is unchanged; what is clarified is that it constrains consumer placement, not only payload size. Every new module states in its `MODULE.md` which events it publishes and consumes. Tests for a consumer use the in-process bus with recorded events.
 
 ## Compliance
 `test_module_dependencies.py` rejects undeclared call edges and cycles; `test_module_boundaries.py` keeps calls on `public.py`; a contract test per event type checks producer and consumer schemas (added with R2a); code review rejects events used as commands.

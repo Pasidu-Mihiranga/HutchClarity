@@ -23,7 +23,8 @@ from clarity.contracts.events import (
     validate_payload,
 )
 from clarity.platform.messaging.envelope import Event
-from clarity.platform.messaging.outbox import Outbox
+from clarity.platform.messaging.outbox import outbox_in
+from clarity.platform.persistence import MemoryStore, MemoryUnitOfWork
 
 from ..support.events import SAMPLES
 
@@ -107,22 +108,24 @@ def test_no_registered_payload_carries_personal_data_even_nested(model: type[Eve
 
 @pytest.mark.parametrize("event_type", sorted(DomainEventType))
 def test_every_event_round_trips_through_the_outbox(event_type: DomainEventType):
-    outbox = Outbox()
     sample = SAMPLES[event_type]
 
-    published = outbox.append(Event.of(sample, subject="sub_test"))
+    with MemoryUnitOfWork(MemoryStore()) as unit:
+        published = outbox_in(unit).append(Event.of(sample, subject="sub_test"))
 
     assert published.schema_id == sample.schema_id()
     assert published.payload() == sample
 
 
 def test_the_outbox_refuses_an_event_whose_payload_does_not_match():
-    outbox = Outbox()
+    """The producer finds its own mistake, inside its own transaction."""
     malformed = Event(type=DomainEventType.ACTION_COMPLETED, subject="sub_x", data={"amount": "49"})
 
-    with pytest.raises(InvalidEventPayload):
-        outbox.append(malformed)
-    assert outbox.pending == []
+    with MemoryUnitOfWork(MemoryStore()) as unit:
+        outbox = outbox_in(unit)
+        with pytest.raises(InvalidEventPayload):
+            outbox.append(malformed)
+        assert outbox.pending() == []
 
 
 def test_money_travels_as_two_decimal_strings():

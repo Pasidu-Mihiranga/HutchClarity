@@ -96,6 +96,49 @@ def test_d1_concurrent_double_tap_gives_one_refund_and_one_receipt(racy: None):
         assert str(credited) == "49.00"
 
 
+def test_d1_fifteen_hundred_concurrent_confirms_give_one_refund_and_one_receipt(racy: None):
+    """The B06 acceptance case: the per-plan lock is gone, the guarantee is not.
+
+    Idempotency now comes from three places instead of one lock: the tool
+    layer's idempotency key gives one execution, the receipt's plan index gives
+    one receipt, and a caller that loses the race to confirm joins the winner's
+    outcome rather than failing. 1,500 simultaneous taps must still move LKR
+    49.00 once and produce a single receipt.
+    """
+    clarity = Clarity(world=build_demo_world())
+    case_id, plan_id = _one_tap_case(clarity)
+    before = clarity.world.account(ref_for(DILANI)).balance_lkr
+
+    taps = 1500
+    start = threading.Barrier(taps)
+    receipts: list[str] = []
+    errors: list[BaseException] = []
+    guard = threading.Lock()
+
+    def tap() -> None:
+        try:
+            start.wait()
+            receipt_id = clarity.cases.confirm_and_execute(case_id, plan_id)[1].receipt_id
+            with guard:
+                receipts.append(receipt_id)
+        except BaseException as error:
+            with guard:
+                errors.append(error)
+
+    threads = [threading.Thread(target=tap) for _ in range(taps)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == [], f"{len(errors)} of {taps} taps failed, first: {errors[:1]}"
+    assert len(receipts) == taps, "every tap must get an answer"
+    assert len(set(receipts)) == 1, f"{len(set(receipts))} receipts were issued for one plan"
+    credited = clarity.world.account(ref_for(DILANI)).balance_lkr - before
+    assert str(credited) == "49.00", "the refund moved more than once"
+    assert clarity.receipts.verify_chain(), "the receipt chain must stay intact"
+
+
 def test_d1_minting_while_redeeming_never_breaks_redemption(racy: None):
     service = ConfirmationService()
     target = service.mint("PLAN-X", confirmed_by=ConfirmedBy.CUSTOMER, principal_ref="s")
