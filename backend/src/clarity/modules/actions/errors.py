@@ -13,6 +13,21 @@ class ToolLayerError(RuntimeError):
 
     code = "TOOL_ERROR"
 
+    transient = False
+    """Whether retrying the same request could succeed later (M-ACT).
+
+    A **final** refusal is a decision: the policy does not allow this action, or
+    the maker tried to approve their own plan. Retrying it with the same
+    idempotency key must give the same answer, or a caller could get a different
+    outcome for one request by asking twice.
+
+    A **transient** failure is a condition: the daily refund budget is spent, or
+    an adapter was briefly unreachable. Nothing was applied, so the same plan may
+    be executed again under a new attempt number. Treating one of these as final
+    is what left a plan stuck forever once its key was burned, which is the
+    defect M-ACT fixes.
+    """
+
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
@@ -56,6 +71,9 @@ class BudgetExhausted(ToolLayerError):
 
     code = "BUDGET_EXHAUSTED"
 
+    transient = True
+    """The daily budget resets, so tomorrow the same plan can be executed."""
+
 
 class PlanNotFound(ToolLayerError):
     code = "PLAN_NOT_FOUND"
@@ -82,3 +100,6 @@ class ExecutionInProgress(ToolLayerError):
     """
 
     code = "EXECUTION_IN_PROGRESS"
+
+    transient = True
+    """The original attempt has not finished; asking again later is the answer."""

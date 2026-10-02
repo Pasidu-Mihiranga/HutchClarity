@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import threading
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
+from time import monotonic, sleep
 from typing import Any
 
 from clarity.contracts.decision import (
@@ -36,22 +37,36 @@ from clarity.contracts.decision import (
     PlanStatus,
     PlanStep,
 )
-from clarity.contracts.events import ActionCompletedV1, ActionStepV1
+from clarity.contracts.events import (
+    ActionCompletedV1,
+    ActionFailedV1,
+    ActionStepV1,
+    ApprovalRequestedV1,
+    EventPayload,
+)
 from clarity.integration.ports import AdapterError, Command, CommandPort, CommandResult
 from clarity.kernel.common import ActionSafetyLevel, utc_now
 from clarity.kernel.ids import new_id
+from clarity.modules.actions.attempts import (
+    AttemptLog,
+    AttemptLost,
+    AttemptRecord,
+    AttemptState,
+)
 from clarity.modules.actions.budget import RefundBudget, Reservation
 from clarity.modules.actions.confirmation import ConfirmationService
 from clarity.modules.actions.errors import (
     ActionNotAllowed,
     ApprovalRequired,
     BudgetExhausted,
+    ConfirmationInvalid,
     ConfirmationRequired,
     ExecutionFailed,
     ExecutionInProgress,
     OutcomeNotExecutable,
     PlanNotFound,
     PlanNotPending,
+    ToolLayerError,
 )
 from clarity.modules.actions.records import FOUR_EYES_THRESHOLD_LKR, PlanRecord
 from clarity.modules.actions.repository import PLANS, PlanRepository, StoredPlanRepository
@@ -66,25 +81,33 @@ from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.observability import span
 from clarity.platform.persistence import UnitOfWorkFactory
 
+#: Stable code -> the refusal to raise again on a replay.
+#:
+#: A settled attempt stores its code, not the exception object, because the
+#: record outlives the process and crosses replicas. Rebuilding the same type
+#: means a duplicate request gets the refusal the original caller got, rather
+#: than a generic failure that a caller would handle differently.
+_REFUSALS: dict[str, type[ToolLayerError]] = {
+    error.code: error
+    for error in (
+        ActionNotAllowed,
+        ApprovalRequired,
+        BudgetExhausted,
+        ConfirmationInvalid,
+        ConfirmationRequired,
+        ExecutionFailed,
+        OutcomeNotExecutable,
+        PlanNotFound,
+        PlanNotPending,
+    )
+}
+
 #: Actions whose effect can be undone if a later step in the plan fails.
 _COMPENSATIONS: dict[ActionType, ActionType | None] = {
     ActionType.SET_SPEND_CAP: None,
     ActionType.ENABLE_DATA_STOP: None,
     ActionType.ENABLE_FUP_ALERTS: None,
 }
-
-
-@dataclass
-class _Attempt:
-    """One execution of one idempotency key, and its single outcome.
-
-    Duplicates wait on ``done`` and then take whichever of ``result`` or
-    ``error`` was set, so every caller of the same key sees the same thing.
-    """
-
-    done: threading.Event = field(default_factory=threading.Event)
-    result: ExecutionResult | None = None
-    error: BaseException | None = None
 
 
 class ToolLayer:
@@ -102,16 +125,15 @@ class ToolLayer:
     ) -> None:
         self._commands = command_port
         self._budget = budget or RefundBudget()
-        self._confirmations = confirmations or ConfirmationService()
+        self._confirmations = confirmations or ConfirmationService(open_unit)
         # Plans live in the repository (B02); the layer keeps no business state.
         self._plans = plans
         # Completing a plan writes the plan and its event in one transaction
         # (I7, B04), so nobody can observe a completed plan with no event.
         self._open_unit = open_unit
-        # In-flight coordination, not business state: one event per key so a
-        # duplicate call waits for the original instead of acting again. The
-        # durable idempotency record is M-ACT's work.
-        self._attempts: dict[str, _Attempt] = {}
+        # Durable idempotency (M-ACT): one record per key, in the repository, so
+        # the guarantee survives a restart and holds across replicas.
+        self._attempts = AttemptLog(open_unit)
         self._lock = threading.Lock()
         self._duplicate_wait_seconds = duplicate_wait_seconds
 
@@ -277,6 +299,9 @@ class ToolLayer:
         self._save(record)
 
         if len(record.approvals) < self._approvals_needed(record):
+            # Still short. Say so on the bus, so a supervisor can be told
+            # rather than the plan waiting for somebody to notice (M-ACT).
+            self._publish_approval_requested(record)
             return None
 
         roles = {a.role for a in record.approvals}
@@ -341,52 +366,79 @@ class ToolLayer:
         ``CONFIRMATION_INVALID`` even though the fix had succeeded, which is
         what a customer double-tapping Confirm would have seen.
         """
-        attempt, is_owner = self._claim(idempotency_key)
-        if not is_owner:
-            return self._await_original(attempt, idempotency_key)
+        try:
+            claimed = self._attempts.claim(idempotency_key, plan_id=plan_id)
+        except AttemptLost:
+            # Someone else owns this key: either it is running now, or it has
+            # already settled and the answer is recorded.
+            return self._settled_outcome(idempotency_key)
 
         try:
             result = self._execute_claimed(
                 plan_id, confirmation=confirmation, idempotency_key=idempotency_key, now=now
             )
-        except BaseException as error:
-            # The outcome of a key is final, success or failure. Releasing the
-            # key here would let a duplicate that arrives a moment later start
-            # fresh and receive a *different* error for the same request. A
-            # caller who wants a genuine new attempt uses a new key.
-            with self._lock:
-                attempt.error = error
-            attempt.done.set()
+        except ToolLayerError as refusal:
+            # A final refusal is recorded so a duplicate gets the same answer. A
+            # transient failure leaves the key claimable, so a retry after the
+            # cause has passed gets a genuine new attempt rather than a replay
+            # of yesterday's "budget exhausted" forever (M-ACT).
+            self._record_failure(claimed, idempotency_key, plan_id, refusal)
+            raise
+        except BaseException as unexpected:
+            # Not a typed refusal, so nothing is known about whether it is safe
+            # to retry. Treated as final, which is the cautious side on a money
+            # path: a stuck plan is recoverable by a person, a double refund is
+            # not.
+            self._attempts.refused(
+                idempotency_key,
+                code="UNEXPECTED",
+                message=f"{type(unexpected).__name__}: {unexpected}",
+            )
             raise
         else:
-            with self._lock:
-                attempt.result = result
-            attempt.done.set()
+            self._attempts.succeeded(idempotency_key, result)
             return result
 
-    # -- idempotency claim ----------------------------------------------- #
-
-    def _claim(self, idempotency_key: str) -> tuple[_Attempt, bool]:
-        """Reserve the key, or find the attempt that already owns it."""
-        with self._lock:
-            existing = self._attempts.get(idempotency_key)
-            if existing is not None:
-                return existing, False
-            attempt = _Attempt()
-            self._attempts[idempotency_key] = attempt
-            return attempt, True
-
-    def _await_original(self, attempt: _Attempt, idempotency_key: str) -> ExecutionResult:
-        """Return exactly what the original call returned, or raise what it raised."""
-        if not attempt.done.wait(timeout=self._duplicate_wait_seconds):
-            raise ExecutionInProgress(
-                f"an identical request for {idempotency_key} is still running; "
-                "retry with the same idempotency key"
+    def _record_failure(
+        self,
+        claimed: AttemptRecord,
+        idempotency_key: str,
+        plan_id: str,
+        refusal: ToolLayerError,
+    ) -> None:
+        if refusal.transient:
+            self._attempts.failed_transiently(
+                idempotency_key, code=refusal.code, message=str(refusal)
             )
-        if attempt.error is not None:
-            raise attempt.error
-        assert attempt.result is not None  # done implies one of the two is set
-        return replace(attempt.result, replayed=True)
+        else:
+            self._attempts.refused(idempotency_key, code=refusal.code, message=str(refusal))
+        self._publish_failure(claimed, plan_id, refusal)
+
+    def _settled_outcome(self, idempotency_key: str) -> ExecutionResult:
+        """The outcome recorded for a key somebody else claimed.
+
+        Waits a little for an attempt that is still running, because a customer
+        double-tapping Confirm should see the fix, not a race.
+        """
+        deadline = monotonic() + self._duplicate_wait_seconds
+        while True:
+            record = self._attempts.get(idempotency_key)
+            if record is not None and record.is_settled:
+                return self._replay_of(record, idempotency_key)
+            if monotonic() >= deadline:
+                raise ExecutionInProgress(
+                    f"an identical request for {idempotency_key} is still running; "
+                    "retry with the same idempotency key"
+                )
+            sleep(0.001)
+
+    def _replay_of(self, record: AttemptRecord, idempotency_key: str) -> ExecutionResult:
+        """Exactly what the original attempt returned, or the refusal it raised."""
+        if record.state is AttemptState.SUCCEEDED and record.result is not None:
+            return replace(record.result, replayed=True)
+        raise _REFUSALS.get(record.error_code or "", ExecutionFailed)(
+            record.error_message or f"{idempotency_key} failed: {record.error_code}"
+        )
 
     def _execute_claimed(
         self,
@@ -404,7 +456,20 @@ class ToolLayer:
                 "this action needs a confirmation token minted by the customer or staff"
             )
         value = confirmation.value if isinstance(confirmation, ConfirmationToken) else confirmation
-        token = self._confirmations.redeem(value, plan_id=plan_id, now=now)
+
+        # Budget before the token. A confirmation is single use, so consuming it
+        # and then refusing for an unrelated reason burns the customer's
+        # authority: the retry that M-ACT makes possible would then always fail
+        # with CONFIRMATION_INVALID instead of executing. Reserving the budget
+        # applies nothing outside the budget and is released if anything after
+        # it refuses.
+        reservation = self._reserve(record)
+        try:
+            token = self._confirmations.redeem(value, plan_id=plan_id, now=now)
+        except BaseException:
+            if reservation is not None:
+                self._budget.release(reservation)
+            raise
 
         span_scope = span(
             "actions.execute",
@@ -414,7 +479,7 @@ class ToolLayer:
             idempotency_key=idempotency_key,
         )
         with span_scope:
-            return self._execute_steps(record, plan_id, token, idempotency_key)
+            return self._execute_steps(record, plan_id, token, idempotency_key, reservation)
 
     def _execute_steps(
         self,
@@ -422,8 +487,8 @@ class ToolLayer:
         plan_id: str,
         token: ConfirmationToken,
         idempotency_key: str,
+        reservation: Reservation | None,
     ) -> ExecutionResult:
-        reservation = self._reserve(record)
         record.reservation = reservation
         record.idempotency_key = idempotency_key
         self._save(record)
@@ -572,6 +637,61 @@ class ToolLayer:
         """Write a record back after mutating it, so a storing driver sees it."""
         self._plans.save(record)
 
+    def _publish_failure(
+        self, claimed: AttemptRecord, plan_id: str, refusal: ToolLayerError
+    ) -> None:
+        """Say that a plan did not execute, and whether it can be tried again.
+
+        A consumer needs the difference: a retryable failure is something to
+        wait out, a final one is a case that needs a person (M-ACT).
+        """
+        record = self._plans.get(plan_id)
+        if record is None:  # pragma: no cover - the plan was found to refuse it
+            return
+        # A plan is built with at least one step, so there is always one to name.
+        failed_step = record.plan.steps[0].action_type
+        self._publish(
+            record,
+            ActionFailedV1(
+                case_id=record.plan.case_id,
+                plan_id=plan_id,
+                failed_step=failed_step,
+                error_code=refusal.code,
+                # Compensated means steps were applied and reversed. A refusal
+                # that stopped before any step applied compensated nothing.
+                compensated=record.plan.status is PlanStatus.COMPENSATED,
+                retryable=refusal.transient,
+                attempt=claimed.attempt,
+            ),
+        )
+
+    def _publish_approval_requested(self, record: PlanRecord) -> None:
+        """Ask for an approval through the bus, so a notification can follow it."""
+        self._publish(
+            record,
+            ApprovalRequestedV1(
+                case_id=record.plan.case_id,
+                plan_id=record.plan.plan_id,
+                decision_id=record.decision.decision_id,
+                total_amount_lkr=record.plan.total_amount_lkr,
+                approvals_needed=self._approvals_needed(record),
+                approvals_held=len(record.approvals),
+                four_eyes_threshold_lkr=record.four_eyes_threshold_lkr,
+                requested_by=record.plan.created_by,
+            ),
+        )
+
+    def _publish(self, record: PlanRecord, payload: EventPayload) -> None:
+        """Append one event in its own unit of work.
+
+        Separate from the plan write, unlike ``action.completed``: these events
+        report that nothing changed, so there is no state change to be atomic
+        with, and a failure to publish must not undo a refusal.
+        """
+        with self._open_unit() as unit:
+            outbox_in(unit).append(Event.of(payload, subject=self._subscriber_of(record)))
+            unit.commit()
+
     def _complete(self, record: PlanRecord, result: ExecutionResult) -> None:
         """Store the completed plan and its ``action.completed`` event atomically.
 
@@ -600,6 +720,8 @@ class ToolLayer:
                     action_type=action.type,
                     amount_lkr=action.amount_lkr,
                     status=action.status.value,
+                    idempotency_key=action.idempotency_key,
+                    adapter_ref=action.adapter_ref,
                 )
                 for action in result.actions
             ],

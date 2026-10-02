@@ -61,6 +61,23 @@ class RefundBudget:
         self._reservations: dict[str, Reservation] = {}
         self._next = 0
 
+    def start_new_day(self) -> None:
+        """Zero the day's spending, keeping the limits.
+
+        The ceiling is a *daily* one, so something has to mark the boundary. A
+        plan refused because today's allowance was spent becomes executable
+        again after this, which is what makes such a refusal transient rather
+        than a plan stuck forever (M-ACT).
+
+        Outstanding reservations are kept: they belong to executions that are
+        still in flight, and dropping them would let the new day's allowance be
+        spent twice.
+        """
+        with self._lock:
+            self._global.spent = Decimal("0.00")
+            for counter in self._per_rule.values():
+                counter.spent = Decimal("0.00")
+
     # -- reading ----------------------------------------------------------- #
 
     def state_for(self, rule_id: str | None = None) -> BudgetState:

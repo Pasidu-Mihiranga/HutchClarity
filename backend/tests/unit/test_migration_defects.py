@@ -6,6 +6,7 @@ which moves the same guarantees into the database.
 
 from __future__ import annotations
 
+import shutil
 import sys
 import threading
 from collections.abc import Iterator
@@ -18,9 +19,10 @@ from clarity.app.container import Clarity, Profile
 from clarity.integration.drivers.mock.world import build_demo_world, ref_for
 from clarity.interfaces.http.main import create_app
 from clarity.kernel.common import Channel
-from clarity.modules.actions.confirmation import ConfirmationService
 from clarity.modules.actions.results import ConfirmedBy
-from clarity.modules.case.public import CaseService
+from clarity.modules.resolution.public import ResolutionService
+
+from ..support.repositories import confirmations
 
 DILANI = "+94771234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
 PRIYA = "+94774445555"  # LKR 12,000 reload, SIM swap: STAFF_APPROVAL
@@ -75,7 +77,7 @@ def test_d1_concurrent_double_tap_gives_one_refund_and_one_receipt(racy: None):
         def tap(
             cid: str = case_id,
             pid: str = plan_id,
-            cases: CaseService = clarity.cases,
+            cases: ResolutionService = clarity.cases,
             sink: list[str] = receipts,
             failures: list[BaseException] = errors,
         ) -> None:
@@ -140,7 +142,7 @@ def test_d1_fifteen_hundred_concurrent_confirms_give_one_refund_and_one_receipt(
 
 
 def test_d1_minting_while_redeeming_never_breaks_redemption(racy: None):
-    service = ConfirmationService()
+    service = confirmations()
     target = service.mint("PLAN-X", confirmed_by=ConfirmedBy.CUSTOMER, principal_ref="s")
     stop = threading.Event()
 
@@ -164,9 +166,11 @@ def test_d1_minting_while_redeeming_never_breaks_redemption(racy: None):
 
 def test_d2_the_four_eyes_threshold_comes_from_policy(tmp_path: Path):
     """Finance lowers the threshold to LKR 10,000: a LKR 12,000 case needs two people."""
+    # The whole directory, not one file: the decision module also loads its
+    # outcome table from here (M-DEC), so a partial copy leaves it with no table.
     policy = tmp_path / "policy"
-    policy.mkdir()
-    text = (REPO / "config" / "policy" / "decision.yaml").read_text(encoding="utf-8")
+    shutil.copytree(REPO / "config" / "policy", policy)
+    text = (policy / "decision.yaml").read_text(encoding="utf-8")
     key = text.index("decision.four_eyes.threshold_lkr")
     value = text.index('"25000.00"', key)
     (policy / "decision.yaml").write_text(

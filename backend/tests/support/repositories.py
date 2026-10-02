@@ -12,6 +12,7 @@ from typing import Any
 
 from clarity.integration.ports import CommandPort
 from clarity.modules.actions.capability import PLANS, StoredPlanRepository, ToolLayer
+from clarity.modules.actions.confirmation import ConfirmationService
 from clarity.modules.case.public import CASE_SEQUENCE, CASES, StoredCaseRepository
 from clarity.modules.governance.public import CHANGES, StoredPolicyChangeRepository
 from clarity.modules.receipts.public import (
@@ -62,6 +63,11 @@ def units(store: MemoryStore) -> Callable[[], UnitOfWork]:
     return lambda: MemoryUnitOfWork(store)
 
 
+def confirmations(store: MemoryStore | None = None, **kwargs: Any) -> ConfirmationService:
+    """A confirmation service over a store, as the composition root builds one."""
+    return ConfirmationService(units(store or MemoryStore()), **kwargs)
+
+
 def tool_layer(
     command_port: CommandPort, *, store: MemoryStore | None = None, **kwargs: Any
 ) -> ToolLayer:
@@ -77,6 +83,7 @@ def tool_layer(
 __all__ = [
     "case_repository",
     "change_repository",
+    "confirmations",
     "plan_repository",
     "receipt_repository",
     "tool_layer",

@@ -26,7 +26,7 @@ from clarity.integration.registry import AdapterRegistry
 from clarity.kernel.common import EventSource, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.budget import RefundBudget
-from clarity.modules.actions.confirmation import ConfirmationService, ConfirmedBy
+from clarity.modules.actions.confirmation import ConfirmedBy
 from clarity.modules.actions.errors import (
     ActionNotAllowed,
     ApprovalRequired,
@@ -39,7 +39,7 @@ from clarity.modules.actions.errors import (
 )
 from clarity.modules.actions.layer import ToolLayer
 
-from ..support.repositories import tool_layer
+from ..support.repositories import confirmations, tool_layer
 
 DILANI = "+94771234567"
 SUBSCRIBER = ref_for(DILANI)
@@ -195,7 +195,7 @@ def test_a_token_is_single_use(tools: ToolLayer):
 def test_an_expired_token_is_refused(registry):
     tools = tool_layer(
         registry.command_port,
-        confirmations=ConfirmationService(ttl=timedelta(minutes=15)),
+        confirmations=confirmations(ttl=timedelta(minutes=15)),
     )
     plan = propose(tools, a_decision())
     token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
@@ -574,7 +574,7 @@ def test_a_token_cannot_be_redeemed_twice_under_concurrency(registry):
     import sys
     import threading
 
-    service = ConfirmationService()
+    service = confirmations()
     token = service.mint("PLAN-1", confirmed_by=ConfirmedBy.CUSTOMER, principal_ref="sub")
     accepted, refused = [], []
     barrier = threading.Barrier(40)
@@ -602,22 +602,63 @@ def test_a_token_cannot_be_redeemed_twice_under_concurrency(registry):
     assert len(refused) == 39
 
 
-def test_the_outcome_of_a_key_is_final(registry, world):
-    """Replaying a key returns what happened, even when that was a failure.
+def test_a_final_refusal_is_replayed_for_the_same_key(registry, world):
+    """One key, one answer, when the refusal was a decision.
 
-    This is the usual idempotency contract: one key, one outcome. A caller who
-    wants a genuine new attempt uses a new key. Releasing the key on failure
-    would let a duplicate arriving moments later get a different error for the
-    same request.
+    A caller must not get a different outcome for the same request by asking
+    twice, so a refusal the policy made is recorded and replayed.
     """
-    tools = tool_layer(registry.command_port, budget=RefundBudget(daily_limit_lkr="10.00"))
+    tools = tool_layer(registry.command_port)
     plan = tools.propose(
         a_decision(), subscriber_ref=SUBSCRIBER, created_by="agent-1", params=vas_params()
     )
-    token = tools.confirm_by_customer(plan.plan_id, subscriber_ref=SUBSCRIBER)
+
+    with pytest.raises(ConfirmationInvalid):
+        tools.execute(plan.plan_id, confirmation="not-a-real-token", idempotency_key="final-key")
+    with pytest.raises(ConfirmationInvalid):
+        tools.execute(plan.plan_id, confirmation="not-a-real-token", idempotency_key="final-key")
+
+
+def test_a_budget_exhausted_plan_executes_once_after_the_budget_resets(registry, world):
+    """M-ACT acceptance 1, and the stuck-plan defect it fixes.
+
+    The prototype recorded the first failure against the idempotency key and
+    replayed it forever, so a plan refused because the day's refund allowance
+    was spent could never execute, even after midnight. The refusal is now
+    transient: the key stays claimable and the retry is a real attempt.
+
+    It also has to execute exactly **once**, not once per attempt.
+    """
+    # Exactly one refund fits in the day.
+    budget = RefundBudget(daily_limit_lkr="49.00")
+    tools = tool_layer(registry.command_port, budget=budget)
+
+    spent_today = propose(tools, a_decision())
+    tools.execute(
+        spent_today.plan_id,
+        confirmation=tools.confirm_by_customer(spent_today.plan_id, subscriber_ref=SUBSCRIBER),
+        idempotency_key="first-plan",
+    )
+
+    refused = propose(tools, a_decision())
+    token = tools.confirm_by_customer(refused.plan_id, subscriber_ref=SUBSCRIBER)
+    before = world.account(SUBSCRIBER).balance_lkr
 
     with pytest.raises(BudgetExhausted):
-        tools.execute(plan.plan_id, confirmation=token, idempotency_key="retry-key")
+        tools.execute(refused.plan_id, confirmation=token, idempotency_key="retry-key")
+    assert world.account(SUBSCRIBER).balance_lkr == before, "a refusal moves no money"
 
-    with pytest.raises(BudgetExhausted):
-        tools.execute(plan.plan_id, confirmation=token, idempotency_key="retry-key")
+    budget.start_new_day()
+
+    # The same key and the same token: the refusal was about the budget, so the
+    # customer's single-use authority must not have been spent on it.
+    result = tools.execute(refused.plan_id, confirmation=token, idempotency_key="retry-key")
+
+    assert result.status is PlanStatus.COMPLETED
+    assert not result.replayed, "this was a new attempt, not a replay"
+    assert world.account(SUBSCRIBER).balance_lkr - before == Decimal("49.00")
+
+    # And a third call on the settled key replays rather than refunding again.
+    again = tools.execute(refused.plan_id, confirmation=token, idempotency_key="retry-key")
+    assert again.replayed
+    assert world.account(SUBSCRIBER).balance_lkr - before == Decimal("49.00")
