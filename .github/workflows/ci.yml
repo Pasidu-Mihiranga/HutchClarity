@@ -70,6 +70,34 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      opa:
+        # Evaluates the real Rego in config/opa, so the authorization parity
+        # suite compares Python against OPA rather than against a Python
+        # reimplementation of the same rules (M-IAM).
+        #
+        # A service container cannot mount the workspace, because it starts
+        # before the checkout. So it runs empty and the policy is uploaded
+        # through OPA's API in a step below.
+        image: openpolicyagent/opa:1.1.0
+        ports: ["8181:8181"]
+        options: >-
+          --args --server --addr=0.0.0.0:8181
+      openbao:
+        # Signs receipts in the full lane, so the Transit driver is exercised
+        # against the real API rather than against a Python stand-in of it
+        # (M-RCPT). Dev mode: in-memory, unsealed, fixed root token. The token
+        # is a CI-only literal and grants nothing outside this container.
+        image: ghcr.io/openbao/openbao:2.7.1
+        env:
+          BAO_DEV_ROOT_TOKEN_ID: clarity-ci-only-not-a-secret
+          BAO_ADDR: http://127.0.0.1:8200
+        ports: ["8200:8200"]
+        options: >-
+          --cap-add IPC_LOCK
+          --health-cmd "bao status"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
       kafka:
         image: apache/kafka:4.0.0
         env:
@@ -95,6 +123,10 @@ jobs:
     env:
       CLARITY_TEST_DATABASE_URL: postgresql+psycopg://clarity:clarity@localhost:5432/clarity
       CLARITY_KAFKA_BOOTSTRAP: localhost:9092
+      CLARITY_OPA_URL: http://localhost:8181
+      CLARITY_OPENBAO_URL: http://localhost:8200
+      CLARITY_OPENBAO_TOKEN: clarity-ci-only-not-a-secret
+      CLARITY_KEYCLOAK_URL: http://localhost:8081
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -104,6 +136,50 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install with the full-profile extras
         run: pip install -e ".[dev,postgres,kafka,otlp]"
+      - name: Load the authorization policy into OPA
+        # Uploaded rather than mounted, and then checked: an OPA answering with
+        # no policy denies everything, which a parity suite would read as a
+        # disagreement rather than as "the policy never loaded".
+        working-directory: .
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            curl -sf localhost:8181/health && break || sleep 2
+          done
+          curl -sf -X PUT localhost:8181/v1/policies/clarity-authz \
+            --data-binary @config/opa/authz.rego
+          curl -sf -X PUT localhost:8181/v1/data/clarity \
+            --data-binary @<(python -c "import json,sys; json.dump(json.load(open('config/opa/data.json'))['clarity'], sys.stdout)")
+          echo "an agent may read a case:"
+          curl -sf -X POST localhost:8181/v1/data/clarity/authz/allow \
+            -H 'Content-Type: application/json' \
+            -d '{"input":{"roles":["agent"],"permission":"case:read","assurance":"mfa"}}' \
+            | tee /dev/stderr | grep -q '"result":true'
+        shell: bash
+      - name: Start Keycloak with the realm imported
+        # Run as a step, not a service container, for two reasons. A service
+        # container starts before the checkout so it cannot mount the realm
+        # file; and Keycloak's master realm refuses an admin token over plain
+        # HTTP ("HTTPS required"), so importing through the admin API does not
+        # work either. Importing at startup avoids both, and is exactly what
+        # deploy/compose/full.yml does locally.
+        run: |
+          set -euo pipefail
+          docker run -d --name clarity-keycloak -p 8081:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=clarity-admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=clarity-ci-only-not-a-secret \
+            -v "$GITHUB_WORKSPACE/config/keycloak/clarity-realm.json:/opt/keycloak/data/import/clarity-realm.json:ro" \
+            quay.io/keycloak/keycloak:26.4 \
+            start-dev --import-realm --http-port=8080
+          for attempt in $(seq 1 40); do
+            curl -sf localhost:8081/realms/clarity >/dev/null && break || sleep 3
+          done
+          # Checked, not assumed: a Keycloak with no realm answers 404 for
+          # everything, which the integration lane would read as a broken
+          # driver rather than a realm that never imported.
+          curl -sf localhost:8081/realms/clarity >/dev/null
+          echo "the clarity realm answers"
+        shell: bash
       - name: Parity suites against the real drivers
         # The suites skip when a component is unreachable, so a silent skip
         # here would look like a pass. -ra lists every skip in the summary.

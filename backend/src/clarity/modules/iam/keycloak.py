@@ -37,6 +37,42 @@ def _role_names(claims: dict[str, Any], audience: str) -> set[str]:
     return names
 
 
+def _signing_keys(keys: list[Any]) -> dict[str, Any]:
+    """The usable signing keys from a JWKS, skipping the rest.
+
+    Keycloak publishes more than one key: an RS256 key for signatures and an
+    RSA-OAEP key for encryption. ``PyJWK.from_dict`` has no algorithm for the
+    encryption key and raises.
+
+    This is loaded key by key, and a key that cannot be loaded is skipped. An
+    earlier version built the whole map in one comprehension, so the encryption
+    key's failure aborted the set and the driver rejected **every** token a real
+    Keycloak issued, valid ones included. A mock JWKS publishing only a signing
+    key cannot show that up, which is why this is tested against the real
+    service.
+
+    Encryption keys are skipped rather than merely tolerated: a key published
+    for encrypting must never be accepted as proof of a signature.
+    """
+    usable: dict[str, Any] = {}
+    for item in keys:
+        if not isinstance(item, dict) or not isinstance(item.get("kid"), str):
+            continue
+        if item.get("use") not in (None, "sig"):
+            continue
+        if item.get("alg") is not None and item["alg"] not in _ALGORITHMS:
+            continue
+        try:
+            usable[str(item["kid"])] = jwt.PyJWK.from_dict(item).key
+        except jwt.PyJWTError:
+            # Not a key this library can use for verification. Another key in
+            # the set may still be the one that signed this token.
+            continue
+    if not usable:
+        raise TokenInvalid
+    return usable
+
+
 class KeycloakTokenVerifier:
     """Validate Keycloak access tokens against its published JWKS."""
 
@@ -65,11 +101,7 @@ class KeycloakTokenVerifier:
             keys = payload.get("keys") if isinstance(payload, dict) else None
             if not isinstance(keys, list):
                 raise TokenInvalid
-            self._keys = {
-                str(item["kid"]): jwt.PyJWK.from_dict(item).key
-                for item in keys
-                if isinstance(item, dict) and isinstance(item.get("kid"), str)
-            }
+            self._keys = _signing_keys(keys)
             return self._keys[kid]
         except (httpx.HTTPError, KeyError, TypeError, ValueError, jwt.PyJWTError) as error:
             raise TokenInvalid from error
