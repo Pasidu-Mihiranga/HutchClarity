@@ -30,6 +30,18 @@ COORDINATION = frozenset(
     }
 )
 
+#: Caches of data a remote system owns, keyed by an id that system issued.
+#:
+#: Not business state: losing one costs a round trip, not a fact. A JWKS cache
+#: that had to survive a restart would mean Clarity was the system of record for
+#: somebody else's signing keys, which is the opposite of what these do.
+REMOTE_CACHES = frozenset(
+    {
+        "_keys",
+        "_public",
+    }
+)
+
 #: Attributes that hold injected collaborators or configuration, not state.
 #: A mapping of configuration is fine: it is read, never accumulated.
 CONFIGURATION = frozenset(
@@ -47,15 +59,11 @@ CONFIGURATION = frozenset(
 #: known limitation, not an exemption: the module is still single-process until
 #: its issue lands. A new collection that is in neither map fails this test.
 DEFERRED: dict[str, str] = {
-    # The money path's concurrency state. M-ACT replaces the process-local lock
-    # with database row locks and a conditional UPDATE, which is the only thing
-    # that stops two replicas overspending the same daily budget.
-    "actions/budget.py:_reservations": "#25 M-ACT",
-    "actions/confirmation.py:_issued": "#25 M-ACT",
-    "actions/confirmation.py:_redeemed": "#25 M-ACT",
-    # M-IAM's scope names "shared OTP state" directly: it moves with Keycloak.
-    "iam/otp.py:_challenges": "#7 M-IAM",
-    "iam/otp.py:_requests": "#7 M-IAM",
+    # The daily refund ceiling. M-ACT moved idempotency and confirmation tokens
+    # to the database; the counters are the remaining piece, and they need a
+    # conditional UPDATE rather than a repository put to stop two replicas
+    # overspending the same allowance. Tracked on M-ACT's follow-up.
+    "actions/budget.py:_reservations": "#25 M-ACT (counters remain)",
 }
 
 
@@ -108,6 +116,7 @@ def test_no_module_accumulates_business_state_in_an_attribute() -> None:
             for attribute in _collection_attributes(path)
             if attribute not in COORDINATION
             and attribute not in CONFIGURATION
+            and attribute not in REMOTE_CACHES
             and f"{relative}:{attribute}" not in DEFERRED
         ]
         if kept:
@@ -132,12 +141,12 @@ def test_every_deferral_still_exists() -> None:
 def test_the_services_that_held_dicts_now_take_repositories() -> None:
     """The four collections B02 names are injected, not built in the service."""
     from clarity.modules.actions.capability import ToolLayer
-    from clarity.modules.case.public import CaseService
+    from clarity.modules.case.public import CaseAggregate
     from clarity.modules.governance.public import PolicyGovernance
     from clarity.modules.receipts.public import ReceiptService
 
     required = {
-        CaseService: "cases",
+        CaseAggregate: "cases",
         ToolLayer: "plans",
         ReceiptService: "ledger",
         PolicyGovernance: "changes",

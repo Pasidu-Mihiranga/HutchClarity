@@ -44,6 +44,14 @@ def _completed_events(clarity: Clarity) -> list[Event]:
     ]
 
 
+def _receipt_events(clarity: Clarity) -> list[Event]:
+    return [
+        event
+        for event in clarity.relay.published_events()
+        if event.type is EventType.RECEIPT_ISSUED
+    ]
+
+
 # -- the flow itself ------------------------------------------------------ #
 
 
@@ -72,6 +80,20 @@ def test_the_receipt_is_the_consequence_of_the_event(clarity: Clarity) -> None:
     assert clarity.receipts.for_plan(plan_id) is not None
 
 
+def test_issuing_the_receipt_publishes_receipt_issued(clarity: Clarity) -> None:
+    case_id, plan_id = _executed_plan(clarity)
+    receipt = clarity.receipts.for_plan(plan_id)
+    assert receipt is not None
+
+    events = _receipt_events(clarity)
+    assert len(events) == 1
+    payload = events[0].payload()
+    assert payload.case_id == case_id  # type: ignore[attr-defined]
+    assert payload.plan_id == plan_id  # type: ignore[attr-defined]
+    assert payload.receipt_id == receipt.receipt_id  # type: ignore[attr-defined]
+    assert events[0].subject == ref_for(DILANI)
+
+
 def test_the_event_carries_identifiers_and_amounts_only(clarity: Clarity) -> None:
     """ADR-0029 section 4: identifiers, amounts as Money strings, a hash.
 
@@ -91,7 +113,17 @@ def test_the_event_carries_identifiers_and_amounts_only(clarity: Clarity) -> Non
         "total_amount_lkr",
         "config_snapshot_hash",
     }
-    assert set(event.data["steps"][0]) == {"action_id", "action_type", "amount_lkr", "status"}
+    assert set(event.data["steps"][0]) == {
+        "action_id",
+        "action_type",
+        "amount_lkr",
+        "status",
+        # Both are system references, not personal data, and reconciliation
+        # needs them to match an executed action against the adapter's
+        # confirmation (M-REC).
+        "adapter_ref",
+        "idempotency_key",
+    }
 
 
 def test_the_event_carries_no_raw_number_anywhere(clarity: Clarity) -> None:

@@ -94,7 +94,8 @@ def test_health_declares_the_data_is_synthetic(client: TestClient):
     assert body["status"] == "ok"
     assert body["driver_mode"] == "mock"
     assert "SYNTHETIC" in body["data"]
-    assert len(body["rules"]) == 6
+    # Six at R0, plus the four M-DET added (#35).
+    assert len(body["rules"]) == 10
 
 
 def test_public_keys_are_published_for_verification(client: TestClient):

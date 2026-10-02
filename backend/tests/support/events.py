@@ -10,6 +10,7 @@ from clarity.contracts.events import (
     ActionFailedV1,
     ActionRequestedV1,
     ActionStepV1,
+    ApprovalRequestedV1,
     CaseCreatedV1,
     CauseDetectedV1,
     ChargeAppliedV1,
@@ -20,6 +21,7 @@ from clarity.contracts.events import (
     McpInvokedV1,
     PackExpiringV1,
     PaymentRecordedV1,
+    PolicyPublishedV1,
     ReceiptIssuedV1,
     ReconciliationMismatchV1,
     RiskDetectedV1,
@@ -91,10 +93,22 @@ SAMPLES: dict[DomainEventType, EventPayload] = {
                     action_type=ActionType.REFUND,
                     amount_lkr="49.00",
                     status="COMPLETED",
+                    idempotency_key="case-1:plan-1:0:refund",
+                    adapter_ref="adj-1",
                 )
             ],
             confirmed_by="customer_confirmed",
             total_amount_lkr="49.00",
+        ),
+        ApprovalRequestedV1(
+            case_id="CASE-1",
+            plan_id="PLAN-1",
+            decision_id="DEC-1",
+            total_amount_lkr="12000.00",
+            approvals_needed=2,
+            approvals_held=1,
+            four_eyes_threshold_lkr="25000.00",
+            requested_by="agent-1",
         ),
         ActionFailedV1(
             case_id="CASE-1",
@@ -123,6 +137,13 @@ SAMPLES: dict[DomainEventType, EventPayload] = {
         ),
         RulePublishedV1(
             rule_id="VAS_NO_CONSENT", rule_version=4, pack_hash="sha256:ff", change_class="C2"
+        ),
+        PolicyPublishedV1(
+            change_id="CHG-1",
+            key="decision.auto_fix.cap_lkr",
+            policy_version=2,
+            change_class="C3",
+            effective_from=AT,
         ),
         ReconciliationMismatchV1(
             plan_id="PLAN-1",

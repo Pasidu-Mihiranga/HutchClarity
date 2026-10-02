@@ -72,6 +72,14 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/admin/policy/changes": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[object]",
+      "status": "200"
+    },
     "GET /v1/admin/switches": {
       "parameters": [
         "header:authorization?"
@@ -167,6 +175,14 @@
       "response": "array[QueueItem]",
       "status": "200"
     },
+    "GET /v1/finance/reconciliation": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[object]",
+      "status": "200"
+    },
     "GET /v1/knowledge/search": {
       "parameters": [
         "query:q?"
@@ -251,6 +267,59 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/admin/policy/changes": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "PolicyDraftRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/policy/changes/{change_id}/activate": {
+      "parameters": [
+        "header:authorization?",
+        "path:change_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/policy/changes/{change_id}/approve": {
+      "parameters": [
+        "header:authorization?",
+        "path:change_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/policy/changes/{change_id}/review": {
+      "parameters": [
+        "header:authorization?",
+        "path:change_id"
+      ],
+      "request": "PolicyReviewRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/policy/changes/{change_id}/rollback": {
+      "parameters": [
+        "header:authorization?",
+        "path:change_id"
+      ],
+      "request": "PolicyRollbackRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/policy/changes/{change_id}/schedule": {
+      "parameters": [
+        "header:authorization?",
+        "path:change_id"
+      ],
+      "request": "PolicyScheduleRequest",
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/admin/switches": {
       "parameters": [
         "header:authorization?"
@@ -268,6 +337,12 @@
     "POST /v1/auth/otp/verify": {
       "parameters": [],
       "request": "OtpVerify",
+      "response": "SessionView",
+      "status": "200"
+    },
+    "POST /v1/auth/refresh": {
+      "parameters": [],
+      "request": "RefreshRequest",
       "response": "SessionView",
       "status": "200"
     },
@@ -656,6 +731,47 @@
         "total_amount_lkr"
       ]
     },
+    "PolicyDraftRequest": {
+      "fields": [
+        "effective_from",
+        "effective_to",
+        "key",
+        "reason",
+        "scope",
+        "value",
+        "version"
+      ],
+      "required": [
+        "key",
+        "reason",
+        "value"
+      ]
+    },
+    "PolicyReviewRequest": {
+      "fields": [
+        "candidate_summary",
+        "cases_evaluated"
+      ],
+      "required": [
+        "cases_evaluated"
+      ]
+    },
+    "PolicyRollbackRequest": {
+      "fields": [
+        "reason"
+      ],
+      "required": [
+        "reason"
+      ]
+    },
+    "PolicyScheduleRequest": {
+      "fields": [
+        "effective_from"
+      ],
+      "required": [
+        "effective_from"
+      ]
+    },
     "PreferencesRequest": {
       "fields": [
         "language",
@@ -694,6 +810,14 @@
         "state"
       ]
     },
+    "RefreshRequest": {
+      "fields": [
+        "refresh_token"
+      ],
+      "required": [
+        "refresh_token"
+      ]
+    },
     "ReloadRequest": {
       "fields": [
         "amount_lkr"
@@ -726,6 +850,7 @@
         "assurance",
         "expires_at",
         "permissions",
+        "refresh_token",
         "roles",
         "subject",
         "token"

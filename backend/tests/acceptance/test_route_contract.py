@@ -24,6 +24,9 @@ from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
 
 PUBLIC = {
+    # Exchanges a refresh token for a new access token (M-IAM). Public like
+    # sign-in: the refresh token is the credential, so there is no session yet.
+    ("POST", "/v1/auth/refresh"),
     ("GET", "/"),
     ("GET", "/desk"),
     ("GET", "/ops"),
@@ -69,6 +72,19 @@ SIGNED_IN = {
     ("GET", "/v1/admin/switches"),
     ("POST", "/v1/admin/switches"),
     ("POST", "/v1/admin/merchants/suspend"),
+    # The finance queue of unmatched actions (M-REC). Staff only: it lists
+    # money that moved without a confirmation from the adapter.
+    ("GET", "/v1/finance/reconciliation"),
+    # Policy Studio (M-GOV). Staff only, and the governance gate inside decides
+    # who may approve or activate: separation of duties is enforced there, not
+    # by the route, because the route cannot know who drafted the change.
+    ("GET", "/v1/admin/policy/changes"),
+    ("POST", "/v1/admin/policy/changes"),
+    ("POST", "/v1/admin/policy/changes/{change_id}/review"),
+    ("POST", "/v1/admin/policy/changes/{change_id}/approve"),
+    ("POST", "/v1/admin/policy/changes/{change_id}/schedule"),
+    ("POST", "/v1/admin/policy/changes/{change_id}/activate"),
+    ("POST", "/v1/admin/policy/changes/{change_id}/rollback"),
     ("GET", "/v1/demo/ops"),
     ("GET", "/v1/demo/autopsy"),
     ("GET", "/v1/demo/foresight"),

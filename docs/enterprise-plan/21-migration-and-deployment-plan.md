@@ -288,15 +288,21 @@ Source of truth: `backend/tests/architecture/test_module_dependencies.py`. A new
 
 | Module | May call (public surface) | Why |
 |---|---|---|
-| `case` | `timeline`, `detection`, `decision`, `actions`, `receipts` | Orchestrates the resolution of one case. Also the **consumer** of `action.completed` (§11.5): it keeps the `receipts` edge, and the edge is what the consumer uses to ask for the receipt. |
+| `resolution` | `case`, `timeline`, `detection`, `decision`, `actions`, `receipts` | Orchestrates one case and consumes `action.completed` to ask receipts for proof. |
+| `case` | `actions`, `decision`, `detection`, `receipts` | Holds shared result vocabulary in the aggregate; it performs no synchronous domain calls. |
 | `decision` | `detection` | Decides on the ranked causes |
 | `governance` | `decision` | Replays decisions under candidate policy |
 | `receipts` | `actions` | Reads result types (vocabulary only) |
-| `timeline`, `detection`, `actions`, `iam`, `conversation`, `autopsy`, `foresight` | none | Leaf modules |
+| `timeline`, `detection`, `actions`, `iam`, `conversation`, `autopsy`, `foresight`, `reconciliation` | none | Leaf modules; reconciliation consumes events and queries the lower-layer adapter confirmation port |
 
 ```mermaid
 flowchart LR
-    case --> timeline
+    resolution --> case
+    resolution --> timeline
+    resolution --> detection
+    resolution --> decision
+    resolution --> actions
+    resolution --> receipts
     case --> detection
     case --> decision
     case --> actions
@@ -318,11 +324,11 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `action.requested` | actions | audit | exists |
 | `action.completed` | actions | **case** (issues the proof through `receipts`, §11.5), reconciliation, insights, audit | exists |
 | `action.failed` | actions | case (hand off), notifications, audit | exists |
-| `approval.requested` | actions | notifications (supervisor push), desk queue projection | planned |
+| `approval.requested` | actions | notifications (supervisor push), desk queue projection | exists |
 | `receipt.issued` | receipts | notifications (send link), insights, audit | exists |
 | `risk.detected` | proactive | case (open zero-contact case), notifications | exists |
 | `notification.sent` / `.failed` | notifications | insights, audit | planned |
-| `policy.published` / `rule.published` | governance | detection, decision (reload artefacts), audit | exists (`rule.published`) |
+| `policy.published` / `rule.published` | governance | detection, decision (reload artefacts), audit | exists |
 | `switch.changed` | platform config | decision, ai gateway, audit | planned |
 | `mcp.invoked` | interfaces.mcp | audit, security alerts | exists |
 | `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |

@@ -200,6 +200,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/policy/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Policy Changes
+         * @description Policy Studio catalogue and lifecycle timeline.
+         */
+        get: operations["list_policy_changes_v1_admin_policy_changes_get"];
+        put?: never;
+        /** Draft Policy Change */
+        post: operations["draft_policy_change_v1_admin_policy_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/policy/changes/{change_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Policy Change */
+        post: operations["activate_policy_change_v1_admin_policy_changes__change_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/policy/changes/{change_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Policy Change */
+        post: operations["approve_policy_change_v1_admin_policy_changes__change_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/policy/changes/{change_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Policy Change */
+        post: operations["review_policy_change_v1_admin_policy_changes__change_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/policy/changes/{change_id}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rollback Policy Change */
+        post: operations["rollback_policy_change_v1_admin_policy_changes__change_id__rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/policy/changes/{change_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Schedule Policy Change */
+        post: operations["schedule_policy_change_v1_admin_policy_changes__change_id__schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/switches": {
         parameters: {
             query?: never;
@@ -302,6 +408,26 @@ export interface paths {
          * @description Exchange a correct code for a short-lived customer token.
          */
         post: operations["verify_otp_v1_auth_otp_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Session
+         * @description Rotate a refresh token. Reuse and revoked sessions are refused.
+         */
+        post: operations["refresh_session_v1_auth_refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -697,6 +823,26 @@ export interface paths {
          * @description Cases needing a person, biggest money at stake first (deck S9).
          */
         get: operations["desk_queue_v1_desk_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reconciliation Queue
+         * @description Persisted T+1 mismatches for finance investigation.
+         */
+        get: operations["reconciliation_queue_v1_finance_reconciliation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1284,6 +1430,51 @@ export interface components {
             /** Total Amount Lkr */
             total_amount_lkr: string;
         };
+        /** PolicyDraftRequest */
+        PolicyDraftRequest: {
+            /** Effective From */
+            effective_from?: string | null;
+            /** Effective To */
+            effective_to?: string | null;
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Scope */
+            scope?: {
+                [key: string]: string;
+            };
+            /** Value */
+            value: unknown;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+        };
+        /** PolicyReviewRequest */
+        PolicyReviewRequest: {
+            /**
+             * Candidate Summary
+             * @default
+             */
+            candidate_summary: string;
+            /** Cases Evaluated */
+            cases_evaluated: number;
+        };
+        /** PolicyRollbackRequest */
+        PolicyRollbackRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** PolicyScheduleRequest */
+        PolicyScheduleRequest: {
+            /**
+             * Effective From
+             * Format: date-time
+             */
+            effective_from: string;
+        };
         /** PreferencesRequest */
         PreferencesRequest: {
             language: components["schemas"]["Language"];
@@ -1336,6 +1527,11 @@ export interface components {
             /** State */
             state: string;
         };
+        /** RefreshRequest */
+        RefreshRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
         /** ReloadRequest */
         ReloadRequest: {
             /** Amount Lkr */
@@ -1363,6 +1559,8 @@ export interface components {
             expires_at?: string | null;
             /** Permissions */
             permissions?: string[];
+            /** Refresh Token */
+            refresh_token?: string | null;
             /** Roles */
             roles?: string[];
             /** Subject */
@@ -1822,6 +2020,263 @@ export interface operations {
             };
         };
     };
+    list_policy_changes_v1_admin_policy_changes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_policy_change_v1_admin_policy_changes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_policy_change_v1_admin_policy_changes__change_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_policy_change_v1_admin_policy_changes__change_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_policy_change_v1_admin_policy_changes__change_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rollback_policy_change_v1_admin_policy_changes__change_id__rollback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyRollbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_policy_change_v1_admin_policy_changes__change_id__schedule_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_switches_v1_admin_switches_get: {
         parameters: {
             query?: never;
@@ -1990,6 +2445,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OtpVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_session_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
             };
         };
         responses: {
@@ -2700,6 +3188,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconciliation_queue_v1_finance_reconciliation_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
             /** @description Validation Error */

@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import create_engine
 
 from clarity.ai.gateway import AIGateway, ModelProvider
-from clarity.app.mcp_view import CaseServiceMCPView
+from clarity.app.mcp_view import ResolutionServiceMCPView
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
@@ -31,12 +31,26 @@ from clarity.modules.actions.capability import (
 from clarity.modules.case.public import (
     CASE_SEQUENCE,
     CASES,
-    CaseService,
+    CaseAggregate,
     StoredCaseRepository,
 )
-from clarity.modules.decision.public import DecisionPolicy, PolicyThresholds
+from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.detection.public import RuleEngine, load_packs
-from clarity.modules.iam.public import OtpService, TokenIssuer
+from clarity.modules.governance.public import (
+    CHANGES,
+    PolicyGovernance,
+    StoredPolicyChangeRepository,
+)
+from clarity.modules.iam.public import (
+    AuthorizationPolicy,
+    CompositeTokenVerifier,
+    KeycloakTokenVerifier,
+    OpaAuthorizationPolicy,
+    OtpService,
+    PythonAuthorizationPolicy,
+    TokenIssuer,
+    TokenVerifier,
+)
 from clarity.modules.receipts.public import (
     BY_PLAN,
     RECEIPT_SEQUENCE,
@@ -44,10 +58,13 @@ from clarity.modules.receipts.public import (
     SUBSCRIBERS,
     SUPERSEDED,
     DevSigningService,
+    OpenBaoSigningService,
     ReceiptService,
     SigningService,
     StoredReceiptRepository,
 )
+from clarity.modules.reconciliation.public import ReconciliationService
+from clarity.modules.resolution.public import ResolutionService
 from clarity.modules.timeline.public import TimelineBuilder
 from clarity.platform.audit.ledger import AuditLedger
 from clarity.platform.config.resolver import PolicyResolver
@@ -268,7 +285,10 @@ class Clarity:
         )
         self.registry = AdapterRegistry(mode=DriverMode.MOCK, world=self.world)
         self.rules = RuleEngine(load_packs(rules_dir or default_rules_dir(self.settings.rules_dir)))
-        self.policy = DecisionPolicy(thresholds)
+        self.policy = ZenDecisionPolicy.from_file(
+            default_policy_dir(policy_dir or self.settings.policy_dir) / "decision-table.json",
+            thresholds=thresholds,
+        )
         self.timeline = TimelineBuilder(self.registry.read_ports())
         self.tools = ToolLayer(
             self.registry.command_port,
@@ -279,9 +299,39 @@ class Clarity:
         self.audit = AuditLedger()
         # Identity is not demo data: a reset of the synthetic world must not
         # sign everyone out mid-demonstration, so these carry over.
-        self.tokens = tokens or TokenIssuer()
-        self.otp = otp or OtpService()
-        self.signing = signing or DevSigningService()
+        self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
+        self.otp = otp or OtpService(open_unit=self.open_unit)
+        self.token_verifier: TokenVerifier = self.tokens
+        if self.settings.keycloak_issuer:
+            self.token_verifier = CompositeTokenVerifier(
+                self.tokens,
+                KeycloakTokenVerifier(
+                    self.settings.keycloak_issuer,
+                    self.settings.keycloak_audience,
+                    jwks_url=self.settings.keycloak_jwks_url,
+                    timeout_seconds=self.settings.auth_timeout_seconds,
+                ),
+            )
+        self.authorization: AuthorizationPolicy = (
+            OpaAuthorizationPolicy(
+                self.settings.opa_url,
+                timeout_seconds=self.settings.auth_timeout_seconds,
+            )
+            if self.settings.opa_url
+            else PythonAuthorizationPolicy()
+        )
+        self.signing = signing or (
+            OpenBaoSigningService(
+                self.settings.signer_url,
+                key_name=self.settings.signer_key_name,
+                token=self.settings.signer_token or "",
+                mount=self.settings.signer_mount,
+                namespace=self.settings.signer_namespace,
+                timeout_seconds=self.settings.signer_timeout_seconds,
+            )
+            if self.settings.signer_url
+            else DevSigningService()
+        )
         self.receipts = ReceiptService(
             self.signing,
             ledger=StoredReceiptRepository(
@@ -294,6 +344,7 @@ class Clarity:
             probe=MockRecurrenceProbe(self.world),
             verify_base=verify_base,
             persist=persist,
+            open_unit=self.open_unit,
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
@@ -313,11 +364,31 @@ class Clarity:
             bus=self.bus,
             alert=self.dead_letters,
         )
-        self.cases = CaseService(
-            cases=StoredCaseRepository(
+        # The aggregate owns the case; the resolution service orchestrates
+        # (M-CASE, plan 21 section 2.2).
+        self.case_aggregate = CaseAggregate(
+            StoredCaseRepository(
                 self._repository(CASES),
                 self._repository(CASE_SEQUENCE),
             ),
+            clock=clock,
+        )
+        self.reconciliation = ReconciliationService(
+            open_unit=self.open_unit,
+            confirmations=self.registry.command_port,
+            clock=self.case_aggregate._now,
+        )
+        self.governance = PolicyGovernance(
+            StoredPolicyChangeRepository(self._repository(CHANGES)),
+            policies=self.policies,
+            audit=self.audit,
+            clock=self.case_aggregate._now,
+            open_unit=self.open_unit,
+            deliver_events=self.deliver_events,
+        )
+        self.cases = ResolutionService(
+            aggregate=self.case_aggregate,
+            open_unit=self.open_unit,
             deliver_events=self.deliver_events,
             timeline=self.timeline,
             rules=self.rules,
@@ -336,9 +407,14 @@ class Clarity:
             group="receipts",
             handler=self.cases.on_action_completed,
         )
+        self.consumers.register(
+            EventType.ACTION_COMPLETED,
+            group="reconciliation",
+            handler=self.reconciliation.on_action_completed,
+        )
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
-        self.mcp_view = CaseServiceMCPView(self.cases, self.receipts)
+        self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts)
 
     def deliver_events(self) -> None:
         """Publish whatever the last unit of work committed, then consume it.
@@ -348,8 +424,15 @@ class Clarity:
         deployment runs the relay as its own process instead; the seam is the
         same either way.
         """
-        self.relay.run_once()
-        self.bus.drain()
+        # A consumer may atomically write a follow-on event, such as
+        # receipt.issued after action.completed. Keep draining until no newly
+        # committed outbox row remains, without recursively draining inside a
+        # handler.
+        while True:
+            report = self.relay.run_once()
+            self.bus.drain()
+            if report.published == 0:
+                return
 
     def reset(self) -> Clarity:
         """Build a fresh instance with the same configuration.

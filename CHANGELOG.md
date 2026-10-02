@@ -4,6 +4,27 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (Wave 1 core modules)
+
+**`/v1` contract change.** Nine new operations; the reviewed OpenAPI snapshot
+was regenerated on purpose (`backend/tests/acceptance/golden/openapi-contract.json`).
+No existing operation changed shape, so a current client keeps working.
+
+- Policy Studio (M-GOV, #20): `GET /v1/admin/policy/changes`, `POST /v1/admin/policy/changes`, and `review`, `approve`, `schedule`, `activate`, `rollback` on `/v1/admin/policy/changes/{change_id}`. Staff only; separation of duties is enforced by the governance gate, not the route, because a route cannot know who drafted a change.
+- `POST /v1/auth/refresh` (M-IAM, #7): exchanges a refresh token for a new access token. Public, like sign-in: the refresh token is the credential.
+- `GET /v1/finance/reconciliation` (M-REC, #38): the queue of executed actions with no adapter confirmation. Staff only, because it lists money that moved unmatched.
+
+- Durable idempotency, transient-versus-final refusals, durable confirmation tokens, and `approval.requested@v1` (M-ACT, #25).
+- Orchestration split out of `CaseService` into `clarity.modules.resolution`; the aggregate keeps the case and its state machine (M-CASE, #34). Method names unchanged, so the HTTP and MCP interfaces were untouched.
+- Rule confidence can come from the policy store, resolved as of the disputed event, and four new rule packs: `VAS_RENEWAL_UNNOTIFIED`, `PACK_MISMATCH`, `LOAN_RECOVERY`, `OUTAGE_DURING_PACK` (M-DET, #35).
+- Keycloak JWKS verification, OPA authorization parity, shared OTP state and revocable rotating sessions (M-IAM, #7).
+- Persisted Policy Studio lifecycle with approvals, schedules, activations, supersession and rollback drafting (M-GOV, #20).
+- GoRules ZEN-compatible outcome table with a 1,000-input reference parity suite (M-DEC, #36).
+- OpenBao Transit signing, retained rotation keys, isolated stateless rendering and `receipt.issued@v1` (M-RCPT, #37).
+- Daily action reconciliation and `reconciliation.mismatch@v1` (M-REC, #38).
+
+Consumers to update: the frontend SDK is regenerated from the schema (`make contracts`), which is checked in CI.
+
 ### Added (B01, #10)
 - `clarity.contracts.events`: one typed payload model per catalogued event (17, `type@v1`), a registry, `validate_payload`; a payload class cannot define a personal-data field.
 - The event vocabulary moved from `platform.messaging` to `contracts.events` (`EventType` kept as an alias); `Event.of(payload, subject=...)`; `Event.caused(payload)`; `schema_version` is now an integer.

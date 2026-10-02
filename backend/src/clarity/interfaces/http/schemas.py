@@ -8,6 +8,7 @@ internal plumbing like policy input hashes or adapter references.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -282,6 +283,7 @@ class PreferencesRequest(ApiModel):
 
 class SessionView(ApiModel):
     token: str
+    refresh_token: str | None = None
     expires_at: datetime | None = None
     subject: str
     roles: list[str] = Field(default_factory=list)
@@ -289,11 +291,38 @@ class SessionView(ApiModel):
     permissions: list[str] = Field(default_factory=list)
 
 
+class RefreshRequest(ApiModel):
+    refresh_token: str = Field(min_length=20)
+
+
 class SwitchFlipRequest(ApiModel):
     """Flip a kill switch. Requires ``flags:kill_switch``."""
 
     key: str
     enabled: bool
+    reason: str = Field(min_length=1)
+
+
+class PolicyDraftRequest(ApiModel):
+    key: str
+    value: Any
+    scope: dict[str, str] = Field(default_factory=dict)
+    version: int = Field(default=1, ge=1)
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
+    reason: str = Field(min_length=1)
+
+
+class PolicyReviewRequest(ApiModel):
+    cases_evaluated: int = Field(ge=0)
+    candidate_summary: str = ""
+
+
+class PolicyScheduleRequest(ApiModel):
+    effective_from: datetime
+
+
+class PolicyRollbackRequest(ApiModel):
     reason: str = Field(min_length=1)
 
 

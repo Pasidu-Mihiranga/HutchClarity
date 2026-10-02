@@ -74,6 +74,17 @@ class Settings(BaseSettings):
         description="Ed25519 key the signer uses for Trust Receipts.",
     )
     keys_dir: Path = Field(default=Path(".keys"), alias="KEYS_DIR")
+    keycloak_issuer: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_ISSUER")
+    keycloak_audience: str = Field(default="clarity-api", alias="CLARITY_KEYCLOAK_AUDIENCE")
+    keycloak_jwks_url: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_JWKS_URL")
+    opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
+    auth_timeout_seconds: float = Field(default=3.0, alias="CLARITY_AUTH_TIMEOUT", gt=0)
+    signer_url: str | None = Field(default=None, alias="CLARITY_SIGNER_URL")
+    signer_token: str | None = Field(default=None, alias="CLARITY_SIGNER_TOKEN")
+    signer_key_name: str = Field(default="clarity-receipts", alias="CLARITY_SIGNER_KEY_NAME")
+    signer_mount: str = Field(default="transit", alias="CLARITY_SIGNER_MOUNT")
+    signer_namespace: str | None = Field(default=None, alias="CLARITY_SIGNER_NAMESPACE")
+    signer_timeout_seconds: float = Field(default=3.0, alias="CLARITY_SIGNER_TIMEOUT", gt=0)
 
     # -- artefacts -------------------------------------------------------- #
 
@@ -128,6 +139,11 @@ class Settings(BaseSettings):
             raise SettingsInvalid(
                 "OTEL_EXPORTER is otlp but OTEL_EXPORTER_OTLP_ENDPOINT is not set; "
                 "the collector address is required"
+            )
+        if self.signer_url and not self.signer_token:
+            raise SettingsInvalid(
+                "CLARITY_SIGNER_URL is set but CLARITY_SIGNER_TOKEN is empty; "
+                "OpenBao requires a scoped Transit token"
             )
         return self
 

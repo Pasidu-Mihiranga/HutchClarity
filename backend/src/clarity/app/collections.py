@@ -11,9 +11,11 @@ schema, the role grants and the row-level security policy follow it.
 
 from __future__ import annotations
 
-from clarity.modules.actions.capability import PLANS
+from clarity.modules.actions.capability import ATTEMPTS as ACTION_ATTEMPTS
+from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.governance.public import CHANGES
+from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
 from clarity.modules.receipts.public import (
     BY_PLAN,
     RECEIPT_SEQUENCE,
@@ -21,7 +23,9 @@ from clarity.modules.receipts.public import (
     SUBSCRIBERS,
     SUPERSEDED,
 )
-from clarity.platform.messaging.consumers import ATTEMPTS, DEAD_LETTERS, PROCESSED
+from clarity.modules.reconciliation.public import EXPECTED_ACTIONS, MISMATCHES
+from clarity.platform.messaging.consumers import ATTEMPTS as CONSUMER_ATTEMPTS
+from clarity.platform.messaging.consumers import DEAD_LETTERS, PROCESSED
 from clarity.platform.messaging.outbox import OUTBOX
 
 #: Order matters only for legibility; each collection is an independent table.
@@ -31,18 +35,28 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     CASE_SEQUENCE,
     # actions
     PLANS,
+    ACTION_ATTEMPTS,
+    CONFIRMATIONS,
     # receipts
     RECEIPTS,
     SUPERSEDED,
     SUBSCRIBERS,
     RECEIPT_SEQUENCE,
     BY_PLAN,
+    # reconciliation
+    EXPECTED_ACTIONS,
+    MISMATCHES,
     # governance
     CHANGES,
+    # iam
+    OTP_CHALLENGES,
+    OTP_REQUESTS,
+    SESSIONS,
+    REFRESH_TOKENS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,
-    ATTEMPTS,
+    CONSUMER_ATTEMPTS,
     DEAD_LETTERS,
 )
 

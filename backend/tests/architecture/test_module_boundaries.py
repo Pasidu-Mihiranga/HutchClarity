@@ -2,8 +2,9 @@
 
 Outside a module, only its ``public`` surface may be imported. The one
 exception is the actions module's ``capability`` surface, which only the
-``case`` module and the composition root may use, because it is the only code
-that can move money.
+``resolution`` module and the composition root may use, because it is the only
+code that can move money. It was ``case`` until M-CASE split orchestration out:
+the right to move money follows the orchestrator, not the aggregate.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 import clarity
 
 SRC = Path(clarity.__file__).parent
-CAPABILITY_USERS = ("clarity.modules.case", "clarity.app")
+CAPABILITY_USERS = ("clarity.modules.resolution", "clarity.app")
 
 
 def _module_of(path: Path) -> str:

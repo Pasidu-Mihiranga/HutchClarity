@@ -61,9 +61,14 @@ from clarity.interfaces.http.schemas import (
     OtpVerify,
     PendingApprovalView,
     PlanView,
+    PolicyDraftRequest,
+    PolicyReviewRequest,
+    PolicyRollbackRequest,
+    PolicyScheduleRequest,
     PreferencesRequest,
     ProposeRequest,
     QueueItem,
+    RefreshRequest,
     ReloadRequest,
     RuledOutView,
     SafeguardRequest,
@@ -80,7 +85,9 @@ from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
-from clarity.modules.iam.public import OtpRefused, SimulatedInbox
+from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
+from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
+from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
 from clarity.platform.messaging.correlation import correlated
 from clarity.platform.observability import current_trace_id, span
@@ -164,9 +171,11 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.middleware("http")(_trace_requests)
-    # The auth dependency reads the issuer from app state, so one process
-    # always validates against the keys it minted.
-    app.state.token_issuer = (clarity or get_clarity()).tokens
+    # Authentication and authorization are profile-selected drivers. Lite uses
+    # local JWT/Python drivers; full may use Keycloak and OPA.
+    core = clarity or get_clarity()
+    app.state.token_verifier = core.token_verifier
+    app.state.authorization_policy = core.authorization
     _register_handlers(app)
     _register_routes(app)
     _register_pages(app)
@@ -204,6 +213,10 @@ def _register_handlers(app: FastAPI) -> None:
     async def _case_not_ready(_: Request, error: CaseNotReady) -> JSONResponse:
         return _problem(409, "Case not ready", str(error), "CASE_NOT_READY")
 
+    @app.exception_handler(ChangeRefused)
+    async def _policy_refused(_: Request, error: ChangeRefused) -> JSONResponse:
+        return _problem(409, "Policy change refused", str(error), error.code)
+
 
 # --------------------------------------------------------------------------- #
 # Views
@@ -222,6 +235,39 @@ def _case_summary(record: CaseRecord) -> CaseSummary:
         money_at_stake_lkr=case.money_at_stake_lkr,
         opened_at=case.opened_at,
     )
+
+
+def _policy_change_view(change: PolicyChange) -> dict[str, Any]:
+    return {
+        "change_id": change.change_id,
+        "key": change.key,
+        "candidate": change.candidate.model_dump(mode="json"),
+        "change_class": change.change_class.value,
+        "maker_ref": change.maker_ref,
+        "state": change.state.value,
+        "reason": change.reason,
+        "approvals_needed": change.approvals_needed,
+        "approvals": [
+            {
+                "approver_ref": approval.approver_ref,
+                "role": approval.role,
+                "at": approval.at.isoformat(),
+                "mfa_step_up": approval.mfa_step_up,
+            }
+            for approval in change.approvals
+        ],
+        "impact": None
+        if change.impact is None
+        else {
+            "cases_evaluated": change.impact.cases_evaluated,
+            "changed": change.impact.changed,
+            "money_delta_lkr": str(change.impact.money_delta_lkr),
+            "candidate_summary": change.impact.candidate_summary,
+        },
+        "scheduled_for": change.scheduled_for,
+        "activated_at": change.activated_at,
+        "supersedes": change.supersedes,
+    }
 
 
 def _decision_view(record: CaseRecord, clarity: Clarity | None = None) -> DecisionView:
@@ -427,6 +473,7 @@ def _register_routes(app: FastAPI) -> None:
         )
         return SessionView(
             token=issued.value,
+            refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
             subject=account.masked,
             roles=["customer"],
@@ -461,11 +508,29 @@ def _register_routes(app: FastAPI) -> None:
         )
         return SessionView(
             token=issued.value,
+            refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
             subject=body.user_ref,
             roles=sorted(role.value for role in roles),
             assurance=issued.principal.assurance.value,
             permissions=sorted(p.value for p in issued.principal.permissions),
+        )
+
+    @app.post("/v1/auth/refresh", response_model=SessionView, tags=["auth"])
+    def refresh_session(body: RefreshRequest, clarity: ClarityDep) -> SessionView:
+        """Rotate a refresh token. Reuse and revoked sessions are refused."""
+        try:
+            issued = clarity.tokens.refresh(body.refresh_token)
+        except TokenInvalid as error:
+            raise HTTPException(status_code=401, detail=str(error)) from error
+        return SessionView(
+            token=issued.value,
+            refresh_token=issued.refresh_token,
+            expires_at=issued.expires_at,
+            subject=issued.principal.ref,
+            roles=sorted(role.value for role in issued.principal.roles),
+            assurance=issued.principal.assurance.value,
+            permissions=sorted(permission.value for permission in issued.principal.permissions),
         )
 
     @app.get("/v1/auth/me", response_model=SessionView, tags=["auth"])
@@ -846,6 +911,124 @@ def _register_routes(app: FastAPI) -> None:
             )
             for r in waiting
         ]
+
+    @app.get("/v1/finance/reconciliation", tags=["finance"])
+    def reconciliation_queue(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.RECONCILIATION_READ))],
+    ) -> list[dict[str, Any]]:
+        """Persisted T+1 mismatches for finance investigation."""
+        return [
+            {
+                "mismatch_id": item.mismatch_id,
+                "action_id": item.action_id,
+                "plan_id": item.plan_id,
+                "expected_lkr": str(item.expected_lkr),
+                "confirmed_lkr": (
+                    str(item.confirmed_lkr) if item.confirmed_lkr is not None else None
+                ),
+                "reason": item.reason,
+                "detected_at": item.detected_at.isoformat(),
+            }
+            for item in clarity.reconciliation.queue()
+        ]
+
+    @app.get("/v1/admin/policy/changes", tags=["policy-studio"])
+    def list_policy_changes(
+        clarity: ClarityDep,
+        principal: CurrentPrincipal,
+    ) -> list[dict[str, Any]]:
+        """Policy Studio catalogue and lifecycle timeline."""
+        if principal is ANONYMOUS or not principal.roles:
+            raise HTTPException(status_code=401, detail="sign in to continue")
+        if not (principal.has(Permission.CONFIG_DRAFT) or principal.has(Permission.CONFIG_APPROVE)):
+            raise HTTPException(status_code=403, detail="this account may not read policy")
+        clarity.governance.activate_due()
+        return [_policy_change_view(change) for change in clarity.governance.all_changes()]
+
+    @app.post("/v1/admin/policy/changes", tags=["policy-studio"])
+    def draft_policy_change(
+        body: PolicyDraftRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.CONFIG_DRAFT))],
+    ) -> dict[str, Any]:
+        artefact = clarity.policies.key(body.key)
+        candidate = PolicyValue(
+            value=body.value,
+            scope=Scope.model_validate(body.scope),
+            version=body.version,
+            effective_from=body.effective_from,
+            effective_to=body.effective_to,
+        )
+        change = clarity.governance.draft(
+            key=body.key,
+            candidate=candidate,
+            computed_class=artefact.change_class,
+            maker_ref=principal.ref,
+            reason=body.reason,
+        )
+        return _policy_change_view(change)
+
+    @app.post("/v1/admin/policy/changes/{change_id}/review", tags=["policy-studio"])
+    def review_policy_change(
+        change_id: str,
+        body: PolicyReviewRequest,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.CONFIG_DRAFT))],
+    ) -> dict[str, Any]:
+        change = clarity.governance.get(change_id)
+        report = ImpactReport(
+            key=change.key,
+            change_class=change.change_class,
+            cases_evaluated=body.cases_evaluated,
+            candidate_summary=body.candidate_summary,
+        )
+        return _policy_change_view(clarity.governance.attach_impact(change_id, report))
+
+    @app.post("/v1/admin/policy/changes/{change_id}/approve", tags=["policy-studio"])
+    def approve_policy_change(
+        change_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.CONFIG_APPROVE))],
+    ) -> dict[str, Any]:
+        role = sorted(role.value for role in principal.roles)[0]
+        change = clarity.governance.approve(
+            change_id,
+            approver_ref=principal.ref,
+            role=role,
+            mfa_step_up=principal.assurance.is_step_up,
+        )
+        return _policy_change_view(change)
+
+    @app.post("/v1/admin/policy/changes/{change_id}/schedule", tags=["policy-studio"])
+    def schedule_policy_change(
+        change_id: str,
+        body: PolicyScheduleRequest,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.CONFIG_APPROVE))],
+    ) -> dict[str, Any]:
+        return _policy_change_view(
+            clarity.governance.schedule(change_id, effective_from=body.effective_from)
+        )
+
+    @app.post("/v1/admin/policy/changes/{change_id}/activate", tags=["policy-studio"])
+    def activate_policy_change(
+        change_id: str,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.CONFIG_APPROVE))],
+    ) -> dict[str, Any]:
+        return _policy_change_view(clarity.governance.activate(change_id))
+
+    @app.post("/v1/admin/policy/changes/{change_id}/rollback", tags=["policy-studio"])
+    def rollback_policy_change(
+        change_id: str,
+        body: PolicyRollbackRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.CONFIG_APPROVE))],
+    ) -> dict[str, Any]:
+        return _policy_change_view(
+            clarity.governance.rollback(change_id, maker_ref=principal.ref, reason=body.reason)
+        )
 
     @app.get("/v1/admin/switches", tags=["admin"])
     def list_switches(

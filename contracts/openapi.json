@@ -659,6 +659,117 @@
         "title": "PlanView",
         "type": "object"
       },
+      "PolicyDraftRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Scope",
+            "type": "object"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "version": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "reason"
+        ],
+        "title": "PolicyDraftRequest",
+        "type": "object"
+      },
+      "PolicyReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_summary": {
+            "default": "",
+            "title": "Candidate Summary",
+            "type": "string"
+          },
+          "cases_evaluated": {
+            "minimum": 0.0,
+            "title": "Cases Evaluated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cases_evaluated"
+        ],
+        "title": "PolicyReviewRequest",
+        "type": "object"
+      },
+      "PolicyRollbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PolicyRollbackRequest",
+        "type": "object"
+      },
+      "PolicyScheduleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "effective_from": {
+            "format": "date-time",
+            "title": "Effective From",
+            "type": "string"
+          }
+        },
+        "required": [
+          "effective_from"
+        ],
+        "title": "PolicyScheduleRequest",
+        "type": "object"
+      },
       "PreferencesRequest": {
         "additionalProperties": false,
         "properties": {
@@ -798,6 +909,21 @@
         "title": "QueueItem",
         "type": "object"
       },
+      "RefreshRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "refresh_token": {
+            "minLength": 20,
+            "title": "Refresh Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshRequest",
+        "type": "object"
+      },
       "ReloadRequest": {
         "additionalProperties": false,
         "properties": {
@@ -881,6 +1007,17 @@
             },
             "title": "Permissions",
             "type": "array"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
           },
           "roles": {
             "items": {
@@ -1666,6 +1803,450 @@
         ]
       }
     },
+    "/v1/admin/policy/changes": {
+      "get": {
+        "description": "Policy Studio catalogue and lifecycle timeline.",
+        "operationId": "list_policy_changes_v1_admin_policy_changes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Policy Changes V1 Admin Policy Changes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Policy Changes",
+        "tags": [
+          "policy-studio"
+        ]
+      },
+      "post": {
+        "operationId": "draft_policy_change_v1_admin_policy_changes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Draft Policy Change V1 Admin Policy Changes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
+    "/v1/admin/policy/changes/{change_id}/activate": {
+      "post": {
+        "operationId": "activate_policy_change_v1_admin_policy_changes__change_id__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Activate Policy Change V1 Admin Policy Changes  Change Id  Activate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
+    "/v1/admin/policy/changes/{change_id}/approve": {
+      "post": {
+        "operationId": "approve_policy_change_v1_admin_policy_changes__change_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Policy Change V1 Admin Policy Changes  Change Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
+    "/v1/admin/policy/changes/{change_id}/review": {
+      "post": {
+        "operationId": "review_policy_change_v1_admin_policy_changes__change_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Review Policy Change V1 Admin Policy Changes  Change Id  Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
+    "/v1/admin/policy/changes/{change_id}/rollback": {
+      "post": {
+        "operationId": "rollback_policy_change_v1_admin_policy_changes__change_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyRollbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rollback Policy Change V1 Admin Policy Changes  Change Id  Rollback Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
+    "/v1/admin/policy/changes/{change_id}/schedule": {
+      "post": {
+        "operationId": "schedule_policy_change_v1_admin_policy_changes__change_id__schedule_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Schedule Policy Change V1 Admin Policy Changes  Change Id  Schedule Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Schedule Policy Change",
+        "tags": [
+          "policy-studio"
+        ]
+      }
+    },
     "/v1/admin/switches": {
       "get": {
         "description": "Kill-switch state. Readable with kill_switch or admin:manage.",
@@ -1933,6 +2514,48 @@
           }
         },
         "summary": "Verify Otp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "description": "Rotate a refresh token. Reuse and revoked sessions are refused.",
+        "operationId": "refresh_session_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Session",
         "tags": [
           "auth"
         ]
@@ -3051,6 +3674,61 @@
         "summary": "Desk Queue",
         "tags": [
           "desk"
+        ]
+      }
+    },
+    "/v1/finance/reconciliation": {
+      "get": {
+        "description": "Persisted T+1 mismatches for finance investigation.",
+        "operationId": "reconciliation_queue_v1_finance_reconciliation_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Reconciliation Queue V1 Finance Reconciliation Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconciliation Queue",
+        "tags": [
+          "finance"
         ]
       }
     },

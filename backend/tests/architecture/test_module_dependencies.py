@@ -18,7 +18,17 @@ MODULES = Path(clarity.__file__).parent / "modules"
 
 #: module -> modules it may call through their public surface (synchronous).
 ALLOWED: dict[str, set[str]] = {
-    "case": {"timeline", "detection", "decision", "actions", "receipts"},
+    # Orchestration (M-CASE, plan 21 section 2.2). Every edge out of the domain
+    # starts here, which is what makes `case` a leaf.
+    "resolution": {"case", "timeline", "detection", "decision", "actions", "receipts"},
+    # `case` calls nothing. These are the types its aggregate record *holds*:
+    # the evaluation detection produced, the thresholds decision used, the
+    # execution actions returned, the receipt that proves it. This test reads
+    # imports, which cannot tell naming a type from calling a function, so the
+    # edges are declared. Moving those four types down to `clarity.contracts`,
+    # where ADR-0029 section 4 says shared vocabulary belongs, would make `case`
+    # a leaf in the file as well as in behaviour; that is the follow-up.
+    "case": {"actions", "decision", "detection", "receipts"},
     "decision": {"detection"},
     "governance": {"decision"},
     "receipts": {"actions"},
@@ -29,6 +39,15 @@ ALLOWED: dict[str, set[str]] = {
     "conversation": set(),
     "autopsy": set(),
     "foresight": set(),
+    # scaffold modules: no synchronous calls declared yet
+    "content": set(),
+    "customer": set(),
+    "deskops": set(),
+    "insights": set(),
+    "knowledge": set(),
+    "notifications": set(),
+    "proactive": set(),
+    "reconciliation": set(),
 }
 
 

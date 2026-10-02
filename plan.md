@@ -233,14 +233,14 @@ Linked to the 42 open issues in the repo. Check off each item as it is merged. I
 
 ### Wave 1 - Core modules (money path, detection, identity)
 
-- [ ] #25 `[M-ACT]` Actions: database idempotency, row locks, approval.requested, retry after transient failure `p0`
-- [ ] #34 `[M-CASE]` Case: split orchestration into a resolution service, case aggregate on repositories `p0`
-- [ ] #35 `[M-DET]` Detection: rule parameters in the policy store (D5) and four more rule packs `p0`
-- [ ] #7 `[M-IAM]` Identity: Keycloak for staff and MCP clients, OPA for authorization, shared OTP state `p1`
-- [ ] #20 `[M-GOV]` Governance: persisted policy artefacts, approvals and activations; Policy Studio API `p1`
-- [ ] #36 `[M-DEC]` Decision: outcome matrix as a GoRules ZEN decision table `p1`
-- [ ] #37 `[M-RCPT]` Receipts: signer service port with OpenBao/KMS driver, isolated rendering `p1`
-- [ ] #38 `[M-REC]` Reconciliation module: daily match of actions against adapter confirmations `p2`
+- [x] #25 `[M-ACT]` Actions: database idempotency, row locks, approval.requested, retry after transient failure `p0`
+- [x] #34 `[M-CASE]` Case: split orchestration into a resolution service, case aggregate on repositories `p0`
+- [x] #35 `[M-DET]` Detection: rule parameters in the policy store (D5) and four more rule packs `p0`
+- [x] #7 `[M-IAM]` Identity: Keycloak for staff and MCP clients, OPA for authorization, shared OTP state `p1`
+- [x] #20 `[M-GOV]` Governance: persisted policy artefacts, approvals and activations; Policy Studio API `p1`
+- [x] #36 `[M-DEC]` Decision: outcome matrix as a GoRules ZEN decision table `p1`
+- [x] #37 `[M-RCPT]` Receipts: signer service port with OpenBao/KMS driver, isolated rendering `p1`
+- [x] #38 `[M-REC]` Reconciliation module: daily match of actions against adapter confirmations `p2`
 
 ### Wave 2 - AI layer (gateway, safety, MCP, evaluation)
 

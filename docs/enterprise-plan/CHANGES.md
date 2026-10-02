@@ -16,6 +16,13 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.7 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| Wave 1 core | Marked 10 implemented rule packs active; recorded effective-dated detection parameters and the ZEN decision table | 09 |
+| Module interaction | Updated the as-built resolution orchestration edge and registered reconciliation as an event-driven leaf | 21 §11 |
+
 ## v1.6 - 2026-10-02
 
 | Area | Change | Chapters |

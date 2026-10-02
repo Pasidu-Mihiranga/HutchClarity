@@ -12,15 +12,17 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | contracts | L0 | `backend/src/clarity/contracts/` | - | built; **domain event payloads typed and versioned** (`events.py`, #10) | AsyncAPI generation (R2) |
 | integration (ports, mock drivers) | L1 | `backend/src/clarity/integration/` | - | built (simulated) | `hutch-sim` HTTP drivers (R4) |
 | integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team; used by the `full` profile | Becomes `hutch-sim`'s own database (R4) |
+| resolution | L4 | `backend/src/clarity/modules/resolution/` | case, timeline, detection, decision, actions, receipts | built | Orchestration split out of `case` (M-CASE #34). The only module allowed to import `actions.capability`. |
 | platform: config, audit, messaging, persistence, observability, content, security | L2 | `backend/src/clarity/platform/` | - | built | Persistence port with in-memory and PostgreSQL drivers, schema and role per module, row-level security (B02, B05); event bus port with in-process and Kafka drivers (B03); transactional outbox, relay and consumer framework (B04); traces and masked structured logs (B08). OPA with R2. |
 | ai (gateway, providers, PII, verifier) | L3 | `backend/src/clarity/ai/` | - | built (no model) | Model roles, cassettes (R4) |
 | actions | L4 | `backend/src/clarity/modules/actions/` | [MODULE.md](../backend/src/clarity/modules/actions/MODULE.md) | built | DB idempotency, row locks (R3) |
 | case | L4 | `backend/src/clarity/modules/case/` | [MODULE.md](../backend/src/clarity/modules/case/MODULE.md) | built | Split orchestration; event-driven receipts (R3) |
-| decision | L4 | `backend/src/clarity/modules/decision/` | [MODULE.md](../backend/src/clarity/modules/decision/MODULE.md) | built | ZEN decision table (R3) |
-| detection | L4 | `backend/src/clarity/modules/detection/` | [MODULE.md](../backend/src/clarity/modules/detection/MODULE.md) | built (6 of 16 rules) | Rule parameters to policy (R3) |
-| governance | L4 | `backend/src/clarity/modules/governance/` | [MODULE.md](../backend/src/clarity/modules/governance/MODULE.md) | built | Persist artefacts and approvals (R2/R3) |
-| iam | L4 | `backend/src/clarity/modules/iam/` | [MODULE.md](../backend/src/clarity/modules/iam/MODULE.md) | built (own issuer) | Keycloak driver (R2) |
-| receipts | L4 | `backend/src/clarity/modules/receipts/` | [MODULE.md](../backend/src/clarity/modules/receipts/MODULE.md) | built | Signer service (R4), event-driven issue (R3) |
+| decision | L4 | `backend/src/clarity/modules/decision/` | [MODULE.md](../backend/src/clarity/modules/decision/MODULE.md) | migrated | ZEN-compatible decision table and parity suite (M-DEC) |
+| detection | L4 | `backend/src/clarity/modules/detection/` | [MODULE.md](../backend/src/clarity/modules/detection/MODULE.md) | migrated (10 of 16 rules) | Product validation of remaining candidates |
+| governance | L4 | `backend/src/clarity/modules/governance/` | [MODULE.md](../backend/src/clarity/modules/governance/MODULE.md) | migrated | Policy Studio lifecycle and persisted approvals/activations (M-GOV) |
+| iam | L4 | `backend/src/clarity/modules/iam/` | [MODULE.md](../backend/src/clarity/modules/iam/MODULE.md) | migrated | Keycloak/OPA full drivers and shared identity state (M-IAM) |
+| receipts | L4 | `backend/src/clarity/modules/receipts/` | [MODULE.md](../backend/src/clarity/modules/receipts/MODULE.md) | migrated | OpenBao signer driver and isolated render job (M-RCPT) |
+| reconciliation | L4 | `backend/src/clarity/modules/reconciliation/` | [MODULE.md](../backend/src/clarity/modules/reconciliation/MODULE.md) | built | Production worker schedule (M-REC) |
 | timeline | L4 | `backend/src/clarity/modules/timeline/` | [MODULE.md](../backend/src/clarity/modules/timeline/MODULE.md) | built | HTTP drivers (R4) |
 | conversation | L4 | `backend/src/clarity/modules/conversation/` | [MODULE.md](../backend/src/clarity/modules/conversation/MODULE.md) | built by the team (keyword intake, no LLM) | Intents as policy content; optional `extract` role (R4) |
 | autopsy | L4 | `backend/src/clarity/modules/autopsy/` | [MODULE.md](../backend/src/clarity/modules/autopsy/MODULE.md) | built | Serverless batch job (R6/R7) |

@@ -63,7 +63,7 @@ Money protection:
 
 ## 3. Modules
 
-How modules talk (ADR-0029, plan 21 §11): they **call** each other's `public.py` only along declared edges (`case` → timeline, detection, decision, actions, receipts; `decision` → detection; `governance` → decision; `receipts` → actions), and **publish events** through the outbox for side effects. Event payloads are typed and versioned in `clarity.contracts.events` (17 schemas, `type@v1`, no personal data by construction) and the outbox rejects any event that does not match (#10). No module publishes events yet; the first event-driven flow (receipts on `action.completed`, #14) follows the outbox wiring (#12).
+How modules talk (ADR-0029, plan 21 §11): they **call** each other's `public.py` only along declared edges (`resolution` → case, timeline, detection, decision, actions, receipts; `decision` → detection; `governance` → decision; `receipts` → actions), and **publish events** through the outbox for side effects. Typed, versioned events now carry case, cause, decision, action, receipt, policy and reconciliation facts without personal data.
 
 
 Registry with status and next migration step: [docs/modules.md](docs/modules.md). Each module's `MODULE.md` lists its public surface, users, dependencies, invariants and tests.
@@ -77,10 +77,11 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Step | Status |
 |---|---|
 | R0 Freeze behaviour | **Done.** `backend/tests/acceptance`: route contract for all 66 routes (public, signed-in, synthetic-only), the four journeys plus subject binding over HTTP, and an OpenAPI snapshot of 54 operations. |
-| R0.5 Defects | **D1, D2, D3, D4, D6, D7, D8 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
+| R0.5 Defects | **D1-D8 fixed.** D5 now resolves rule confidence/windows from effective-dated policy values (M-DET). |
 | R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
-| R2 Infrastructure drivers | **In progress.** The `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). The persistence port and its in-memory driver are built (B02) and every module's state is behind a repository; the event bus port has in-process **and Kafka** drivers, both passing one parity suite against a real broker (B03, `make up-full`). Still to do: the PostgreSQL repository driver and per-module schemas (B05), wiring the outbox to the bus (B04), Keycloak and OPA. |
-| R3, R4, R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md) (waves W0-W5); assistant design: [plan 22](docs/enterprise-plan/22-agentic-assistant-and-rag.md). |
+| R2 Infrastructure drivers | **In progress.** PostgreSQL, Kafka, Keycloak, OPA and OpenBao drivers are wired behind parity-tested ports; lite remains Python-only. Remaining full-stack components are tracked in the backlog. |
+| R3 Core migration | **In progress.** Wave 1 core work M-ACT, M-CASE, M-DET, M-GOV, M-DEC, M-RCPT and M-REC is implemented. |
+| R4, R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
 ## 6. Where this differs from the target
@@ -88,17 +89,17 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Area | Target (plan) | Built | Why / when |
 |---|---|---|---|
 | Persistence | PostgreSQL 18, schema per module, RLS | **Built** (B02, B05). Unit of work and repositories per module; in-memory driver for `demo`, PostgreSQL for `full`, both passing one parity suite. Schema and role per module with grants on its own schema only, and row-level security on customer-scoped tables. | Versioned Alembic migrations before there is data worth keeping |
-| Concurrency | Database unique keys and row locks | **Two replicas can share one database** for case, plan, receipt and outbox state (B05): PostgreSQL row locks plus a version check, verified by two OS processes contending on 500 plans. Still in-process: budget counters, confirmation tokens and OTP state, listed in `DEFERRED` in `tests/architecture/test_module_state.py`. | M-ACT (#25) for the money path, M-IAM (#7) for OTP |
-| Identity | Keycloak (staff, admins, MCP clients) + customer issuer + OPA | Own EdDSA issuer; Python permission checks; demo-only role picker | ADR-0010; Keycloak and OPA drivers in R2 |
-| Events | Outbox → Kafka + Apicurio | Event bus port with in-process and Kafka drivers (B03); transactional outbox in the unit of work, a relay, and a consumer framework with `processed_event`, backoff, dead letters and an alert hook (B04). No schema registry, and no module publishes yet. | B06 is the first real subscriber; Apicurio with R2 |
-| Decision outcomes | ZEN decision table | Python over a hashed input document | R3 (ADR-0026) |
-| Rule parameters | In the policy store | Inside the YAML packs | R3 (D5) |
+| Concurrency | Database unique keys and row locks | Case, action, receipt, outbox, OTP and session state share the selected persistence driver. Budget counters remain a later distributed-state concern. | Budget migration |
+| Identity | Keycloak (staff, admins, MCP clients) + customer issuer + OPA | Keycloak JWKS and OPA drivers in full; shared OTP/session state; labelled dev drivers in lite | HUTCH federation configuration requires confirmation |
+| Events | Outbox → Kafka + Apicurio | Transactional outbox, Kafka/in-process buses, idempotent consumers and core fact events are built. | Apicurio with later R2 work |
+| Decision outcomes | ZEN decision table | Versioned ZEN-compatible JSON table with Python parity oracle | Complete (M-DEC) |
+| Rule parameters | In the policy store | Confidence and time windows resolve effective-dated policy values | Complete (M-DET) |
 | MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | In-process class; tools listed at `/v1/mcp/tools` | R4. No external agent can connect yet. |
-| Signing key | `clarity-signer` with OpenBao/KMS | Generated in memory at startup | R4 |
+| Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js 16 apps + shared packages (plan 19) | Static UI served by FastAPI **and** Next.js 14 apps in `frontend/` | R5: verify the build, retire the static UI, move to Next.js 16 |
 | Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
 | Channels | Web, app, WhatsApp, SMS/USSD | Web only | R4/R6 |
-| Rules | 16 candidates | 6 | Prototype scope |
+| Rules | 16 candidates | 10 | Remaining candidates need product/CX confirmation |
 
 ## 7. Known gaps
 

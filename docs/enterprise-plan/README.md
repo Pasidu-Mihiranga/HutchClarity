@@ -7,7 +7,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | Item | Value |
 |---|---|
 | Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
-| Version / date | **v1.5** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
+| Version / date | **v1.7** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
 | Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
 | Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
@@ -79,6 +79,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.4 | 2026-10-02 | Module interaction model (21 §11, ADR-0029); R0 acceptance suite; D7. |
 | v1.5 | 2026-10-02 | Agentic assistant and RAG (ch. 22, ADR-0030); per-module backlog with acceptance tests and DoD (`docs/backlog`). |
 | v1.6 | 2026-10-02 | Drivers built so far: persistence and event bus ports with their parity suites and the Kafka driver (19 §2.3.1, B02 and B03). |
+| v1.7 | 2026-10-02 | Wave 1 core migration: policy-backed rule parameters, active rule catalogue status and the corrected module interaction map. |
 
 ### v1.1 audit: gaps found and added
 

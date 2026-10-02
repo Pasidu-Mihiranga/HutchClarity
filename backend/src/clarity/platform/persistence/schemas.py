@@ -16,6 +16,8 @@ OWNERS: dict[str, str] = {
     "actions": "actions",
     "receipts": "receipts",
     "governance": "governance",
+    "reconciliation": "reconciliation",
+    "iam": "iam",
     "platform": "platform",
 }
 
@@ -26,9 +28,17 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
     {
         "case.records",
         "actions.plans",
+        "actions.attempts",
+        "actions.confirmations",
         "receipts.chain",
         "receipts.subscriber",
         "platform.outbox",
+        "iam.otp_challenges",
+        "iam.otp_requests",
+        "iam.sessions",
+        "iam.refresh_tokens",
+        "reconciliation.expected_actions",
+        "reconciliation.mismatches",
     }
 )
 

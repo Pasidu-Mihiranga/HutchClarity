@@ -1,8 +1,8 @@
 # The `full` profile's real components (ADR-0027, plan 19 section 2.3).
 #
 # Started by `make up-full`. Only what a work package needs is here: B03 added
-# Kafka and B05 added PostgreSQL. Valkey, Keycloak, OPA and the Grafana stack
-# arrive with their own issues, and the production-shaped artefacts (images,
+# Kafka and B05 added PostgreSQL. M-IAM adds Keycloak and OPA. Valkey and the
+# Grafana stack arrive with their own issues, and the production-shaped artefacts (images,
 # Helm, OpenTofu) are X03's work, not this file's.
 #
 # Simulated: this is a development broker with one node, no auth and no TLS.
@@ -64,3 +64,74 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  keycloak:
+    # Simulated development identity provider. No real HUTCH directory is
+    # connected; production federation requires HUTCH confirmation.
+    image: quay.io/keycloak/keycloak:26.4
+    container_name: clarity-keycloak
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    ports:
+      - "8081:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: clarity-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: clarity-development-only
+    volumes:
+      - ../../config/keycloak/clarity-realm.json:/opt/keycloak/data/import/clarity-realm.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /realms/clarity HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '200 OK' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  opa:
+    image: openpolicyagent/opa:1.1.0
+    container_name: clarity-opa
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policy"]
+    ports:
+      - "8181:8181"
+    volumes:
+      - ../../config/opa:/policy:ro
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  openbao:
+    # Simulated development Transit service. The fixed root token is only for
+    # this local compose stack; production injects a short-lived scoped token.
+    image: ghcr.io/openbao/openbao:2.7.1
+    container_name: clarity-openbao
+    command: ["server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
+    ports:
+      - "8200:8200"
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: clarity-development-only
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "bao", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  openbao-init:
+    image: ghcr.io/openbao/openbao:2.7.1
+    depends_on:
+      openbao:
+        condition: service_healthy
+    environment:
+      BAO_ADDR: http://openbao:8200
+      BAO_TOKEN: clarity-development-only
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        bao secrets enable transit || true;
+        bao write transit/keys/clarity-receipts type=ed25519 exportable=true
+    restart: "no"

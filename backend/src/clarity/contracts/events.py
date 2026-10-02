@@ -49,10 +49,12 @@ class DomainEventType(StrEnum):
     ACTION_REQUESTED = "action.requested"
     ACTION_COMPLETED = "action.completed"
     ACTION_FAILED = "action.failed"
+    APPROVAL_REQUESTED = "approval.requested"
     RECEIPT_ISSUED = "receipt.issued"
     RISK_DETECTED = "risk.detected"
     MCP_INVOKED = "mcp.invoked"
     RULE_PUBLISHED = "rule.published"
+    POLICY_PUBLISHED = "policy.published"
     RECONCILIATION_MISMATCH = "reconciliation.mismatch"
 
 
@@ -209,6 +211,8 @@ class ActionStepV1(ClarityModel):
     action_type: ActionType
     amount_lkr: Money | None = None
     status: str
+    idempotency_key: str
+    adapter_ref: str | None = None
 
 
 class ActionCompletedV1(EventPayload):
@@ -230,6 +234,33 @@ class ActionFailedV1(EventPayload):
     failed_step: ActionType
     error_code: str
     compensated: bool
+    retryable: bool = False
+    """True when nothing was applied, so the same plan can be executed again.
+
+    A failure that applied a step and reversed it is not retryable: that plan is
+    compensated and needs a person (M-ACT).
+    """
+    attempt: int = 1
+
+
+class ApprovalRequestedV1(EventPayload):
+    """A plan is waiting for a staff approval (M-ACT).
+
+    Carries how many approvals are still needed and the threshold that decided
+    it, so a notification can say what it is asking for without reading the
+    policy itself.
+    """
+
+    event_type = DomainEventType.APPROVAL_REQUESTED
+    case_id: str
+    plan_id: str
+    decision_id: str
+    total_amount_lkr: Money
+    approvals_needed: int = Field(ge=1)
+    approvals_held: int = Field(ge=0)
+    four_eyes_threshold_lkr: Money
+    requested_by: str
+    """The maker, who may not also approve (plan section 14.2)."""
 
 
 class ReceiptIssuedV1(EventPayload):
@@ -268,6 +299,15 @@ class RulePublishedV1(EventPayload):
     change_class: str
 
 
+class PolicyPublishedV1(EventPayload):
+    event_type = DomainEventType.POLICY_PUBLISHED
+    change_id: str
+    key: str
+    policy_version: int
+    change_class: str
+    effective_from: datetime | None = None
+
+
 class ReconciliationMismatchV1(EventPayload):
     event_type = DomainEventType.RECONCILIATION_MISMATCH
     plan_id: str
@@ -294,10 +334,12 @@ _PAYLOADS: tuple[type[EventPayload], ...] = (
     ActionRequestedV1,
     ActionCompletedV1,
     ActionFailedV1,
+    ApprovalRequestedV1,
     ReceiptIssuedV1,
     RiskDetectedV1,
     McpInvokedV1,
     RulePublishedV1,
+    PolicyPublishedV1,
     ReconciliationMismatchV1,
 )
 
@@ -338,6 +380,7 @@ __all__ = [
     "ActionFailedV1",
     "ActionRequestedV1",
     "ActionStepV1",
+    "ApprovalRequestedV1",
     "CaseCreatedV1",
     "CauseDetectedV1",
     "ChargeAppliedV1",
@@ -349,6 +392,7 @@ __all__ = [
     "McpInvokedV1",
     "PackExpiringV1",
     "PaymentRecordedV1",
+    "PolicyPublishedV1",
     "ReceiptIssuedV1",
     "ReconciliationMismatchV1",
     "RiskDetectedV1",
