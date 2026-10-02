@@ -18,6 +18,8 @@ OWNERS: dict[str, str] = {
     "governance": "governance",
     "reconciliation": "reconciliation",
     "iam": "iam",
+    "notifications": "notifications",
+    "proactive": "proactive",
     "platform": "platform",
 }
 
@@ -33,6 +35,11 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
         "receipts.chain",
         "receipts.subscriber",
         "platform.outbox",
+        # A notification and a risk signal are both about one customer.
+        "notifications.records",
+        "notifications.preferences",
+        "proactive.risks",
+        "proactive.signals",
         "iam.otp_challenges",
         "iam.otp_requests",
         "iam.sessions",
