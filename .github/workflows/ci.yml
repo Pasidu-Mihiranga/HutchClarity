@@ -1,3 +1,14 @@
+# CI lanes (B10, issue #18; plan 12 section 23).
+#
+# Two lanes, because one is not enough. The `lite` lane proves the code is
+# correct with no infrastructure, which is what ADR-0006 promises a reviewer.
+# The `full` lane runs the same parity suites against the real components, which
+# is the only thing that proves a driver actually honours its port: a mock that
+# has drifted passes the lite lane every time.
+#
+# Nothing here is `continue-on-error` any more. A check that cannot fail the
+# build is documentation, not a gate.
+
 name: ci
 
 on:
@@ -8,9 +19,14 @@ on:
 permissions:
   contents: read
 
+env:
+  # The Python the venv and the console scripts agree on.
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
 jobs:
-  backend:
-    name: backend (lint, types, import contracts, tests)
+  backend-lite:
+    name: backend lite (lint, types, import contracts, tests)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
@@ -35,12 +51,105 @@ jobs:
       - name: Tests (unit, golden, property, contract, architecture)
         run: pytest
 
-  frontend:
-    name: frontend (build)
+  backend-full:
+    name: backend full (PostgreSQL and Kafka drivers)
     runs-on: ubuntu-latest
-    # Reports without blocking until the Next.js build is verified on dev
-    # (docs/enterprise-plan/21 section 7, R5). Remove this line once green.
-    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: clarity
+          POSTGRES_PASSWORD: clarity
+          POSTGRES_DB: clarity
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U clarity -d clarity"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      kafka:
+        image: apache/kafka:4.0.0
+        env:
+          KAFKA_NODE_ID: "1"
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+          KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+          KAFKA_NUM_PARTITIONS: "6"
+          CLUSTER_ID: clarity-ci-cluster-00001
+        ports: ["9092:9092"]
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CLARITY_TEST_DATABASE_URL: postgresql+psycopg://clarity:clarity@localhost:5432/clarity
+      CLARITY_KAFKA_BOOTSTRAP: localhost:9092
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install with the full-profile extras
+        run: pip install -e ".[dev,postgres,kafka,otlp]"
+      - name: Parity suites against the real drivers
+        # The suites skip when a component is unreachable, so a silent skip
+        # here would look like a pass. -ra lists every skip in the summary.
+        run: pytest tests/contract -v -ra
+      - name: Integration (schema isolation, row-level security, two replicas)
+        run: pytest tests/integration -v -ra
+      - name: Fail if the full-profile tests only skipped
+        # The lane exists to exercise the real drivers. If they all skipped, the
+        # services did not come up and the lane proved nothing.
+        run: |
+          set -o pipefail
+          pytest tests/integration -q 2>&1 | tee result.txt
+          if grep -qE "^(no tests ran|[0-9]+ skipped)$" result.txt; then
+            echo "::error::the full lane skipped its tests; PostgreSQL or Kafka did not start"
+            exit 1
+          fi
+
+  contracts:
+    name: contracts (OpenAPI schema and generated SDK are current)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: |
+          pip install -e "backend[dev]"
+          cd frontend && npm ci
+      - name: The committed OpenAPI schema matches what the app serves
+        run: cd backend && python scripts/export_openapi.py --check
+      - name: The committed SDK types match the schema
+        run: cd frontend && npm run sdk:check
+
+  frontend:
+    name: frontend (typecheck and build)
+    runs-on: ubuntu-latest
+    # Blocking (B10). It used to report without failing, which meant a broken
+    # build could land; the build is green, so the exemption is gone.
     defaults:
       run:
         working-directory: frontend
@@ -48,37 +157,54 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         run: npm ci
-      - name: Build
+      - name: Typecheck the SDK
+        run: npm run typecheck
+      - name: Build every app
         run: npm run build
 
-  gitleaks:
+  secrets:
+    name: secret scanning (gitleaks)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
+          # Gitleaks scans history, not just the tip: a key that was committed
+          # and then removed is still a leaked key.
           fetch-depth: 0
-      - name: Gitleaks (placeholder)
-        run: |
-          echo "gitleaks placeholder - wire gitleaks/gitleaks-action when secrets scanning is enabled"
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
   sbom:
+    name: SBOM and licence check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: SBOM placeholder
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install the runtime dependencies to inventory
+        run: pip install -e "backend[postgres,kafka,otlp]"
+      - name: Syft SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+          artifact-name: sbom.cyclonedx.json
+      - name: "Licence check (I17): neutral, OSI licences in the runtime path"
         run: |
-          mkdir -p artifacts
-          version="$(cat VERSION)"
-          echo "{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.5\",\"metadata\":{\"component\":{\"name\":\"hutch-clarity\",\"version\":\"${version}\"}},\"components\":[]}" \
-            > artifacts/sbom-placeholder.json
-          echo "SBOM placeholder written for version ${version}"
+          pip install pip-licenses
+          pip-licenses --format=json --with-urls > licences.json
+          python backend/scripts/check_licences.py licences.json
       - uses: actions/upload-artifact@v4
         with:
-          name: sbom-placeholder
-          path: artifacts/sbom-placeholder.json
+          name: licences
+          path: licences.json

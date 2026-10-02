@@ -23,7 +23,7 @@ flowchart LR
         APP["app.container<br/>composition root"]
         MOD["modules<br/>case · timeline · detection · decision ·<br/>actions · receipts · governance · iam ·<br/>autopsy · foresight"]
         AI["ai<br/>gateway · masking · verifier"]
-        PLT["platform<br/>config · audit · messaging · content · security"]
+        PLT["platform<br/>config · audit · messaging · persistence · observability · content · security"]
         INT["integration<br/>ports + mock drivers"]
     end
     SIM["mock HUTCH systems<br/>SIMULATED"]
@@ -53,7 +53,7 @@ Enforced on every `make check` by import-linter (`backend/pyproject.toml`) and b
 | L5 Composition | `clarity.app` | Builds the object graph; the only reader of `CLARITY_PROFILE` |
 | L4 Domain | `clarity.modules.*` | Each module imported only through its `public.py` |
 | L3 AI | `clarity.ai` | Language only; no authority over money |
-| L2 Platform | `clarity.platform.*` | Config (policy resolver, switches), audit, messaging, content, security |
+| L2 Platform | `clarity.platform.*` | Config (policy resolver, switches), audit, messaging (outbox, event bus), persistence (unit of work, repositories), observability (traces, masked logs), content, security |
 | L1 Integration | `clarity.integration` | Every HUTCH access goes through a port |
 | L0 Vocabulary | `clarity.contracts`, `clarity.kernel` | Money, IDs, canonical hashing, canonical models |
 
@@ -79,7 +79,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | R0 Freeze behaviour | **Done.** `backend/tests/acceptance`: route contract for all 66 routes (public, signed-in, synthetic-only), the four journeys plus subject binding over HTTP, and an OpenAPI snapshot of 54 operations. |
 | R0.5 Defects | **D1, D2, D3, D4, D6, D7, D8 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
 | R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
-| R2 Infrastructure drivers | **Started by the team:** the `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). Kafka, Keycloak, OPA and the per-module schemas are still to do. |
+| R2 Infrastructure drivers | **In progress.** The `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). The persistence port and its in-memory driver are built (B02) and every module's state is behind a repository; the event bus port has in-process **and Kafka** drivers, both passing one parity suite against a real broker (B03, `make up-full`). Still to do: the PostgreSQL repository driver and per-module schemas (B05), wiring the outbox to the bus (B04), Keycloak and OPA. |
 | R3, R4, R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md) (waves W0-W5); assistant design: [plan 22](docs/enterprise-plan/22-agentic-assistant-and-rag.md). |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
@@ -87,10 +87,10 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 
 | Area | Target (plan) | Built | Why / when |
 |---|---|---|---|
-| Persistence | PostgreSQL 18, schema per module, RLS | In memory | `lite` profile; PostgreSQL driver in R2, modules move in R3 |
-| Concurrency | Database unique keys and row locks | In-process locks; correct for **one** process only | R3. Do not run more than one replica until then (risk R28). |
+| Persistence | PostgreSQL 18, schema per module, RLS | **Built** (B02, B05). Unit of work and repositories per module; in-memory driver for `demo`, PostgreSQL for `full`, both passing one parity suite. Schema and role per module with grants on its own schema only, and row-level security on customer-scoped tables. | Versioned Alembic migrations before there is data worth keeping |
+| Concurrency | Database unique keys and row locks | **Two replicas can share one database** for case, plan, receipt and outbox state (B05): PostgreSQL row locks plus a version check, verified by two OS processes contending on 500 plans. Still in-process: budget counters, confirmation tokens and OTP state, listed in `DEFERRED` in `tests/architecture/test_module_state.py`. | M-ACT (#25) for the money path, M-IAM (#7) for OTP |
 | Identity | Keycloak (staff, admins, MCP clients) + customer issuer + OPA | Own EdDSA issuer; Python permission checks; demo-only role picker | ADR-0010; Keycloak and OPA drivers in R2 |
-| Events | Outbox → Kafka + Apicurio | In-process relay over an outbox | R2 |
+| Events | Outbox → Kafka + Apicurio | Event bus port with in-process and Kafka drivers (B03); transactional outbox in the unit of work, a relay, and a consumer framework with `processed_event`, backoff, dead letters and an alert hook (B04). No schema registry, and no module publishes yet. | B06 is the first real subscriber; Apicurio with R2 |
 | Decision outcomes | ZEN decision table | Python over a hashed input document | R3 (ADR-0026) |
 | Rule parameters | In the policy store | Inside the YAML packs | R3 (D5) |
 | MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | In-process class; tools listed at `/v1/mcp/tools` | R4. No external agent can connect yet. |

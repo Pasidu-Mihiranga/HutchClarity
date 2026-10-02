@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.6 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| Runtime profiles | New 19 §2.3.1 "Drivers built so far": the port, driver and parity suite for persistence (B02) and the event bus (B03), how to run the `full` drivers (`make up-full`, `make test-full`), and the Kafka driver's design. Records that Kafka blocks a whole partition where the in-process driver blocks one subject, and that confluent-kafka (Apache-2.0 over BSD-2 librdkafka) is an optional extra rather than a core dependency | 19 |
+
 ## v1.5 - 2026-10-02
 
 | Area | Change | Chapters |

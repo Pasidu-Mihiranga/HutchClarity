@@ -212,3 +212,69 @@ Phases 0 to 2 deliver real value regardless of whether microservices happen: the
 4. Apply a fix, receive a signed Trust Receipt
 5. Verify that receipt publicly
 6. Staff handoff appears in the desk queue and can be approved
+
+---
+
+## 10. GitHub issue backlog - todo list
+
+Linked to the 42 open issues in the repo. Check off each item as it is merged. Issue numbers link to GitHub. Priority: p0 = critical path, p1 = required, p2 = important, p3 = nice-to-have.
+
+### Wave 0 - Baseline wiring (do before any other wave)
+
+- [x] #5 `[B02]` Unit of work and repository interfaces per module (in-memory drivers) `p0`
+- [x] #6 `[B05]` PostgreSQL repositories: schema and role per module, migrations, row-level security `p0`
+- [x] #11 `[B03]` Event bus port: in-process driver and Kafka driver with one parity suite `p0`
+- [x] #12 `[B04]` Outbox in the unit of work, relay, and consumer framework with dead-letter handling `p0`
+- [x] #14 `[B06]` First event-driven flow: receipts issued on action.completed `p0`
+- [x] #15 `[B07]` Typed settings and profile wiring: no environment reads outside the composition root `p1`
+- [x] #16 `[B08]` Observability baseline: traces, metrics, masked logs, correlation IDs `p1`
+- [x] #17 `[B09]` Frontend SDK generated from OpenAPI, checked in CI `p1`
+- [x] #18 `[B10]` CI lanes: full-profile integration, blocking frontend build, secret scanning and SBOM `p1`
+
+### Wave 1 - Core modules (money path, detection, identity)
+
+- [ ] #25 `[M-ACT]` Actions: database idempotency, row locks, approval.requested, retry after transient failure `p0`
+- [ ] #34 `[M-CASE]` Case: split orchestration into a resolution service, case aggregate on repositories `p0`
+- [ ] #35 `[M-DET]` Detection: rule parameters in the policy store (D5) and four more rule packs `p0`
+- [ ] #7 `[M-IAM]` Identity: Keycloak for staff and MCP clients, OPA for authorization, shared OTP state `p1`
+- [ ] #20 `[M-GOV]` Governance: persisted policy artefacts, approvals and activations; Policy Studio API `p1`
+- [ ] #36 `[M-DEC]` Decision: outcome matrix as a GoRules ZEN decision table `p1`
+- [ ] #37 `[M-RCPT]` Receipts: signer service port with OpenBao/KMS driver, isolated rendering `p1`
+- [ ] #38 `[M-REC]` Reconciliation module: daily match of actions against adapter confirmations `p2`
+
+### Wave 2 - AI layer (gateway, safety, MCP, evaluation)
+
+- [ ] #2 `[A01]` AI gateway: model roles, config/ai/models.yaml, fallback chains, quota-aware buckets `p0`
+- [ ] #3 `[A02]` Recorded responses (cassettes): no live model calls in CI `p0`
+- [ ] #4 `[A03]` Safety: PII masking coverage per language and the guard role `p0`
+- [ ] #8 `[A04]` MCP server over the network: SDK, Streamable HTTP, OAuth 2.1 resource server, new tools `p0`
+- [ ] #9 `[A05]` Evaluation harness: per-language golden sets, metrics and release gates `p1`
+
+### Wave 3 - Conversation and knowledge (RAG, flows, chat UI)
+
+- [ ] #19 `[C01]` Conversation orchestrator and state store `p0`
+- [ ] #21 `[C02]` Flow registry and the seven flows `p0`
+- [ ] #22 `[C03]` Bounded agent step: planner with tool allowlist, limits and fallback `p0`
+- [ ] #31 `[K01]` Knowledge module: source registry and governed ingestion `p0`
+- [ ] #32 `[K02]` Index and retrieval: BM25 (lite), pgvector hybrid (full), filters and rerank `p0`
+- [ ] #33 `[K03]` Grounded answers: compose with citations, citation verifier, refusal, semantic cache `p0`
+- [ ] #23 `[C04]` Intake: keyword rules first, extract role when unsure, Singlish support `p1`
+- [ ] #24 `[C05]` Customer chat experience on flows: confirm cards, citations, handoff `p1`
+
+### Wave 4 - Enrichment, ops, channels (parallel tracks)
+
+- [ ] #29 `[H01]` hutch-sim as an HTTP service with HTTP drivers `p1`
+- [ ] #39 `[N01]` Notifications module: templates, preferences, consent, dispatch, delivery status `p1`
+- [ ] #41 `[P01]` Proactive module: stream detectors and risk.detected `p1`
+- [ ] #13 `[AU01]` Autopsy: event-fed, embeddings via the embed role, review workflow `p2`
+- [ ] #26 `[D01]` Desk operations: bulk fix with four-eyes, merchant watch, regulator pack, shift handover `p2`
+- [ ] #30 `[I01]` Insights: projections and console dashboards `p2`
+- [ ] #40 `[N02]` Channel gateway: WhatsApp sandbox, SMS and USSD simulator, verified webhooks `p2`
+- [ ] #27 `[F01]` Foresight: backtest and calibration report `p3`
+
+### Wave 5 - Production readiness (ship gate)
+
+- [ ] #28 `[FE01]` Frontend: verified build, static UI retired, Next.js 16, accessibility and language review `p1`
+- [ ] #42 `[X01]` Security hardening: threat-model checks, DAST, dependency and licence scanning `p1`
+- [ ] #44 `[X03]` Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges `p1`
+- [ ] #43 `[X02]` Performance and resilience: load and chaos tests `p2`

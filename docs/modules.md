@@ -12,7 +12,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | contracts | L0 | `backend/src/clarity/contracts/` | - | built; **domain event payloads typed and versioned** (`events.py`, #10) | AsyncAPI generation (R2) |
 | integration (ports, mock drivers) | L1 | `backend/src/clarity/integration/` | - | built (simulated) | `hutch-sim` HTTP drivers (R4) |
 | integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team; used by the `full` profile | Becomes `hutch-sim`'s own database (R4) |
-| platform: config, audit, messaging, content, security | L2 | `backend/src/clarity/platform/` | - | built | PostgreSQL, Kafka, OPA drivers (R2) |
+| platform: config, audit, messaging, persistence, observability, content, security | L2 | `backend/src/clarity/platform/` | - | built | Persistence port with in-memory and PostgreSQL drivers, schema and role per module, row-level security (B02, B05); event bus port with in-process and Kafka drivers (B03); transactional outbox, relay and consumer framework (B04); traces and masked structured logs (B08). OPA with R2. |
 | ai (gateway, providers, PII, verifier) | L3 | `backend/src/clarity/ai/` | - | built (no model) | Model roles, cassettes (R4) |
 | actions | L4 | `backend/src/clarity/modules/actions/` | [MODULE.md](../backend/src/clarity/modules/actions/MODULE.md) | built | DB idempotency, row locks (R3) |
 | case | L4 | `backend/src/clarity/modules/case/` | [MODULE.md](../backend/src/clarity/modules/case/MODULE.md) | built | Split orchestration; event-driven receipts (R3) |

@@ -1,0 +1,43 @@
+# Gitleaks configuration (B10, issue #18).
+#
+# The default ruleset plus the allowlist this repository needs. An allowlist
+# entry is a decision with a reason: a scanner that is muted by a broad path
+# pattern stops being a control.
+
+title = "Hutch Clarity"
+
+[extend]
+# Every default rule, then narrowed below.
+useDefault = true
+
+[allowlist]
+description = "Paths and values that are deliberately not secrets"
+
+paths = [
+  # Declares every variable with a dummy value, which is its whole purpose.
+  '''^\.env\.example$''',
+  # Lock files carry integrity hashes that look like high-entropy secrets.
+  '''package-lock\.json$''',
+  # The committed OpenAPI schema and the types generated from it.
+  '''^contracts/openapi\.json$''',
+]
+
+regexes = [
+  # The demo HMAC key, which is in .env.example and says so in its own value.
+  '''clarity-demo-subscriber-key-not-a-secret''',
+  # Synthetic Sri Lankan test numbers used throughout the fixtures.
+  '''\+9477\d{7}''',
+  # The generic-api-key rule matches the word "key" inside an identifier. These
+  # are the exact strings it flagged in this repository, verified one by one as
+  # variable and parameter names rather than values. Listed as the strings
+  # themselves, not as file paths, so the rule keeps working everywhere else in
+  # the same files.
+  '''idempotency_key=f?''',
+  '''chip\.i18n_key''',
+]
+
+stopwords = [
+  "synthetic",
+  "placeholder",
+  "not-a-secret",
+]

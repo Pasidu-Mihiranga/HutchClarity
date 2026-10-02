@@ -78,6 +78,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.3 | 2026-10-02 | **Merged plan.** v1.1 audit + the v1.2 line + chapter 21 (migration and runtime model). Details in [CHANGES.md](CHANGES.md). |
 | v1.4 | 2026-10-02 | Module interaction model (21 §11, ADR-0029); R0 acceptance suite; D7. |
 | v1.5 | 2026-10-02 | Agentic assistant and RAG (ch. 22, ADR-0030); per-module backlog with acceptance tests and DoD (`docs/backlog`). |
+| v1.6 | 2026-10-02 | Drivers built so far: persistence and event bus ports with their parity suites and the Kafka driver (19 §2.3.1, B02 and B03). |
 
 ### v1.1 audit: gaps found and added
 

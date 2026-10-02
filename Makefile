@@ -7,7 +7,13 @@
 PY      := $(CURDIR)/.venv/bin
 BACKEND := backend
 
+COMPOSE := deploy/compose/full.yml
+# 5440, not 5432: a developer machine usually already runs PostgreSQL there.
+FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
+
 .PHONY: help setup dev check lint format types imports test demo tokens keys seed \
+        up-full down-full test-full contracts contracts-check \
+        licences secrets \
         web-install web-build web-customer web-console web-verify
 
 help:
@@ -20,11 +26,22 @@ help:
 	@echo "make tokens  - measured AI usage per journey"
 	@echo "make keys    - generate a local Ed25519 signing key into .keys/"
 	@echo "make seed    - load the synthetic world into DATABASE_URL (full profile)"
+	@echo "make up-full - start the full profile's components (Kafka); needs Docker"
+	@echo "make down-full - stop them and remove their volumes"
+	@echo "make test-full - run the parity suites against the full profile"
+	@echo "make contracts - re-export contracts/openapi.json and regenerate the SDK types"
+	@echo "make contracts-check - fail if the committed schema or SDK types are stale"
+	@echo "make licences - check every dependency licence is neutral and OSI-approved"
+	@echo "make secrets  - scan the history for secrets (needs Docker)"
 	@echo "make web-install / web-build - frontend (Node 18+, npm workspaces)"
 	@echo "make web-customer | web-console | web-verify - run one Next.js app"
 
+# --clear so a venv left at this path by an older interpreter is replaced
+# rather than half-reused: a stale bin/python symlink pointing at a different
+# Python leaves the console scripts and `python` disagreeing, and every
+# Makefile target that calls `python` directly then fails to import clarity.
 setup:
-	python3 -m venv .venv
+	python3 -m venv --clear .venv
 	$(PY)/pip install -e "$(BACKEND)[dev]"
 
 dev:
@@ -58,6 +75,43 @@ keys:
 
 seed:
 	cd $(BACKEND) && $(PY)/python scripts/seed.py
+
+# The `full` profile: real components instead of in-process drivers (ADR-0027).
+# Needs Docker. `lite` stays the default and needs none of this.
+up-full:
+	docker compose -f $(COMPOSE) up -d --wait
+
+down-full:
+	docker compose -f $(COMPOSE) down -v
+
+# The parity suites against the real drivers. Each one skips unless its
+# component is reachable, so this is honest about what it actually verified.
+test-full:
+	$(PY)/pip install -e "$(BACKEND)[dev,kafka,postgres]"
+	cd $(BACKEND) && \
+		CLARITY_KAFKA_BOOTSTRAP=localhost:9092 \
+		CLARITY_TEST_DATABASE_URL=$(FULL_DATABASE_URL) \
+		$(PY)/pytest tests/contract tests/integration -v
+
+# Contracts: the OpenAPI schema is committed, so a change shows up in a diff and
+# CI can tell a generated client is stale without starting the app (B09).
+contracts:
+	cd $(BACKEND) && $(PY)/python scripts/export_openapi.py
+	cd frontend && npm run sdk:generate
+
+contracts-check:
+	cd $(BACKEND) && $(PY)/python scripts/export_openapi.py --check
+	cd frontend && npm run sdk:check
+
+# Supply chain: the same gates CI runs, so a failure is found before the push.
+licences:
+	$(PY)/pip install -q pip-licenses
+	$(PY)/pip-licenses --format=json --with-urls > licences.json
+	cd $(BACKEND) && $(PY)/python scripts/check_licences.py ../licences.json
+
+secrets:
+	docker run --rm -v "$(CURDIR)":/repo -w /repo zricethezav/gitleaks:latest \
+		detect --config .gitleaks.toml --no-banner --redact --exit-code 1
 
 # Frontend (Next.js apps). Optional: the backend serves a static UI on its own.
 web-install:
