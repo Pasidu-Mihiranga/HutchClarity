@@ -96,4 +96,4 @@ See [backend/pyproject.toml](backend/pyproject.toml). Key: FastAPI, Uvicorn, Pyd
 No model is configured by default. Model roles and the opt-in provider plan: [plan 19 §4](docs/enterprise-plan/19-tech-stack-and-ai.md). Declaration: [docs/submission/AI_DISCLOSURE.md](docs/submission/AI_DISCLOSURE.md).
 
 ## For contributors
-[AGENTS.md](AGENTS.md) (rules for people and AI agents) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/modules.md](docs/modules.md) · [docs/WALKTHROUGHS.md](docs/WALKTHROUGHS.md) · [docs/devlog/](docs/devlog/README.md)
+[AGENTS.md](AGENTS.md) (rules for people and AI agents) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/backlog](docs/backlog/README.md) (issues by wave) · [docs/modules.md](docs/modules.md) · [docs/WALKTHROUGHS.md](docs/WALKTHROUGHS.md) · [docs/devlog/](docs/devlog/README.md)

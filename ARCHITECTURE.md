@@ -80,7 +80,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | R0.5 Defects | **D1, D2, D3, D4, D6, D7, D8 fixed** with regression tests (`backend/tests/unit/test_migration_defects.py`). D5 (rule parameters to policy) moves with R3; ADR-0001 amended. |
 | R1 Restructure | **Done.** Layered layout, `public.py` per module, `MODULE.md` per module, boundary tests, composition root in `app`, entry point in `entrypoints`, docs merged. |
 | R2 Infrastructure drivers | **Started by the team:** the `full` profile persists the simulated HUTCH estate and receipts in SQL (PostgreSQL via `DATABASE_URL`, or a local SQLite file). Kafka, Keycloak, OPA and the per-module schemas are still to do. |
-| R3, R4, R6, R7 | Not started |
+| R3, R4, R6, R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md) (waves W0-W5); assistant design: [plan 22](docs/enterprise-plan/22-agentic-assistant-and-rag.md). |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
 ## 6. Where this differs from the target
