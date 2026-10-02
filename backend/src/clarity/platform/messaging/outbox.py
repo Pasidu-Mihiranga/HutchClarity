@@ -63,7 +63,13 @@ class Outbox:
     # ------------------------------------------------------------------ #
 
     def append(self, event: Event) -> Event:
-        """Record an event. Nothing is delivered until :meth:`relay` runs."""
+        """Record an event. Nothing is delivered until :meth:`relay` runs.
+
+        The payload is checked against its registered schema first
+        (``clarity.contracts.events``), so a malformed event fails at the
+        producer, inside its unit of work, never at a consumer.
+        """
+        event.payload()
         with self._lock:
             self._pending.append(_Delivery(event=event))
         return event

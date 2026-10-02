@@ -17,42 +17,17 @@ Two fields carry most of the operational weight:
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
 from typing import Any
 
 from pydantic import Field
 
+from clarity.contracts.events import DomainEventType, EventPayload, validate_payload
 from clarity.kernel.common import ClarityModel, utc_now
 from clarity.kernel.ids import new_id
 
-
-class EventType(StrEnum):
-    """The catalogue from plan §18.2.
-
-    Ingest events describe things that happened in a HUTCH system. Core events
-    describe what Clarity did about them.
-    """
-
-    # Ingest - from HUTCH via adapters
-    PAYMENT_RECORDED = "payment.recorded"
-    CHARGE_APPLIED = "charge.applied"
-    USAGE_THRESHOLD_REACHED = "usage.threshold_reached"
-    PACK_EXPIRING = "pack.expiring"
-    VAS_RENEWED = "vas.renewed"
-    COMPLAINT_CREATED = "complaint.created"
-
-    # Core - Clarity's own outbox
-    CASE_CREATED = "case.created"
-    CAUSE_DETECTED = "cause.detected"
-    DECISION_GENERATED = "decision.generated"
-    ACTION_REQUESTED = "action.requested"
-    ACTION_COMPLETED = "action.completed"
-    ACTION_FAILED = "action.failed"
-    RECEIPT_ISSUED = "receipt.issued"
-    RISK_DETECTED = "risk.detected"
-    MCP_INVOKED = "mcp.invoked"
-    RULE_PUBLISHED = "rule.published"
-    RECONCILIATION_MISMATCH = "reconciliation.mismatch"
+#: The catalogue lives in ``clarity.contracts.events`` (shared vocabulary, L0).
+#: This alias keeps existing imports working.
+EventType = DomainEventType
 
 
 #: Events that must never be dropped silently: each one either moved money or
@@ -76,23 +51,52 @@ class Event(ClarityModel):
     source: str = Field(default="clarity", description="Service that produced it.")
     subject: str = Field(description="subscriber_ref - the partition key.")
     time: datetime = Field(default_factory=utc_now)
-    schema_version: str = "1.0"
+    schema_version: int = Field(default=1, ge=1, description="Payload schema: type@vN.")
     correlation_id: str | None = Field(
         default=None, description="Ties every event in one request together."
     )
     causation_id: str | None = Field(default=None, description="The event that caused this one.")
     data: dict[str, Any] = Field(default_factory=dict)
 
+    @classmethod
+    def of(
+        cls,
+        payload: EventPayload,
+        *,
+        subject: str,
+        correlation_id: str | None = None,
+        causation_id: str | None = None,
+        source: str = "clarity",
+    ) -> Event:
+        """Build an event from a typed payload, so type and version cannot disagree."""
+        return cls(
+            type=payload.event_type,
+            schema_version=payload.version,
+            subject=subject,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+            source=source,
+            data=payload.model_dump(mode="json"),
+        )
+
+    @property
+    def schema_id(self) -> str:
+        """The payload schema this event claims, as ``type@vN``."""
+        return f"{self.type.value}@v{self.schema_version}"
+
     @property
     def is_critical(self) -> bool:
         return self.type in CRITICAL_EVENTS
 
-    def caused(self, type_: EventType, **data: Any) -> Event:
+    def payload(self) -> EventPayload:
+        """The typed payload. Raises ``InvalidEventPayload`` if ``data`` does not match."""
+        return validate_payload(self.type, self.data, self.schema_version)
+
+    def caused(self, payload: EventPayload) -> Event:
         """Derive a follow-on event that keeps the trace intact."""
-        return Event(
-            type=type_,
+        return Event.of(
+            payload,
             subject=self.subject,
             correlation_id=self.correlation_id or self.id,
             causation_id=self.id,
-            data=data,
         )
