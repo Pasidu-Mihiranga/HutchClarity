@@ -1,4 +1,4 @@
-# AI / LLM Usage Declaration — Hutch Clarity
+# AI / LLM Usage Declaration - Hutch Clarity
 
 Completes the disclosure required by the HUTCH Hackathon Final Submission
 Guidelines §6.1, §6.2 and §9.
@@ -6,7 +6,7 @@ Guidelines §6.1, §6.2 and §9.
 Reproduce every number below with:
 
 ```bash
-.venv/bin/python scripts/measure_tokens.py
+make tokens
 curl -s localhost:8000/v1/ai/usage | jq
 ```
 
@@ -20,7 +20,7 @@ The deck's own guardrail is that Clarity "works without the LLM (templates)"
 (slide 7). The prototype ships that path running for real: explanations come
 from CX-approved templates in Sinhala, Tamil and English. The masking, output
 verification, routing and fallback machinery that *would* wrap a model is all
-built and tested — a model simply is not configured.
+built and tested - a model simply is not configured.
 
 Point `CLARITY_MODEL_BASE_URL` at any OpenAI-compatible endpoint (vLLM,
 llama.cpp, Ollama, or a hosted gateway) and the gateway routes through it. None
@@ -79,7 +79,7 @@ disclosed under Guidelines §6.3:
 | **Complaint Autopsy** | Canonical-form mapping + character-trigram TF-IDF with cosine similarity | Clusters, each a **hypothesis** until a CX engineer confirms it | Implemented. Plan §3.3 uses multilingual embeddings + UMAP + HDBSCAN in production. |
 | **Foresight** | Statistical baseline over aggregated segments | Complaint themes per segment as **relative bands**, never counts | Implemented. **Not backtested**, so explicitly not usable for a launch decision (plan §3.4 gate). |
 
-Foresight reads **aggregates only** — no individual customer data (deck S8),
+Foresight reads **aggregates only** - no individual customer data (deck S8),
 asserted by `test_a_report_states_that_it_used_no_individual_data`.
 
 ## 5. Guardrails, and how to check them
@@ -96,14 +96,14 @@ asserted by `test_a_report_states_that_it_used_no_individual_data`.
 | Provider outage still answers the customer | `test_a_provider_outage_falls_back_to_a_template` |
 
 ```bash
-.venv/bin/pytest tests/unit/test_ai.py tests/unit/test_mcp.py -v
+cd backend && ../.venv/bin/pytest tests/unit/test_ai.py tests/unit/test_mcp.py -v
 ```
 
 ## 6. AI tools used to build this
 
 | Item | Response |
 |---|---|
-| AI coding assistants | **[Team to complete]** — e.g. Claude Code, Copilot, Cursor |
+| AI coding assistants | **[Team to complete]** - e.g. Claude Code, Copilot, Cursor |
 | AI-generated code used? | **[Team to complete: Yes/No, and which parts]** |
 | External AI APIs called at runtime | **No.** The prototype makes no outbound model calls. |
 

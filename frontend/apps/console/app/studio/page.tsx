@@ -41,7 +41,7 @@ export default function StudioPage() {
     const next = { ...draft, savedAt: new Date().toISOString() };
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(next));
     setDraft(next);
-    setStatus("Draft saved locally (simulated — no publish API yet).");
+    setStatus("Draft saved locally (simulated - no publish API yet).");
   }
 
   function exportPack() {
@@ -137,7 +137,7 @@ export default function StudioPage() {
             variant="secondary"
             disabled={!canDraft}
             onClick={() =>
-              setStatus("Simulate: 0 auto-fixes flipped (placeholder — no replay API).")
+              setStatus("Simulate: 0 auto-fixes flipped (placeholder - no replay API).")
             }
           >
             Simulate

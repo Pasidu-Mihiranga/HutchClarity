@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 33. Risk Register
 P = Probability, I = Impact (H/M/L).
@@ -34,9 +34,11 @@ P = Probability, I = Impact (H/M/L).
 | R21 | Agent adoption / change resistance | M | M | Co-design with agents, training, "teach once" credit, supervisor dashboards | Additional coaching; adjust UI |
 | R22 | Third-party licence constraints (Foresight stack, models) | M | M | Licence review gate (B4) | Replace components behind interfaces |
 | R23 | Refund fraud rings exploiting auto-fix | L | H | Velocity limits, SIM-swap checks, graph anomaly detection, whitelisted rules only | Disable auto-fix; staff approval for all |
-| R24 | Free-tier LLM quotas or terms change during the prototype | M | M | Role chains across two providers, quota-aware gateway, cassettes in CI, template fallback | Switch role mapping in config; paid tier for demo day if needed |
-| R25 | Faulty or unauthorized policy change in production | M | H | Change classes, maker-checker, guardrail ceilings, replay impact report, scheduled activation ([19](19-policy-change-management.md)) | Instant rollback to previous version; incident review |
-| R26 | Documentation drifts from code across parallel developers | H | M | AGENTS.md rules, MODULE.md per module, review checklist, devlog per change, ADRs | Doc-debt sprint; block merges until fixed |
+| R24 | Free-tier LLM quotas or terms change during the prototype | M | M | Template default (ADR-0009), role chains across two providers, quota-aware gateway, cassettes in CI | Switch role mapping in config; paid tier for demo day if needed |
+| R25 | Faulty or unauthorized policy change in production | M | H | Change classes, maker-checker, guardrails, replay impact report, scheduled activation ([20](20-policy-change-management.md)) | Instant rollback to previous version; incident review |
+| R26 | Documentation drifts from code across parallel developers | H | M | AGENTS.md sync matrix, MODULE.md per module, devlog per change, ADRs, review checklist | Doc-debt sprint; block merges until fixed |
+| R27 | Migration regresses working behaviour | M | H | R0 freezes behaviour as black-box `/v1` acceptance tests; strangler migration one module at a time; old path removed only when the new one passes ([21](21-migration-and-deployment-plan.md)) | Revert the module switch; old implementation kept until parity |
+| R28 | State held in process memory blocks horizontal scaling | H (today) | H | R2/R3 move idempotency, tokens, plans and budgets to PostgreSQL with unique keys and row locks; parity suites | Single-instance deployment until R3 completes |
 
 ---
 

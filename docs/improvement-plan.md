@@ -1,5 +1,7 @@
 # Improvement plan: adopting the strongest ideas from the alternative design
 
+> **Superseded (2026-10-02)** by the merged plan v1.3: [chapter 21](enterprise-plan/21-migration-and-deployment-plan.md) (migration and runtime model) and ADR-0025. Kept as the record of Phases 0-3. Its "alternative design" is the v1.2 plan line, now chapters 18-20 and ADR-0011…0024. Paths below refer to the pre-R1 layout (`src/clarity/core/...`, now `backend/src/clarity/modules/...`).
+
 | | |
 |---|---|
 | Compared | Our system (this repo: plan v1.1 + working prototype) vs the alternative design in `HutchClarity-compair/` |
@@ -42,7 +44,7 @@
 | **Plan base** | v1.0 + our v1.1 audit (24 gaps closed) | v1.0 + its own v1.1/v1.2 changes |
 | **Rules** | YAML detector DSL, 6 rules, 21 golden tests | Python detector plugins + GoRules ZEN tables (designed) |
 | **Policy thresholds** | One global `PolicyThresholds` Python class | Scoped, effective-dated, guard-railed config, evaluated `as_of` event time |
-| **Identity** | **None at review time — every endpoint was open.** Implemented in Phase 3: EdDSA tokens, 10 roles, deny-by-default routes, subject binding, step-up for money | Keycloak (staff) + Clarity customer issuer, OPA, RLS |
+| **Identity** | **None at review time - every endpoint was open.** Implemented in Phase 3: EdDSA tokens, 10 roles, deny-by-default routes, subject binding, step-up for money | Keycloak (staff) + Clarity customer issuer, OPA, RLS |
 | **AI gateway** | Tiers; template provider; OpenAI-compatible provider | Logical model roles mapped in config; Gemini + Groq free tiers |
 | **MCP** | 8 tools across 3 profiles, subject binding, audit | Same tools, plus stateless OAuth 2.1 resource server, no DB access, no execute code |
 | **Integration** | Mock drivers in process | `hutch-sim` as a separate service + **parity suites** per port |
@@ -55,7 +57,7 @@
 
 Both findings come from applying the alternative's own checks to our code. They are measured, not inferred.
 
-### F1 — Idempotency fails under concurrency
+### F1 - Idempotency fails under concurrency
 
 The alternative's baseline gate (17 §12) requires: *"50 concurrent identical POSTs → exactly one execution."* We ran 40 trials of 50 concurrent identical `execute` calls on a duplicate-reload auto-fix, with forced thread switching (`sys.setswitchinterval(1e-7)`) to expose races the GIL normally hides:
 
@@ -71,7 +73,7 @@ The alternative's baseline gate (17 §12) requires: *"50 concurrent identical PO
 
 **Fix.** See Phase 0, items 0.1 and 0.2.
 
-### F2 — The MCP server can reach execute paths
+### F2 - The MCP server can reach execute paths
 
 `ClarityMCPServer.__init__(self, cases: CaseService)` receives an object that exposes:
 
@@ -218,7 +220,7 @@ flowchart LR
 | 6 | ~1 | Records what changed |
 | **0–4** | **~16** | **Recommended scope** |
 
-### Phase 0 — Fix the defects the review exposed (~1 day, do first)
+### Phase 0 - Fix the defects the review exposed (~1 day, do first)
 
 | # | Work | Files | Acceptance test |
 |---|---|---|---|
@@ -227,7 +229,7 @@ flowchart LR
 | 0.3 | **Narrow MCP facade.** Define `MCPCaseView`, a protocol with only read methods and `propose`. `ClarityMCPServer` takes that, not `CaseService`. Remove the `tools` accessor from `CaseService` (introduced in P6). | `mcp/server.py`, `core/cases/service.py`, `api/container.py` | `ClarityMCPServer` cannot reach `confirm_and_execute`, `auto_fix` or `authorise_auto_fix` |
 | 0.4 | **Code-level guarantee.** A test parses `src/clarity/mcp/` with `ast` and fails if any of `execute`, `confirm_and_execute`, `approve_and_execute`, `auto_fix`, `authorise_auto_fix`, `confirm_by_customer` or `approve_by_staff` is referenced. | `tests/unit/test_mcp.py` | Inserting any such call into `server.py` turns the test red |
 
-### Phase 1 — Policy as governed, time-aware data (~5 days)
+### Phase 1 - Policy as governed, time-aware data (~5 days)
 
 | # | Work | Files | Acceptance test |
 |---|---|---|---|
@@ -239,7 +241,7 @@ flowchart LR
 | 1.6 | **Replay impact report (A7).** Re-evaluate the last N cases under a candidate artefact set and report outcome deltas, money delta and sample cases. Expose as an API and a Desk page. | new `core/policy/replay.py`, `api/main.py`, `api/static/desk.html` | A cap change produces a correct, deterministic before/after with money delta |
 | 1.7 | **Change classes + maker ≠ checker publish.** C0–C4/E computed from tags, never lowered by hand; publishing a `money`-tagged change needs a second approver. | `core/policy/governance.py` | A C3 change by its maker alone cannot activate |
 
-### Phase 2 — Verifiable boundaries (~2 days)
+### Phase 2 - Verifiable boundaries (~2 days)
 
 | # | Work | Files | Acceptance test |
 |---|---|---|---|
@@ -248,7 +250,7 @@ flowchart LR
 | 2.3 | **Runtime profiles (D4)**: `CLARITY_PROFILE=demo` (default, all in-memory) chosen only in `api/container.py`. | `api/container.py` | A grep test: no `CLARITY_PROFILE` outside the container |
 | 2.4 | **ADRs (A13)** for decisions already taken: YAML DSL over Python detectors; in-memory demo stores; static UI over Next.js; tokens minted server-side; risk signals from evidence; template-only explanations; no model by default. Plus `ARCHITECTURE.md` as-built. | `docs/adr/*.md`, `ARCHITECTURE.md` | Each ADR states context, decision, alternatives, consequences |
 
-### Phase 3 — Identity and authorization (~5 days)
+### Phase 3 - Identity and authorization (~5 days)
 
 | # | Work | Files | Acceptance test |
 |---|---|---|---|
@@ -256,9 +258,9 @@ flowchart LR
 | 3.2 | **Staff dev issuer** with seeded users per role (agent, supervisor, finance, cx_engineer, compliance, auditor, platform_admin) and the permission matrix from the alternative's 17 §5.4 (A12). | `core/iam/staff.py`, `config/iam/roles.yaml` | Admins cannot approve money; a maker cannot check their own item |
 | 3.3 | **Deny by default.** Every route declares a permission; customer routes bind the case to the token's subject; approvals need step-up `acr`. | `api/main.py`, new `api/auth.py` | **Customer A cannot read customer B's case** (closes today's open read). Unauthenticated → 401. Approval without step-up → 403. |
 | 3.4 | **UI sign-in**: customer OTP entry; Desk role picker in demo mode, clearly labelled | `api/static/*.html` | Browser-driven journeys still pass |
-| 3.5 | Keycloak and OPA recorded as future drivers behind the same interfaces, with parity suites (Phase 2) | ADR | — |
+| 3.5 | Keycloak and OPA recorded as future drivers behind the same interfaces, with parity suites (Phase 2) | ADR | - |
 
-### Phase 4 — AI model roles and an optional live model (~3 days)
+### Phase 4 - AI model roles and an optional live model (~3 days)
 
 | # | Work | Files | Acceptance test |
 |---|---|---|---|
@@ -267,7 +269,7 @@ flowchart LR
 | 4.3 | **Optional live provider.** Our existing `OpenAICompatibleProvider` already speaks Groq's and Gemini's OpenAI-compatible endpoints. Add quota-aware buckets, and refuse to start a free-tier provider unless the data is synthetic (A11). | `ai/providers.py`, `api/container.py` | With no key, behaviour is unchanged (templates, 0 tokens) |
 | 4.4 | **Demo default stays templates.** A live model is opt-in; `scripts/measure_tokens.py` reports real numbers when it is on. | `docs/submission/AI_DISCLOSURE.md` | Disclosure states which mode produced which numbers |
 
-### Phase 5 — Persistence and a real integration boundary (~6 days, optional)
+### Phase 5 - Persistence and a real integration boundary (~6 days, optional)
 
 | # | Work | Acceptance test |
 |---|---|---|
@@ -275,7 +277,7 @@ flowchart LR
 | 5.2 | Row-level security on customer-scoped tables keyed by `subscriber_ref` | A bug that drops the subject filter still cannot return another subscriber's row |
 | 5.3 | `hutch-sim` as an HTTP service + HTTP drivers (S7) | The read and command parity suites pass against both the in-process and HTTP drivers |
 
-### Phase 6 — Documentation and plan merge (~1 day)
+### Phase 6 - Documentation and plan merge (~1 day)
 
 | # | Work |
 |---|---|

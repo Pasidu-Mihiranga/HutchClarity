@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 10. MCP Architecture
 
@@ -77,7 +77,7 @@ sequenceDiagram
 
 ### 10.6 MCP server implementation
 
-**Technology:** Python 3.14 with the official MCP Python SDK and Streamable HTTP transport, implementing the **2026-07-28 specification** (stateless core). It runs as its own deployable (`clarity-mcp`) with **no database access**: every tool calls `clarity-api` through the generated client, so authorization, row-level security and audit are reused ([17 §10](17-build-blueprint.md)).
+**Technology:** Python with the official MCP Python SDK and Streamable HTTP transport, implementing the **2026-07-28 specification** (stateless core). It runs as its own deployable (`clarity-mcp`) with **no database access**: every tool calls `clarity-api` through the generated client, so authorization, row-level security and audit are reused ([18 §10](18-build-blueprint.md)).
 
 ```text
 mcp/server/
@@ -114,9 +114,12 @@ Illustrative tool definition (design sketch, not final code):
 class ProposeActionIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     case_id: CaseId
-    action_type: Literal["REFUND", "DEACTIVATE_VAS", "BLOCK_MERCHANT", "SET_SPEND_CAP", "ENABLE_DATA_STOP"]
+    action_type: Literal[
+        "REFUND", "DEACTIVATE_VAS", "BLOCK_MERCHANT", "SET_SPEND_CAP", "ENABLE_DATA_STOP"
+    ]
     idempotency_key: constr(min_length=16, max_length=64)
     # NOTE: no amount field - amounts come only from the deterministic Decision record
+
 
 @mcp.tool()
 @guarded(level=SafetyLevel.L3_PROPOSE, resource="case")
@@ -124,29 +127,31 @@ async def propose_action(inp: ProposeActionIn, ctx: ToolContext) -> ProposalOut:
     decision = await core.get_decision(inp.case_id, principal=ctx.principal)
     if inp.action_type not in decision.allowed_actions:
         raise ToolError("ACTION_NOT_ALLOWED_BY_POLICY")
-    return await core.create_proposal(decision, inp.action_type, inp.idempotency_key, ctx.correlation_id)
+    return await core.create_proposal(
+        decision, inp.action_type, inp.idempotency_key, ctx.correlation_id
+    )
 ```
 
 ### 10.7 External MCP clients, MCP Apps and the 2026-07-28 specification
 
-The MCP server serves **two kinds of client** with the same tools and the same controls:
+The MCP server serves **two kinds of client** with the same tools and controls:
 
 | Client | Example | Token | Profile |
 |---|---|---|---|
 | Clarity's own agent loop | Orchestrator explaining a case | Session principal token minted by the orchestrator | `customer-assist` or `staff-assist` |
-| **Registered external MCP client** | HUTCH's existing chatbot, agent-assist tool, an approved AI assistant | OAuth 2.1 token from Keycloak / HUTCH IdP for a registered client, with scopes | Scope → profile (`clarity.customer-assist`, `clarity.staff-assist`, `clarity.analytics`) |
+| **Registered external MCP client** | HUTCH's chatbot, agent-assist tool, an approved AI assistant | OAuth 2.1 token from Keycloak / HUTCH IdP for a registered client, with scopes | Scope → profile (`clarity.customer-assist`, `clarity.staff-assist`, `clarity.analytics`) |
 
-HUTCH's websites and apps integrate through **REST plus the embeddable `<clarity-why>` widget**, not MCP. MCP is the surface for **AI agents**. The three integration surfaces are described in [17 §6 and §10](17-build-blueprint.md).
+HUTCH's websites and apps integrate through **REST plus the embeddable `<clarity-why>` widget**, not MCP. MCP is the surface for **AI agents** ([18 §6, §10](18-build-blueprint.md)).
 
 | 2026-07-28 spec topic | Hutch Clarity design |
 |---|---|
-| Stateless protocol core | `clarity-mcp` keeps no session state; case context is passed by ID and re-authorized on every call. It scales horizontally. |
+| Stateless protocol core | `clarity-mcp` keeps no session state; case context is passed by ID and re-authorized on every call. It scales horizontally and can run serverless ([21 §5](21-migration-and-deployment-plan.md)). |
 | Authorization | OAuth 2.1 **resource server only**; validates `iss`, audience and scopes; clients send resource indicators (RFC 8707) |
 | Token passthrough | **Forbidden.** Downstream calls to `clarity-api` use token exchange (RFC 8693) with a narrowed audience. |
-| Extensions | **MCP Apps** (`io.modelcontextprotocol/ui`): `ui://clarity/why-card` and `ui://clarity/receipt`, built from `packages/widget`, rendered sandboxed by the host |
+| Extensions | **MCP Apps** (`io.modelcontextprotocol/ui`): `ui://clarity/why-card` and `ui://clarity/receipt`, rendered sandboxed by the host |
 | Client registry | Admin console registers clients, scopes, rate limits and an owner; every client can be suspended instantly |
 
-**MCP-specific threats** (added to [§19.2](11-security-privacy-audit.md)): tool-description poisoning (descriptions are versioned and code-reviewed; served only from the signed release), confused deputy (subject binding + token exchange), scope creep (scopes reviewed per client, least privilege), malicious external client (per-client quotas, denial-spike alerts, kill switch).
+**MCP-specific threats** (see [§19.2](11-security-privacy-audit.md)): tool-description poisoning, confused deputy, scope creep, malicious external client.
 
 ---
 

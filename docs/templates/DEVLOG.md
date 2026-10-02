@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Author(s) | human handle(s); "agent: <tool/model>" if an AI agent did the work |
-| Work package | e.g. C4 (enterprise-plan/17 §11.2) |
+| Work package | e.g. R3 (docs/enterprise-plan/21 §7) |
 | PR / commit | #nn / short sha |
 | Units touched | e.g. detection, contracts |
 

@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 8. Architecture Diagrams
 
@@ -614,7 +614,7 @@ flowchart LR
         F3["Ops / insights console"]
         F4["Public receipt verify page"]
     end
-    subgraph SVC["Python 3.14 / FastAPI - logical services, deployed per 17 §4"]
+    subgraph SVC["Python / FastAPI - logical services, deployed per 18 §4"]
         B1["bff-api"]
         B2["orchestrator"]
         B3["case-service"]
@@ -733,7 +733,7 @@ stateDiagram-v2
     CLOSED --> [*]
 ```
 
-### 8.1 Diagram Index (all 34 architecture diagrams in this plan)
+### 8.1 Diagram Index (all 39 architecture diagrams in this plan)
 
 | # | Diagram | Type | Location |
 |---|---|---|---|
@@ -771,6 +771,11 @@ stateDiagram-v2
 | 32 | Critical Path Network | flowchart | [§29](13-delivery-plan.md) |
 | 33 | Rollout Path (Steps 1–4) | flowchart | [§34](14-risk-pilot-readiness-operations.md) |
 | 34 | Degradation Ladder | flowchart | [§39](15-cost-scale-failure-kpi.md) |
+| 35 | Governance Structure | flowchart | [§46](17-governance-compliance-change-cost.md) |
+| 36 | Release Roadmap | flowchart | [§47](17-governance-compliance-change-cost.md) |
+| 37 | Reconciliation | flowchart | [§14.4](09-rules-decision-receipts.md) |
+| 38 | Proactive Care Engine | flowchart | [§3.6](02-solution-capabilities.md) |
+| 39 | Continuous Improvement Loop | flowchart | [§52](17-governance-compliance-change-cost.md) |
 
 When split into files ([§43](16-gap-submission-repo-docs.md)), Diagrams 1–18 go to `05-architecture-diagrams.md`. The others stay with their chapters.
 ---

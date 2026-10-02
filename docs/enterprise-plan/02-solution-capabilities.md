@@ -79,6 +79,86 @@ Customer-facing features carried from the deck `[DECK S5–S6]`:
 | Regulator pack | One click: trail + consents for TRCSL `[DECK S9]` |
 | Insights | Top services, where the AI stops, self-service drops, slicing; gap → fix → measure loop `[DECK S10]` |
 | Mobile approval | Supervisors can approve from phones `[DECK S9]`, via a PWA with SSO/MFA |
+
+### 3.6 Proactive Care Engine `[DECK S5, S6]`
+Proactive care covers refunds before customers ask, the pack-end choice, early VAS renewal notices, fair-use alerts at 80%/95% and outage heads-ups `[DECK S6]`. Without controls it could turn into spam, so every message passes through deterministic eligibility, consent and pacing checks.
+
+| Control | Design `[PROPOSED]` |
+|---|---|
+| Triggers | `usage.threshold_reached`, `pack.expiring`, `vas.renewed`, `risk.detected` (bill shock), outage events, `action.completed` (zero-contact refund) |
+| Eligibility | Deterministic trigger rules (e.g., pack ≥ 80% used **and** data-stop off **and** ≥ 2 days left). The bill-shock score only ranks and never decides alone. |
+| Consent | Separate notification consent per purpose (service vs marketing) and channel. Guardian alerts need the member's consent (§3.7). |
+| Quiet hours | No proactive messages 21:00–07:00 local time (**ASSUMPTION**). Refund confirmations and fraud alerts are exempt. |
+| Frequency cap | ≤ 2 proactive messages per customer per day and ≤ 6 per week (**ASSUMPTION**), deduplicated by subject + trigger |
+| Channel choice | Customer preference first, then app push → WhatsApp utility template → SMS |
+| Content | CX-approved templates in si/ta/en. LLM wording only through the verifier. Each message carries "why you got this" and an opt-out. |
+| Actions | Offered choices are L2 safeguards (stop data, cap spend) or a top-up link, confirmed with one tap. A safeguard receipt is issued. |
+| Measurement | Offer acceptance, opt-out rate, complaints after messages, bill-shock recurrence ([§40](15-cost-scale-failure-kpi.md)) |
+
+#### Diagram 38 - Proactive care engine
+
+```mermaid
+flowchart LR
+    EV["Events<br/>usage threshold · pack expiring · VAS renewal · bill-shock risk · outage · refund done"] --> EL{"Eligible by rule?"}
+    EL -- no --> DROP["No message"]
+    EL -- yes --> CON{"Consent for this purpose<br/>and channel?"}
+    CON -- no --> DROP
+    CON -- yes --> QH{"Quiet hours or<br/>frequency cap hit?"}
+    QH -- yes --> DEF["Defer or drop<br/>refund confirmations exempt"]
+    QH -- no --> CHS["Choose channel<br/>push · WhatsApp utility template · SMS"]
+    CHS --> MSG["Approved template<br/>in customer language"]
+    MSG --> OFF["Offer L2 choice<br/>stop data · cap spend · top up"]
+    OFF --> CONF["Customer one-tap confirm"]
+    CONF --> TOOL["Tool layer"]
+    TOOL --> RCPT["Safeguard receipt"]
+    MSG --> MEAS["Measure: acceptance · opt-out · complaints"]
+```
+
+### 3.7 Personalization & Family Guardian `[DECK S5, S6]`
+
+| Feature | Design `[PROPOSED]` |
+|---|---|
+| Remembered preferences | Language, short or long answers, large text and voice replies are stored on `CustomerReference` and changeable at any time `[DECK S6]` |
+| Safeguards per person | Spend cap, data stop, merchant blocks and FUP alerts per number, each with a receipt when changed |
+| Guardian link | Up to 10 numbers `[DECK S5]`. Each member approves the link by OTP from their own number. Either side can revoke at any time. Every link and revocation is audited. |
+| Guardian rights | See safeguard status and receive alerts for linked numbers, and propose safeguards that the member confirms (or that apply directly where the guardian is the account holder). **No refunds or usage detail on another person's number without that member's consent.** |
+| Minors and account holders | Rules for children's lines and corporate or family accounts **REQUIRE HUTCH legal confirmation** |
+| Privacy | The guardian view shows status, not content. Foresight and analytics never use guardian links at the individual level. |
+
+### 3.8 Self-Service Flow DSL `[DECK S11, S15]`
+Autopsy generates self-service flows "from real checks only" `[DECK S11]`, and the deck names a reusable "flow DSL" `[DECK S15]`. A flow is versioned YAML that can call **only allowlisted read tools** and **propose L2 actions**. Money never moves inside a flow: refunds go through rules and the decision policy.
+
+```yaml
+flow_id: data_stopped_check
+version: 3
+status: approved                # draft | in_review | approved | retired
+languages: [si, ta, en]
+entry: { intents: [data_stopped], channels: [whatsapp, app, web] }
+steps:
+  - id: check_fup
+    call: get_usage_summary     # allowlisted read tool only
+    on_result:
+      - when: "fup.cap_reached == true"
+        goto: explain_fup
+      - otherwise: check_pack
+  - id: check_pack
+    call: get_pack_details
+    on_result:
+      - when: "active_packs == 0"
+        goto: offer_topup
+      - otherwise: handoff
+  - id: explain_fup
+    say: { template: fup_reached_v2 }        # CX-approved template filled from tool results
+    offer: [ENABLE_FUP_ALERTS, BUY_ADDON]    # L2 proposals; the customer confirms
+  - id: offer_topup
+    say: { template: no_active_pack_v1 }
+  - id: handoff
+    handoff: { reason: FLOW_NO_MATCH }
+tests_ref: tests/flows/data_stopped_check/v3/
+```
+
+Lifecycle: draft (from Autopsy or a CX engineer) → replay on historic cases → approval by CX, product and compliance → publish behind a flag → A/B test of two versions where a step causes drop-off `[DECK S10]` → measure completion and repeats.
+
 ---
 
 [← 01-executive-summary-problem.md](01-executive-summary-problem.md) · [← Plan index](README.md) · [03-requirements-personas-journeys.md →](03-requirements-personas-journeys.md)

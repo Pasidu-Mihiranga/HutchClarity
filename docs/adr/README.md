@@ -1,26 +1,49 @@
 # Architecture Decision Records
 
-New ADR: copy [../templates/ADR.md](../templates/ADR.md) to `NNNN-short-title.md`, add a row here in the same PR.
+Decisions that shaped this system, with the alternatives considered and what
+each one costs. A decision that is not written down gets re-argued, or quietly
+reversed.
 
-When documents disagree: accepted ADR > [`ARCHITECTURE.md`](../../ARCHITECTURE.md) > plan chapters 17–19 > plan chapters 01–16.
+| # | Decision | Status |
+|---|---|---|
+| [0001](0001-yaml-rule-packs-over-python-detectors.md) | Cause rules are YAML rule packs, not Python plugins | Accepted |
+| [0002](0002-policy-as-scoped-effective-dated-data.md) | Policy is scoped, effective-dated data with guardrails | Accepted |
+| [0003](0003-policy-change-governance.md) | Every policy change has a class, an impact report and two sets of eyes | Accepted |
+| [0004](0004-mcp-holds-no-execute-capability.md) | The MCP server holds no capability to execute | Accepted |
+| [0005](0005-idempotency-claimed-before-side-effects.md) | An idempotency key is claimed before anything is consumed | Accepted |
+| [0006](0006-prototype-runs-with-no-infrastructure.md) | The prototype runs with no infrastructure, behind swappable ports | Accepted |
+| [0007](0007-confirmation-tokens-never-leave-the-server.md) | Confirmation tokens are minted and spent server-side | Accepted |
+| [0008](0008-risk-signals-derived-from-evidence.md) | Risk signals are derived from evidence, not supplied by callers | Accepted |
+| [0009](0009-no-model-configured-by-default.md) | No language model is configured by default | Accepted |
+| [0010](0010-identity-is-issued-here-but-federated-later.md) | Clarity issues its own tokens now, behind the interface Keycloak will fill | Accepted |
+| [0011](0011-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0012](0012-modular-monolith-with-satellites.md) | Modular monolith with separately deployed services | Accepted |
+| [0013](0013-schema-per-module.md) | One Postgres schema and DB role per module; no cross-schema joins | Accepted |
+| [0014](0014-outbox-and-kafka.md) | Transactional outbox and Kafka for events | Accepted |
+| [0015](0015-detectors-zen-tables-opa.md) | Python detectors + ZEN decision tables for rules; OPA for authorization | Superseded by 0026 |
+| [0016](0016-deployment-contract-and-ports.md) | Deployment contract and infrastructure ports | Accepted |
+| [0017](0017-identity-keycloak-and-customer-issuer.md) | Identity: Keycloak for staff/admin/machines, Clarity issuer for customers | Accepted |
+| [0018](0018-mcp-stateless-resource-server.md) | MCP server: stateless OAuth 2.1 resource server that can only read and propose | Accepted |
+| [0019](0019-ai-gateway-model-roles.md) | AI gateway with model roles; Gemini + Groq free tiers for the prototype | Accepted |
+| [0020](0020-template-only-notifications.md) | Customer notifications use approved templates only | Accepted |
+| [0021](0021-policy-change-lifecycle.md) | One lifecycle for every policy change | Accepted |
+| [0022](0022-neutral-licence-stack.md) | Neutral, OSI-licensed infrastructure stack | Accepted |
+| [0023](0023-living-documentation.md) | Living documentation system | Accepted |
+| [0024](0024-runtime-profiles.md) | Runtime profiles: lite inner loop, full outer loop | Superseded by 0027 |
+| [0025](0025-migrate-structure-keep-logic.md) | Migrate the prototype: rewrite structure, replace infrastructure, keep proven logic | Accepted |
+| [0026](0026-rules-yaml-packs-zen-outcomes-opa-authz.md) | Rules: YAML cause packs, ZEN outcome tables, OPA for authorization | Accepted |
+| [0027](0027-runtime-profiles-lite-needs-only-python.md) | Runtime profiles: lite needs only Python | Accepted |
+| [0028](0028-containers-for-the-core-serverless-at-the-edges.md) | Containers for the core, serverless at the edges | Accepted |
 
-| ADR | Title | Status | Date |
-|---|---|---|---|
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted | 2026-10-01 |
-| [0002](0002-modular-monolith-with-satellites.md) | Modular monolith with separately deployed services | Accepted | 2026-10-01 |
-| [0003](0003-schema-per-module.md) | One Postgres schema and DB role per module; no cross-schema joins | Accepted | 2026-10-01 |
-| [0004](0004-outbox-and-kafka.md) | Transactional outbox and Kafka for events | Accepted | 2026-10-01 |
-| [0005](0005-detectors-zen-tables-opa.md) | Python detectors + ZEN decision tables for rules; OPA for authorization | Accepted | 2026-10-01 |
-| [0006](0006-deployment-contract-and-ports.md) | Deployment contract and infrastructure ports | Accepted | 2026-10-01 |
-| [0007](0007-identity-keycloak-and-customer-issuer.md) | Identity: Keycloak for staff/admin/machines, Clarity issuer for customers | Accepted | 2026-10-01 |
-| [0008](0008-mcp-stateless-resource-server.md) | MCP server: stateless OAuth 2.1 resource server that can only read and propose | Accepted | 2026-10-01 |
-| [0009](0009-ai-gateway-model-roles.md) | AI gateway with model roles; Gemini + Groq free tiers for the prototype | Accepted | 2026-10-01 |
-| [0010](0010-template-only-notifications.md) | Customer notifications use approved templates only | Accepted | 2026-10-01 |
-| [0011](0011-policy-change-lifecycle.md) | One lifecycle for every policy change | Accepted | 2026-10-01 |
-| [0012](0012-neutral-licence-stack.md) | Neutral, OSI-licensed infrastructure stack | Accepted | 2026-10-01 |
-| [0013](0013-living-documentation.md) | Living documentation system | Accepted | 2026-10-01 |
-| [0014](0014-runtime-profiles.md) | Runtime profiles: lite inner loop, full outer loop | Accepted | 2026-10-01 |
+ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 
-## Legacy (prototype era)
+## Writing one
 
-Earlier prototype ADRs and short alignment stubs superseded by the table above are kept under [`legacy/`](legacy/) for history. Do not cite them for new work.
+Status: `Proposed` -> `Accepted` / `Rejected` -> `Superseded by NNNN`. Never
+delete an ADR; supersede it. Each one states context, the decision, the
+alternatives and why they lost, the consequences, and how compliance is
+checked.
+
+The enterprise plan in [`../enterprise-plan/`](../enterprise-plan/README.md) is
+the intended design. These records say what was actually decided while
+building, and why it sometimes differs.

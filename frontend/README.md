@@ -8,10 +8,10 @@ Lean npm workspaces monorepo for Phase **B5 / D2–D4 / D7**.
 frontend/
   package.json          # workspaces: packages/*, apps/*
   packages/
-    ui/                 # @clarity/ui — Button, Card, Badge, Input
-    sdk/                # @clarity/sdk — ClarityClient → NEXT_PUBLIC_API_BASE
-    i18n/               # @clarity/i18n — en / si / ta + t(lang, key)
-    widget/             # @clarity/widget — <clarity-why-card> custom element
+    ui/                 # @clarity/ui - Button, Card, Badge, Input
+    sdk/                # @clarity/sdk - ClarityClient → NEXT_PUBLIC_API_BASE
+    i18n/               # @clarity/i18n - en / si / ta + t(lang, key)
+    widget/             # @clarity/widget - <clarity-why-card> custom element
   apps/
     customer-web/       # Next.js 14 customer PWA (port 3000)
     console/            # Staff console: desk / insights / studio / admin (3001)
@@ -55,26 +55,26 @@ npm run dev -w @clarity/customer-web
 
 **customer-web**
 
-- `/` — why balance changed + Why widget + language switcher (si/ta/en)
-- `/login` — OTP request / verify via SDK
-- `/case/[id]` — case detail
-- `/receipt/[id]` — receipt view
-- `app/manifest.ts` — PWA basics
+- `/` - why balance changed + Why widget + language switcher (si/ta/en)
+- `/login` - OTP request / verify via SDK
+- `/case/[id]` - case detail
+- `/receipt/[id]` - receipt view
+- `app/manifest.ts` - PWA basics
 
 **console**
 
 - Bottom **role switcher** (agent … security_admin) + step-up MFA toggle
-- `/` — home with permission-aware section cards
-- `/desk` — live queue + cockpit + approve (via `@clarity/sdk`)
-- `/insights` — `/v1/demo/ops`, autopsy, foresight
-- `/studio` — role-aware draft / publish stub / regulator export stub
-- `/admin` — kill switches (`/v1/admin/switches`)
+- `/` - home with permission-aware section cards
+- `/desk` - live queue + cockpit + approve (via `@clarity/sdk`)
+- `/insights` - `/v1/demo/ops`, autopsy, foresight
+- `/studio` - role-aware draft / publish stub / regulator export stub
+- `/admin` - kill switches (`/v1/admin/switches`)
 
-Walkthrough: [docs/walkthroughs/WT-02-staff-console.md](../docs/walkthroughs/WT-02-staff-console.md)
+Walkthrough: [docs/walkthroughs/WT-02-staff-console.md](../docs/walkthroughs/WT-13-staff-console.md)
 
 **verify**
 
-- `/r/[id]` — fetches `GET /v1/verify/{id}`; falls back to a local valid/invalid demo when the API is down (ids containing `bad` → invalid)
+- `/r/[id]` - fetches `GET /v1/verify/{id}`; falls back to a local valid/invalid demo when the API is down (ids containing `bad` → invalid)
 
 ## Packages
 

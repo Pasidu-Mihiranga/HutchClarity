@@ -4,9 +4,9 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
-> **Scope of this chapter.** This is the **HUTCH production programme**, from selection to production, assumed to start 2027-01-04. The **prototype build** (baseline → modules → release v1.0) is scheduled in [17 §14](17-build-blueprint.md); its output is the input to P0 below.
+> **Scope of this chapter.** This is the **HUTCH production programme**, from selection to production, assumed to start 2027-01-04. The **prototype migration** (restructure the working prototype into the target architecture, R0 to R7) is scheduled in [21](21-migration-and-deployment-plan.md); its output is the input to P0 below.
 
 ## 26. Implementation Phases
 
@@ -19,7 +19,7 @@
 | | P2 Architecture & Security Design | Feb 1 – Mar 14 | Solution/data/integration/AI/MCP architecture; threat model; DPIA; licence reviews | SAD, ICDs per adapter, MCP spec, threat model, DPIA draft | **M2 Architecture Sign-Off (Mar 15)** |
 | **B. Foundation & core** | P3 Platform Foundation | Feb 22 – Mar 28 | Envs, K8s, CI/CD, secrets, observability, Kafka/PG/Valkey/WORM | Running DEV/QA, pipelines, golden-signal dashboards | Platform smoke test |
 | | P4 Timeline + Case Core | Mar 15 – May 2 | Case service, canonical model, timeline builder, snapshots | Case + timeline APIs on mocks | Contract tests green |
-| | P5 Rule/Decision Engine + Tool Layer | Mar 22 – May 30 | Rule engine, 16 rules + golden tests, OPA policy, caps/budgets, tool layer, reconciliation | Rule bundle v1 (detectors + decision tables), policy artefacts v1, tool layer | **M3 Core Complete (May 31)** |
+| | P5 Rule/Decision Engine + Tool Layer | Mar 22 – May 30 | Rule engine, 16 rules + golden tests, OPA policy, caps/budgets, tool layer, reconciliation | Rule pack v1, policy bundle v1, tool layer | **M3 Core Complete (May 31)** |
 | | P6 AI + RAG | Mar 8 – May 30 | Model selection eval, AI gateway, PII masking, extraction/explanation/verifier, RAG, eval harness | AI services + eval report v1 | AI eval gates met on golden sets |
 | | P7 MCP Server | Apr 19 – Jun 13 | Tools L1/L2, propose/confirm, OPA authZ, audit | MCP server + tool spec | MCP abuse tests pass |
 | **C. Integrate & build experience** | P8 HUTCH Integration Adapters | Mar 29 – Jul 4 | Read adapters → HUTCH non-prod; event ingestion; write adapters per approved action | Adapters + contract tests | **M4 Integration Complete (Jul 5)** |
@@ -72,7 +72,7 @@
 | 4.1 | Case service + state machine + outbox | Backend |
 | 4.2 | Timeline builder + snapshots | Backend |
 | 4.3 | Rule engine + predicate library | Backend |
-| 4.4 | Rule bundle v1 (16 detectors + decision tables) + golden tests | CX Engineer + Backend |
+| 4.4 | Rule pack v1 (16 rules) + golden tests | CX Engineer + Backend |
 | 4.5 | Decision policy (OPA) + caps/budgets | Backend |
 | 4.6 | Tool layer + idempotency + compensations | Backend |
 | 4.7 | Reconciliation service | Backend + Finance |
@@ -202,7 +202,7 @@
 gantt
     title Hutch Clarity - Prototype to Production (assumed start 2027-01-04)
     dateFormat YYYY-MM-DD
-    axisFormat %b %y
+    axisFormat %b %Y
     todayMarker off
 
     section Mobilise and define

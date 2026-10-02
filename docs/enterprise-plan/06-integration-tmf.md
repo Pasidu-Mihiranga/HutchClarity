@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 9. HUTCH Integration Strategy
 
@@ -12,7 +12,7 @@
 1. **Abstraction layer:** Clarity → **Integration Adapter Layer** → **Approved Enterprise Interfaces** → **Existing HUTCH Systems**. No Clarity service calls a HUTCH system directly.
 2. **Read-first, write only via the tool layer** `[DECK S12]`. Adapters expose separate read and command ports, and command ports accept calls only from the tool layer's service identity.
 3. **Anti-corruption layer.** Every adapter maps HUTCH-native fields to the canonical (TMF-shaped) model. A field mapping registry records the source, owner and quality of each field.
-4. **Same contract, swappable implementation.** Prototype = `hutch-sim` mock drivers + synthetic streams (a separate, clearly labelled service, so adapters make real network calls). Pilot = HUTCH non-prod/sandbox. Production = approved HUTCH interfaces. The adapter is selected by config `[DECK S13]` ("plugs into Hutch systems by config").
+4. **Same contract, swappable implementation.** Prototype = `hutch-sim` mock drivers + synthetic streams (in process for `lite`, a separate HTTP service for `full`, so adapters make real network calls). Pilot = HUTCH non-prod/sandbox. Production = approved HUTCH interfaces. The adapter is selected by config `[DECK S13]` ("plugs into Hutch systems by config").
 5. **Resilience.** Per-adapter timeouts, retries with jitter (reads only), circuit breakers, bulkheads, cached reference data (catalogue), and a completeness flag on every response.
 6. **Least privilege.** One service account per adapter, scoped to the minimum fields, mTLS, and an egress allowlist.
 
@@ -102,6 +102,20 @@ The deck uses "TM Forum API shapes" `[DECK S12, S13]`. **We do not assume HUTCH 
 | TMF678 Customer Bill Management | Postpaid bills | **Future** (Step 4 postpaid) |
 
 Implementation: a shared `packages/schemas` defines Pydantic and TypeScript types generated from one JSON Schema source. Each schema carries TMF-style `id`, `href`, `@type`, `@baseType` and `@schemaLocation`, plus a Clarity extension `x-clarity-source` with completeness flags.
+
+### 9.7 Channel constraints and design responses
+Each channel has technical limits that shape the experience. Values come from public channel specifications. HUTCH-specific gateway settings **REQUIRE HUTCH CONFIRMATION**.
+
+| Channel | Constraint | Design response |
+|---|---|---|
+| **WhatsApp** (Cloud API) | Business-initiated messages outside the 24-hour customer-service window must use pre-approved templates. Templates are categorised (utility, marketing, authentication) and charged per message by Meta. Voice notes arrive as OGG/Opus audio. Interactive buttons and lists have count and length limits. The business account, display name and templates belong to HUTCH. | Proactive messages use **utility** templates in si/ta/en. Confirmations use interactive reply buttons bound to a single-use token. Voice notes are capped at about 60 s (**ASSUMPTION**) before STT. Template approval is a dependency (DEP-10). Current pricing **REQUIRES CONFIRMATION** ([§50](17-governance-compliance-change-cost.md)). |
+| **SMS** | GSM-7 allows 160 characters per segment. Sinhala and Tamil need UCS-2, which allows 70 characters in one segment and 67 per segment when concatenated, so long messages cost more segments. | The SMS receipt is a short form: receipt ID, amount, safeguard, and a short verify link on a HUTCH domain. At most 3 segments (**ASSUMPTION**). The language follows preference. Clarity never sends or asks for OTPs in free text. |
+| **USSD** | Session-based. About 182 GSM characters per screen. Operator-defined session timeouts. Sinhala/Tamil rendering varies by handset. | USSD shows short menus (English or romanised, ≤ 3 levels). The full reason goes by SMS ("short code sends the reason by SMS" `[DECK S5]`). Gateway Unicode support and timeouts **REQUIRE HUTCH CONFIRMATION**. |
+| **Hutch app (WebView)** | Depends on the app shell, the WebView version and how the session is passed | Token exchange from the app session. Deep links to receipts. Lean module per NFR-PERF-06. The embedding slot is DEP-12. |
+| **Web (hutch.lk)** | Anonymous visitors; bot traffic | OTP login, WAF and bot management. A PWA shell lets customers keep receipts offline. |
+| **Voice** | STT accuracy for si/ta and background noise | Show the transcript back to the customer ("Did you mean…?") before any L2+ proposal. The transcript is a hint, never evidence `[DECK S7]`. |
+| **Shop (Desk shop view)** | Shared terminals; customer present | Staff SSO, customer OTP to open a case, no full PII on screen, session auto-lock |
+
 ---
 
 [← 05-architecture-diagrams.md](05-architecture-diagrams.md) · [← Plan index](README.md) · [07-mcp.md →](07-mcp.md)

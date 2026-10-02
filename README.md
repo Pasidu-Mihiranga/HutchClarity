@@ -2,150 +2,98 @@
 
 **Explain every rupee. Fix it by rule. Prove it won't happen again.**
 
-One platform for HUTCH customers and staff — website, Hutch app, WhatsApp, SMS/USSD and the Clarity Desk staff console. For any charge it explains the exact cause with evidence, fixes safe cases by deterministic rule, and issues a signed, QR-verifiable **Trust Receipt** as proof.
-
-> **Hackathon prototype.** All HUTCH systems are **mocked** and all data is **synthetic**. No HUTCH APIs, credentials or production data are used. See [Known limitations](#known-limitations).
-
-## Modular monolith
-
-The repo now carries a second code tree that matches the enterprise modular
-monolith plan (see [`docs/enterprise-plan/`](docs/enterprise-plan/README.md) and [`docs/adr/`](docs/adr/README.md)). Business code never
-reads the runtime profile; only the composition root binds drivers.
-
-| Profile | Command | What runs |
-|---|---|---|
-| `lite` | `make up-lite` | Postgres (pgvector) only; in-process bus, cache, blob |
-| `full` | `make up-full` | Postgres + Kafka, Valkey, SeaweedFS, Keycloak, OPA, OTel/Grafana LGTM, Langfuse stub |
-
-```bash
-make up-lite    # daily inner loop
-make dev-new    # uvicorn clarity.entrypoints.api:app on :8000 (PYTHONPATH=backend/src)
-make test-g1    # backend/tests (in-memory)
-```
-
-| Path | Role |
+| | |
 |---|---|
-| `backend/src/clarity/kernel` | L0 shared types (`Money`, `Clock`, events) |
-| `backend/src/clarity/integration` | L1 ports + drivers (`drivers/mock`, Kafka/Valkey/Seaweed stubs) |
-| `backend/src/clarity/platform` | L2 outbox, jobs, authz, idempotency, DB helpers |
-| `backend/src/clarity/modules/*` | L4 domain modules (schema-per-module) |
-| `backend/src/clarity/entrypoints` | `api.py`, `worker.py`, `stream.py` |
-| `deploy/` | OPA, Helm, OpenTofu reference stubs |
-| `docs/walkthroughs/WT-01-vas-journey.md` | VAS demo walkthrough |
+| Team | **[Team name - to fill]** · [University and batch - to fill] |
+| Track | **Track A - Resolve & Support:** Intelligent Automation & Root-Cause AI |
+| Status | Working prototype (447 tests). Migrating into the target architecture: step R1 done ([plan 21](docs/enterprise-plan/21-migration-and-deployment-plan.md)). |
 
-Agent rules: [`AGENTS.md`](AGENTS.md). Baseline version: see `VERSION`.
+One platform for HUTCH customers and staff: website, Hutch app, WhatsApp, SMS/USSD and the Clarity Desk staff console. For any charge it explains the exact cause with evidence, fixes safe cases by deterministic rule, and issues a signed, QR-verifiable **Trust Receipt** as proof.
+
+> **Hackathon prototype.** All HUTCH systems are **simulated** and all data is **synthetic**. No HUTCH APIs, credentials or production data are used. See [Known limitations](#known-limitations).
+
+## Problem statement
+Prepaid customers lose money and nobody can say why: reloads taken twice, surprise VAS debits, "unlimited" data that stops at a fair-use cap, and support that does not resolve. The evidence exists but is split across payment, charging, catalogue, consent and usage systems. See [plan 01](docs/enterprise-plan/01-executive-summary-problem.md).
 
 ## Core principle: rules decide, the LLM explains
 
 | Deterministic (decides, moves money) | AI (language only) |
 |---|---|
-| Timeline from system records, cause rules, decision policy, caps and budgets, tool layer, receipt signing | Multilingual intake, explanation drafting, summaries, retrieval, clustering |
+| Timeline from system records, YAML rule packs, decision policy, caps and budgets, tool layer, receipt signing | Multilingual intake, explanation drafting, summaries, retrieval, clustering |
 
-The LLM can never authorize a refund or a service change. Through MCP it may only **propose**; execution needs a confirmation token minted outside the model (customer tap or staff approval).
+The LLM can never authorize a refund or a service change. Through MCP it may only **propose**; execution needs a confirmation token minted outside the model (customer tap, staff approval, or policy for a whitelisted auto-fix).
 
-## Status
+## Key features
+**Why?** with cause, evidence and ruled-out causes · one-tap fixes · zero-contact refunds · signed, chained Trust Receipts with QR verification · Clarity Desk (queue by money at stake, case cockpit, step-up and four-eyes approval) · policy as scoped, effective-dated data with guardrails, kill switches, replay impact reports and maker-checker · Complaint Autopsy · Foresight · MCP tools that can read and propose only · Sinhala, Tamil and English.
 
-Implementation has started. Progress is tracked in [`agent.md`](agent.md) §6a.
+## Architecture
+A **modular monolith** with enforced layers, designed to become microservices where it pays off:
 
-| Milestone | Status |
-|---|---|
-| P1 Foundation (schemas, canonical hashing) | done |
-| P2 Mock HUTCH systems + adapters | done |
-| P3 Deterministic core (timeline, rules, decision, tool layer) | done |
-| P4 Trust Receipts (Ed25519, chain, verify) | done |
-| P5 API (`/v1`, 15 endpoints) | done (persistence in-memory) |
-| P7 Web + Clarity Desk | done |
-| P6 AI + MCP | todo |
-| P8 Autopsy, Foresight, submission pack | todo |
+`kernel → contracts → integration → platform → ai → modules → app → interfaces → entrypoints`
 
-193 tests pass; `ruff` and `mypy --strict` are clean.
+Each domain module is reachable only through its `public.py`; the money-moving code is reachable only from the case orchestration and the composition root. Target runtime: **containers for the money path, serverless at the edges** (ADR-0028). Details: [ARCHITECTURE.md](ARCHITECTURE.md) (as built) and [plan 18](docs/enterprise-plan/18-build-blueprint.md) / [21](docs/enterprise-plan/21-migration-and-deployment-plan.md) (target).
 
-## Documentation
-
-The full enterprise plan (52 sections, 39 diagrams) is in [`docs/enterprise-plan/`](docs/enterprise-plan/README.md): architecture, integration strategy, MCP design, security, delivery plan and Gantt.
-
-## Repository layout
-
-The plan's §43 describes the production monorepo. The prototype implements it as one Python package whose modules map 1:1 to those components:
-
-| Plan (§43) | Prototype |
-|---|---|
-| `packages/schemas`, `packages/events` | `src/clarity/schemas`, `src/clarity/events` |
-| `integrations/framework` + adapters + mocks | `src/clarity/integrations` |
-| `services/case-service`, `timeline-builder`, `rule-engine`, `decision-policy`, `tool-layer`, `receipts` | `src/clarity/core/{cases,timeline,rules,decision,tools,receipts}` |
-| `ai/`, `mcp/server`, `services/bff-api` | `src/clarity/{ai,mcp,api}` |
-| `rules/packs` | `rules/packs` (YAML data — rules are data, not code) |
+## Technology stack
+Python 3.12+ · FastAPI · Pydantic v2 · YAML rule packs · Ed25519 (`cryptography`) · import-linter · pytest + Hypothesis · ruff · mypy --strict. Target stack (PostgreSQL 18, Kafka, Keycloak, OPA, ZEN, Next.js, MCP SDK, Gemini + Groq by role) and the reasons: [plan 19](docs/enterprise-plan/19-tech-stack-and-ai.md).
 
 ## Setup
-
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+Needs **only Python 3.12+** (no Docker, database or broker; `lite` profile).
 
 ```bash
-uv venv --python 3.12
-uv pip install -e ".[dev]"
+make setup     # creates .venv and installs the backend with dev tools
 make check     # lint, types, import contracts, tests
 ```
 
-### See it work
+## How to run and test
 
 ```bash
-# Walk all four journeys in the terminal
-.venv/bin/python scripts/demo.py
-
-# Or run the whole prototype — UI and API in one process
-.venv/bin/uvicorn clarity.api.main:app
+make demo      # walk the four journeys in the terminal
+make dev       # UI + API on http://localhost:8000
 ```
 
 | Page | What it is |
 |---|---|
-| <http://localhost:8000/> | Customer **Why?** journey — ask, see the cause with evidence, confirm in one tap, keep the receipt |
-| <http://localhost:8000/desk> | **Clarity Desk** — queue by money at stake, case cockpit, supervisor approval |
-| <http://localhost:8000/v/TR-2027-000001> | **Public receipt check** — what the QR code opens |
+| <http://localhost:8000/> | Customer **Why?** journey: sign in with the simulated OTP inbox, see the cause with evidence, confirm in one tap, keep the receipt |
+| <http://localhost:8000/desk> | **Clarity Desk**: queue by money at stake, case cockpit, approvals (simulated staff sign-in; never available in `prod`) |
+| <http://localhost:8000/v/TR-2027-000001> | **Public receipt check**: what the QR code opens |
 | <http://localhost:8000/docs> | API reference (OpenAPI) |
 
-`POST /v1/demo/reset` restores the synthetic data so the demo can be run again.
+`POST /v1/demo/reset` restores the synthetic data so the demo can run again.
 
-A full journey over HTTP:
+**Next.js apps (optional, Node 18+):** `make web-install`, then `make web-customer` (port 3000), `make web-console` (3001) or `make web-verify` (3002) against the API on port 8000. See [frontend/README.md](frontend/README.md). The full storyboard is [docs/submission/DEMO_SCRIPT.md](docs/submission/DEMO_SCRIPT.md).
 
-```bash
-CASE=$(curl -s -X POST localhost:8000/v1/cases \
-  -H 'content-type: application/json' \
-  -d '{"msisdn":"0771234567","channel":"app","language":"si"}' | jq -r .case_id)
+## API / external services
+- **HUTCH systems:** none required; all are simulated (labelled in every response).
+- **LLM:** none required; explanations come from CX-approved templates by default (ADR-0009). An OpenAI-compatible provider can be enabled by environment variables (synthetic data only).
 
-curl -s -X POST localhost:8000/v1/cases/$CASE/evaluate | jq       # cause + ruled out
-PLAN=$(curl -s -X POST localhost:8000/v1/cases/$CASE/proposals \
-  -H 'content-type: application/json' -d '{"created_by":"channel:web"}' | jq -r .plan_id)
-curl -s -X POST localhost:8000/v1/cases/$CASE/confirm \
-  -H 'content-type: application/json' -d "{\"plan_id\":\"$PLAN\"}" | jq
-curl -s -X POST localhost:8000/v1/receipts/TR-2027-000001/verify | jq
-```
+## Known limitations
+1. **No real HUTCH integration.** Every HUTCH system is a mock driver; real interfaces are unconfirmed.
+2. **Synthetic data only.**
+3. Rule thresholds, caps and budgets are illustrative, not validated by HUTCH Finance.
+4. **In memory, single process.** Nothing survives a restart, and only one instance may run until migration step R3.
+5. **Identity is simulated:** an own token issuer, a simulated SMS inbox, and a staff role picker available only in the synthetic profiles (refused in `prod`).
+6. **MCP has no network transport yet** (migration step R4).
+7. **No language model is configured**, so measured token use is zero.
+8. Sinhala and Tamil wording has **not been reviewed by native speakers**.
+
+Full detail: [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITATIONS.md).
 
 ## For reviewers
 
 | Document | What it covers |
 |---|---|
-| [`docs/submission/AI_DISCLOSURE.md`](docs/submission/AI_DISCLOSURE.md) | AI/LLM declaration with **measured** token numbers (Guidelines §6) |
-| [`docs/submission/KNOWN_LIMITATIONS.md`](docs/submission/KNOWN_LIMITATIONS.md) | Exactly where the prototype stops |
-| [`docs/submission/DEMO_SCRIPT.md`](docs/submission/DEMO_SCRIPT.md) | A 6-minute walkthrough |
-| [`docs/enterprise-plan/`](docs/enterprise-plan/README.md) | The 52-section plan from here to production |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | What is actually built, and where it differs from the plan |
-| [`docs/adr/`](docs/adr/README.md) | Why each significant decision was made |
-
-```bash
-.venv/bin/python scripts/measure_tokens.py   # measured AI usage per journey
-```
-
-## Known limitations
-
-1. **No real HUTCH integration.** Every HUTCH system is a mock driver; real interfaces are unknown and unconfirmed.
-2. **Synthetic data only.** Subscribers, charges, payments, consents and complaints are generated.
-3. Rule thresholds, caps and budgets are illustrative and not validated by HUTCH Finance.
-4. **No authentication** on the API, and all state is **in memory** — nothing survives a restart.
-5. **No language model is configured.** Explanations come from CX-approved templates, which is the deck's "works without the LLM" path; measured token use is therefore zero.
-6. Sinhala and Tamil wording has **not been reviewed by native speakers**.
-
-Full detail in [`docs/submission/KNOWN_LIMITATIONS.md`](docs/submission/KNOWN_LIMITATIONS.md).
+| [docs/submission/AI_DISCLOSURE.md](docs/submission/AI_DISCLOSURE.md) | AI/LLM declaration with measured token numbers |
+| [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITATIONS.md) | Exactly where the prototype stops |
+| [docs/submission/DEMO_SCRIPT.md](docs/submission/DEMO_SCRIPT.md) | A 6-minute walkthrough |
+| [docs/enterprise-plan/](docs/enterprise-plan/README.md) | The plan from here to production (v1.3) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | What is built, and where it differs from the plan |
+| [docs/adr/](docs/adr/README.md) | Why each significant decision was made |
 
 ## Third-party components
+See [backend/pyproject.toml](backend/pyproject.toml). Key: FastAPI, Uvicorn, Pydantic, PyYAML, cryptography, PyJWT, python-ulid, qrcode, SQLAlchemy; dev: pytest, Hypothesis, ruff, mypy, import-linter; optional: Playwright (receipt PNG/PDF).
 
-See [`pyproject.toml`](pyproject.toml). Key: Pydantic, FastAPI, SQLAlchemy, PyYAML, cryptography (Ed25519), pytest, Hypothesis, Ruff, mypy.
+## AI tools / models used
+No model is configured by default. Model roles and the opt-in provider plan: [plan 19 §4](docs/enterprise-plan/19-tech-stack-and-ai.md). Declaration: [docs/submission/AI_DISCLOSURE.md](docs/submission/AI_DISCLOSURE.md).
+
+## For contributors
+[AGENTS.md](AGENTS.md) (rules for people and AI agents) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/modules.md](docs/modules.md) · [docs/WALKTHROUGHS.md](docs/WALKTHROUGHS.md) · [docs/devlog/](docs/devlog/README.md)

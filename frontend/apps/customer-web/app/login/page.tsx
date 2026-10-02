@@ -28,7 +28,12 @@ export default function LoginPage() {
       });
       setStep("verify");
     } catch (err) {
-      setStatus({ text: (err instanceof Error ? err.message : "Request failed") + " - demo mode: enter any 6-digit code", tone: "info" });
+      setStatus({
+        text: err instanceof Error
+          ? `${err.message} - demo mode: enter any 6-digit code`
+          : "Request failed",
+        tone: "info",
+      });
       setStep("verify");
     } finally { setBusy(false); }
   }
@@ -43,10 +48,16 @@ export default function LoginPage() {
       setStatus({ text: "Signed in - redirecting...", tone: "ok" });
       router.push("/");
     } catch (err) {
-      setStatus({ text: (err instanceof Error ? err.message : "Verify failed") + " - placeholder login accepted", tone: "info" });
+      setStatus({
+        text: err instanceof Error
+          ? `${err.message} - placeholder login accepted locally`
+          : "Verify failed",
+        tone: "info",
+      });
       try { window.sessionStorage.setItem("clarity_token", "demo-token"); } catch {}
-      setTimeout(() => router.push("/"), 1200);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

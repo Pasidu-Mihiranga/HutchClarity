@@ -1,10 +1,11 @@
-# Demo script — Hutch Clarity
+# Demo script - Hutch Clarity
 
 Target 5–6 minutes (Guidelines §10 allows 3–7). Based on the storyboard in
 plan §42.5.
 
 ```bash
-.venv/bin/uvicorn clarity.api.main:app
+make setup   # once
+make dev
 ```
 
 Open <http://localhost:8000/>. Click **Reset demo data** before recording, so
@@ -15,12 +16,12 @@ balances start clean.
 
 ---
 
-## 0:00–0:45 — The problem
+## 0:00–0:45 - The problem
 
 Show the deck's quotes (slide 2) or say them:
 
 > "The bank took 3,500 for my 90-day pack twice. My Hutch balance is still zero."
-> "I recharged and didn't buy anything — the money was deducted anyway."
+> "I recharged and didn't buy anything - the money was deducted anyway."
 
 **Say:** Customers can see *that* money went. They cannot see *why*. The facts
 exist, but they are split across payment, charging, catalogue, consent and
@@ -28,23 +29,23 @@ usage logs, so nobody can assemble them in a conversation.
 
 **Then:** Explain every rupee. Fix it by rule. Prove it won't happen again.
 
-## 0:45–2:15 — Journey 1: a charge with no consent
+## 0:45–2:15 - Journey 1: a charge with no consent
 
 Pick **VAS charged with no consent** (Dilani, Sinhala).
 
 A sign-in step appears: the code sits in a panel labelled **simulated SMS
 inbox**, because nobody can receive a real SMS in a demo. Enter it.
 
-**Say in one line:** the code is simulated, the check is not — a case holds
+**Say in one line:** the code is simulated, the check is not - a case holds
 someone's charges, so holding its link is not enough to open it. Type a wrong
 code first if there is time; it is refused, and attempts are capped.
 
 Then click **ඇයි?** and point out, in this order:
 
-1. **The cause** — `VAS_NO_CONSENT` version 4, 90% confidence, LKR 49.00.
-2. **The evidence** — the charge from the charging source, and the *absence* of an OTP in the consent log. Absence is the evidence here.
+1. **The cause** - `VAS_NO_CONSENT` version 4, 90% confidence, LKR 49.00.
+2. **The evidence** - the charge from the charging source, and the *absence* of an OTP in the consent log. Absence is the evidence here.
 3. **All eight sources reporting in**, each with its completeness.
-4. **What it wasn't** — duplicate reload, FUP cap, pack expiry burn, all explicitly ruled out.
+4. **What it wasn't** - duplicate reload, FUP cap, pack expiry burn, all explicitly ruled out.
 5. **The explanation is in Sinhala**, because that is her language.
 
 **Say:** A rule decided this, not a model. The wording is a template, and any
@@ -53,21 +54,21 @@ model-written wording would be checked against these facts before she saw it.
 Click **මෙම නිවැරදි කිරීම තහවුරු කරන්න** (Confirm this fix). Three things happen
 in one tap: refund, subscription off, merchant blocked.
 
-## 2:15–3:00 — The proof
+## 2:15–3:00 - The proof
 
 The Trust Receipt appears. Point out:
 
 - **Balance 263.00 → 312.00**, the real before and after.
-- **Recurrence test: PASSED** — and stress this: *it re-read the live state. It did not assume the block worked because the command was accepted.*
+- **Recurrence test: PASSED** - and stress this: *it re-read the live state. It did not assume the block worked because the command was accepted.*
 - **Signed Ed25519, chain intact.**
 
 Scan the QR (or open `/v/TR-2027-000001`). The public page verifies it with
-nothing secret — the same check a customer, an agent on 1788, or TRCSL can run.
+nothing secret - the same check a customer, an agent on 1788, or TRCSL can run.
 
-**Optional, strong:** open `/v/TR-2027-999999` — a receipt that was never
+**Optional, strong:** open `/v/TR-2027-999999` - a receipt that was never
 issued fails: *"No receipt numbered TR-2027-999999 has ever been issued."*
 
-## 3:00–3:40 — Journey 2: fixed before she noticed
+## 3:00–3:40 - Journey 2: fixed before she noticed
 
 Back to **My Hutch** → **Reload taken twice** → **Why?**
 
@@ -78,7 +79,7 @@ the narrowest one: money back only, nothing switched off, high confidence,
 inside the cap, and the rule explicitly whitelisted. Anything else needs a tap
 or a supervisor.
 
-## 3:40–4:30 — Journey 3 and 4: knowing when *not* to act
+## 3:40–4:30 - Journey 3 and 4: knowing when *not* to act
 
 **'Unlimited' hit a fair-use cap** → **EXPLAIN ONLY.** Nothing was charged
 wrongly; the cap was shown at purchase. A receipt is still issued.
@@ -89,7 +90,7 @@ wrongly; the cap was shown at purchase. A receipt is still issued.
 days ago. Open `/desk`, show the queue sorted by money at stake, open the case,
 **Approve as supervisor**.
 
-## 4:30–5:15 — The boundary
+## 4:30–5:15 - The boundary
 
 Open `/v1/mcp/tools`:
 
@@ -102,20 +103,20 @@ L3  propose_action
 
 **Say:** This is every tool an AI agent can call. There is no execute tool. The
 strongest thing a model can do is *propose*, and `propose_action` takes an
-action type but **no amount** — the amount comes from the decision record.
+action type but **no amount** - the amount comes from the decision record.
 Confirmation is minted outside the model.
 
 Open `/v1/ai/usage`: **0 tokens, 100% LLM-free.** The deck says Clarity works
 without the LLM; this is that running.
 
 If there is time, the other boundary: on the **Desk**, sign in as `agent-9`
-with *agent* only and try to approve Priya's LKR 12,000 case — refused, the
+with *agent* only and try to approve Priya's LKR 12,000 case - refused, the
 role does not carry high-value approval. Sign in as `sup-2`, *supervisor*,
-without ticking step-up — refused, it needs recent re-authentication. Tick it
+without ticking step-up - refused, it needs recent re-authentication. Tick it
 and it goes through, with the approval recorded against the signed-in name
 rather than anything the browser claimed.
 
-## 5:15–6:00 — Close
+## 5:15–6:00 - Close
 
 - 300+ tests, `ruff` and `mypy --strict` clean.
 - Four journeys end to end on mocked HUTCH systems.

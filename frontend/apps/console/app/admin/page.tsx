@@ -162,7 +162,7 @@ export default function AdminPage() {
         <Card className="space-y-3">
           <h2 className="font-medium">MCP / templates</h2>
           <p className="text-sm text-slate-600">
-            Placeholder inventory — not connected to live MCP clients.
+            Placeholder inventory - not connected to live MCP clients.
           </p>
           <ul className="space-y-1 text-sm text-slate-700">
             <li>· desk-copilot (designed)</li>

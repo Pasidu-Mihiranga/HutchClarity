@@ -4,7 +4,7 @@
 
 > Part of the **Hutch Clarity Enterprise Project Plan**. Labels: `[DECK Sx]` = stated in deck slide x · `[PROPOSED]` = expanded by this plan · **ASSUMPTION** / **REQUIRES HUTCH CONFIRMATION** / **PROPOSED TARGET – REQUIRES HUTCH VALIDATION**. See the [index](README.md) for the full legend.
 
-> **Plan v1.1 (2026-10-01).** Updated to match [17](17-build-blueprint.md), [18](18-tech-stack-and-ai.md) and [19](19-policy-change-management.md). Change record: [CHANGES.md](CHANGES.md).
+> **Plan v1.3 (2026-10-02).** Merged plan: updated to match [18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md) and [21](21-migration-and-deployment-plan.md). Change record: [CHANGES.md](CHANGES.md).
 
 ## 19. Security Architecture
 
@@ -15,7 +15,7 @@
 | Edge | CDN + WAF (OWASP CRS), bot management, rate limits per IP/MSISDN token/device, geo and velocity rules on OTP endpoints |
 | Customer identity | App token exchange or OTP via HUTCH OTP service. Short-lived signed JWT (≤ 15 min, **PROPOSED**), refresh bound to device. **Step-up OTP before any L2+ confirmation on WhatsApp/SMS** (**REQUIRES HUTCH CONFIRMATION** of identity policy). |
 | Staff identity | HUTCH SSO (OIDC/SAML) + MFA. Step-up MFA for approvals above threshold. Session timeout. Phishing-resistant MFA for admin roles (**PROPOSED**). |
-| RBAC/ABAC | Roles: agent, supervisor, finance-approver, cx-engineer, vas-ops, compliance, auditor, platform-admin, security-admin. The full permission matrix and separation-of-duties rules are in [17 §5.4](17-build-blueprint.md). ABAC attributes (team, region, amount) evaluated in OPA. Four-eyes for L4 and high-value L3. |
+| RBAC/ABAC | Roles: agent, supervisor, finance-approver, cx-engineer, vas-ops, compliance, auditor, platform-admin, security-admin. The full permission matrix and separation-of-duties rules are in [18 §5.4](18-build-blueprint.md); the prototype implements 10 roles and 19 permissions (`core/iam/principal.py`). ABAC attributes (team, region, amount) evaluated in OPA. Four-eyes for L4 and high-value L3. |
 | Service identity | Workload identities (SPIFFE/SPIRE or mesh-issued certs); **mTLS** everywhere; per-service DB users |
 | Data-level isolation | One PostgreSQL schema and DB role per module. **Row-level security** on customer-scoped tables keyed by `subscriber_ref` (set per request), so an application bug cannot return another subscriber's rows. |
 | Network segmentation | Zones per Diagram 8 / Diagram 28. K8s NetworkPolicies default-deny. Adapters in an integration namespace with egress allowlists. AI zone egress only to an approved hosted endpoint. |
@@ -48,8 +48,10 @@
 | TH13 | Malicious VAS merchant | Charging without consent | Customer harm | VAS_NO_CONSENT, merchant watch scoring, suspension workflow | Low |
 | TH14 | MCP tool poisoning / malicious external MCP client | Altered tool descriptions; registered client abusing scopes | Data exfiltration, misleading agents | Tool descriptions served only from the signed release; per-client registry, scopes, quotas and kill switch; denial-spike alerts | Low |
 | TH15 | Confused deputy via token passthrough | MCP forwarding a client token downstream | Privilege misuse | Passthrough forbidden; RFC 8693 token exchange with narrowed audience; subject binding | Very low |
-| TH16 | Data exposure through free-tier AI providers (prototype) | Real customer data sent to an unpaid tier that may use prompts for product improvement | PDPA breach | Synthetic data only in the prototype; masking enforced in the AI gateway; Groq ZDR; paid/enterprise tier or HUTCH models before real data | Very low |
-| TH17 | Unauthorized or faulty policy change | Insider edits a cap; wrong effective date; bad decision table | Over-refunding, unfair outcomes, regulatory breach | Maker-checker by change class, guardrail ceilings, mandatory replay impact report, signed bundles, scheduled activation, instant rollback, audit ([19](19-policy-change-management.md)) | Low |
+| TH16 | Data exposure through free-tier AI providers (prototype) | Real customer data sent to an unpaid tier that may use prompts for product improvement | PDPA breach | Synthetic data only; masking enforced in the AI gateway; Groq ZDR; paid/enterprise tier or HUTCH models before real data | Very low |
+| TH17 | Unauthorized or faulty policy change | Insider edits a cap; wrong effective date; bad decision table; a constant shadowing a policy value | Over-refunding, unfair outcomes, regulatory breach | Maker-checker by change class, guardrails, mandatory replay impact report, signed bundles, scheduled activation, instant rollback, audit ([20](20-policy-change-management.md)) | Low |
+| TH18 | Duplicate proof | Concurrent or repeated confirmation of one plan | Two signed receipts for one refund; confused customers and auditors | Receipt issued once per completed plan by an idempotent consumer of `action.completed`; replays return the original receipt ([21 §3](21-migration-and-deployment-plan.md)) | Low |
+| TH19 | Self-asserted staff identity outside the demo | A development sign-in reachable on a public deployment | Anyone approves refunds | Development issuers exist only in the synthetic profiles (`demo`, `full`) and return 404 in `prod`; production staff identity is federated SSO | Very low |
 
 ---
 
