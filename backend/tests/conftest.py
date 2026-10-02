@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from clarity.modules.detection.parameters import PolicyRuleParameters
 from clarity.modules.timeline.builder import TimelineBuilder, TimelineRequest
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.observability import configure_tracing
+from tests.support.no_network import no_live_calls
 
 PACKS_DIR = Path(__file__).resolve().parents[2] / "rules" / "packs"
 POLICY_DIR = Path(__file__).resolve().parents[2] / "config" / "policy"
@@ -171,3 +173,15 @@ def clarity_container():
 # JSON span for every operation in the suite. ``tests/unit/test_tracing.py``
 # attaches an in-memory exporter where spans are the thing under test.
 configure_tracing(exporter="none")
+
+
+@pytest.fixture(autouse=True)
+def _no_live_model_calls() -> Iterator[None]:
+    """Close the network for every test (A02).
+
+    Autouse and unconditional: a guard a test can forget to apply is not a
+    guard. Loopback stays open, because the suite drives the app and the full
+    lane's containers over it; anything leaving this machine raises.
+    """
+    with no_live_calls():
+        yield
