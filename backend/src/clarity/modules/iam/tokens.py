@@ -19,14 +19,24 @@ the user store.
 from __future__ import annotations
 
 import base64
+import hashlib
+import secrets
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Protocol, runtime_checkable
 
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from clarity.kernel.common import utc_now
+from clarity.platform.persistence import (
+    MemoryStore,
+    MemoryUnitOfWork,
+    Repository,
+    UnitOfWorkFactory,
+)
 from clarity.platform.security.principal import Assurance, Principal, Role
 
 #: Customer tokens are short: long enough to finish a journey, short enough
@@ -35,12 +45,16 @@ CUSTOMER_TOKEN_TTL = timedelta(minutes=10)
 
 #: Staff sessions last a shift; anything that moves money needs step-up anyway.
 STAFF_TOKEN_TTL = timedelta(hours=8)
+REFRESH_TOKEN_TTL = timedelta(days=30)
 
 #: How recently MFA must have happened to count as step-up.
 STEP_UP_WINDOW = timedelta(minutes=5)
 
 _ALGORITHM = "EdDSA"
 _ISSUER = "clarity"
+
+SESSIONS = "iam.sessions"
+REFRESH_TOKENS = "iam.refresh_tokens"
 
 
 class TokenInvalid(ValueError):
@@ -52,6 +66,13 @@ class TokenInvalid(ValueError):
 
     def __init__(self, detail: str = "the token is not valid") -> None:
         super().__init__(detail)
+
+
+@runtime_checkable
+class TokenVerifier(Protocol):
+    """Validate a bearer token and return its authenticated principal."""
+
+    def verify(self, token: str, *, now: datetime | None = None) -> Principal: ...
 
 
 def _strings(value: object) -> tuple[str, ...]:
@@ -71,6 +92,16 @@ class IssuedToken:
     value: str
     expires_at: datetime
     principal: Principal
+    refresh_token: str | None = None
+
+
+@dataclass
+class SessionRecord:
+    jti: str
+    principal: Principal
+    expires_at: datetime
+    refresh_expires_at: datetime
+    revoked: bool = False
 
 
 class TokenIssuer:
@@ -81,11 +112,26 @@ class TokenIssuer:
     as receipt signing does.
     """
 
-    def __init__(self, *, audience: str = "clarity-api", kid: str = "clarity-iam-dev") -> None:
+    def __init__(
+        self,
+        *,
+        audience: str = "clarity-api",
+        kid: str = "clarity-iam-dev",
+        open_unit: UnitOfWorkFactory | None = None,
+    ) -> None:
         self._private = Ed25519PrivateKey.generate()
         self._public = self._private.public_key()
         self._audience = audience
         self._kid = kid
+        if open_unit is None:
+            store = MemoryStore()
+
+            def open_memory_unit() -> MemoryUnitOfWork:
+                return MemoryUnitOfWork(store)
+
+            open_unit = open_memory_unit
+        self._open_unit = open_unit
+        self._lock = threading.Lock()
 
     # -- minting ---------------------------------------------------------- #
 
@@ -111,12 +157,9 @@ class TokenIssuer:
             "delegations": sorted(delegations or set()),
             "iat": int(moment.timestamp()),
             "exp": int(expires.timestamp()),
+            "jti": secrets.token_urlsafe(18),
         }
-        return IssuedToken(
-            value=self._encode(claims),
-            expires_at=expires,
-            principal=self._to_principal(claims),
-        )
+        return self._issue(claims, expires=expires, now=moment)
 
     def for_staff(
         self,
@@ -136,14 +179,34 @@ class TokenIssuer:
             "acr": assurance.value,
             "iat": int(moment.timestamp()),
             "exp": int(expires.timestamp()),
+            "jti": secrets.token_urlsafe(18),
             # When MFA happened, so step-up can be judged at request time
             # rather than trusting a claim that never ages.
             "auth_time": int(moment.timestamp()),
         }
+        return self._issue(claims, expires=expires, now=moment)
+
+    def _issue(self, claims: dict[str, object], *, expires: datetime, now: datetime) -> IssuedToken:
+        principal = self._to_principal(claims, now=now)
+        refresh = secrets.token_urlsafe(32)
+        refresh_hash = hashlib.sha256(refresh.encode("utf-8")).hexdigest()
+        record = SessionRecord(
+            jti=str(claims["jti"]),
+            principal=principal,
+            expires_at=expires,
+            refresh_expires_at=now + REFRESH_TOKEN_TTL,
+        )
+        with self._lock, self._open_unit() as unit:
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            refreshes: Repository[str, str] = unit.repository(REFRESH_TOKENS)
+            sessions.put(record.jti, record)
+            refreshes.put(refresh_hash, record.jti)
+            unit.commit()
         return IssuedToken(
             value=self._encode(claims),
             expires_at=expires,
-            principal=self._to_principal(claims, now=moment),
+            principal=principal,
+            refresh_token=refresh,
         )
 
     def _encode(self, claims: dict[str, object]) -> str:
@@ -170,7 +233,7 @@ class TokenIssuer:
                 algorithms=[_ALGORITHM],
                 audience=self._audience,
                 issuer=_ISSUER,
-                options={"require": ["exp", "iat", "sub", "aud", "iss"]},
+                options={"require": ["exp", "iat", "sub", "aud", "iss", "jti"]},
             )
         except jwt.InvalidTokenError as error:
             raise TokenInvalid from error
@@ -181,7 +244,63 @@ class TokenIssuer:
         if now is not None and int(claims["exp"]) <= int(now.timestamp()):
             raise TokenInvalid
 
+        with self._open_unit() as unit:
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            session = sessions.get(str(claims["jti"]))
+        if session is None or session.revoked:
+            raise TokenInvalid
+
         return self._to_principal(claims, now=now)
+
+    def revoke(self, token: str) -> None:
+        """Revoke one access token and its refresh token immediately."""
+        self.verify(token)
+        claims = jwt.decode(token, options={"verify_signature": False})
+        jti = str(claims["jti"])
+        with self._lock, self._open_unit() as unit:
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            record = sessions.get(jti)
+            if record is None:
+                raise TokenInvalid
+            record.revoked = True
+            sessions.put(jti, record)
+            unit.commit()
+
+    def refresh(self, refresh_token: str, *, now: datetime | None = None) -> IssuedToken:
+        """Rotate a refresh token and issue a new access session."""
+        moment = now or utc_now()
+        digest = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
+        with self._lock, self._open_unit() as unit:
+            refreshes: Repository[str, str] = unit.repository(REFRESH_TOKENS)
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            jti = refreshes.get(digest)
+            record = sessions.get(jti) if jti is not None else None
+            if record is None or record.revoked or moment >= record.refresh_expires_at:
+                raise TokenInvalid
+            record.revoked = True
+            sessions.put(record.jti, record)
+            refreshes.delete(digest)
+            unit.commit()
+
+        principal = record.principal
+        if Role.CUSTOMER in principal.roles:
+            assert principal.subscriber_ref is not None
+            return self.for_customer(
+                principal.subscriber_ref,
+                assurance=principal.assurance,
+                channel=principal.channel or "web",
+                delegations=set(principal.delegations),
+                now=moment,
+            )
+        assurance = (
+            Assurance.MFA if principal.assurance is Assurance.MFA_RECENT else principal.assurance
+        )
+        return self.for_staff(
+            principal.ref,
+            roles=set(principal.roles),
+            assurance=assurance,
+            now=moment,
+        )
 
     def _to_principal(self, claims: dict[str, object], *, now: datetime | None = None) -> Principal:
         roles = frozenset(

@@ -7,13 +7,13 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `otp.py`, `public.py`, `tokens.py` |
+| Files | `authorization.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py` |
 
 ## 1. Purpose
-Customer identity: OTP over a delivery port and short-lived EdDSA tokens whose subject is the `subscriber_ref` pseudonym; development staff issuer.
+Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization.
 
 ## 2. Public surface (`public.py`)
-Other code imports only these names: `OtpRefused`, `OtpService`, `SimulatedInbox`, `TokenInvalid`, `TokenIssuer`.
+Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers.
 
 ## 3. Used by
 `clarity.app`, `clarity.interfaces.http`
@@ -25,19 +25,21 @@ Other code imports only these names: `OtpRefused`, `OtpService`, `SimulatedInbox
 | `clarity.platform.security` | - |
 
 ## 5. Data owned
-In-memory structures in the `lite` profile. Target: one PostgreSQL schema `iam` with its own role (ADR-0013), same repository interfaces, same parity suite.
+Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, and `iam.refresh_tokens`. Lite uses the shared memory store; full uses the IAM PostgreSQL schema.
 
 ## 6. Invariants
 - The OTP code travels only through the delivery port; it is never returned by a request.
 - A token never contains the raw MSISDN.
 
 ## 7. Migration status (enterprise-plan 21)
-Own issuer (ADR-0010). R2: Keycloak for staff, admins and MCP clients; the customer issuer stays behind the same interface. Staff dev sign-in must be demo-only (D3).
+M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloak JWKS and delegate permissions to OPA. Refresh tokens rotate, access sessions revoke immediately, and OTP/rate-limit state is shared between replicas. Staff dev sign-in remains synthetic-profile only (D3).
 
 ## 8. Tests
 - `tests/unit/test_iam.py`
+- `tests/contract/test_authz_parity.py`
 
 ## 9. Change history
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.iam` with a public surface (R1) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-keycloak-opa-shared-state.md` | Keycloak, OPA, shared OTP and revocable sessions (M-IAM, #7) |

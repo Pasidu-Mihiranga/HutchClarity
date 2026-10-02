@@ -20,6 +20,15 @@ from datetime import datetime, timedelta
 from typing import Protocol, runtime_checkable
 
 from clarity.kernel.common import normalise_msisdn, utc_now
+from clarity.platform.persistence import (
+    MemoryStore,
+    MemoryUnitOfWork,
+    Repository,
+    UnitOfWorkFactory,
+)
+
+OTP_CHALLENGES = "iam.otp_challenges"
+OTP_REQUESTS = "iam.otp_requests"
 
 #: Short, because a code that lives long is a code worth stealing.
 OTP_TTL = timedelta(minutes=5)
@@ -81,7 +90,7 @@ class SimulatedInbox:
 
 
 @dataclass
-class _Challenge:
+class OtpChallenge:
     code: str
     msisdn: str
     expires_at: datetime
@@ -91,10 +100,21 @@ class _Challenge:
 class OtpService:
     """Issues and verifies one-time codes."""
 
-    def __init__(self, delivery: OtpDelivery | None = None) -> None:
+    def __init__(
+        self,
+        delivery: OtpDelivery | None = None,
+        *,
+        open_unit: UnitOfWorkFactory | None = None,
+    ) -> None:
         self._delivery = delivery or SimulatedInbox()
-        self._challenges: dict[str, _Challenge] = {}
-        self._requests: dict[str, list[datetime]] = {}
+        if open_unit is None:
+            store = MemoryStore()
+
+            def open_memory_unit() -> MemoryUnitOfWork:
+                return MemoryUnitOfWork(store)
+
+            open_unit = open_memory_unit
+        self._open_unit = open_unit
         self._lock = threading.Lock()
 
     @property
@@ -110,20 +130,26 @@ class OtpService:
         normalised = normalise_msisdn(msisdn)
         moment = now or utc_now()
 
-        with self._lock:
-            recent = [
-                at for at in self._requests.get(normalised, []) if moment - at < REQUEST_WINDOW
-            ]
+        with self._lock, self._open_unit() as unit:
+            requests: Repository[str, list[datetime]] = unit.repository(OTP_REQUESTS)
+            challenges: Repository[str, OtpChallenge] = unit.repository(OTP_CHALLENGES)
+            recent = [at for at in (requests.get(normalised) or []) if moment - at < REQUEST_WINDOW]
             if len(recent) >= MAX_REQUESTS_PER_WINDOW:
                 raise OtpRefused("OTP_RATE_LIMITED")
             recent.append(moment)
-            self._requests[normalised] = recent
+            requests.put(normalised, recent)
 
             challenge_id = secrets.token_urlsafe(16)
             code = f"{secrets.randbelow(1_000_000):06d}"
-            self._challenges[challenge_id] = _Challenge(
-                code=code, msisdn=normalised, expires_at=moment + OTP_TTL
+            challenges.put(
+                challenge_id,
+                OtpChallenge(
+                    code=code,
+                    msisdn=normalised,
+                    expires_at=moment + OTP_TTL,
+                ),
             )
+            unit.commit()
 
         self._delivery.send(normalised, code)
         return challenge_id
@@ -132,27 +158,35 @@ class OtpService:
         """Check a code and return the number it proves. Single use."""
         moment = now or utc_now()
 
-        with self._lock:
-            challenge = self._challenges.get(challenge_id)
+        with self._lock, self._open_unit() as unit:
+            challenges: Repository[str, OtpChallenge] = unit.repository(OTP_CHALLENGES)
+            challenge = challenges.get(challenge_id)
             if challenge is None:
                 raise OtpRefused
             if moment >= challenge.expires_at:
-                del self._challenges[challenge_id]
+                challenges.delete(challenge_id)
+                unit.commit()
                 raise OtpRefused
 
             challenge.attempts += 1
             if challenge.attempts > MAX_ATTEMPTS:
-                del self._challenges[challenge_id]
+                challenges.delete(challenge_id)
+                unit.commit()
                 raise OtpRefused("OTP_TOO_MANY_ATTEMPTS")
 
-            # Constant-time, so response timing does not leak how much of the
-            # code was right.
+            # Constant-time, so response timing does not leak how much of
+            # the code was right.
             if not hmac.compare_digest(challenge.code, code.strip()):
+                challenges.put(challenge_id, challenge)
+                unit.commit()
                 raise OtpRefused
 
-            del self._challenges[challenge_id]  # single use
+            challenges.delete(challenge_id)  # single use
+            unit.commit()
             return challenge.msisdn
 
     @property
     def outstanding(self) -> int:
-        return len(self._challenges)
+        with self._open_unit() as unit:
+            challenges: Repository[str, OtpChallenge] = unit.repository(OTP_CHALLENGES)
+            return len(challenges.keys())

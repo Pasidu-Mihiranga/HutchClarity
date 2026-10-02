@@ -1,0 +1,37 @@
+{
+  "realm": "clarity",
+  "enabled": true,
+  "displayName": "Hutch Clarity simulated development realm",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {"name": "agent"},
+      {"name": "supervisor"},
+      {"name": "finance"},
+      {"name": "vas_ops"},
+      {"name": "cx_engineer"},
+      {"name": "compliance"},
+      {"name": "auditor"},
+      {"name": "platform_admin"},
+      {"name": "security_admin"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "clarity-api",
+      "name": "Clarity API audience",
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "clarity-mcp",
+      "name": "Clarity MCP simulated client registry",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect"
+    }
+  ]
+}

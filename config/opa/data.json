@@ -1,0 +1,101 @@
+{
+  "clarity": {
+    "admin_roles": ["platform_admin", "security_admin"],
+    "money_permissions": [
+      "action:approve",
+      "action:approve:high_value",
+      "action:confirm:own"
+    ],
+    "step_up_permissions": [
+      "action:approve:high_value",
+      "admin:manage",
+      "config:approve",
+      "merchant:suspend",
+      "rule:publish"
+    ],
+    "role_permissions": {
+      "customer": [
+        "action:confirm:own",
+        "action:propose",
+        "case:evaluate",
+        "case:read",
+        "receipt:read",
+        "self:read",
+        "self:settings",
+        "self:transact"
+      ],
+      "agent": [
+        "action:approve",
+        "action:propose",
+        "case:evaluate",
+        "case:read",
+        "case:read:any",
+        "desk:queue:read",
+        "receipt:read",
+        "receipt:read:any"
+      ],
+      "supervisor": [
+        "action:approve",
+        "action:approve:high_value",
+        "action:propose",
+        "case:evaluate",
+        "case:read",
+        "case:read:any",
+        "desk:queue:read",
+        "flags:kill_switch",
+        "receipt:read",
+        "receipt:read:any"
+      ],
+      "finance": [
+        "action:approve",
+        "action:approve:high_value",
+        "case:read",
+        "case:read:any",
+        "config:approve",
+        "desk:queue:read",
+        "reconciliation:read",
+        "receipt:read",
+        "receipt:read:any"
+      ],
+      "vas_ops": [
+        "action:propose",
+        "case:read",
+        "case:read:any",
+        "desk:queue:read",
+        "merchant:suspend",
+        "receipt:read",
+        "receipt:read:any"
+      ],
+      "cx_engineer": [
+        "case:evaluate",
+        "case:read",
+        "case:read:any",
+        "config:draft",
+        "desk:queue:read",
+        "receipt:read",
+        "receipt:read:any",
+        "rule:draft"
+      ],
+      "compliance": [
+        "audit:read",
+        "case:read",
+        "case:read:any",
+        "desk:queue:read",
+        "merchant:suspend",
+        "receipt:read",
+        "receipt:read:any",
+        "regulator_pack:export",
+        "rule:publish"
+      ],
+      "auditor": [
+        "audit:read",
+        "case:read",
+        "case:read:any",
+        "receipt:read",
+        "receipt:read:any"
+      ],
+      "platform_admin": ["admin:manage", "audit:read", "flags:kill_switch"],
+      "security_admin": ["admin:manage", "audit:read"]
+    }
+  }
+}

@@ -8,13 +8,17 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import httpx
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
 from fastapi.testclient import TestClient
 
 from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
 from clarity.kernel.common import utc_now
+from clarity.modules.iam.keycloak import KeycloakTokenVerifier
 from clarity.modules.iam.otp import (
     MAX_ATTEMPTS,
     MAX_REQUESTS_PER_WINDOW,
@@ -28,6 +32,7 @@ from clarity.modules.iam.tokens import (
     TokenInvalid,
     TokenIssuer,
 )
+from clarity.platform.persistence import MemoryStore, MemoryUnitOfWork
 from clarity.platform.security.principal import (
     MONEY_PERMISSIONS,
     Assurance,
@@ -146,6 +151,26 @@ def test_the_demo_inbox_is_labelled_as_simulated():
     assert inbox.latest_for(DILANI)["simulated"] == "yes"
 
 
+def test_two_otp_replicas_share_challenges_and_rate_limits():
+    store = MemoryStore()
+
+    def open_unit() -> MemoryUnitOfWork:
+        return MemoryUnitOfWork(store)
+
+    inbox = SimulatedInbox()
+    first = OtpService(inbox, open_unit=open_unit)
+    second = OtpService(inbox, open_unit=open_unit)
+    challenge = first.request(DILANI)
+    code = inbox.latest_for(DILANI)["code"]
+
+    assert second.verify(challenge, code) == DILANI
+
+    for _ in range(MAX_REQUESTS_PER_WINDOW):
+        first.request(PRIYA)
+    with pytest.raises(OtpRefused, match="that code is not valid"):
+        second.request(PRIYA)
+
+
 # --------------------------------------------------------------------------- #
 # Tokens
 # --------------------------------------------------------------------------- #
@@ -236,6 +261,57 @@ def test_the_public_key_is_publishable(issuer: TokenIssuer):
 
     assert jwk["kty"] == "OKP" and jwk["crv"] == "Ed25519"
     assert "d" not in jwk, "a private key component must never be published"
+
+
+def test_refresh_rotates_and_reuse_is_refused(issuer: TokenIssuer):
+    issued = issuer.for_staff("staff-1", roles={Role.AGENT})
+    assert issued.refresh_token is not None
+
+    rotated = issuer.refresh(issued.refresh_token)
+
+    assert issuer.verify(rotated.value).ref == "staff-1"
+    with pytest.raises(TokenInvalid):
+        issuer.refresh(issued.refresh_token)
+    with pytest.raises(TokenInvalid):
+        issuer.verify(issued.value)
+
+
+def test_keycloak_verifier_maps_signed_realm_roles():
+    now = utc_now()
+    private = generate_private_key(public_exponent=65537, key_size=2048)
+    public_jwk = jwt.algorithms.RSAAlgorithm.to_jwk(private.public_key(), as_dict=True)
+    public_jwk["kid"] = "kc-1"
+    public_jwk["alg"] = "RS256"
+
+    def keycloak(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/protocol/openid-connect/certs")
+        return httpx.Response(200, json={"keys": [public_jwk]})
+
+    token = jwt.encode(
+        {
+            "iss": "https://id.example/realms/clarity",
+            "aud": "clarity-api",
+            "sub": "staff-42",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
+            "auth_time": int(now.timestamp()),
+            "acr": "mfa-recent",
+            "realm_access": {"roles": ["supervisor", "unknown-role"]},
+        },
+        private,
+        algorithm="RS256",
+        headers={"kid": "kc-1"},
+    )
+    verifier = KeycloakTokenVerifier(
+        "https://id.example/realms/clarity",
+        "clarity-api",
+        client=httpx.Client(transport=httpx.MockTransport(keycloak)),
+    )
+
+    principal = verifier.verify(token, now=now)
+
+    assert principal.roles == frozenset({Role.SUPERVISOR})
+    assert principal.assurance is Assurance.MFA_RECENT
 
 
 # --------------------------------------------------------------------------- #
@@ -344,6 +420,16 @@ def test_every_protected_route_refuses_an_anonymous_caller(client, method, path)
 
 def test_a_garbage_token_is_refused(client: TestClient):
     assert client.get("/v1/desk/queue", headers=auth("not-a-token")).status_code == 401
+
+
+def test_a_revoked_staff_token_is_refused_with_401():
+    clarity = Clarity(world=build_demo_world())
+    client = TestClient(create_app(clarity))
+    token = staff_token(client, ["agent"])
+
+    clarity.tokens.revoke(token)
+
+    assert client.get("/v1/desk/queue", headers=auth(token)).status_code == 401
 
 
 def test_one_customer_cannot_read_another_customers_case(client: TestClient):

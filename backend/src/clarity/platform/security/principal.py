@@ -60,6 +60,7 @@ class Permission(StrEnum):
     RECEIPT_READ = "receipt:read"
     RECEIPT_READ_ANY = "receipt:read:any"
     DESK_QUEUE_READ = "desk:queue:read"
+    RECONCILIATION_READ = "reconciliation:read"
     RULE_DRAFT = "rule:draft"
     RULE_PUBLISH = "rule:publish"
     CONFIG_DRAFT = "config:draft"
@@ -149,6 +150,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.RECEIPT_READ_ANY,
             Permission.DESK_QUEUE_READ,
             Permission.CONFIG_APPROVE,
+            Permission.RECONCILIATION_READ,
         }
     ),
     Role.VAS_OPS: frozenset(

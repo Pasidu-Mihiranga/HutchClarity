@@ -21,7 +21,12 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from clarity.modules.iam.public import TokenInvalid, TokenIssuer
+from clarity.modules.iam.public import (
+    AuthorizationPolicy,
+    PythonAuthorizationPolicy,
+    TokenInvalid,
+    TokenVerifier,
+)
 
 #: Permissions that require recent re-authentication.
 from clarity.platform.security.principal import (
@@ -51,12 +56,12 @@ def principal_from(request: Request, authorization: str | None) -> Principal:
     if not authorization or not authorization.lower().startswith("bearer "):
         return ANONYMOUS
 
-    issuer: TokenIssuer | None = getattr(request.app.state, "token_issuer", None)
-    if issuer is None:  # pragma: no cover - the app always wires one
+    verifier: TokenVerifier | None = getattr(request.app.state, "token_verifier", None)
+    if verifier is None:  # pragma: no cover - the app always wires one
         return ANONYMOUS
 
     try:
-        return issuer.verify(authorization.split(" ", 1)[1].strip())
+        return verifier.verify(authorization.split(" ", 1)[1].strip())
     except TokenInvalid as error:
         raise _unauthenticated() from error
 
@@ -81,14 +86,21 @@ def requires(permission: Permission) -> Callable[..., Awaitable[Principal]]:
         @app.get("/v1/desk/queue", dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))])
     """
 
-    async def dependency(principal: CurrentPrincipal) -> Principal:
+    async def dependency(request: Request, principal: CurrentPrincipal) -> Principal:
         if principal is ANONYMOUS or not principal.roles:
             raise _unauthenticated()
-        if not principal.has(permission):
-            raise _forbidden(f"this account may not {permission.value}")
-        if permission in STEP_UP_PERMISSIONS and not principal.assurance.is_step_up:
+        policy: AuthorizationPolicy = getattr(
+            request.app.state, "authorization_policy", PythonAuthorizationPolicy()
+        )
+        if policy.allows(principal, permission):
+            return principal
+        if (
+            permission in STEP_UP_PERMISSIONS
+            and principal.has(permission)
+            and not principal.assurance.is_step_up
+        ):
             raise _forbidden(f"{permission.value} needs recent re-authentication (step-up)")
-        return principal
+        raise _forbidden(f"this account may not {permission.value}")
 
     return dependency
 
