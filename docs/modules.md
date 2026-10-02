@@ -25,6 +25,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | receipts | L4 | `backend/src/clarity/modules/receipts/` | [MODULE.md](../backend/src/clarity/modules/receipts/MODULE.md) | migrated | OpenBao signer driver and isolated render job (M-RCPT) |
 | reconciliation | L4 | `backend/src/clarity/modules/reconciliation/` | [MODULE.md](../backend/src/clarity/modules/reconciliation/MODULE.md) | built | Production worker schedule (M-REC) |
 | notifications | L4 | `backend/src/clarity/modules/notifications/` | [MODULE.md](../backend/src/clarity/modules/notifications/MODULE.md) | built | Channel gateway providers and callbacks (N02) |
+| proactive | L4 | `backend/src/clarity/modules/proactive/` | [MODULE.md](../backend/src/clarity/modules/proactive/MODULE.md) | built | Extract into `clarity-stream` when scaling requires it |
 | timeline | L4 | `backend/src/clarity/modules/timeline/` | [MODULE.md](../backend/src/clarity/modules/timeline/MODULE.md) | migrated | HUTCH sandbox mappings require confirmation |
 | conversation | L4 | `backend/src/clarity/modules/conversation/` | [MODULE.md](../backend/src/clarity/modules/conversation/MODULE.md) | built by the team (keyword intake, no LLM) | Intents as policy content; optional `extract` role (R4) |
 | autopsy | L4 | `backend/src/clarity/modules/autopsy/` | [MODULE.md](../backend/src/clarity/modules/autopsy/MODULE.md) | built | Serverless batch job (R6/R7) |
@@ -44,7 +45,6 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | clarity-signer | service | `services/signer/` | R4 |
 | clarity-ai-gateway | service | `services/ai-gateway/` | R4 |
 | clarity-channel-gateway (WhatsApp, SMS/USSD) | service | `services/channel-gateway/` | R4 |
-| proactive (stream detectors) | module | `backend/src/clarity/modules/proactive/` | R6 |
 | knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 |
 | insights | module | `backend/src/clarity/modules/insights/` | R6 |
 | desk-ops (bulk fix, merchant watch, regulator pack) | module | `backend/src/clarity/modules/deskops/` | R6 |

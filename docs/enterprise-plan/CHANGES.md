@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.10 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| R6 capabilities | Recorded P01 complete: payment, usage and pack stream facts produce policy-backed, idempotent risk events; duplicate reloads enter the existing zero-contact resolution flow | 21 §7 |
+
 ## v1.9 - 2026-10-02
 
 | Area | Change | Chapters |

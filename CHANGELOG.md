@@ -4,6 +4,17 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (P01, #41)
+
+- Proactive consumers for `payment.recorded@v1`,
+  `usage.threshold_reached@v1` and `pack.expiring@v1`.
+- Policy-backed duplicate-reload, FUP threshold and pack-end detectors publish
+  idempotent `risk.detected@v1` facts through the transactional outbox.
+- Duplicate reload risks enter the existing resolution path and complete one
+  AUTO_FIX action and receipt without human input.
+- Nested event delivery is guarded so an active queue head cannot be consumed
+  recursively while its handler creates follow-on facts.
+
 ### Added (N01, #39)
 
 - Notifications consume `receipt.issued@v1`, `risk.detected@v1` and

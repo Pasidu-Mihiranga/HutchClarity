@@ -265,7 +265,7 @@ Linked to the 42 open issues in the repo. Check off each item as it is merged. I
 
 - [x] #29 `[H01]` hutch-sim as an HTTP service with HTTP drivers `p1`
 - [x] #39 `[N01]` Notifications module: templates, preferences, consent, dispatch, delivery status `p1`
-- [ ] #41 `[P01]` Proactive module: stream detectors and risk.detected `p1`
+- [x] #41 `[P01]` Proactive module: stream detectors and risk.detected `p1`
 - [ ] #13 `[AU01]` Autopsy: event-fed, embeddings via the embed role, review workflow `p2`
 - [ ] #26 `[D01]` Desk operations: bulk fix with four-eyes, merchant watch, regulator pack, shift handover `p2`
 - [ ] #30 `[I01]` Insights: projections and console dashboards `p2`

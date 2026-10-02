@@ -17,6 +17,7 @@ from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
+from clarity.modules.proactive.public import RISKS, SIGNALS
 from clarity.modules.receipts.public import (
     BY_PLAN,
     RECEIPT_SEQUENCE,
@@ -57,6 +58,9 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # notifications
     NOTIFICATIONS,
     PREFERENCES,
+    # proactive
+    SIGNALS,
+    RISKS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,

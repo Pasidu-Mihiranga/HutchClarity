@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 from sqlalchemy import create_engine
@@ -18,10 +19,14 @@ from sqlalchemy import create_engine
 from clarity.ai.gateway import AIGateway, ModelProvider
 from clarity.app.mcp_view import ResolutionServiceMCPView
 from clarity.app.settings import Settings, SettingsInvalid
+from clarity.contracts.case import CaseTrigger
+from clarity.contracts.decision import Outcome
+from clarity.contracts.events import RiskDetectedV1
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
 from clarity.integration.ports import DriverMode
 from clarity.integration.registry import AdapterRegistry
+from clarity.kernel.common import Channel, Language
 from clarity.modules.actions.capability import (
     PLANS,
     RefundBudget,
@@ -58,6 +63,8 @@ from clarity.modules.notifications.public import (
     MemoryNotificationDispatcher,
     NotificationService,
 )
+from clarity.modules.proactive.public import CONSUMED_EVENTS as PROACTIVE_EVENTS
+from clarity.modules.proactive.public import ProactiveService
 from clarity.modules.receipts.public import (
     BY_PLAN,
     RECEIPT_SEQUENCE,
@@ -78,7 +85,7 @@ from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard
 from clarity.platform.messaging.consumers import CollectingAlertHook, ConsumerRegistry
 from clarity.platform.messaging.drivers.in_process import InProcessEventBus
-from clarity.platform.messaging.envelope import EventType
+from clarity.platform.messaging.envelope import Event, EventType
 from clarity.platform.messaging.relay import Relay
 from clarity.platform.observability import configure_logging, configure_tracing
 from clarity.platform.persistence import (
@@ -371,6 +378,8 @@ class Clarity:
         # and dead-lettering (B03, B04).
         self.bus = InProcessEventBus()
         self.relay = Relay(open_unit=self.open_unit, bus=self.bus)
+        self._delivery_lock = RLock()
+        self._delivering_events = False
         self.dead_letters = CollectingAlertHook()
         self.consumers = ConsumerRegistry(
             open_unit=self.open_unit,
@@ -383,6 +392,7 @@ class Clarity:
             dispatcher=self.notification_dispatcher,
             clock=lambda: clock or DEMO_NOW,
         )
+        self.proactive = ProactiveService(open_unit=self.open_unit, policies=self.policies)
         # The aggregate owns the case; the resolution service orchestrates
         # (M-CASE, plan 21 section 2.2).
         self.case_aggregate = CaseAggregate(
@@ -437,9 +447,71 @@ class Clarity:
                 group="notifications",
                 handler=self.notifications.consume_event,
             )
+        for event_type in PROACTIVE_EVENTS:
+            self.consumers.register(
+                event_type,
+                group="proactive",
+                handler=self.proactive.consume_event,
+            )
+        self.consumers.register(
+            EventType.RISK_DETECTED,
+            group="proactive-cases",
+            handler=self._open_zero_contact_case,
+        )
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts)
+
+    def _open_zero_contact_case(self, event: Event) -> None:
+        payload = event.payload()
+        if not isinstance(payload, RiskDetectedV1) or payload.risk_type != "duplicate_reload":
+            return
+        if not payload.evidence_refs:
+            return
+        charge_ref = payload.evidence_refs[-1]
+        account = self.world.account(event.subject)
+        existing = next(
+            (
+                record
+                for record in self.cases.all_cases()
+                if record.subscriber_ref == event.subject
+                and record.case.trigger is CaseTrigger.STREAM
+                and record.case.charge_ref == charge_ref
+            ),
+            None,
+        )
+        case = (
+            existing.case
+            if existing is not None
+            else self.cases.open_case(
+                subscriber_ref=event.subject,
+                msisdn_masked=account.masked if account is not None else "07X XXX XXXX",
+                channel=Channel.SYSTEM,
+                trigger=CaseTrigger.STREAM,
+                language=account.language if account is not None else Language.EN,
+                charge_ref=charge_ref,
+            )
+        )
+        decision = self.cases.evaluate(case.case_id)
+        if decision.outcome is not Outcome.AUTO_FIX:
+            return
+        record = self.cases.get(case.case_id)
+        if not record.plans:
+            self.cases.propose(case.case_id, created_by="clarity-stream-detector")
+
+    def _complete_zero_contact_cases(self) -> None:
+        """Execute persisted stream plans after their triggering event is consumed."""
+        for record in self.cases.all_cases():
+            if (
+                record.case.trigger is not CaseTrigger.STREAM
+                or record.decision is None
+                or record.decision.outcome is not Outcome.AUTO_FIX
+                or record.execution is not None
+                or not record.plans
+            ):
+                continue
+            plan = next(iter(record.plans.values()))
+            self.cases.auto_fix(record.case_id, plan.plan_id)
 
     def deliver_events(self) -> None:
         """Publish whatever the last unit of work committed, then consume it.
@@ -451,13 +523,26 @@ class Clarity:
         """
         # A consumer may atomically write a follow-on event, such as
         # receipt.issued after action.completed. Keep draining until no newly
-        # committed outbox row remains, without recursively draining inside a
-        # handler.
-        while True:
-            report = self.relay.run_once()
-            self.bus.drain()
-            if report.published == 0:
+        # committed outbox row remains. Domain operations called by a handler
+        # also request delivery, so the guard leaves their rows for this active
+        # loop instead of consuming the queue head recursively.
+        with self._delivery_lock:
+            if self._delivering_events:
                 return
+            self._delivering_events = True
+            try:
+                while True:
+                    report = self.relay.run_once()
+                    self.bus.drain()
+                    if report.published == 0:
+                        break
+            finally:
+                self._delivering_events = False
+        # The stream handler persists the case and plan, then returns so the
+        # risk event can leave its partition. Executing here lets the normal
+        # action.completed consumer issue the receipt without re-entering the
+        # still-active risk handler. Persisted plans also survive a restart.
+        self._complete_zero_contact_cases()
 
     def reset(self) -> Clarity:
         """Build a fresh instance with the same configuration.

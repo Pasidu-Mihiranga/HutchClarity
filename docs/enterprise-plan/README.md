@@ -7,7 +7,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | Item | Value |
 |---|---|
 | Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
-| Version / date | **v1.9** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
+| Version / date | **v1.10** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
 | Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
 | Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
@@ -82,6 +82,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.7 | 2026-10-02 | Wave 1 core migration: policy-backed rule parameters, active rule catalogue status and the corrected module interaction map. |
 | v1.8 | 2026-10-02 | R4 started: H01 extracted the simulated HUTCH estate behind parity-tested HTTP drivers. |
 | v1.9 | 2026-10-02 | R6 started: N01 added event-driven, template-only notification routing and delivery tracking. |
+| v1.10 | 2026-10-02 | R6 continued: P01 added policy-backed stream detectors and zero-contact duplicate-reload resolution. |
 
 ### v1.1 audit: gaps found and added
 
