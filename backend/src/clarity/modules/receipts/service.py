@@ -24,6 +24,7 @@ from datetime import datetime
 
 from clarity.contracts.case import Case
 from clarity.contracts.decision import ActionStatus, ActionType, CauseAssessment, Decision
+from clarity.contracts.events import ReceiptIssuedV1
 from clarity.contracts.receipt import (
     ActorType,
     ReceiptAction,
@@ -45,8 +46,19 @@ from clarity.kernel.common import Language, utc_now
 from clarity.kernel.ids import receipt_id as make_receipt_id
 from clarity.modules.actions.public import ConfirmedBy, ExecutionResult
 from clarity.modules.receipts.recurrence import CHECK_FOR_ACTION, RecurrenceProbe, run_check
-from clarity.modules.receipts.repository import ReceiptRepository
+from clarity.modules.receipts.repository import (
+    BY_PLAN,
+    RECEIPT_SEQUENCE,
+    RECEIPTS,
+    SUBSCRIBERS,
+    SUPERSEDED,
+    ReceiptRepository,
+    StoredReceiptRepository,
+)
 from clarity.modules.receipts.signing import SigningService, UnknownKeyId, verify_signature
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
+from clarity.platform.persistence import UnitOfWork, UnitOfWorkFactory
 
 #: Where the public verification page lives. Configured per environment;
 #: the host is a placeholder until HUTCH confirms the domain.
@@ -86,6 +98,7 @@ class ReceiptService:
         probe: RecurrenceProbe | None = None,
         verify_base: str = DEFAULT_VERIFY_BASE,
         persist: bool = False,
+        open_unit: UnitOfWorkFactory | None = None,
     ) -> None:
         self._signing = signing
         self._probe = probe
@@ -94,6 +107,7 @@ class ReceiptService:
         self._ledger = ledger
         self._lock = threading.Lock()
         self._persist = persist
+        self._open_unit = open_unit
         if persist:
             self._hydrate()
 
@@ -157,68 +171,147 @@ class ReceiptService:
         )
 
         with self._lock:
-            # Inside the lock, so two deliveries of one action.completed cannot
-            # both pass the check and chain two receipts for the same plan.
-            if plan_id is not None:
-                existing = self._ledger.receipt_id_for_plan(plan_id)
-                if existing is not None:
-                    already = self._ledger.get(existing)
-                    if already is not None:
-                        return already
-
-            sequence = self._ledger.next_receipt_number()
-            payload = ReceiptPayload(
-                receipt_id=make_receipt_id(sequence, year=issued_at.year),
-                case_id=case.case_id,
-                issued_at=issued_at,
-                subject=ReceiptSubject(
-                    msisdn_masked=case.customer.msisdn_masked,
-                    subscriber_ref_hash=hash_payload(subscriber_ref),
-                ),
-                what_happened=ReceiptCause(
-                    cause_rule=cause.rule_id if cause else "NO_CAUSE_DETERMINED",
-                    rule_version=cause.rule_version if cause else 0,
+            if self._open_unit is None:
+                receipt, created = self._issue_in(
+                    self._ledger,
+                    case=case,
+                    decision=decision,
+                    cause=cause,
+                    snapshot=snapshot,
+                    execution=execution,
                     summary=summary,
-                ),
-                evidence=self._receipt_evidence(cause, snapshot),
-                decision=ReceiptDecision(
-                    decision_id=decision.decision_id,
-                    outcome=decision.outcome,
-                    policy_version=decision.policy_version,
-                    input_hash=decision.input_hash,
-                ),
-                actions=actions,
-                safeguard=safeguard,
-                recurrence_test=recurrence,
-                actor=self._actor(execution),
-                languages=[Language.SI, Language.TA, Language.EN],
-                supersedes=supersedes,
-                prev_receipt_hash=self._chain_head(),
-            )
+                    subscriber_ref=subscriber_ref,
+                    issued_at=issued_at,
+                    actions=actions,
+                    safeguard=safeguard,
+                    recurrence=recurrence,
+                    supersedes=supersedes,
+                    plan_id=plan_id,
+                )
+            else:
+                with self._open_unit() as unit:
+                    receipt, created = self._issue_in(
+                        self._ledger_in(unit),
+                        case=case,
+                        decision=decision,
+                        cause=cause,
+                        snapshot=snapshot,
+                        execution=execution,
+                        summary=summary,
+                        subscriber_ref=subscriber_ref,
+                        issued_at=issued_at,
+                        actions=actions,
+                        safeguard=safeguard,
+                        recurrence=recurrence,
+                        supersedes=supersedes,
+                        plan_id=plan_id,
+                    )
+                    if created:
+                        outbox_in(unit).append(
+                            Event.of(
+                                ReceiptIssuedV1(
+                                    case_id=case.case_id,
+                                    receipt_id=receipt.receipt_id,
+                                    plan_id=plan_id,
+                                    payload_hash=receipt.payload_hash,
+                                    key_id=receipt.signature.kid,
+                                ),
+                                subject=subscriber_ref,
+                            )
+                        )
+                    unit.commit()
 
-            payload_hash = payload.compute_hash()
-            kid, signature = self._signing.sign(payload_hash)
-            receipt = TrustReceipt(
-                payload=payload,
-                payload_hash=payload_hash,
-                signature=ReceiptSignature(kid=kid, value=signature),
-                verify_url=f"{self._verify_base}/{payload.receipt_id}",
-            )
-
-            self._ledger.append(receipt, subscriber_ref=subscriber_ref)
-            if plan_id is not None:
-                self._ledger.link_plan(plan_id, receipt_id=receipt.receipt_id)
-            if supersedes:
-                self._ledger.mark_superseded(supersedes, by_receipt_id=receipt.receipt_id)
-            if self._persist:
+            if created and self._persist:
                 from clarity.integration.drivers.mock.store import save_receipt, session_scope
 
                 with session_scope() as session:
                     save_receipt(session, receipt, subscriber_ref=subscriber_ref)
             return receipt
 
-    def _chain_head(self) -> str | None:
-        chain = self._ledger.in_order()
+    def _issue_in(
+        self,
+        ledger: ReceiptRepository,
+        *,
+        case: Case,
+        decision: Decision,
+        cause: CauseAssessment | None,
+        snapshot: EvidenceSnapshot,
+        execution: ExecutionResult | None,
+        summary: str,
+        subscriber_ref: str,
+        issued_at: datetime,
+        actions: list[ReceiptAction],
+        safeguard: ReceiptSafeguard | None,
+        recurrence: ReceiptRecurrenceTest | None,
+        supersedes: str | None,
+        plan_id: str | None,
+    ) -> tuple[TrustReceipt, bool]:
+        """Build and stage one receipt in the supplied repository."""
+        if plan_id is not None:
+            existing = ledger.receipt_id_for_plan(plan_id)
+            if existing is not None:
+                already = ledger.get(existing)
+                if already is not None:
+                    return already, False
+
+        sequence = ledger.next_receipt_number()
+        payload = ReceiptPayload(
+            receipt_id=make_receipt_id(sequence, year=issued_at.year),
+            case_id=case.case_id,
+            issued_at=issued_at,
+            subject=ReceiptSubject(
+                msisdn_masked=case.customer.msisdn_masked,
+                subscriber_ref_hash=hash_payload(subscriber_ref),
+            ),
+            what_happened=ReceiptCause(
+                cause_rule=cause.rule_id if cause else "NO_CAUSE_DETERMINED",
+                rule_version=cause.rule_version if cause else 0,
+                summary=summary,
+            ),
+            evidence=self._receipt_evidence(cause, snapshot),
+            decision=ReceiptDecision(
+                decision_id=decision.decision_id,
+                outcome=decision.outcome,
+                policy_version=decision.policy_version,
+                input_hash=decision.input_hash,
+            ),
+            actions=actions,
+            safeguard=safeguard,
+            recurrence_test=recurrence,
+            actor=self._actor(execution),
+            languages=[Language.SI, Language.TA, Language.EN],
+            supersedes=supersedes,
+            prev_receipt_hash=self._chain_head(ledger),
+        )
+
+        payload_hash = payload.compute_hash()
+        kid, signature = self._signing.sign(payload_hash)
+        receipt = TrustReceipt(
+            payload=payload,
+            payload_hash=payload_hash,
+            signature=ReceiptSignature(kid=kid, value=signature),
+            verify_url=f"{self._verify_base}/{payload.receipt_id}",
+        )
+        ledger.append(receipt, subscriber_ref=subscriber_ref)
+        if plan_id is not None:
+            ledger.link_plan(plan_id, receipt_id=receipt.receipt_id)
+        if supersedes:
+            ledger.mark_superseded(supersedes, by_receipt_id=receipt.receipt_id)
+        return receipt, True
+
+    @staticmethod
+    def _ledger_in(unit: UnitOfWork) -> StoredReceiptRepository:
+        return StoredReceiptRepository(
+            unit.repository(RECEIPTS),
+            unit.repository(SUPERSEDED),
+            unit.repository(SUBSCRIBERS),
+            unit.repository(RECEIPT_SEQUENCE),
+            unit.repository(BY_PLAN),
+        )
+
+    @staticmethod
+    def _chain_head(ledger: ReceiptRepository) -> str | None:
+        chain = ledger.in_order()
         return chain[-1].payload_hash if chain else None
 
     @staticmethod

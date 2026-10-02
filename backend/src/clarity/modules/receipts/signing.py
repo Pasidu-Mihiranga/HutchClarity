@@ -94,6 +94,15 @@ class DevSigningService:
             for kid, key in self._public.items()
         }
 
+    def rotate(self, kid: str, *, key_path: Path | None = None) -> None:
+        """Activate a new key while retaining every old verification key."""
+        if kid in self._public:
+            raise ValueError(f"signing key id {kid!r} already exists")
+        private = self._load_or_create(key_path)
+        self._private = private
+        self._kid = kid
+        self._public[kid] = private.public_key()
+
 
 def verify_signature(
     payload_hash: str, *, kid: str, signature_b64: str, public_keys: dict[str, str]

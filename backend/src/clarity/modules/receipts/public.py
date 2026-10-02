@@ -7,6 +7,7 @@ this package is internal and may change without notice.
 
 from __future__ import annotations
 
+from clarity.modules.receipts.openbao import OpenBaoSigningService, SignerUnavailable
 from clarity.modules.receipts.render import (
     RendererUnavailable,
     RenderFormat,
@@ -37,10 +38,12 @@ __all__ = [
     "SUBSCRIBERS",
     "SUPERSEDED",
     "DevSigningService",
+    "OpenBaoSigningService",
     "ReceiptRepository",
     "ReceiptService",
     "RenderFormat",
     "RendererUnavailable",
+    "SignerUnavailable",
     "SigningService",
     "StoredReceiptRepository",
     "UnknownKeyId",

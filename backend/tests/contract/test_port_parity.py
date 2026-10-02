@@ -14,11 +14,16 @@ regression net for behaviour the core relies on.
 
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import Callable
 from datetime import timedelta
 from decimal import Decimal
 
+import httpx
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from clarity.contracts.decision import ActionType
 from clarity.contracts.receipt import RecurrenceResult
@@ -33,6 +38,7 @@ from clarity.integration.ports import (
     ReadPort,
 )
 from clarity.kernel.common import EventSource
+from clarity.modules.receipts.openbao import OpenBaoSigningService
 from clarity.modules.receipts.recurrence import RecurrenceProbe, run_check
 from clarity.modules.receipts.signing import DevSigningService, SigningService, verify_signature
 
@@ -266,8 +272,38 @@ class TestRecurrenceProbeParity:
 # SigningService
 # --------------------------------------------------------------------------- #
 
+
+def _openbao_signer() -> OpenBaoSigningService:
+    private = Ed25519PrivateKey.generate()
+    public = base64.b64encode(
+        private.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+    ).decode("ascii")
+
+    def transit(request: httpx.Request) -> httpx.Response:
+        assert request.headers["X-Vault-Token"] == "parity-token"
+        if "/sign/" in request.url.path:
+            document = json.loads(request.content)
+            payload = base64.b64decode(document["input"])
+            signature = base64.b64encode(private.sign(payload)).decode("ascii")
+            return httpx.Response(200, json={"data": {"signature": f"vault:v1:{signature}"}})
+        if "/export/public-key/" in request.url.path:
+            return httpx.Response(200, json={"data": {"keys": {"1": public}}})
+        return httpx.Response(404)
+
+    return OpenBaoSigningService(
+        "http://openbao",
+        key_name="parity-key",
+        token="parity-token",
+        client=httpx.Client(transport=httpx.MockTransport(transit)),
+    )
+
+
 SIGNING_DRIVERS: list[tuple[str, Callable[[], SigningService]]] = [
     ("dev", lambda: DevSigningService(kid="parity-key")),
+    ("openbao", _openbao_signer),
 ]
 
 

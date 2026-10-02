@@ -7,13 +7,13 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `public.py`, `recurrence.py`, `render.py`, `repository.py`, `service.py`, `signing.py` |
+| Files | `openbao.py`, `public.py`, `recurrence.py`, `render.py`, `render_job.py`, `repository.py`, `service.py`, `signing.py` |
 
 ## 1. Purpose
 Trust Receipts: build the canonical payload, chain to the previous receipt, sign with Ed25519, verify (hash, signature, ledger, chain), run the recurrence test, render PNG/PDF/SMS in si/ta/en.
 
 ## 2. Public surface (`public.py`)
-Other code imports only these names: `DevSigningService`, `ReceiptService`, `RenderFormat`, `RendererUnavailable`, `SigningService`, `UnknownKeyId`, `render`.
+Other code imports only `public.py`, including the signer port, dev/OpenBao drivers, receipt service and renderer.
 
 ## 3. Used by
 `clarity.app`, `clarity.interfaces.http`, `clarity.modules.case`
@@ -34,7 +34,7 @@ The hash-chained receipt ledger in issue order, what each receipt supersedes, wh
 - Evidence is cited by id and hash, never copied.
 
 ## 7. Migration status (enterprise-plan 21)
-Signing key generated in memory (`lite`). R4: `clarity-signer` with OpenBao/KMS. R3: one receipt per completed plan, issued by an idempotent consumer.
+M-RCPT complete: lite uses a rotatable dev Ed25519 key; full can use the OpenBao Transit/KMS driver and publishes all retained public keys. Rendering is a stateless job with browser networking blocked. Receipt state and `receipt.issued@v1` are committed together.
 
 ## 8. Tests
 - `tests/contract/test_port_parity.py`
@@ -46,3 +46,4 @@ Signing key generated in memory (`lite`). R4: `clarity-signer` with OpenBao/KMS.
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.receipts` with a public surface (R1) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-B02-unit-of-work-and-repositories.md` | The receipt chain, supersession map, subscriber map and sequence moved behind `ReceiptRepository` (B02, #5) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-B06-receipts-on-action-completed.md` | `issue(plan_id=...)` is idempotent per plan via a plan index; `for_plan()` added (B06, #14) |
+| 2026-10-02 | `docs/devlog/2026/2026-10-02-M-RCPT-openbao-and-render-isolation.md` | OpenBao signer, rotation and isolated render job (M-RCPT, #37) |

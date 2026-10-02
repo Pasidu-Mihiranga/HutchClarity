@@ -231,9 +231,19 @@ def render(
     markup = receipt_html(receipt, language)
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(channel="chromium")
+            browser = pw.chromium.launch(
+                channel="chromium",
+                args=[
+                    "--disable-background-networking",
+                    "--disable-component-update",
+                    "--disable-sync",
+                    "--host-resolver-rules=MAP * ~NOTFOUND",
+                ],
+            )
             try:
-                page = browser.new_page(viewport={"width": 420, "height": 620})
+                context = browser.new_context(viewport={"width": 420, "height": 620})
+                context.route("**/*", lambda route: route.abort())
+                page = context.new_page()
                 page.set_content(markup, wait_until="load")
                 content = (
                     page.screenshot(full_page=True)

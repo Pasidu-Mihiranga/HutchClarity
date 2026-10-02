@@ -324,6 +324,23 @@ def test_signatures_verify_with_public_material_only(signing):
     )
 
 
+def test_rotation_keeps_old_receipts_valid_and_uses_the_new_key(
+    receipts: ReceiptService,
+    signing: DevSigningService,
+    case: Case,
+    executed,
+):
+    first = issue(receipts, case, executed)
+
+    signing.rotate("test-key-2")
+    second = issue(receipts, case, executed)
+
+    assert first.signature.kid == "test-key-1"
+    assert second.signature.kid == "test-key-2"
+    assert receipts.verify(first.receipt_id).valid
+    assert receipts.verify(second.receipt_id).valid
+
+
 # --------------------------------------------------------------------------- #
 # Chaining and correction
 # --------------------------------------------------------------------------- #
