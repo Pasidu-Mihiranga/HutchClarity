@@ -308,7 +308,7 @@ flowchart LR
 
 ### 11.3 Event catalogue
 
-Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key = `subscriber_ref` unless stated. Status: **exists** = defined in `platform/messaging/envelope.py` today; **planned** = to add.
+Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key = `subscriber_ref` unless stated. **Schemas:** [`backend/src/clarity/contracts/events.py`](../../backend/src/clarity/contracts/events.py), one `…V1` model per row marked *exists*; `backend/tests/contract/test_event_contracts.py` fails if this table and the code disagree (issue #10). Status: **exists** = defined in `platform/messaging/envelope.py` today; **planned** = to add.
 
 | Event | Producer | Consumers | Status |
 |---|---|---|---|

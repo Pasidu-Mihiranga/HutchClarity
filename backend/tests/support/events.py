@@ -1,0 +1,134 @@
+"""One valid example payload per event type, shared by contract and outbox tests."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from clarity.contracts.decision import ActionType, Outcome
+from clarity.contracts.events import (
+    ActionCompletedV1,
+    ActionFailedV1,
+    ActionRequestedV1,
+    ActionStepV1,
+    CaseCreatedV1,
+    CauseDetectedV1,
+    ChargeAppliedV1,
+    ComplaintCreatedV1,
+    DecisionGeneratedV1,
+    DomainEventType,
+    EventPayload,
+    McpInvokedV1,
+    PackExpiringV1,
+    PaymentRecordedV1,
+    ReceiptIssuedV1,
+    ReconciliationMismatchV1,
+    RiskDetectedV1,
+    RulePublishedV1,
+    UsageThresholdReachedV1,
+    VasRenewedV1,
+)
+from clarity.kernel.common import Channel, Language
+
+AT = datetime(2027, 9, 14, 14, 6, tzinfo=UTC)
+
+SAMPLES: dict[DomainEventType, EventPayload] = {
+    p.event_type: p
+    for p in (
+        PaymentRecordedV1(
+            payment_ref="pay-1", amount_lkr="3500.00", bank_ref_hash="sha256:aa", captured_at=AT
+        ),
+        ChargeAppliedV1(
+            charge_ref="chg-1", amount_lkr="49.00", merchant_id="MER-GAMEHUB", rated_at=AT
+        ),
+        UsageThresholdReachedV1(
+            offering_id="PKG-DATA-30", bucket="data", threshold_percent=80, reached_at=AT
+        ),
+        PackExpiringV1(offering_id="PKG-DATA-30", expires_at=AT),
+        VasRenewedV1(
+            subscription_id="SUB-GAME-1",
+            merchant_id="MER-GAMEHUB",
+            amount_lkr="49.00",
+            renewed_at=AT,
+        ),
+        ComplaintCreatedV1(complaint_id="CMP-1", channel=Channel.APP, language=Language.SI),
+        CaseCreatedV1(
+            case_id="CASE-1",
+            case_no="CL-2027-000001",
+            channel=Channel.APP,
+            trigger="customer",
+            language=Language.SI,
+        ),
+        CauseDetectedV1(
+            case_id="CASE-1",
+            rule_id="VAS_NO_CONSENT",
+            rule_version=4,
+            confidence=0.96,
+            snapshot_hash="sha256:bb",
+        ),
+        DecisionGeneratedV1(
+            case_id="CASE-1",
+            decision_id="DEC-1",
+            outcome=Outcome.ONE_TAP_FIX,
+            amount_lkr="49.00",
+            policy_version="2027.09.1",
+            input_hash="sha256:cc",
+        ),
+        ActionRequestedV1(
+            case_id="CASE-1",
+            plan_id="PLAN-1",
+            action_id="ACT-1",
+            action_type=ActionType.REFUND,
+            amount_lkr="49.00",
+            idempotency_key="CASE-1:PLAN-1:0",
+        ),
+        ActionCompletedV1(
+            case_id="CASE-1",
+            plan_id="PLAN-1",
+            decision_id="DEC-1",
+            steps=[
+                ActionStepV1(
+                    action_id="ACT-1",
+                    action_type=ActionType.REFUND,
+                    amount_lkr="49.00",
+                    status="COMPLETED",
+                )
+            ],
+            confirmed_by="customer_confirmed",
+            total_amount_lkr="49.00",
+        ),
+        ActionFailedV1(
+            case_id="CASE-1",
+            plan_id="PLAN-1",
+            failed_step=ActionType.DEACTIVATE_VAS,
+            error_code="ADAPTER_TIMEOUT",
+            compensated=True,
+        ),
+        ReceiptIssuedV1(
+            case_id="CASE-1",
+            receipt_id="TR-2027-000001",
+            plan_id="PLAN-1",
+            payload_hash="sha256:dd",
+            key_id="clarity-rcpt-2027-01",
+        ),
+        RiskDetectedV1(
+            risk_type="duplicate_reload", band="high", score=0.97, evidence_refs=["ev-1", "ev-2"]
+        ),
+        McpInvokedV1(
+            invocation_id="MCP-1",
+            tool="get_case_timeline",
+            profile="customer-assist",
+            allowed=True,
+            args_hash="sha256:ee",
+            latency_ms=12,
+        ),
+        RulePublishedV1(
+            rule_id="VAS_NO_CONSENT", rule_version=4, pack_hash="sha256:ff", change_class="C2"
+        ),
+        ReconciliationMismatchV1(
+            plan_id="PLAN-1",
+            action_id="ACT-1",
+            expected_lkr="49.00",
+            reason="no adapter confirmation",
+        ),
+    )
+}

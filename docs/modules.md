@@ -9,7 +9,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | Unit | Layer | Path | MODULE.md | Status | Next migration step |
 |---|---|---|---|---|---|
 | kernel | L0 | `backend/src/clarity/kernel/` | - | built | - |
-| contracts | L0 | `backend/src/clarity/contracts/` | - | built | OpenAPI/AsyncAPI generation (R2) |
+| contracts | L0 | `backend/src/clarity/contracts/` | - | built; **domain event payloads typed and versioned** (`events.py`, #10) | AsyncAPI generation (R2) |
 | integration (ports, mock drivers) | L1 | `backend/src/clarity/integration/` | - | built (simulated) | `hutch-sim` HTTP drivers (R4) |
 | integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team; used by the `full` profile | Becomes `hutch-sim`'s own database (R4) |
 | platform: config, audit, messaging, content, security | L2 | `backend/src/clarity/platform/` | - | built | PostgreSQL, Kafka, OPA drivers (R2) |

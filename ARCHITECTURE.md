@@ -63,7 +63,7 @@ Money protection:
 
 ## 3. Modules
 
-How modules talk (ADR-0029, plan 21 §11): they **call** each other's `public.py` only along declared edges (`case` → timeline, detection, decision, actions, receipts; `decision` → detection; `governance` → decision; `receipts` → actions), and **publish events** through the outbox for side effects. Today no module publishes events yet; the first event-driven flow (receipts on `action.completed`) follows the R2a platform work.
+How modules talk (ADR-0029, plan 21 §11): they **call** each other's `public.py` only along declared edges (`case` → timeline, detection, decision, actions, receipts; `decision` → detection; `governance` → decision; `receipts` → actions), and **publish events** through the outbox for side effects. Event payloads are typed and versioned in `clarity.contracts.events` (17 schemas, `type@v1`, no personal data by construction) and the outbox rejects any event that does not match (#10). No module publishes events yet; the first event-driven flow (receipts on `action.completed`, #14) follows the outbox wiring (#12).
 
 
 Registry with status and next migration step: [docs/modules.md](docs/modules.md). Each module's `MODULE.md` lists its public surface, users, dependencies, invariants and tests.
