@@ -1,6 +1,6 @@
 # Hutch Clarity - Migration & Deployment Plan: from working prototype to target architecture
 
-[← 20-policy-change-management.md](20-policy-change-management.md) · [← Plan index](README.md)
+[← 20-policy-change-management.md](20-policy-change-management.md) · [← Plan index](README.md) · [22-agentic-assistant-and-rag.md →](22-agentic-assistant-and-rag.md)
 
 > **Purpose.** The prototype works (438 tests, all journeys end to end) but is shaped as one in-memory process. The target architecture ([18](18-build-blueprint.md), [19](19-tech-stack-and-ai.md), [20](20-policy-change-management.md)) is shaped for HUTCH production. This chapter is the plan to get from one to the other **without losing working behaviour**, and it defines the **runtime model**: which parts run as containers, which may run serverless, and how modules become microservices.
 >
@@ -359,4 +359,4 @@ Done when: 1,500 concurrent double confirms give one refund and one receipt, the
 
 ---
 
-[← 20-policy-change-management.md](20-policy-change-management.md) · [← Plan index](README.md)
+[← 20-policy-change-management.md](20-policy-change-management.md) · [← Plan index](README.md) · [22-agentic-assistant-and-rag.md →](22-agentic-assistant-and-rag.md)

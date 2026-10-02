@@ -16,6 +16,13 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.5 - 2026-10-02
+
+| Area | Change | Chapters |
+|---|---|---|
+| Agentic assistant | Flows as versioned state machines, bounded agent step with tool allowlists and limits, RAG with mandatory citations, guardrails, per-language evaluation (ADR-0030) | 22 (new) |
+| Backlog | Per-module issues with acceptance tests and Definition of Done, in waves from the platform baseline upward | docs/backlog |
+
 ## v1.4 - 2026-10-02
 
 | Area | Change | Chapters |

@@ -11,7 +11,7 @@ These rules apply to **every contributor, human or AI coding agent**, across the
 1. This file.
 2. [`ARCHITECTURE.md`](ARCHITECTURE.md): what is built today, module status, deviations from the plan.
 3. The `MODULE.md` of the module you are touching (registry: [`docs/modules.md`](docs/modules.md)).
-4. The plan chapter for your area. Start with [21 Migration & deployment](docs/enterprise-plan/21-migration-and-deployment-plan.md), then [18 Build blueprint](docs/enterprise-plan/18-build-blueprint.md), [19 Tech stack & AI](docs/enterprise-plan/19-tech-stack-and-ai.md), [20 Policy change](docs/enterprise-plan/20-policy-change-management.md); chapters 01-17 for depth ([index](docs/enterprise-plan/README.md)).
+4. Your issue in [`docs/backlog/`](docs/backlog/README.md) and the plan chapter for your area. Start with [21 Migration & deployment](docs/enterprise-plan/21-migration-and-deployment-plan.md), [22 Agentic assistant & RAG](docs/enterprise-plan/22-agentic-assistant-and-rag.md), then [18 Build blueprint](docs/enterprise-plan/18-build-blueprint.md), [19 Tech stack & AI](docs/enterprise-plan/19-tech-stack-and-ai.md), [20 Policy change](docs/enterprise-plan/20-policy-change-management.md); chapters 01-17 for depth ([index](docs/enterprise-plan/README.md)).
 5. Accepted ADRs in [`docs/adr/`](docs/adr/README.md).
 
 **When documents disagree:** accepted ADR > `ARCHITECTURE.md` > plan chapters 18-21 > plan chapters 01-17. A disagreement is a bug: fix it in the same change, or raise it before writing code.
@@ -73,6 +73,7 @@ Hutch Clarity is a resolve-and-support platform for HUTCH (Sri Lanka) customers 
 | `rules/packs/`, `config/policy/`, `config/ai/` | Policy artefacts and AI model roles (YAML), shared by every profile |
 | `docs/enterprise-plan/` | The plan (changes via `CHANGES.md`) |
 | `docs/adr/` · `docs/devlog/` · `docs/walkthroughs/` · `docs/templates/` · `docs/modules.md` | Decisions · history · verified flows · templates · module registry |
+| `docs/backlog/` | Work items as issues: waves, dependencies, acceptance tests, Definition of Done |
 | `docs/submission/` | Hackathon submission material |
 | `documents/` | The two source documents (read-only) |
 

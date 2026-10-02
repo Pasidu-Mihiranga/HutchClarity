@@ -35,6 +35,7 @@ reversed.
 | [0027](0027-runtime-profiles-lite-needs-only-python.md) | Runtime profiles: lite needs only Python | Accepted |
 | [0028](0028-containers-for-the-core-serverless-at-the-edges.md) | Containers for the core, serverless at the edges | Accepted |
 | [0029](0029-module-interaction-calls-and-events.md) | Module interaction: public calls for answers, outbox events for side effects | Accepted |
+| [0030](0030-bounded-agency-flows-and-grounded-rag.md) | Bounded agency: flows as state machines, tools by allowlist, grounded RAG | Accepted |
 
 ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 
