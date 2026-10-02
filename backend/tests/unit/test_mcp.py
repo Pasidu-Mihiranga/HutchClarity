@@ -17,7 +17,7 @@ from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world, ref_for
 from clarity.interfaces.mcp.server import ClarityMCPServer, Principal, Profile, ToolDenied
 from clarity.kernel.common import ActionSafetyLevel, Channel
-from clarity.modules.case.service import CaseService
+from clarity.modules.resolution.public import ResolutionService
 
 DILANI = "+94771234567"
 PRIYA = "+94774445555"
@@ -29,7 +29,7 @@ def clarity() -> Clarity:
 
 
 @pytest.fixture
-def cases(clarity: Clarity) -> CaseService:
+def cases(clarity: Clarity) -> ResolutionService:
     return clarity.cases
 
 

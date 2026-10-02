@@ -3,7 +3,7 @@
 Improvement plan item 0.3, from the alternative design's ADR-0008: *the MCP
 server has no execute capability at all*.
 
-Before this, ``ClarityMCPServer`` received the whole ``CaseService``, which
+Before this, ``ClarityMCPServer`` received the whole ``ResolutionService``, which
 exposes ``confirm_and_execute``, ``approve_and_execute``, ``auto_fix`` and (via
 a ``tools`` accessor) ``ToolLayer.authorise_auto_fix``. Nothing called them, so
 the system was safe in practice -- but "the model cannot execute" was a
@@ -21,9 +21,10 @@ from typing import Protocol, runtime_checkable
 
 from clarity.contracts.decision import ActionPlan, ActionType
 from clarity.contracts.timeline import EvidenceSnapshot
-from clarity.modules.case.public import CaseRecord, CaseService
+from clarity.modules.case.public import CaseRecord
 from clarity.modules.detection.public import RulePack
 from clarity.modules.receipts.public import ReceiptService
+from clarity.modules.resolution.public import ResolutionService
 
 
 @runtime_checkable
@@ -45,14 +46,14 @@ class MCPCaseView(Protocol):
     ) -> ActionPlan: ...
 
 
-class CaseServiceMCPView:
-    """Adapts :class:`CaseService` to :class:`MCPCaseView`.
+class ResolutionServiceMCPView:
+    """Adapts :class:`ResolutionService` to :class:`MCPCaseView`.
 
     It holds the service privately and forwards only the permitted calls, so
     the execute methods are not reachable through the object MCP is given.
     """
 
-    def __init__(self, cases: CaseService, receipts: ReceiptService) -> None:
+    def __init__(self, cases: ResolutionService, receipts: ReceiptService) -> None:
         self.__cases = cases
         self.__receipts = receipts
 

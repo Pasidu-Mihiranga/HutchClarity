@@ -1,36 +1,46 @@
-"""Case service: the orchestration every channel shares (plan §3.1, §16.2).
+"""The resolution service: the orchestration every channel shares (M-CASE).
 
-One case file follows the customer across channels - "start on WhatsApp,
-finish in the app or at a shop" (deck S5) - so the sequence of
-open → evidence → causes → decision → proposal → confirmation → action →
-receipt lives here once, not in each channel.
+One case file follows the customer across channels - "start on WhatsApp, finish
+in the app or at a shop" (deck S5) - so the sequence of open, evidence, causes,
+decision, proposal, confirmation, action and receipt lives here once rather than
+in each channel.
 
-Channels and the API call this. They never reach into the rule engine, the
-decision policy or the tool layer directly, which is what keeps the money path
-identical no matter where the customer started.
+This used to be ``CaseService``, a single class that both held the case and
+called every other module. Plan 21 section 2.2 splits those two jobs: the case
+aggregate keeps the record and its state machine
+(``clarity.modules.case.aggregate``), and this service orchestrates. The win is
+in the dependency map: orchestration points at domain logic and ``case`` becomes
+a leaf, so the module holding a customer's case no longer drags five others with
+it.
+
+Channels and the API call this. They never reach the rule engine, the decision
+policy or the tool layer directly, which is what keeps the money path identical
+no matter where the customer started.
 """
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 from time import monotonic, sleep
 
-from clarity.contracts.case import Case, CaseState, CaseTrigger, CustomerReference
+from clarity.contracts.case import Case, CaseState, CaseTrigger
 from clarity.contracts.decision import (
     ActionPlan,
     ActionType,
     Decision,
     Outcome,
 )
-from clarity.contracts.events import ActionCompletedV1
+from clarity.contracts.events import (
+    ActionCompletedV1,
+    CaseCreatedV1,
+    CauseDetectedV1,
+    DecisionGeneratedV1,
+)
 from clarity.contracts.receipt import TrustReceipt
 from clarity.contracts.timeline import EvidenceSnapshot
-from clarity.kernel.common import Channel, Language, utc_now
-from clarity.kernel.ids import case_no as make_case_no
-from clarity.kernel.ids import new_id
+from clarity.kernel.common import Channel, Language
 from clarity.modules.actions.capability import ToolLayer
 from clarity.modules.actions.public import (
     EXECUTABLE_OUTCOMES,
@@ -38,61 +48,149 @@ from clarity.modules.actions.public import (
     ExecutionResult,
     PlanNotPending,
 )
-from clarity.modules.case.records import CaseNotFound, CaseNotReady, CaseRecord
-from clarity.modules.case.repository import CaseRepository
+from clarity.modules.case.public import (
+    NO_CONFIRMATION_CHANNELS,
+    CaseAggregate,
+    CaseNotFound,
+    CaseNotReady,
+    CaseRecord,
+)
 from clarity.modules.decision.public import (
     DecisionPolicy,
     PolicyThresholds,
     build_decision_input,
     build_risk_signals,
 )
-from clarity.modules.detection.public import RuleEngine, RuleEvaluation
+from clarity.modules.detection.public import (
+    PolicyRuleParameters,
+    RuleEngine,
+    RuleEvaluation,
+)
 from clarity.modules.receipts.public import ReceiptService
 from clarity.modules.timeline.public import TimelineBuilder, TimelineRequest
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard, SwitchState
 from clarity.platform.content.templates import explanation as customer_explanation
 from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.observability import span
-from clarity.platform.persistence import ConcurrentUpdate
+from clarity.platform.persistence import UnitOfWorkFactory
 
-#: Channels that cannot capture a reliable confirmation for a service change
-#: (plan §9.7). The decision policy uses this to route them to staff.
-_NO_CONFIRMATION_CHANNELS = frozenset({Channel.SMS, Channel.USSD})
+#: Kept for callers that imported it from the old module path.
+_NO_CONFIRMATION_CHANNELS = NO_CONFIRMATION_CHANNELS
 
 
-class CaseService:
-    """Drives a case through its lifecycle."""
+class ResolutionService:
+    """Drives a case through its lifecycle, calling one module per step."""
 
     def __init__(
         self,
         *,
+        aggregate: CaseAggregate,
         timeline: TimelineBuilder,
         rules: RuleEngine,
         policy: DecisionPolicy,
         tools: ToolLayer,
         receipts: ReceiptService,
-        cases: CaseRepository,
+        open_unit: UnitOfWorkFactory,
         deliver_events: Callable[[], None],
         policies: PolicyResolver | None = None,
         switches: SwitchBoard | None = None,
         clock: datetime | None = None,
     ) -> None:
+        self._aggregate = aggregate
         self._timeline = timeline
         self._rules = rules
         self._policy = policy
         self._tools = tools
         self._receipts = receipts
-        # All case state lives in the repository (B02): the service keeps none.
-        self._cases = cases
+        self._open_unit = open_unit
         # Runs the relay and the bus, so an event this call produced is acted on
-        # before the call returns. The composition root binds it; the case module
+        # before the call returns. The composition root binds it; this module
         # does not know which bus is behind it.
         self._deliver_events = deliver_events
         self._policies = policies
         self._switches = switches or SwitchBoard()
         self._clock = clock
-        self._lock = threading.Lock()
+
+    # -- the aggregate, delegated --------------------------------------- #
+    #
+    # The orchestration below reads and writes the case through these, exactly
+    # as it did when both lived in one class. They are one line each on purpose:
+    # the aggregate owns the state machine, and this service must not reach past
+    # it to change a state directly.
+
+    def open_case(
+        self,
+        *,
+        subscriber_ref: str,
+        msisdn_masked: str,
+        channel: Channel,
+        trigger: CaseTrigger = CaseTrigger.CUSTOMER,
+        language: Language = Language.EN,
+        charge_ref: str | None = None,
+    ) -> Case:
+        case = self._aggregate.open_case(
+            subscriber_ref=subscriber_ref,
+            msisdn_masked=msisdn_masked,
+            channel=channel,
+            trigger=trigger,
+            language=language,
+            charge_ref=charge_ref,
+        )
+        self._publish_case_created(case, subscriber_ref)
+        return case
+
+    def get(self, case_id: str) -> CaseRecord:
+        return self._aggregate.get(case_id)
+
+    def save(self, record: CaseRecord) -> None:
+        self._aggregate.save(record)
+
+    def all_cases(self) -> list[CaseRecord]:
+        return self._aggregate.all_cases()
+
+    def _cache_outcome(self, record: CaseRecord) -> None:
+        self._aggregate._cache_outcome(record)
+
+    def _advance(self, record: CaseRecord, target: CaseState) -> None:
+        self._aggregate._advance(record, target)
+
+    def _now(self) -> datetime:
+        return self._aggregate._now()
+
+    @staticmethod
+    def _state_for(outcome: Outcome) -> CaseState:
+        return CaseAggregate._state_for(outcome)
+
+    @staticmethod
+    def _require_decision(record: CaseRecord) -> Decision:
+        return CaseAggregate._require_decision(record)
+
+    def _safeguard_params(self, record: CaseRecord) -> dict[ActionType, dict[str, object]]:
+        return self._aggregate._safeguard_params(record)
+
+    @staticmethod
+    def _flat_safeguard_params(record: CaseRecord) -> dict[str, object]:
+        return CaseAggregate._flat_safeguard_params(record)
+
+    def _publish_case_created(self, case: Case, subscriber_ref: str) -> None:
+        """Say a case exists, so insights and autopsy can follow it (ADR-0029)."""
+        with self._open_unit() as unit:
+            outbox_in(unit).append(
+                Event.of(
+                    CaseCreatedV1(
+                        case_id=case.case_id,
+                        case_no=case.case_no,
+                        channel=case.origin_channel,
+                        trigger=case.trigger.value,
+                        language=case.language,
+                        money_at_stake_lkr=case.money_at_stake_lkr,
+                    ),
+                    subject=subscriber_ref,
+                )
+            )
+            unit.commit()
 
     @property
     def switches(self) -> SwitchBoard:
@@ -110,83 +208,9 @@ class CaseService:
     def receipts(self) -> ReceiptService:
         return self._receipts
 
-    def _now(self) -> datetime:
-        """Fixed clock in the demo, wall clock otherwise."""
-        return self._clock or utc_now()
-
-    # ------------------------------------------------------------------ #
-    # Open
-    # ------------------------------------------------------------------ #
-
-    def open_case(
-        self,
-        *,
-        subscriber_ref: str,
-        msisdn_masked: str,
-        channel: Channel,
-        trigger: CaseTrigger = CaseTrigger.CUSTOMER,
-        language: Language = Language.EN,
-        charge_ref: str | None = None,
-    ) -> Case:
-        with self._lock:
-            sequence = self._cases.next_case_number()
-            case = Case(
-                case_id=new_id("CASE"),
-                case_no=make_case_no(sequence, year=self._now().year),
-                customer=CustomerReference(
-                    subscriber_ref=subscriber_ref,
-                    msisdn_masked=msisdn_masked,
-                    preferred_language=language,
-                ),
-                trigger=trigger,
-                origin_channel=channel,
-                language=language,
-                charge_ref=charge_ref,
-                opened_at=self._now(),
-            )
-            self._cases.save(CaseRecord(case=case, subscriber_ref=subscriber_ref))
-            return case
-
-    def get(self, case_id: str) -> CaseRecord:
-        record = self._cases.get(case_id)
-        if record is None:
-            raise CaseNotFound(case_id)
-        return record
-
-    def save(self, record: CaseRecord) -> None:
-        """Persist a record the caller mutated.
-
-        The service mutates a record in place and then writes it back, so a
-        driver that stores a copy (B05) sees every change. Strict: a conflict
-        here means two callers changed one case differently, and silently
-        dropping one of those changes is how a case loses its decision.
-        """
-        self._cases.save(record)
-
-    def _cache_outcome(self, record: CaseRecord) -> None:
-        """Write back the outcome facts that other modules own.
-
-        ``execution`` and ``receipts_by_plan`` are this module's read cache of
-        state the actions and receipts modules are authoritative for. Two
-        confirmations of one plan necessarily produce the same values: the tool
-        layer's idempotency key gives one execution result, and the receipt's
-        plan index gives one receipt. So a conflict means another thread already
-        wrote the identical cache, and standing down loses nothing.
-
-        Unlike :meth:`save`, which stays strict, because a conflict there is a
-        genuine lost update.
-        """
-        try:
-            self._cases.save(record)
-        except ConcurrentUpdate:
-            return
-
-    def all_cases(self) -> list[CaseRecord]:
-        return self._cases.all_records()
-
-    # ------------------------------------------------------------------ #
-    # Evidence and decision
-    # ------------------------------------------------------------------ #
+    @property
+    def executable_outcomes(self) -> frozenset[Outcome]:
+        return EXECUTABLE_OUTCOMES
 
     def build_timeline(self, case_id: str) -> EvidenceSnapshot:
         record = self.get(case_id)
@@ -242,7 +266,12 @@ class CaseService:
 
         snapshot = record.snapshot or self._collect_evidence(record)
 
-        evaluation = self._rules.evaluate(snapshot)
+        # Rule parameters are resolved for the moment the disputed event
+        # happened, not for now, so a confidence Risk changed this morning does
+        # not change what last week's case looks like (D5).
+        evaluation = self._rules.evaluate(
+            snapshot, parameters=self._rule_parameters(record, snapshot)
+        )
         record.evaluation = evaluation
 
         top = evaluation.top
@@ -287,7 +316,69 @@ class CaseService:
         self._advance(record, CaseState.EVALUATED)
         self._advance(record, self._state_for(decision.outcome))
         self.save(record)
+        self._publish_evaluation(record)
         return decision
+
+    def _publish_evaluation(self, record: CaseRecord) -> None:
+        """Publish the detected cause and generated decision as immutable facts."""
+        decision = self._require_decision(record)
+        evaluation = record.evaluation
+        snapshot = record.snapshot
+        if evaluation is None or snapshot is None:  # pragma: no cover - evaluate builds both
+            return
+        with self._open_unit() as unit:
+            outbox = outbox_in(unit)
+            if evaluation.top is not None:
+                assessment = evaluation.top.assessment
+                outbox.append(
+                    Event.of(
+                        CauseDetectedV1(
+                            case_id=record.case_id,
+                            rule_id=assessment.rule_id,
+                            rule_version=assessment.rule_version,
+                            confidence=float(assessment.confidence),
+                            snapshot_hash=snapshot.snapshot_hash,
+                            ruled_out=[
+                                f"{item.rule_id}@{item.rule_version}"
+                                for item in evaluation.ruled_out
+                            ],
+                        ),
+                        subject=record.subscriber_ref,
+                    )
+                )
+            outbox.append(
+                Event.of(
+                    DecisionGeneratedV1(
+                        case_id=record.case_id,
+                        decision_id=decision.decision_id,
+                        outcome=decision.outcome,
+                        amount_lkr=decision.amount_lkr,
+                        policy_version=decision.policy_version,
+                        input_hash=decision.input_hash,
+                        config_snapshot_hash=decision.config_snapshot_hash,
+                    ),
+                    subject=record.subscriber_ref,
+                )
+            )
+            unit.commit()
+
+    def _rule_parameters(
+        self, record: CaseRecord, snapshot: EvidenceSnapshot
+    ) -> PolicyRuleParameters | None:
+        """Parameters for this evaluation, or ``None`` when no policy is loaded.
+
+        ``as_of`` is taken from the evidence rather than from the matched cause,
+        because the parameters are needed to score the match in the first place.
+        The latest event in the snapshot is the disputed moment: the snapshot was
+        built for this case and ends at the charge being complained about.
+        """
+        if self._policies is None:
+            return None
+        moments = [event.occurred_at for event in snapshot.events]
+        return PolicyRuleParameters(
+            self._policies,
+            as_of=max(moments) if moments else self._now(),
+        )
 
     def _as_of(self, record: CaseRecord, evaluation: RuleEvaluation) -> datetime:
         """When the disputed event happened.
@@ -323,24 +414,6 @@ class CaseService:
             PolicyThresholds.from_snapshot(snapshot, version=self._policy.thresholds.version),
             snapshot.hash,
         )
-
-    @staticmethod
-    def _state_for(outcome: Outcome) -> CaseState:
-        match outcome:
-            case Outcome.AUTO_FIX:
-                return CaseState.EXECUTING
-            case Outcome.ONE_TAP_FIX:
-                return CaseState.AWAITING_CUSTOMER
-            case Outcome.STAFF_APPROVAL:
-                return CaseState.AWAITING_APPROVAL
-            case Outcome.EXPLAIN_ONLY:
-                return CaseState.EXPLAINED
-            case _:
-                return CaseState.HANDED_OFF
-
-    # ------------------------------------------------------------------ #
-    # Act
-    # ------------------------------------------------------------------ #
 
     def propose(
         self,
@@ -454,9 +527,10 @@ class CaseService:
         ):
             if self._receipts.for_plan(payload.plan_id) is not None:
                 return
-            record = self._cases.get(payload.case_id)
-            if record is None:
-                raise CaseNotFound(payload.case_id)
+            try:
+                record = self._aggregate.get(payload.case_id)
+            except CaseNotFound:
+                raise
             receipt = self._issue_receipt(record, plan_id=payload.plan_id)
             record.receipts_by_plan[payload.plan_id] = receipt
             self._cache_outcome(record)
@@ -528,6 +602,13 @@ class CaseService:
             idempotency_key=f"{record.case_id}:{plan_id}",
             now=self._now(),
         )
+        if result.replayed:
+            # The tool layer recognised this as a duplicate of a request it had
+            # already run (M-ACT). Nothing happened, so nothing may move: the
+            # original call advanced the case and issued the receipt, and
+            # advancing again would be an illegal transition out of RECEIPTED.
+            return result, self._join_original(record, plan_id)[1]
+
         record.execution = result
         self._advance(record, CaseState.ACTIONED)
         # Saved before the drain: the consumer reads this record to build the
@@ -601,52 +682,5 @@ class CaseService:
     # Internals
     # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def _require_decision(record: CaseRecord) -> Decision:
-        if record.decision is None:
-            raise CaseNotReady(f"case {record.case_id} has not been evaluated yet")
-        return record.decision
 
-    def _safeguard_params(self, record: CaseRecord) -> dict[ActionType, dict[str, object]]:
-        """Fill action parameters from evidence, not from the caller.
-
-        The subscription and merchant a remedy applies to come from the events
-        the rule matched, so a caller cannot redirect a block onto a different
-        merchant.
-        """
-        flat = self._flat_safeguard_params(record)
-        return {
-            ActionType.DEACTIVATE_VAS: {k: v for k, v in flat.items() if k == "subscription_id"},
-            ActionType.BLOCK_MERCHANT_UNTIL_OPTIN: {
-                k: v for k, v in flat.items() if k == "merchant_id"
-            },
-        }
-
-    @staticmethod
-    def _flat_safeguard_params(record: CaseRecord) -> dict[str, object]:
-        evaluation, snapshot = record.evaluation, record.snapshot
-        if evaluation is None or evaluation.top is None or snapshot is None:
-            return {}
-
-        params: dict[str, object] = {}
-        for event in evaluation.top.bindings.values():
-            for key in ("subscription_id", "merchant_id", "bucket", "offering_id"):
-                value = event.attr(key)
-                if value is not None and key not in params:
-                    params[key] = value
-        return params
-
-    def _advance(self, record: CaseRecord, target: CaseState) -> None:
-        """Move the case on, tolerating a no-op when it is already there.
-
-        Does not persist: a public method advances the case through several
-        states in one go, and the enclosing method writes the record back once
-        it is finished.
-        """
-        if record.case.state is target:
-            return
-        record.case = record.case.with_state(target)
-
-    @property
-    def executable_outcomes(self) -> frozenset[Outcome]:
-        return EXECUTABLE_OUTCOMES
+__all__ = ["ResolutionService"]
