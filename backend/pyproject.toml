@@ -18,6 +18,10 @@ dependencies = [
     "python-ulid>=2.7",
     "qrcode[pil]>=8.0",
     "pyjwt[crypto]>=2.9",
+    # Tracing baseline (B08, plan 19 section 2.1). Pure Python, Apache-2.0, and
+    # the console exporter needs no collector, so the demo profile still runs
+    # with no infrastructure (ADR-0006).
+    "opentelemetry-sdk>=1.27",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +39,25 @@ dev = [
 # run without a browser, and render() reports clearly when it is missing.
 render = [
     "playwright>=1.48",
+]
+# Kafka event bus driver for the `full` profile (ADR-0014, B03). Optional: the
+# `demo` profile uses the in-process driver, so `make check` needs no broker.
+# Licence: confluent-kafka is Apache-2.0 over librdkafka (BSD-2-Clause); both
+# are OSI-approved and neutral (I17, plan 19 section 1).
+kafka = [
+    "confluent-kafka>=2.6",
+]
+# PostgreSQL repositories for the `full` profile (ADR-0013, B05). Optional: the
+# `demo` profile uses the in-memory driver, so `make check` needs no database.
+# Licence: psycopg 3 is LGPL-3.0, OSI-approved and already the plan's choice
+# (19 section 2.1). The binary build ships libpq; no system packages needed.
+postgres = [
+    "psycopg[binary]>=3.2",
+]
+# OTLP trace export for the `full` profile, to an OpenTelemetry Collector.
+# Licence: Apache-2.0. The demo profile uses the console exporter instead.
+otlp = [
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
 ]
 
 [build-system]
@@ -69,6 +92,16 @@ plugins = []
 [[tool.mypy.overrides]]
 # Optional dependency (the `render` extra); typed when installed, absent otherwise.
 module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Optional dependency (the `kafka` extra); ships no stubs.
+module = ["confluent_kafka", "confluent_kafka.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Optional dependency (the `otlp` extra); present only in the full profile.
+module = ["opentelemetry.exporter.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
