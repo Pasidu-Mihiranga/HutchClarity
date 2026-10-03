@@ -466,11 +466,22 @@ def _body(message: Message) -> bytes:
     A Kafka record may have a null value (a tombstone in a compacted topic).
     Clarity publishes no tombstones, so one here means something else is writing
     to our topics and the event cannot be trusted.
+
+    The payload is checked with ``isinstance`` rather than trusted, because
+    ``confluent_kafka`` is an optional dependency that ships no stubs: in the
+    lite lane, where it is not installed, every value it hands back is ``Any``
+    and a declared return type would be a claim mypy cannot check. The check
+    is the same guarantee in both lanes.
     """
     value = message.value()
     if value is None:
         topic, index, offset = _where(message)
         raise KafkaUnavailable(f"{topic}[{index}]@{offset} carries no payload")
+    if not isinstance(value, bytes):
+        topic, index, offset = _where(message)
+        raise KafkaUnavailable(
+            f"{topic}[{index}]@{offset} carries {type(value).__name__}, not bytes"
+        )
     return value
 
 

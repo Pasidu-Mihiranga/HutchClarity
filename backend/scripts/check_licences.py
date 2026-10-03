@@ -26,6 +26,11 @@ ALLOWED = frozenset(
         "BSD License",
         "BSD-2-Clause",
         "BSD-3-Clause",
+        # The same two licences as PyPI classifiers write them. protobuf 7.x
+        # reports "3-Clause BSD License", which is BSD-3-Clause spelled the
+        # other way round and was failing this gate on a naming difference.
+        "3-Clause BSD License",
+        "2-Clause BSD License",
         "ISC License (ISCL)",
         "ISC",
         "MIT License",

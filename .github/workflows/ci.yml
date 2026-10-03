@@ -70,18 +70,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
-      opa:
-        # Evaluates the real Rego in config/opa, so the authorization parity
-        # suite compares Python against OPA rather than against a Python
-        # reimplementation of the same rules (M-IAM).
-        #
-        # A service container cannot mount the workspace, because it starts
-        # before the checkout. So it runs empty and the policy is uploaded
-        # through OPA's API in a step below.
-        image: openpolicyagent/opa:1.1.0
-        ports: ["8181:8181"]
-        options: >-
-          --args --server --addr=0.0.0.0:8181
       openbao:
         # Signs receipts in the full lane, so the Transit driver is exercised
         # against the real API rather than against a Python stand-in of it
@@ -136,20 +124,28 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install with the full-profile extras
         run: pip install -e ".[dev,postgres,kafka,otlp]"
-      - name: Load the authorization policy into OPA
-        # Uploaded rather than mounted, and then checked: an OPA answering with
-        # no policy denies everything, which a parity suite would read as a
-        # disagreement rather than as "the policy never loaded".
-        working-directory: .
+      - name: Start OPA with the real policy mounted
+        # Run as a step, not a service container, for two reasons. A service
+        # container starts before the checkout, so it cannot mount
+        # config/opa; and a service container cannot set the image's command,
+        # which OPA needs ("run --server"), so the only way to express it was
+        # an `--args` option that `docker create` rejects outright. That is
+        # what failed this lane with exit 125.
+        #
+        # Mounting the directory is also what deploy/compose/full.yml does, so
+        # CI and the local stack now load the policy the same way.
         run: |
           set -euo pipefail
+          docker run -d --name clarity-ci-opa -p 8181:8181 \
+            -v "$GITHUB_WORKSPACE/config/opa:/policy:ro" \
+            openpolicyagent/opa:1.1.0 \
+            run --server --addr=0.0.0.0:8181 /policy
           for attempt in $(seq 1 30); do
-            curl -sf localhost:8181/health && break || sleep 2
+            curl -sf localhost:8181/health >/dev/null && break || sleep 2
           done
-          curl -sf -X PUT localhost:8181/v1/policies/clarity-authz \
-            --data-binary @config/opa/authz.rego
-          curl -sf -X PUT localhost:8181/v1/data/clarity \
-            --data-binary @<(python -c "import json,sys; json.dump(json.load(open('config/opa/data.json'))['clarity'], sys.stdout)")
+          # Checked, not assumed: an OPA answering with no policy denies
+          # everything, which the parity suite would read as a disagreement
+          # with Python rather than as "the policy never loaded".
           echo "an agent may read a case:"
           curl -sf -X POST localhost:8181/v1/data/clarity/authz/allow \
             -H 'Content-Type: application/json' \
