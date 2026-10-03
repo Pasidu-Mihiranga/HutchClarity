@@ -1,0 +1,90 @@
+{{- /*
+One Deployment and one Service per enabled deployable. They differ only in the
+command and the port, because they are one image (plan 21 section 11.1, S1).
+
+Every pod gets the same contract from ADR-0016: a liveness and a readiness
+probe on /health, config from the environment, a read-only root filesystem and
+no privilege escalation.
+*/ -}}
+{{- range $name, $spec := .Values.deployables }}
+{{- if $spec.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "clarity.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $spec.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "clarity.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: {{ toJson $spec.command }}
+          ports:
+            - name: http
+              containerPort: {{ $spec.port }}
+          env:
+            - name: CLARITY_PROFILE
+              value: {{ $.Values.profile | quote }}
+          {{- if $.Values.existingSecret }}
+          # Secrets come from the cluster, never from the chart (I14).
+          envFrom:
+            - secretRef:
+                name: {{ $.Values.existingSecret }}
+          {{- end }}
+          # ADR-0016: every deployable answers /health.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "clarity.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: http
+      port: {{ $spec.port }}
+      targetPort: http
+{{- end }}
+{{- end }}

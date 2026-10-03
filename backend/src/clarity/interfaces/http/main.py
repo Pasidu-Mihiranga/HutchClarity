@@ -46,6 +46,7 @@ from clarity.interfaces.http.auth import (
     public,
     requires,
 )
+from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
     ActionView,
     ApproveRequest,
@@ -173,6 +174,8 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.middleware("http")(_trace_requests)
+    # Outermost, so it also covers error responses and static files (X01).
+    app.middleware("http")(security_headers)
     # Authentication and authorization are profile-selected drivers. Lite uses
     # local JWT/Python drivers; full may use Keycloak and OPA.
     core = clarity or get_clarity()

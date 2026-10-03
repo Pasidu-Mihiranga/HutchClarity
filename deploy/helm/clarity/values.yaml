@@ -1,0 +1,54 @@
+# Values for the Clarity chart (ADR-0016, X03 issue #44).
+#
+# The chart's job is to prove the deployment contract, not to be a production
+# topology: one image, a command per deployable, config from the environment,
+# health probes on every pod, and no secrets in the chart.
+
+image:
+  repository: clarity
+  tag: dev
+  # `Never` so a kind cluster uses the image loaded into it rather than trying
+  # to pull from a registry that does not exist in CI.
+  pullPolicy: IfNotPresent
+
+# The runtime profile. `lite` needs no infrastructure (ADR-0006), which is what
+# makes the CI smoke test possible without also standing up PostgreSQL, Kafka,
+# Keycloak, OPA and OpenBao inside the cluster.
+profile: lite
+
+# Secrets are never values in this chart. A deployable that needs one reads it
+# from a Secret the cluster already holds; `existingSecret` names it.
+existingSecret: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Each deployable is the same image with a different command and port.
+deployables:
+  api:
+    enabled: true
+    replicas: 1
+    port: 8000
+    command: ["uvicorn", "clarity.entrypoints.asgi:app", "--host", "0.0.0.0", "--port", "8000"]
+  mcp:
+    enabled: true
+    replicas: 1
+    port: 8099
+    command: ["uvicorn", "clarity.entrypoints.mcp_asgi:app", "--host", "0.0.0.0", "--port", "8099"]
+  channel-gateway:
+    enabled: true
+    replicas: 1
+    port: 8102
+    command:
+      - uvicorn
+      - --app-dir
+      - services/channel-gateway/src
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8102"

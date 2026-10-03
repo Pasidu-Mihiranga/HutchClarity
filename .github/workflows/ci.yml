@@ -254,6 +254,120 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
+  dast:
+    name: DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install
+        run: pip install -e "backend[dev]"
+
+      - name: Start the API
+        # Scanned where it runs, not on "staging": there is no staging
+        # environment, and saying there is would be worse than saying this.
+        # The lite profile needs no services (ADR-0006) and serves the same
+        # routes, headers and static UI as any other profile, which is what a
+        # baseline scan looks at.
+        run: |
+          set -euo pipefail
+          cd backend
+          CLARITY_PROFILE=lite OTEL_EXPORTER=none \
+            python -m uvicorn clarity.entrypoints.asgi:app \
+            --host 127.0.0.1 --port 8100 &
+          for attempt in $(seq 1 30); do
+            curl -sf localhost:8100/health >/dev/null && break || sleep 2
+          done
+          # Checked, not assumed: ZAP against a dead port reports a clean scan.
+          curl -sf localhost:8100/health >/dev/null
+          echo "the api answers"
+
+      - name: ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://127.0.0.1:8100
+          rules_file_name: .zap/rules.tsv
+          # Fail on a new alert. The three known warnings are IGNOREd in the
+          # rules file, each with its reason, so anything new is a regression.
+          allow_issue_writing: false
+          cmd_options: "-a"
+
+  deploy:
+    name: deployment artefacts (image, Helm on kind, OpenTofu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        # One image for every Python deployable (plan 21 section 11.1, S1).
+        # The context is the repository root because rules/ and config/ are
+        # read at runtime and are versioned with the code (I10, I11).
+        run: docker build -f deploy/docker/Dockerfile -t clarity:ci .
+
+      - name: Lint and render the chart
+        run: |
+          set -euo pipefail
+          helm lint deploy/helm/clarity
+          # Rendering before install turns a template error into a readable
+          # failure here rather than an opaque one from the API server.
+          helm template clarity deploy/helm/clarity --set image.tag=ci > /tmp/rendered.yaml
+          test -s /tmp/rendered.yaml
+
+      - name: Create a kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: clarity-ci
+          wait: 120s
+
+      - name: Load the image into the cluster
+        # Loaded rather than pulled: there is no registry in CI, which is also
+        # why the chart's pullPolicy must not be Always.
+        run: kind load docker-image clarity:ci --name clarity-ci
+
+      - name: Install the chart
+        run: |
+          helm install clarity deploy/helm/clarity \
+            --set image.tag=ci \
+            --wait --timeout 5m
+
+      - name: Smoke test every deployable
+        # ADR-0016 requires /health on each one, so each one is asked.
+        # `rollout status` already waited; this proves the contract, not just
+        # that a pod started.
+        run: |
+          set -euo pipefail
+          for deployable in api mcp channel-gateway; do
+            echo "::group::$deployable"
+            kubectl rollout status "deployment/clarity-$deployable" --timeout=120s
+            port=$(kubectl get svc "clarity-$deployable" -o jsonpath='{.spec.ports[0].port}')
+            kubectl run "smoke-$deployable" --rm -i --restart=Never \
+              --image=curlimages/curl:8.11.1 -- \
+              curl -sf --max-time 10 "http://clarity-$deployable:$port/health"
+            echo "::endgroup::"
+          done
+
+      - name: Show what failed, if anything
+        if: failure()
+        run: |
+          kubectl get pods -o wide || true
+          kubectl describe pods || true
+          kubectl logs -l app.kubernetes.io/name=clarity --all-containers --tail=100 || true
+
+      - name: OpenTofu reference validates
+        # validate and fmt only. There is no target cluster and no credentials,
+        # so a plan would prove nothing (deploy/opentofu/README.md).
+        uses: opentofu/setup-opentofu@v1
+      - run: |
+          set -euo pipefail
+          tofu -chdir=deploy/opentofu init -backend=false
+          tofu -chdir=deploy/opentofu validate
+          tofu -chdir=deploy/opentofu fmt -check
+
   sbom:
     name: SBOM and licence check
     runs-on: ubuntu-latest
