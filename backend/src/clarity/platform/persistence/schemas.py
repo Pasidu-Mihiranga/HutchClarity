@@ -21,6 +21,10 @@ OWNERS: dict[str, str] = {
     "notifications": "notifications",
     "proactive": "proactive",
     "conversation": "conversation",
+    "knowledge": "knowledge",
+    "autopsy": "autopsy",
+    "deskops": "deskops",
+    "insights": "insights",
     "platform": "platform",
 }
 
@@ -51,6 +55,20 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
         "reconciliation.mismatches",
     }
 )
+
+#: Four modules own data that is deliberately **not** customer-scoped, and the
+#: reason differs for each. Binding any of them to a subscriber would not be a
+#: stricter setting, it would hide the row from the only query that needs it.
+#:
+#: - ``knowledge.*`` holds published policy and help documents. There is no
+#:   customer in them at all.
+#: - ``insights.projections`` holds folds over the whole event log. A row is an
+#:   aggregate across every subscriber, so it belongs to none of them.
+#: - ``deskops.batches`` holds a staff batch spanning many subscribers, which a
+#:   per-subscriber policy would make unreadable to the desk that owns it.
+#: - ``autopsy.complaints`` holds masked complaint text and carries no
+#:   ``subscriber_ref`` to bind to: the autopsy is aggregate-facing by
+#:   construction (AU01), and the masking is what protects it.
 
 
 #: The role the application runs its requests as.
