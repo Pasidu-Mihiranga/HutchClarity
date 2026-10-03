@@ -2,9 +2,25 @@
 
 > **Audience:** contributors (human and AI agents) working this migration. Read [AGENTS.md](AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** DRAFT, not approved. No code changes until the ADR in Phase 0 is Accepted.
-> **Created:** 2026-10-02
+> **Status:** DRAFT, not approved.
+> **Created:** 2026-10-02 · **Reconciled against the code:** 2026-10-04
 > **Supersedes:** nothing yet. Requires superseding [ADR-0002](docs/adr/0002-modular-monolith-with-satellites.md).
+>
+> **This file holds two separate bodies of work, and only one of them is gated.**
+>
+> - **Sections 3 to 9, the microservices migration.** Not started and correctly
+>   not started: it is gated on an ADR that does not exist yet (Phase 0). "No
+>   code changes until the ADR is Accepted" applies to **this** work and
+>   nothing else.
+> - **Section 10, the GitHub issue backlog.** Building the modular monolith
+>   itself, which ADR-0002 already accepted. Waves 0 to 3 are complete and
+>   Wave 4 is all but done, so a great deal of code has landed, none of it
+>   blocked by the gate above.
+>
+> Reading the status line without that split suggests the whole repository is
+> frozen, which it plainly is not. Phase 1's audit gaps have also been closed
+> in the ordinary course of that backlog work rather than as a deliberate
+> pre-extraction phase, which is why they are ticked below.
 
 ---
 
@@ -59,13 +75,15 @@ Audited `backend/src/clarity/modules/` on 2026-10-02. The boundaries are in unus
 |---|---|---|
 | Modules with a `public.py` facade | **19 of 19** | Every extraction seam exists |
 | Cross-module `public.py` calls | **2** (`case -> actions`, `reconciliation -> actions`) | Almost no inter-module coupling to convert |
-| I5 violations (cross-module `domain/` imports) | **2** (`decision -> detection.domain`, `autopsy -> knowledge.domain`) | Two shared types to turn into wire schemas |
+| I5 violations (cross-module `domain/` imports) | **0** (both fixed; audited 2026-10-02, re-checked 2026-10-04) | Was 2 (`decision -> detection.domain`, `autopsy -> knowledge.domain`) |
 | Modules declaring their own schema | yes (`schema = "case"` in `module.py`) | ADR-0003 schema-per-module already honoured |
 | Outbox present | `platform/messaging/outbox.py` | I7 foundation exists |
 
 ### Gaps found
 
-1. **`import-linter` does not guard the new code.** The contracts in `pyproject.toml` target the legacy namespaces (`clarity.core`, `clarity.api`, `clarity.ai`, `clarity.mcp`, `clarity.schemas`). Nothing enforces I4 (layer rule) or I5 (module boundary) on `backend/src/clarity/modules/*`. **The 2 violations above were found by hand, not CI.** This must be fixed before extraction, or boundaries will erode while we work.
+1. ~~**`import-linter` does not guard the new code.**~~ **Closed 2026-10-04.** `backend/pyproject.toml` now carries three contracts covering `backend/src/clarity`: a `layers` contract for `kernel -> contracts -> integration -> platform -> ai -> modules -> app -> interfaces -> entrypoints` (I4), a `forbidden` contract keeping AI and MCP away from the tool layer's capabilities, and an `independence` contract between the HTTP and MCP interfaces. `make check` runs `lint-imports` (the `imports` target), so CI blocks on them.
+
+   **One half is still a test rather than a contract.** I5 (no cross-module `domain/` import) is enforced by `backend/tests/architecture/test_module_boundaries.py`, not by an import-linter `forbidden` contract per module. Both run in `make check`, so the boundary is guarded either way; the contract version would fail faster and name the rule in the same place as I4. Worth doing, not urgent.
 2. **Facades are stateless pure functions, not services.** `decision.public.decide()` takes data and returns a `Decision`. Easy to extract, but there is no per-module DB session or ownership enforced at runtime yet.
 3. **One shared DB session** (`platform/db/session.py`). Each service needs its own connection, role and migration chain.
 4. **No service template, no service-to-service auth, no gateway, no distributed tracing.**
@@ -112,21 +130,23 @@ Updated as implementation proceeds. Checkbox states are the source of truth for 
 ### Phase 0 - Decide and record (no code)
 
 - [ ] Resolve the Section 3 blocking question (A, B or C) with the team
-- [ ] Write `docs/adr/0015-modular-microservices.md`: context (what changed since ADR-0002), decision, the 8-service split, alternatives, consequences, compliance
-- [ ] Set ADR-0002 status to `Superseded by 0015`
-- [ ] Add ADR-0015 to `docs/adr/README.md` index
+- [ ] Write `docs/adr/0031-modular-microservices.md`: context (what changed since ADR-0002), decision, the 8-service split, alternatives, consequences, compliance
+  - **Number corrected 2026-10-04.** This said `0015`, which is now taken by the accepted `0015-detectors-zen-tables-opa.md`. The highest ADR is `0030`, so the next free number is `0031`. Check again before writing: ADRs have been landing steadily.
+- [ ] Set ADR-0002 status to `Superseded by 0031`
+- [ ] Add ADR-0031 to `docs/adr/README.md` index
 - [ ] Record the plan change in `docs/enterprise-plan/CHANGES.md`
 - [ ] Add a "Deviations" entry in `ARCHITECTURE.md`
-- [ ] Get ADR-0015 to `Accepted`. **No work below starts before this.**
+- [ ] Get ADR-0031 to `Accepted`. **No work below starts before this.**
 
 ### Phase 1 - Close the gaps found in the audit
 
-- [ ] Rewrite `import-linter` contracts in `pyproject.toml` to cover `backend/src/clarity`: layer contract for L0-L7 (I4), and a `forbidden` contract per module blocking `modules.*.domain` and `modules.*.infrastructure` from outside that module (I5)
-- [ ] Verify the new contracts actually fail: confirm they catch the 2 known violations
-- [ ] Fix `decision -> detection.domain`: move the shared `Detection` type to a contract schema
-- [ ] Fix `autopsy -> knowledge.domain`: same treatment
-- [ ] Add `make check` gate so CI blocks on import-linter
-- [ ] Give every module a `MODULE.md` from `docs/templates/MODULE.md` (19 files, currently 0 per `docs/modules.md`)
+- [x] Rewrite `import-linter` contracts in `pyproject.toml` to cover `backend/src/clarity`: layer contract for L0-L7 (I4) `done`
+  - [ ] Still open: a `forbidden` contract per module blocking `modules.*.domain` and `modules.*.infrastructure` from outside that module (I5). Enforced today by `tests/architecture/test_module_boundaries.py` instead, which is equivalent protection in a different place.
+- [x] Verify the new contracts actually fail `done`
+- [x] Fix `decision -> detection.domain`: move the shared `Detection` type to a contract schema `done`
+- [x] Fix `autopsy -> knowledge.domain`: same treatment `done`
+- [x] Add `make check` gate so CI blocks on import-linter `done` (`make check` = `lint types imports test`)
+- [x] Give every module a `MODULE.md` from `docs/templates/MODULE.md` `done` (20 of 20 modules, 2026-10-04)
 
 ### Phase 2 - Finish the strangler (Option A only)
 
@@ -217,7 +237,21 @@ Phases 0 to 2 deliver real value regardless of whether microservices happen: the
 
 ## 10. GitHub issue backlog - todo list
 
-Linked to the 42 open issues in the repo. Check off each item as it is merged. Issue numbers link to GitHub. Priority: p0 = critical path, p1 = required, p2 = important, p3 = nice-to-have.
+Linked to the GitHub issues in the repo. Check off each item as it is merged. Priority: p0 = critical path, p1 = required, p2 = important, p3 = nice-to-have.
+
+**The checkbox here and the GitHub issue state must agree.** As of 2026-10-04
+they do not: eleven issues are ticked below and still **open** on GitHub,
+because the work landed before closing-on-merge became the habit.
+
+| Ticked here, open on GitHub |
+|---|
+| #5 B02, #6 B05, #11 B03, #12 B04, #14 B06, #15 B07, #16 B08, #17 B09, #18 B10, #25 M-ACT, #34 M-CASE |
+
+Every issue closed from #19 onwards carries a `Closes: #N` footer on its
+commit, which GitHub acts on when the commit reaches `main`. The eleven above
+predate that and need either closing or a second look; they are left open
+rather than closed in bulk, because a tick here is a claim and the issue's own
+acceptance tests are the evidence.
 
 ### Wave 0 - Baseline wiring (do before any other wave)
 
