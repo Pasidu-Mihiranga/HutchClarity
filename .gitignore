@@ -24,3 +24,8 @@ licences.json
 
 # Evaluation report artefacts (A05); regenerate with `make eval`.
 backend/.eval/
+
+# ZAP scan output. `.zap/rules.tsv` is source and is committed; the report and
+# the generated plan are artefacts of a run.
+.zap/report.*
+.zap/zap.yaml

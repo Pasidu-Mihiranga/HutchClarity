@@ -336,20 +336,30 @@ jobs:
             --wait --timeout 5m
 
       - name: Smoke test every deployable
-        # ADR-0016 requires /health on each one, so each one is asked.
-        # `rollout status` already waited; this proves the contract, not just
-        # that a pod started.
+        # ADR-0016 requires /health on each one, so each one is asked from
+        # inside the cluster. `helm install --wait` already waited for the
+        # readiness probes; this proves the contract rather than that a pod
+        # started, and it is how `clarity-mcp` was caught shipping without a
+        # /health route at all.
+        #
+        # One pod that loops rather than one pod per deployable: fewer image
+        # pulls, and no pod-name collision on a re-run.
         run: |
           set -euo pipefail
           for deployable in api mcp channel-gateway; do
-            echo "::group::$deployable"
             kubectl rollout status "deployment/clarity-$deployable" --timeout=120s
-            port=$(kubectl get svc "clarity-$deployable" -o jsonpath='{.spec.ports[0].port}')
-            kubectl run "smoke-$deployable" --rm -i --restart=Never \
-              --image=curlimages/curl:8.11.1 -- \
-              curl -sf --max-time 10 "http://clarity-$deployable:$port/health"
-            echo "::endgroup::"
           done
+          kubectl run smoke --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- sh -c '
+            set -e
+            for target in clarity-api:8000 clarity-mcp:8099 clarity-channel-gateway:8102; do
+              printf "%s -> " "$target"
+              curl -sf --max-time 10 "http://$target/health"
+              echo
+            done
+          ' | tee /tmp/smoke.txt
+          # `kubectl run` exits 0 even when the command inside failed, so the
+          # output is checked rather than the exit status.
+          test "$(grep -c '"status":"ok"' /tmp/smoke.txt)" -eq 3
 
       - name: Show what failed, if anything
         if: failure()

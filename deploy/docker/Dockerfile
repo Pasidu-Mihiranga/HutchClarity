@@ -25,8 +25,13 @@ COPY backend/src ./backend/src
 # Installed into a virtualenv so the runtime stage can copy one directory.
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# Every extra that a deployable in the Helm chart needs. `mcp` is easy to
+# leave out and the omission only shows at runtime: it imports fine under
+# `make check`, where the dev extra pulls it in, and `clarity-mcp`
+# crash-looped in the cluster with ModuleNotFoundError. The kind smoke test
+# is what caught it.
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir "./backend[postgres,kafka,otlp]"
+ && pip install --no-cache-dir "./backend[postgres,kafka,otlp,mcp]"
 
 
 FROM python:3.12-slim-bookworm AS runtime

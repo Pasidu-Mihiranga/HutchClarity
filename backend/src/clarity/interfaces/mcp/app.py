@@ -39,6 +39,9 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS
 from pydantic import BaseModel
 from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 from clarity.interfaces.mcp.auth import TokenRejected, principal_from_claims
 from clarity.interfaces.mcp.resource_server import ClarityResourceServer
@@ -271,7 +274,7 @@ def build_mcp_app(
         mcp.add_tool(handler)
 
     _add_ui_cards(mcp)
-    return mcp.streamable_http_app(
+    app = mcp.streamable_http_app(
         stateless_http=True,
         json_response=json_response,
         transport_security=TransportSecuritySettings(
@@ -280,6 +283,20 @@ def build_mcp_app(
             allowed_origins=[f"https://{entry}" for entry in hosts],
         ),
     )
+
+    # ADR-0016: every deployable answers /health. Without it an orchestrator
+    # has no way to tell a started process from a working one, and the Helm
+    # chart's liveness probe killed this pod in a loop until it was added.
+    #
+    # Unauthenticated and deliberately empty of detail: a probe runs before any
+    # token exists, and a health endpoint that lists tools or configuration is
+    # a free reconnaissance endpoint on a server whose whole point is that it
+    # cannot be driven without a token.
+    async def health(request: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok", "service": "clarity-mcp"})
+
+    app.router.routes.append(Route("/health", health, methods=["GET"]))
+    return app
 
 
 def _add_ui_cards(mcp: MCPServer[Any]) -> None:
