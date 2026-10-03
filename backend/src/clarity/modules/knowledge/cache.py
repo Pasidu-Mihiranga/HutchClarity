@@ -30,11 +30,11 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 
+from clarity.ai.language import query_terms
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language
 from clarity.modules.knowledge.answers import AnswerKind, GroundedAnswer
 from clarity.modules.knowledge.sources import Audience
-from clarity.modules.knowledge.terms import query_terms
 
 #: How many answers one process keeps. Small on purpose: this is a latency and
 #: token saver for repeated generic questions, not a store. The eviction is

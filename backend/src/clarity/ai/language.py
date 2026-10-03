@@ -1,4 +1,21 @@
-"""Turning text into the terms an index matches on (K02, #32).
+"""Sri Lankan language handling: tokenising, folding, Singlish (K02, K04).
+
+**Why this is in `clarity.ai` and not in a module.** Two modules need the same
+Singlish vocabulary for different jobs: `knowledge` expands a query into the
+English its corpus is written in (K02, #32), and `conversation` classifies an
+intent from a customer's own words (C04, #23). A lexicon living in one of them
+would be a lexicon the other duplicated, and the duplicate would drift.
+
+It is here rather than in `platform` because the layer is already the right
+one: `clarity.ai` is "language only, never authority", which is exactly what
+this is. It decides no cause, no amount and no eligibility, and it holds no
+model: every function here is deterministic, which is what lets both callers
+work with no provider configured (ADR-0009).
+
+The K02 devlog predicted this move, noting that the lexicon "is content, not
+logic, and if intents move under the policy lifecycle in C04 (#23) it should go
+with them". That lifecycle is still the right eventual home (plan 20): these
+are reviewable word lists, not code.
 
 Retrieval is only as good as the agreement between how a document was indexed
 and how a query was tokenised, so both go through this one module.
@@ -270,7 +287,7 @@ def _fold(token: str) -> str:
 
 #: Built once, after ``_fold`` exists. Keyed by the folded form, so a lexicon
 #: entry cannot be unreachable; asserted by
-#: ``tests/unit/test_knowledge_terms.py``.
+#: ``tests/unit/test_language.py``.
 _LEXICON: dict[str, tuple[str, ...]] = _folded_lexicon()
 
 

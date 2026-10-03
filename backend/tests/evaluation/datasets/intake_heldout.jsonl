@@ -1,0 +1,52 @@
+// Held-out intake set (C04, issue #23).
+//
+// Written BEFORE the keyword rules were extended for C04, and deliberately not
+// consulted while extending them. Its only job is to say whether the rules
+// generalise or were fitted to `intake.jsonl`.
+//
+// That distinction matters more than usual here. The `intake` gate requires 300
+// examples per language and the main set holds 20, so the gate reports
+// UNEVALUABLE however good the F1 is: twenty examples cannot validate a keyword
+// set. This file does not fix that. It is a smaller, independent check that
+// catches the most obvious form of the problem, which is a rule matching the
+// exact phrasing of the example it was written for.
+//
+// Synthetic, like every dataset here. No HUTCH traffic and no real customer
+// text (I13, I16). `language` is declared by whoever wrote the line, not by a
+// detector: the detector is part of what is measured.
+{"id": "held-en-001", "language": "en", "text": "There is a charge on my account I cannot explain", "intent": "UNEXPECTED_CHARGE"}
+{"id": "held-en-002", "language": "en", "text": "Where did my credit go this morning", "intent": "BALANCE_DEDUCTION_QUERY"}
+{"id": "held-en-003", "language": "en", "text": "Topped up last night and nothing showed up", "intent": "RELOAD_MISSING"}
+{"id": "held-en-004", "language": "en", "text": "Everything is loading really slowly today", "intent": "DATA_SLOW"}
+{"id": "held-en-005", "language": "en", "text": "Has my connection been throttled after the cap", "intent": "FUP_QUERY"}
+{"id": "held-en-006", "language": "en", "text": "Turn on the weekly bundle please", "intent": "PACK_ACTIVATE"}
+{"id": "held-en-007", "language": "en", "text": "When will my current bundle run out", "intent": "PACK_EXPIRY"}
+{"id": "held-en-008", "language": "en", "text": "I want to stop this content service", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "held-en-009", "language": "en", "text": "Put me through to one of your staff", "intent": "HANDOFF"}
+{"id": "held-en-010", "language": "en", "text": "Is there an outage in my area", "intent": "NETWORK_STATUS"}
+{"id": "held-si-001", "language": "si", "text": "මගේ ගිණුමෙන් මුදල් අඩු වී ඇත්තේ ඇයි", "intent": "BALANCE_DEDUCTION_QUERY"}
+{"id": "held-si-002", "language": "si", "text": "මම නොදන්නා සේවාවකට ගාස්තු ගෙවා ඇත", "intent": "UNEXPECTED_CHARGE"}
+{"id": "held-si-003", "language": "si", "text": "රීලෝඩ් කළ මුදල් තවම ලැබී නැත", "intent": "RELOAD_MISSING"}
+{"id": "held-si-004", "language": "si", "text": "අන්තර්ජාලය ඉතා මන්දගාමී වේ", "intent": "DATA_SLOW"}
+{"id": "held-si-005", "language": "si", "text": "මගේ වේගය අඩු කර ඇත්තේ ඇයි", "intent": "FUP_QUERY"}
+{"id": "held-si-006", "language": "si", "text": "කරුණාකර දෛනික පැකේජය සක්රිය කරන්න", "intent": "PACK_ACTIVATE"}
+{"id": "held-si-007", "language": "si", "text": "මෙම දායකත්වය අවලංගු කරන්න", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "held-si-008", "language": "si", "text": "මට නිලධාරියෙකු සමඟ කතා කරන්න ඕන", "intent": "HANDOFF"}
+{"id": "held-ta-001", "language": "ta", "text": "என் கணக்கில் இருந்து பணம் குறைந்துள்ளது ஏன்", "intent": "BALANCE_DEDUCTION_QUERY"}
+{"id": "held-ta-002", "language": "ta", "text": "எனக்குத் தெரியாத சேவைக்கு கட்டணம் செலுத்தப்பட்டது", "intent": "UNEXPECTED_CHARGE"}
+{"id": "held-ta-003", "language": "ta", "text": "ரீலோட் செய்த பணம் இன்னும் வரவில்லை", "intent": "RELOAD_MISSING"}
+{"id": "held-ta-004", "language": "ta", "text": "இணையதளம் மிகவும் மெதுவாக உள்ளது", "intent": "DATA_SLOW"}
+{"id": "held-ta-005", "language": "ta", "text": "என் வேகம் குறைக்கப்பட்டது ஏன்", "intent": "FUP_QUERY"}
+{"id": "held-ta-006", "language": "ta", "text": "வாராந்திர தரவுத் திட்டத்தை செயல்படுத்துங்கள்", "intent": "PACK_ACTIVATE"}
+{"id": "held-ta-007", "language": "ta", "text": "என் சந்தாவை ரத்து செய்யுங்கள்", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "held-ta-008", "language": "ta", "text": "எனக்கு ஒரு ஊழியருடன் பேச வேண்டும்", "intent": "HANDOFF"}
+{"id": "held-si-en-001", "language": "si-en", "text": "Mage account eken salli adu wela", "intent": "BALANCE_DEDUCTION_QUERY"}
+{"id": "held-si-en-002", "language": "si-en", "text": "Mama danne na mokak hari gaasthuwak", "intent": "UNEXPECTED_CHARGE"}
+{"id": "held-si-en-003", "language": "si-en", "text": "Reload dapu salli tawama awe na", "intent": "RELOAD_MISSING"}
+{"id": "held-si-en-004", "language": "si-en", "text": "Internet eka godak hemin", "intent": "DATA_SLOW"}
+{"id": "held-si-en-005", "language": "si-en", "text": "Mage speed eka adu karala ane ai", "intent": "FUP_QUERY"}
+{"id": "held-si-en-006", "language": "si-en", "text": "Weekly package eka activate karanna", "intent": "PACK_ACTIVATE"}
+{"id": "held-si-en-007", "language": "si-en", "text": "Me service eka nawaththanna", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "held-si-en-008", "language": "si-en", "text": "Mata kenekwa ekka katha karanna ona", "intent": "HANDOFF"}
+{"id": "held-si-en-009", "language": "si-en", "text": "Mage package eka kawada iwara wenne", "intent": "PACK_EXPIRY"}
+{"id": "held-si-en-010", "language": "si-en", "text": "Signal na ada udhe idan", "intent": "NETWORK_STATUS"}

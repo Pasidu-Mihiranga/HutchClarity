@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from clarity.modules.conversation.intake import IntakeAssist, classify, reply_language
+from clarity.modules.conversation.intake import detect_language as _detect_language
 from clarity.modules.conversation.intent_routes import routing_payload
 from clarity.modules.conversation.intents import Intent
 from clarity.modules.conversation.suggestions import (
@@ -17,73 +19,6 @@ _SINHALA = re.compile(r"[඀-෿]")
 _TAMIL = re.compile(r"[஀-௿]")
 
 # (pattern, intent, score) - en/si/ta. Highest score wins.
-_INTAKE_KEYWORDS: list[tuple[str, str, float]] = [
-    (
-        r"\b(agent|human|speak to|talk to|complaint|fraud|police|lawyer)\b|නීති|පොලීස්|மனிதர்|முறையீடு",
-        Intent.HANDOFF.value,
-        0.95,
-    ),
-    (r"\b(esim|e-sim|convert to esim)\b", Intent.ESIM_HELP.value, 0.92),
-    (r"\b(recommend|best pack|which pack|suitable)\b|හොඳම|சிறந்த", Intent.PACK_RECOMMEND.value, 0.9),
-    (
-        r"\b(prevent|safeguard|stop unexpected|spend cap)\b|වැළැක්|தடுக்க",
-        Intent.PREVENT_CHARGES.value,
-        0.88,
-    ),
-    (
-        r"\b(stop (it|this)|disable (it|this|the service)|cancel (it|this)|turn (it|this) off)\b"
-        r"|නවත්ව|நிறுத்து",
-        Intent.VAS_SUBSCRIPTIONS.value,
-        0.9,
-    ),
-    (r"\b(my case|ticket status|case status)\b|කේස්|வழக்கு", Intent.CASE_STATUS.value, 0.88),
-    (r"\b(refund|got my money back)\b|ආපසු|பணத்தைத் திருப்பு", Intent.REFUND_STATUS.value, 0.88),
-    (r"\b(network|no signal|coverage|outage)\b|සිග්නල්|சிக்னல்", Intent.NETWORK_STATUS.value, 0.86),
-    (
-        r"\b(subscription|subscriptions|vas list|active vas|gamezone|gamehub)\b|දායක|சந்தா",
-        Intent.VAS_SUBSCRIPTIONS.value,
-        0.9,
-    ),
-    (r"\b(twice|duplicate|double.?charge|දෙවර|இரண்டு)\b", Intent.DOUBLE_CHARGE.value, 0.92),
-    (r"\b(fup|fair.?use|speed reduced|throttle)\b|වේගය|வேக", Intent.FUP_QUERY.value, 0.9),
-    (r"\b(slow|data slow|මන්දගත|மெதுவாக)\b", Intent.DATA_SLOW.value, 0.9),
-    (
-        r"\b(paid but|didn.?t receive|missing (data|pack)|නොආ|வரவில்லை)\b",
-        Intent.PACK_MISSING.value,
-        0.88,
-    ),
-    (r"\b(can.?t activate|cannot activate|activation fail)\b", Intent.PACK_ACTIVATE.value, 0.88),
-    (
-        r"\b(pack(age)? (not|isn.?t) work|not working)\b|වැඩ කරන්නේ නැ|வேலை செய்யவில்லை",
-        Intent.PACK_NOT_WORKING.value,
-        0.88,
-    ),
-    (r"\b(expir(e|es|ing)|pack end|when my pack)\b|කල් ඉකුත්|காலாவதி", Intent.PACK_EXPIRY.value, 0.86),
-    (
-        r"\b(reload|top.?up|where.*(money|reload)|payment pending)\b",
-        Intent.RELOAD_MISSING.value,
-        0.88,
-    ),
-    (
-        r"(?:charged|deduct(?:ed|ion)?|unexpected\s+(?:charge|vas)|(?:rs\.?|lkr)\s*\d+(?:\.\d{2})?)|අය|කපා|ගාස්තු|கட்டண|வாங்கி",
-        Intent.UNEXPECTED_CHARGE.value,
-        0.88,
-    ),
-    (
-        r"\b(balance|money (go|went|gone)|why.*(rupee|money)|mage balance|බැලන්ස්|இருப்பு)\b",
-        Intent.BALANCE_DEDUCTION_QUERY.value,
-        0.85,
-    ),
-    (r"\b(why|charge|charged|debit|money|lkr|රු)\b", Intent.BALANCE_DEDUCTION_QUERY.value, 0.7),
-    (r"අය|කපා|ගාස්තු|ඇයි", Intent.BALANCE_DEDUCTION_QUERY.value, 0.75),
-    (r"கட்டண|வாங்கி|ஏன்", Intent.BALANCE_DEDUCTION_QUERY.value, 0.75),
-    (
-        r"\b(how (do|to|can) i|activate a pack|what is fup)\b|කොහොමද|எப்படி",
-        Intent.ESIM_HELP.value,
-        0.65,
-    ),
-]
-
 _REPLY_TEMPLATES: dict[str, dict[str, str]] = {
     Intent.BALANCE_DEDUCTION_QUERY.value: {
         "en": "I will check what changed your balance against charging and payment evidence.",
@@ -158,6 +93,10 @@ class IntakeResult:
     raw_text: str = ""
     route: str = "account"
     client_intent: str = "balance"
+    assisted: bool = False
+    """Whether the `extract` role was consulted (C04). Recorded, not cosmetic:
+    a reader of the audit needs to know an intent came from a model and not
+    from a matched phrase."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -167,28 +106,25 @@ class IntakeResult:
             "language": self.language,
             "needs_handoff": self.needs_handoff,
             "raw_text": self.raw_text,
+            "assisted": self.assisted,
             "route": self.route,
             "client_intent": self.client_intent,
         }
 
 
 def detect_language(text: str) -> str:
-    if _SINHALA.search(text):
-        return "si"
-    if _TAMIL.search(text):
-        return "ta"
-    return "en"
+    """Kept as the module's name for it; the rules live in `intake.py` (C04)."""
+    return _detect_language(text)
 
 
-def extract_intake(text: str) -> IntakeResult:
+def extract_intake(text: str, *, assist: IntakeAssist | None = None) -> IntakeResult:
+    """Classify one message. Keyword rules first, a model only when unsure (C04).
+
+    ``assist`` is the `extract` role and is optional: with none configured the
+    rules answer alone, which is the supported default (ADR-0009).
+    """
     language = detect_language(text)
-    search_text = text if language != "en" else text.lower()
-    best_intent = Intent.FALLBACK.value
-    best_score = 0.0
-    for pattern, intent, score in _INTAKE_KEYWORDS:
-        if score > best_score and re.search(pattern, search_text, re.IGNORECASE):
-            best_intent = intent
-            best_score = score
+    best_intent, best_score, assisted = classify(text, assist=assist)
     amounts = re.findall(r"(?:LKR|Rs\.?|රු)?\s*(\d+(?:\.\d{2})?)", text, re.IGNORECASE)
     slots: dict[str, Any] = {}
     if amounts:
@@ -205,6 +141,7 @@ def extract_intake(text: str) -> IntakeResult:
         raw_text=text,
         route=routing["route"],
         client_intent=routing["client_intent"],
+        assisted=assisted,
     )
 
 
@@ -226,7 +163,10 @@ def check_handoff(intake: IntakeResult) -> dict[str, Any]:
 
 def compose_reply(intake: IntakeResult, *, facts: dict[str, Any] | None = None) -> str:
     facts = facts or {}
-    lang = intake.language
+    # Singlish has no template set of its own and should not: the approved
+    # wording exists in si, ta and en (I15), and a Singlish speaker reads
+    # Sinhala. Without this the lookup fell through to English.
+    lang = reply_language(intake.language)
     key = intake.intent if intake.intent in _REPLY_TEMPLATES else Intent.FALLBACK.value
     if intake.needs_handoff:
         key = Intent.HANDOFF.value

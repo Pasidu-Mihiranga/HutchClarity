@@ -15,6 +15,7 @@ candidate set both build on.
 
 from __future__ import annotations
 
+from clarity.ai.language import query_terms, tokens
 from clarity.modules.knowledge.answers import (
     ACCORDING_TO,
     NO_SOURCE,
@@ -82,7 +83,6 @@ from clarity.modules.knowledge.sources import (
     KnowledgeSource,
     SourceKind,
 )
-from clarity.modules.knowledge.terms import query_terms, tokens
 
 __all__ = [
     "ACCORDING_TO",

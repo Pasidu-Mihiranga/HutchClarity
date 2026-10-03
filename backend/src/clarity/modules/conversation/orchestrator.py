@@ -48,6 +48,7 @@ from clarity.ai.guard import Guard, GuardVerdict, inspect
 from clarity.ai.pii import ForbiddenContent, Masker
 from clarity.contracts.events import ConversationTurnCompletedV1
 from clarity.kernel.common import Channel, Language, utc_now
+from clarity.modules.conversation.intake import IntakeAssist
 from clarity.modules.conversation.intent_routes import routing_payload
 from clarity.modules.conversation.intents import Intent
 from clarity.modules.conversation.service import (
@@ -246,12 +247,16 @@ class ConversationOrchestrator:
         masker: Masker | None = None,
         guard: Guard | None = None,
         flow: FlowEngine | None = None,
+        intake_assist: IntakeAssist | None = None,
         audit: AuditLedger | None = None,
         open_unit: UnitOfWorkFactory | None = None,
     ) -> None:
         self._store = store or ConversationStore(open_unit=open_unit)
         self._masker = masker or Masker()
         self._guard = guard
+        # The `extract` role, asked only when the keyword rules are unsure
+        # (C04, #23). None is the supported default: the rules are the floor.
+        self._intake_assist = intake_assist
         self._flow = flow
         self._audit = audit
         self._open_unit = open_unit
@@ -337,7 +342,7 @@ class ConversationOrchestrator:
 
         # -- 3. Intake, on masked text ------------------------------------- #
         if verdict.allowed:
-            intake = extract_intake(masked.text)
+            intake = extract_intake(masked.text, assist=self._intake_assist)
         else:
             # Neutralised: the held text does not get to choose an intent. See
             # the module docstring for why this is not a refusal.

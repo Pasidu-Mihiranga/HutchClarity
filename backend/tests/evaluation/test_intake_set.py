@@ -163,23 +163,44 @@ def test_the_intake_gate_blocks_today_because_the_set_is_too_small(rows):
         )
 
 
-def test_singlish_has_no_language_of_its_own_in_the_detector_yet(dataset):
-    """A recorded gap, not an accepted one (C04, issue #23).
+def test_singlish_is_detected_as_its_own_language(dataset):
+    """C04 (#23) closed the gap this test used to record.
 
-    `detect_language` looks for Sinhala or Tamil script and falls back to `en`.
-    Singlish is romanised Sinhala, so it has no script to find and arrives as
-    English. Intent F1 for si-en is still measured, because the dataset declares
-    the language rather than asking the detector, but anything that routes on
-    the detected language treats these customers as English speakers.
+    Until C04 this asserted `detected == {"en"}` and said in its docstring that
+    failing would be the point. Singlish is romanised Sinhala, so it has no
+    script to find: it is recognised by vocabulary, and nothing else can
+    recognise it.
 
-    When C04 adds Singlish detection this test fails, which is the point.
+    This matters beyond the metric. Anything routing on the detected language
+    used to treat these customers as English speakers, and `compose_reply` now
+    answers them in Sinhala, which is the language their words are.
     """
     detected = {detect_language(example.text) for example in dataset.for_language("si-en")}
 
-    assert detected == {"en"}, (
-        f"Singlish now detects as {detected}. If C04 has landed, update this test "
-        "and check the si-en gate is routing on the real language."
-    )
+    assert detected == {"si-en"}, f"Singlish detected as {detected}"
+
+
+def test_sinhala_and_tamil_script_still_win_over_the_singlish_lexicon(dataset):
+    """Script is unambiguous, so it is checked first.
+
+    A Sinhala sentence containing a romanised loan word must not be read as
+    Singlish, and the order of the checks in `detect_language` is what
+    guarantees it.
+    """
+    for language in ("si", "ta"):
+        detected = {detect_language(example.text) for example in dataset.for_language(language)}
+        assert detected == {language}, f"{language} detected as {detected}"
+
+
+def test_one_singlish_word_is_not_enough_to_call_a_sentence_singlish():
+    """Two markers, because one is often a name or a coincidence.
+
+    "Please reload my account" is English and contains "reload", which is in
+    the shared lexicon. Reading it as Singlish would answer an English speaker
+    in Sinhala.
+    """
+    assert detect_language("Please reload my account") == "en"
+    assert detect_language("My data pack is slow") == "en"
 
 
 def test_the_safety_gate_is_the_one_that_can_pass_today():

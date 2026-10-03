@@ -7,7 +7,7 @@
 | Deployable | `clarity-api` today (modular monolith); a candidate for extraction (plan 21 section 179) |
 | Owner | TBD |
 | Status | built (`lite`): registry and ingestion K01 (#31), lexical retrieval K02 (#32), grounded answers K03 (#33), all 2026-10-03. The `full` profile's pgvector hybrid and the semantic half of retrieval are blocked on there being no embedding model (section 7) |
-| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `terms.py`, `bm25.py`, `config.py`, `retrieval.py`, `citations.py`, `answers.py`, `cache.py`, `service.py`, `public.py` |
+| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `bm25.py`, `config.py`, `retrieval.py`, `citations.py`, `answers.py`, `cache.py`, `service.py`, `public.py` |
 
 ## 1. Purpose
 
@@ -240,7 +240,7 @@ is how a long-lived process stops carrying dead entries.
 - `backend/tests/unit/test_knowledge_versions.py` - effective dating, supersession, overlap refusal (K01 acceptance 1)
 - `backend/tests/unit/test_knowledge_audience.py` - audience filtering, in all three places it is enforced (K01 acceptance 2)
 - `backend/tests/unit/test_knowledge_ingestion.py` - cleaning, script detection, structure-aware chunking, metadata
-- `backend/tests/unit/test_knowledge_terms.py` - folding, tokenisation per script, the Singlish lexicon, and that a cold index scores like a warm one
+- `backend/tests/unit/test_language.py` - folding, tokenisation per script and the Singlish lexicon (now `clarity.ai.language`, shared with intake)
 - `backend/tests/contract/test_retriever_parity.py` - the retriever port's contract; the hybrid driver skips
 - `backend/tests/evaluation/test_rag_retrieval.py` - recall@5 against the golden set (K02 acceptance 1) and Singlish queries (acceptance 2)
 - `backend/tests/unit/test_citation_verifier.py` - the citation verifier (K03 acceptance 1)

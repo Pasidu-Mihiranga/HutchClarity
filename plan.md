@@ -265,7 +265,7 @@ devlogs.
 - [x] #31 `[K01]` Knowledge module: source registry and governed ingestion `p0`
 - [x] #32 `[K02]` Index and retrieval: BM25 (lite), pgvector hybrid (full), filters and rerank `p0`
 - [x] #33 `[K03]` Grounded answers: compose with citations, citation verifier, refusal, semantic cache `p0`
-- [ ] #23 `[C04]` Intake: keyword rules first, extract role when unsure, Singlish support `p1`
+- [x] #23 `[C04]` Intake: keyword rules first, extract role when unsure, Singlish support `p1`
 - [ ] #24 `[C05]` Customer chat experience on flows: confirm cards, citations, handoff `p1`
 
 ### Wave 4 - Enrichment, ops, channels (parallel tracks)

@@ -39,12 +39,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
+from clarity.ai.language import query_terms
 from clarity.kernel.common import Language
 from clarity.modules.knowledge.bm25 import BM25Index
 from clarity.modules.knowledge.config import RetrievalConfig
 from clarity.modules.knowledge.registry import KnowledgeRegistry
 from clarity.modules.knowledge.sources import Audience, Chunk
-from clarity.modules.knowledge.terms import query_terms
 
 
 @dataclass(frozen=True)

@@ -57,6 +57,8 @@ from clarity.modules.conversation.public import (
     BoundedAgent,
     ConversationOrchestrator,
     FlowRouter,
+    IntakeAssist,
+    Intent,
     Planner,
     PlannerReply,
     load_flows,
@@ -306,6 +308,55 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
         if not step.is_local and step.provider in router.configured:
             return _RoleProvider(router, ModelRole.GUARD)
     return None
+
+
+def _intake_assist(router: RoleRouter, catalogue: ModelCatalogue) -> IntakeAssist | None:
+    """The `extract` role, for intake the keyword rules were unsure about (C04).
+
+    Mirrors `_guard_assist` and `_planner`, including returning ``None``. A
+    template cannot classify an intent, so wiring one would mean a rejected
+    answer on every uncertain turn. ``None`` is the supported default
+    (ADR-0009): the rules answer alone, and they measure F1 at or above 0.93
+    per language on the golden set without any model.
+    """
+    chain = catalogue.routing(ModelRole.EXTRACT).chain
+    for step in chain:
+        if not step.is_local and step.provider in router.configured:
+            return _RoleIntakeAssist(router)
+    return None
+
+
+class _RoleIntakeAssist:
+    """Adapts the `extract` role to the intake assist interface.
+
+    Asks for one intent name and nothing else. The caller validates it against
+    the catalogue, so this does not need to: a model naming an intent that does
+    not exist is a rejected answer rather than a new intent.
+    """
+
+    def __init__(self, router: RoleRouter) -> None:
+        self._router = router
+
+    def classify(self, text: str) -> str | None:
+        answer = self._router.invoke(
+            ModelRole.EXTRACT,
+            Prompt(
+                system=(
+                    "Name the single intent this message is about. Reply with one "
+                    "name from this list and nothing else: "
+                    + ", ".join(intent.value for intent in Intent)
+                ),
+                facts={},
+                # The masked text, because this is the one place a customer's
+                # words reach a provider on this path (I13). The orchestrator
+                # masks before intake runs.
+                user_masked=text,
+                language=Language.EN,
+            ),
+        )
+        if answer.is_refusal or answer.provider in LOCAL_PROVIDERS:
+            return None
+        return answer.text.strip()
 
 
 def _planner(router: RoleRouter, catalogue: ModelCatalogue) -> Planner | None:
@@ -675,6 +726,9 @@ class Clarity:
         # view, which has no execute capability at all. A flow proposing is the
         # strongest thing that can happen here (I1).
         self.flows = load_flows(default_flow_dir(self.settings.flows_dir))
+        # Intake: keyword rules first, the `extract` role only when they are
+        # unsure (C04, #23). None configured means the rules answer alone.
+        self.intake_assist = _intake_assist(self.roles, self.models)
         self.conversation = ConversationOrchestrator(
             flow=FlowRouter(
                 self.flows,
@@ -686,6 +740,7 @@ class Clarity:
             ),
             audit=self.audit,
             open_unit=self.open_unit,
+            intake_assist=self.intake_assist,
         )
 
     def _invalidate_answer_cache(self, event: Event) -> None:

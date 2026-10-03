@@ -203,7 +203,7 @@ def test_the_lexicon_is_what_makes_singlish_work(retriever) -> None:
     English words they happen to contain, the lexicon could be deleted and
     acceptance 2 would still pass.
     """
-    from clarity.modules.knowledge.terms import tokens
+    from clarity.ai.language import tokens
 
     # "wegaya adu" is the whole of the question; neither word is English.
     bare = tokens("Mage wegaya adu karala ai?")

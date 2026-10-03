@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+from clarity.ai.language import SINGLISH_TERMS, STOPWORDS, _fold
 from clarity.modules.knowledge.public import query_terms, tokens
-from clarity.modules.knowledge.terms import SINGLISH_TERMS, STOPWORDS, _fold
 
 # -- folding -------------------------------------------------------------- #
 
@@ -148,7 +148,7 @@ def test_no_lexicon_entry_is_unreachable() -> None:
     and "gaasthu" and passed on those: a dead lexicon entry is invisible from
     the outside, which is why this is asserted directly.
     """
-    from clarity.modules.knowledge.terms import _LEXICON
+    from clarity.ai.language import _LEXICON
 
     unreachable = [key for key in SINGLISH_TERMS if _fold(key) not in _LEXICON]
 

@@ -4,6 +4,37 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (C04, #23)
+
+- `clarity.ai.language`: the Singlish lexicon, tokenising and folding, moved
+  out of `modules.knowledge.terms` so intake and retrieval share one copy.
+  Both import it downward; no module edge was added.
+- `conversation/intake.py`: an ordered rule table with Sinhala, Tamil and
+  Singlish alternations on every rule, Singlish language detection, and the
+  `extract` role seam. `classify`, `detect_language`, `reply_language`, `Rule`,
+  `IntakeAssist` and `ASSIST_BELOW` are on the module's public surface.
+- `detect_language` returns `si-en` for Singlish, recognised by vocabulary
+  because it has no script of its own. `reply_language` answers it in Sinhala.
+- `IntakeResult.assisted` records whether the `extract` role was consulted.
+- `intake_heldout.jsonl`, a held-out set written before the rules were extended
+  and not consulted while extending them.
+
+### Changed (C04, #23)
+
+- **Intake intent F1 per language: en 0.688 to 1.000, si 0.559 to 1.000, ta
+  0.520 to 0.930, si-en 0.305 to 0.930.** Held-out F1 is 1.000 in all four.
+  Thirteen of twenty Singlish examples previously classified as FALLBACK,
+  because the rules held no Singlish vocabulary at all.
+- Rules are ordered and the first match wins. The previous table took the
+  highest confidence matching anywhere, which made specificity depend on
+  whatever number somebody typed.
+- `extract_intake` takes an optional `assist`. A model is asked only below 0.70
+  confidence, its answer is capped and validated against the intent catalogue,
+  and an intent it invents is rejected.
+- The `intake` gate still reports UNEVALUABLE: it requires 300 examples per
+  language and the set holds 20. The minimum was **not** lowered.
+
+
 ### Added (K03, #33)
 
 - Grounded answers. `KnowledgeService.ask` retrieves, composes, verifies and

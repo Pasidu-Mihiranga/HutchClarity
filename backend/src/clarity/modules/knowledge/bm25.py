@@ -28,9 +28,9 @@ import math
 from collections import Counter
 from collections.abc import Sequence
 
+from clarity.ai.language import tokens
 from clarity.modules.knowledge.config import BM25Params
 from clarity.modules.knowledge.sources import Chunk
-from clarity.modules.knowledge.terms import tokens
 
 
 class BM25Index:

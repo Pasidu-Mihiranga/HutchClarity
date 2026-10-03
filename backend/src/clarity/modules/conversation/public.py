@@ -34,6 +34,14 @@ from clarity.modules.conversation.flows import (
     load_flow,
     load_flows,
 )
+from clarity.modules.conversation.intake import (
+    ASSIST_BELOW,
+    IntakeAssist,
+    Rule,
+    detect_language,
+    reply_language,
+)
+from clarity.modules.conversation.intents import Intent, Route
 from clarity.modules.conversation.orchestrator import (
     MAX_MESSAGE_CHARS,
     REFUSALS,
@@ -64,6 +72,7 @@ from clarity.modules.conversation.suggestions import build_suggestions, signals_
 from clarity.modules.conversation.verify import VerifierResult, verify_reply
 
 __all__ = [
+    "ASSIST_BELOW",
     "CONVERSATION_STATES",
     "DEFAULT_TTL",
     "MAX_MESSAGE_CHARS",
@@ -87,20 +96,26 @@ __all__ = [
     "FlowRouter",
     "FlowState",
     "FlowStatus",
+    "IntakeAssist",
+    "Intent",
     "PlanRejected",
     "Planner",
     "PlannerReply",
     "RejectionCode",
+    "Route",
+    "Rule",
     "ToolCaller",
     "ToolNotAllowed",
     "Turn",
     "TurnRecord",
     "VerifierResult",
     "build_suggestions",
+    "detect_language",
     "extract_intake",
     "handle_turn",
     "load_flow",
     "load_flows",
+    "reply_language",
     "signals_from_snapshot",
     "suggest_for_snapshot",
     "validate_plan",

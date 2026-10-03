@@ -6,8 +6,8 @@
 | Layer | L4 domain (`clarity.modules.conversation`) |
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
-| Status | built (`lite` and `full`); turn pipeline C01 (#19), flow registry and seven flows C02 (#21), bounded agent step C03 (#22), all 2026-10-03 |
-| Files | `intents.py`, `intent_routes.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `verify.py`, `flows.py`, `router.py`, `agent.py`, `public.py` |
+| Status | built (`lite` and `full`); turn pipeline C01 (#19), flow registry and seven flows C02 (#21), bounded agent step C03 (#22), intake rules and Singlish C04 (#23), all 2026-10-03 |
+| Files | `intents.py`, `intent_routes.py`, `intake.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `verify.py`, `flows.py`, `router.py`, `agent.py`, `public.py` |
 
 ## 1. Purpose
 Customer chat for the immersive "Clarity chat". Two paths:
@@ -16,6 +16,8 @@ Customer chat for the immersive "Clarity chat". Two paths:
 - **Stateful** (`ConversationOrchestrator`): the turn pipeline of plan 22 section 4, with conversation state per case. Guards the input, masks personal data, classifies intent with deterministic keyword rules, checks for handoff on every turn, steps the flow, composes from an approved template, verifies the result against FACTS, and records the turn.
 
 No language model decides anything here. Intake is keyword rules; composition is templates. The `extract` and `fast-text` roles are optional assists behind the AI gateway (plan 19 section 4), and the `guard` role can only ever add a refusal.
+
+**Intake (C04).** An ordered rule table, first match wins, with Sinhala, Tamil and Singlish alternations on every rule. Singlish is recognised by vocabulary, because it has no script of its own, and is answered in Sinhala. The `extract` role is asked only below 0.70 confidence; what it returns is capped and validated against the intent catalogue, and an intent it invents is rejected. Measured F1 per language: en 1.000, si 1.000, ta 0.930, si-en 0.930, and 1.000 in all four on a held-out set. The Singlish lexicon lives in `clarity.ai.language`, shared with knowledge retrieval, so improving it improves both.
 
 ## 2. Public surface (`public.py`)
 `ConversationOrchestrator`, `ConversationState`, `ConversationStore`, `Turn`, `TurnRecord`, `VerifierResult`, `verify_reply`, `CONVERSATION_STATES`, `DEFAULT_TTL`, `MAX_MESSAGE_CHARS`, `REFUSALS`, `build_suggestions`, `extract_intake`, `handle_turn`, `signals_from_snapshot`, `suggest_for_snapshot`.
@@ -114,7 +116,9 @@ conversation completes, and the codes are in the turn audit under
 - A reply only ever quotes a figure from FACTS. `compose_reply` used to fall back to the amount in the customer's own text, which read as agreement to a number nothing decided.
 
 ## 7. Migration status (enterprise-plan 21)
-Keyword rules in code. Target: intents and phrases as versioned content under the policy lifecycle (plan 20), and the `extract` role as an optional assist with the keyword rules as fallback (C04, issue #23).
+Keyword rules in code, with the `extract` role wired as an optional assist (C04). Target: intents and phrases as versioned content under the policy lifecycle (plan 20), which is the same gap the flows have.
+
+The `intake` release gate still reports UNEVALUABLE: it requires 300 examples per language and the golden set holds 20. Twenty examples cannot tell a rule that works from a rule that matches twenty sentences, so the gate blocks and the minimum was not lowered.
 
 The TTL is a module constant (`DEFAULT_TTL`), injectable per store. It decides how long a chat resumes, not an amount or an eligibility, so it is not a policy artefact today; if HUTCH wants it under the policy lifecycle it becomes a resolved value and the constant becomes the fallback.
 
@@ -134,6 +138,7 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 
 ## 9. Tests
 - `backend/tests/unit/test_conversation_chat.py` - intake, routing, suggestions
+- `backend/tests/evaluation/test_intake.py` - intent F1 per language on the tuned and held-out sets (C04 acceptance 1), plus properties of the rule table
 - `backend/tests/unit/test_conversation_audit.py` - the turn audit (C01 acceptance 2), guard wiring, refusals, the published event
 - `backend/tests/unit/test_conversation_state.py` - TTL behaviour and the reply verifier
 - `backend/tests/acceptance/test_assistant.py` - cross-channel continuity (C01 acceptance 1) and subject binding
@@ -150,3 +155,4 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C01-conversation-orchestrator.md` | Stateful turn pipeline, state store with TTL, verifier, turn audit and `conversation.turn.completed@v1` |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C02-flow-registry.md` | Flow DSL as policy content, the seven flows, the router, and the tool allowlist |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C03-bounded-agent-step.md` | Bounded agent step: planner validation, argument allowlist, per-turn limits and the deterministic fallback |
+| 2026-10-03 | `docs/devlog/2026/2026-10-03-C04-intake-singlish.md` | Ordered intake rules, Singlish detection and vocabulary, the `extract` seam, and a held-out set |
