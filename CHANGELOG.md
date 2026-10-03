@@ -4,6 +4,42 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (K02, #32)
+
+- Lexical retrieval over the knowledge corpus. `KnowledgeRetriever` filters with
+  the registry, ranks with Okapi BM25, applies a deterministic rerank and cuts
+  to `top_k`. `Hit`, `RetrievalTrace`, `SemanticRanker`, `QueryRewriter`,
+  `RewritingRetriever`, `RetrievalConfig` and `tokens`/`query_terms` are on the
+  knowledge module's public surface.
+- `config/ai/retrieval.yaml` and `CLARITY_RETRIEVAL_FILE`: top-k, BM25
+  constants, fusion weights and rerank bonuses out of code (I10).
+- Singlish query expansion. A domain lexicon of romanised Sinhala words maps a
+  query into the English the corpus uses, additively and on the query only.
+- `RewritingRetriever`, the optional `extract`-role query rewrite. Both the
+  original and the rewritten query run and the original wins ties, so a bad
+  rewrite costs latency rather than an answer.
+- The retrieval golden set, `load_rag`/`load_rag_corpus`, a `recall_at_k`
+  metric, and `measure_rag` in the evaluation script. **The `rag.recall_at_5`
+  release gate is now evaluable and passes at 0.967 (n=30)**, where it
+  previously reported UNEVALUABLE and blocked.
+- `tests/contract/test_retriever_parity.py`, the retriever port's contract. The
+  pgvector hybrid driver is registered and skips.
+
+### Changed (K02, #32)
+
+- `config/ai/gates.yaml`: the `rag` gate's `min_per_language` raised from 0 to
+  20, so a set too small for recall@5 to mean anything still blocks.
+- `tests/architecture/test_module_state.py` gained a `DERIVED_INDEXES` category
+  for the BM25 term frequencies: an index is a pure function of committed state
+  and repopulates on a miss, so losing it costs CPU rather than a fact.
+
+The `full` profile's pgvector hybrid is **not** implemented: there is no
+embedding model in the system, so `ModelRole.EMBED` has nothing behind it and
+the AI layer has no shape that can carry a vector. The seam, the fusion and the
+port contract are in place; with no semantic ranker the weights renormalise onto
+the lexical half (ADR-0009). See the K02 devlog.
+
+
 ### Added (K01, #31)
 
 - The `knowledge` module, previously a scaffold. Governed knowledge content:

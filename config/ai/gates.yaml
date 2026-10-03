@@ -62,16 +62,21 @@ gates:
         per_language: false
 
   rag:
-    # No dataset: the knowledge module is a scaffold. Source registry and
-    # ingestion are K01 (issue #31), index and retrieval K02 (issue #32),
-    # grounded answers with citations K03 (issue #33).
     dataset: rag
-    min_per_language: 0
+    # The retrieval golden set landed with K02 (issue #32), so recall_at_5 is
+    # now measured rather than UNEVALUABLE. 20 is a floor for the number to
+    # mean anything, not a plan figure: at 10 examples one query is 10 points
+    # of recall. Plan 22 section 10 states no per-language minimum for this
+    # gate, so this is a local judgement and the set is currently 30.
+    min_per_language: 20
     metrics:
       recall_at_5:
         min: 0.90
         per_language: false
       citation_accuracy:
+        # Still UNEVALUABLE: nothing composes a grounded answer until K03
+        # (issue #33), so there are no citations to check. Declared so the gate
+        # exists and blocks, rather than being absent and silently satisfied.
         min: 0.98
         per_language: false
 

@@ -124,6 +124,51 @@ def by_language(
     )
 
 
+@dataclass(frozen=True)
+class Retrieved:
+    """One retrieval: the sources that should have come back, and what did.
+
+    ``expected`` is a set because a question can have more than one right
+    source, and an answer grounded in any of them is grounded. ``ranked`` is a
+    sequence because order is the thing being measured.
+    """
+
+    language: str
+    expected: frozenset[str]
+    ranked: tuple[str, ...]
+
+    def hit_at(self, k: int) -> bool:
+        return bool(self.expected & set(self.ranked[:k]))
+
+
+def recall_at_k(rows: Sequence[Retrieved], *, k: int) -> Observation:
+    """The share of queries whose expected source appears in the top ``k``.
+
+    Recall rather than precision, because the gate is about whether the answer
+    *can* be grounded: a query whose clause is not retrieved cannot be answered
+    correctly at all, while a query that retrieves one extra irrelevant chunk
+    can still be answered from the right one. K03's citation verifier is what
+    stops the irrelevant chunk being cited.
+
+    A query with no expected source would be silently satisfiable, so it is
+    counted as a miss rather than skipped: an unlabelled line in a golden set is
+    a hole in the measurement, not a free pass.
+    """
+    if not rows:
+        return UNMEASURED
+    hits = sum(1 for row in rows if row.expected and row.hit_at(k))
+    return Observation(value=hits / len(rows), sample_size=len(rows))
+
+
+def recall_by_language(rows: Sequence[Retrieved], *, k: int) -> dict[str, Observation]:
+    """``recall_at_k`` per language, for the per-language report."""
+    languages = sorted({row.language for row in rows})
+    return {
+        language: recall_at_k([row for row in rows if row.language == language], k=k)
+        for language in languages
+    }
+
+
 def ratio(metric: str, *, held: int, total: int) -> Measurement:
     """A pass-rate metric: how many of ``total`` attempts held the property.
 
@@ -151,9 +196,12 @@ __all__ = [
     "Labelled",
     "Measurement",
     "Observation",
+    "Retrieved",
     "accuracy",
     "by_language",
     "macro_f1",
     "ratio",
+    "recall_at_k",
+    "recall_by_language",
     "slot_signature",
 ]

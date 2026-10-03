@@ -15,6 +15,13 @@ candidate set both build on.
 
 from __future__ import annotations
 
+from clarity.modules.knowledge.config import (
+    BM25Params,
+    HybridWeights,
+    RerankBonuses,
+    RetrievalConfig,
+    RetrievalConfigInvalid,
+)
 from clarity.modules.knowledge.ingest import (
     WORDS_OF_OVERLAP,
     WORDS_PER_CHUNK,
@@ -35,12 +42,21 @@ from clarity.modules.knowledge.repository import (
     KnowledgeRepository,
     StoredKnowledgeRepository,
 )
+from clarity.modules.knowledge.retrieval import (
+    Hit,
+    KnowledgeRetriever,
+    QueryRewriter,
+    RetrievalTrace,
+    RewritingRetriever,
+    SemanticRanker,
+)
 from clarity.modules.knowledge.sources import (
     Audience,
     Chunk,
     KnowledgeSource,
     SourceKind,
 )
+from clarity.modules.knowledge.terms import query_terms, tokens
 
 __all__ = [
     "CHUNKS",
@@ -48,12 +64,23 @@ __all__ = [
     "WORDS_OF_OVERLAP",
     "WORDS_PER_CHUNK",
     "Audience",
+    "BM25Params",
     "Chunk",
+    "Hit",
+    "HybridWeights",
     "IngestionRefused",
     "KnowledgeRegistry",
     "KnowledgeRepository",
+    "KnowledgeRetriever",
     "KnowledgeSource",
     "PublicationRefused",
+    "QueryRewriter",
+    "RerankBonuses",
+    "RetrievalConfig",
+    "RetrievalConfigInvalid",
+    "RetrievalTrace",
+    "RewritingRetriever",
+    "SemanticRanker",
     "SourceKind",
     "StoredKnowledgeRepository",
     "check_language",
@@ -61,4 +88,6 @@ __all__ = [
     "dominant_script",
     "ingest",
     "publish_all",
+    "query_terms",
+    "tokens",
 ]

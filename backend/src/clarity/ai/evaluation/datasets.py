@@ -148,6 +148,93 @@ class SafetyDataset:
         return len(self.examples)
 
 
+@dataclass(frozen=True)
+class RagExample:
+    """One retrieval query and the sources that would ground its answer.
+
+    ``expect`` holds `source_id` values rather than chunk ids, because which
+    chunk of a clause answers a question is a chunking decision and the golden
+    set must not have to be rewritten when the chunker changes. What it asserts
+    is that retrieval found the right *source*.
+    """
+
+    example_id: str
+    language: str
+    text: str
+    expect: frozenset[str]
+
+
+@dataclass(frozen=True)
+class RagDataset:
+    """A retrieval golden set, with the per-language counts a gate needs."""
+
+    name: str
+    source: str
+    examples: tuple[RagExample, ...]
+
+    @property
+    def languages(self) -> tuple[str, ...]:
+        return tuple(sorted({example.language for example in self.examples}))
+
+    @property
+    def counts_per_language(self) -> dict[str, int]:
+        return dict(Counter(example.language for example in self.examples))
+
+    def for_language(self, language: str) -> tuple[RagExample, ...]:
+        return tuple(example for example in self.examples if example.language == language)
+
+    def __len__(self) -> int:
+        return len(self.examples)
+
+
+def load_rag(path: Path, *, name: str = "rag") -> RagDataset:
+    """Read a JSONL retrieval set.
+
+    An example with an empty ``expect`` is refused rather than loaded. A query
+    with nothing expected is satisfied by any result at all, so it would lift
+    recall without measuring anything.
+    """
+    examples: list[RagExample] = []
+    seen: set[str] = set()
+    for number, document in _jsonl(path):
+        where = f"{path}:{number}"
+        raw_expect = document.get("expect")
+        if not isinstance(raw_expect, list) or not raw_expect:
+            raise DatasetInvalid(
+                f"{where}: 'expect' must be a non-empty list of source ids; a query with "
+                "nothing expected is satisfied by any result and measures nothing"
+            )
+        expect = frozenset(str(entry) for entry in raw_expect)
+        if any(not entry.strip() for entry in expect):
+            raise DatasetInvalid(f"{where}: 'expect' holds an empty source id")
+
+        example = RagExample(
+            example_id=_required(document, "id", where=where),
+            language=_required(document, "language", where=where),
+            text=_required(document, "text", where=where),
+            expect=expect,
+        )
+        if example.example_id in seen:
+            raise DatasetInvalid(f"{where}: duplicate id {example.example_id!r}")
+        seen.add(example.example_id)
+        examples.append(example)
+
+    if not examples:
+        raise DatasetInvalid(f"{path}: holds no examples")
+    return RagDataset(name=name, source=str(path), examples=tuple(examples))
+
+
+def load_rag_corpus(path: Path) -> tuple[dict[str, Any], ...]:
+    """Read the evaluation corpus as raw documents.
+
+    Deliberately untyped here. The corpus is made of knowledge sources, and
+    `clarity.ai` sits below `clarity.modules` in the layer order (I4), so this
+    module may not import `KnowledgeSource` to validate against. The caller,
+    which is a test, constructs the sources and gets the validation that way.
+    """
+    return tuple(document for _, document in _jsonl(path))
+
+
 def load_intake(path: Path, *, name: str = "intake") -> IntakeDataset:
     """Read a JSONL intake set, refusing anything it cannot read exactly.
 
@@ -241,8 +328,12 @@ __all__ = [
     "IntakeDataset",
     "IntakeExample",
     "MissingDataset",
+    "RagDataset",
+    "RagExample",
     "SafetyDataset",
     "SafetyExample",
     "load_intake",
+    "load_rag",
+    "load_rag_corpus",
     "load_safety",
 ]

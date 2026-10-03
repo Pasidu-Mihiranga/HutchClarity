@@ -6,8 +6,8 @@
 | Layer | L4 domain (`clarity.modules.knowledge`) |
 | Deployable | `clarity-api` today (modular monolith); a candidate for extraction (plan 21 section 179) |
 | Owner | TBD |
-| Status | built (`lite` and `full`): source registry and governed ingestion, K01 (#31), 2026-10-03. Retrieval is K02 (#32), grounded answers K03 (#33) |
-| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `public.py` |
+| Status | built (`lite`): source registry and governed ingestion K01 (#31), lexical index and retrieval K02 (#32), both 2026-10-03. The `full` profile's pgvector hybrid is blocked on there being no embedding model (see section 7). Grounded answers are K03 (#33) |
+| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `terms.py`, `bm25.py`, `config.py`, `retrieval.py`, `public.py` |
 
 ## 1. Purpose
 
@@ -21,8 +21,9 @@ an owner, an effective window, an audience and a language, old versions stay
 readable, and every retrievable chunk carries enough metadata to be filtered
 without a join.
 
-`KnowledgeRegistry` is the way in and the way out. Publish a version; read back
-the chunks in force at a moment for a given audience.
+`KnowledgeRegistry` is the way in and the way out for content. Publish a
+version; read back the chunks in force at a moment for a given audience.
+`KnowledgeRetriever` ranks what the registry allows.
 
 ## 2. Public surface (`public.py`)
 
@@ -30,6 +31,11 @@ the chunks in force at a moment for a given audience.
 `KnowledgeSource`, `Chunk`, `Audience`, `SourceKind`, `PublicationRefused`,
 `IngestionRefused`, `ingest`, `check_language`, `clean`, `dominant_script`,
 `publish_all`, `SOURCES`, `CHUNKS`, `WORDS_PER_CHUNK`, `WORDS_OF_OVERLAP`.
+
+Retrieval (K02): `KnowledgeRetriever`, `RewritingRetriever`, `Hit`,
+`RetrievalTrace`, `SemanticRanker`, `QueryRewriter`, `RetrievalConfig`,
+`BM25Params`, `HybridWeights`, `RerankBonuses`, `RetrievalConfigInvalid`,
+`tokens`, `query_terms`.
 
 ## 3. Used by
 
@@ -71,6 +77,27 @@ section 7). Copied from the source, not looked up through it: a filter that has
 to join to decide is a filter that gets skipped, and a copy stays truthful about
 the version it came from after a successor is published.
 
+## 5c. Retrieval (K02)
+
+Four steps, and the order is the design:
+
+| Step | What | Why it is where it is |
+|---|---|---|
+| Filter | effective date, audience, language, products | K01 owns it and it is authoritative. Ranking never decides eligibility |
+| Rank | BM25 over the candidates, fused with a semantic score when one exists | |
+| Rerank | small bonuses: a cited clause, the query's language, a product in the case | deterministic, each bonus a share of the top score so it nudges rather than replaces |
+| Cut | `top_k`, dropping anything under `min_relative_score` | a padded context is worse than a refusal (K03) |
+
+Parameters live in `config/ai/retrieval.yaml` (I10), not in code.
+
+**Singlish.** A customer writing "Mage wegaya adu karala ai?" is asking about
+speed reduction, and "wegaya" shares no character with "speed". So `terms.py`
+carries a small domain lexicon of romanised Sinhala words mapped to the English
+the corpus uses, and expands the **query** through it. Expansion is additive
+and happens on the query, never on the corpus: expanding the corpus would bake
+one lexicon into stored chunks, so improving it would mean re-indexing and old
+chunks would keep the old expansion.
+
 ## 6. Invariants
 
 - **One version in force at a time.** Publishing a version whose effective
@@ -104,6 +131,21 @@ the version it came from after a successor is published.
 - **A catalogue entry is one chunk**, whatever its length. An offering is the
   unit someone asks about; split up, a question about the price can retrieve
   the piece that does not mention the price.
+- **Filters run before ranking, always.** A chunk the reader may not see, or
+  that was not in force at the moment asked about, is not a weak candidate: it
+  is not a candidate. Scoring first and filtering after is cheaper and can
+  starve a reader, and it makes a disclosure depend on a relevance score.
+- **The index and the query are normalised by one module.** Retrieval is only
+  as good as their agreement, and a corpus folded one way against a query
+  folded another shares no terms at all. Two bugs of exactly this shape were
+  caught by tests in K02, both silent.
+- **English suffix folding only.** An English stemmer applied to romanised
+  Sinhala mangles it, so `_fold` is guarded to ASCII alphabetic tokens of at
+  least five characters.
+- **A query matching nothing returns nothing**, not a weak match. K03 refuses
+  rather than composing from an irrelevant source.
+- **`RetrievalTrace.semantic` reports whether the semantic half ran**, so a
+  caller cannot describe a lexical result as hybrid.
 - Time comes from the injected clock (I11). `chunks_as_of` takes the moment
   explicitly, and for a dispute that moment is the event time, not now.
 - Simulated content is labelled (I16). The registry ships **empty**: the corpus
@@ -112,9 +154,22 @@ the version it came from after a successor is published.
 
 ## 7. Migration status (enterprise-plan 21)
 
-R6. The registry and ingestion are in place; the index, the hybrid score and the
-rerank are K02, and the grounded answer, citation verifier and semantic cache
-are K03.
+R6. The registry, ingestion, the lexical index, the rerank and the top-k cut are
+in place. The grounded answer, the citation verifier and the semantic cache are
+K03 (#33).
+
+**The `full` profile's pgvector hybrid is blocked, and not on this module.**
+Plan 22 section 7 specifies pgvector with embeddings from the `embed` role.
+There is no embedding model anywhere in the system: `ModelRole.EMBED` is a
+declared role name with no implementation, `local-bge` is bound to
+`TemplateProvider` as a stand-in, and `RoleRouter.invoke` returns `str`, which
+cannot carry a vector. So the AI layer has no embedding API to call.
+
+Rather than write a driver that cannot be exercised, K02 ships the seam
+(`SemanticRanker`), the fusion that uses it, and the port contract the driver
+will have to pass (`tests/contract/test_retriever_parity.py`, where the hybrid
+driver is registered and skips). With no semantic ranker the hybrid weights
+renormalise onto the lexical half, which ADR-0009 makes a supported state.
 
 **Not yet under the governance change lifecycle.** Plan 20 makes a knowledge
 source a kind K2 artefact: draft, review, publish. Today `publish` enforces the
@@ -138,6 +193,9 @@ the thing that has to react.
 - `backend/tests/unit/test_knowledge_versions.py` - effective dating, supersession, overlap refusal (K01 acceptance 1)
 - `backend/tests/unit/test_knowledge_audience.py` - audience filtering, in all three places it is enforced (K01 acceptance 2)
 - `backend/tests/unit/test_knowledge_ingestion.py` - cleaning, script detection, structure-aware chunking, metadata
+- `backend/tests/unit/test_knowledge_terms.py` - folding, tokenisation per script, the Singlish lexicon, and that a cold index scores like a warm one
+- `backend/tests/contract/test_retriever_parity.py` - the retriever port's contract; the hybrid driver skips
+- `backend/tests/evaluation/test_rag_retrieval.py` - recall@5 against the golden set (K02 acceptance 1) and Singlish queries (acceptance 2)
 
 ## 10. Change history
 
@@ -145,3 +203,4 @@ the thing that has to react.
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Scaffold: `public.py` and `MODULE.md` stubs to satisfy the architecture tests |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K01-knowledge-source-registry.md` | Source registry, effective dating, audience filtering and governed ingestion |
+| 2026-10-03 | `docs/devlog/2026/2026-10-03-K02-index-and-retrieval.md` | BM25 index, Singlish query expansion, rerank, top-k from config, and the `rag` release gate made evaluable |

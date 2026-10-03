@@ -127,6 +127,7 @@ class Settings(BaseSettings):
     rules_dir: Path | None = Field(default=None, alias="CLARITY_RULES_DIR")
     policy_dir: Path | None = Field(default=None, alias="CLARITY_POLICY_DIR")
     flows_dir: Path | None = Field(default=None, alias="CLARITY_FLOWS_DIR")
+    retrieval_file: Path | None = Field(default=None, alias="CLARITY_RETRIEVAL_FILE")
 
     # -- AI --------------------------------------------------------------- #
 

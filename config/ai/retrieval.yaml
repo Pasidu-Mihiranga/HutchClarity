@@ -1,0 +1,70 @@
+# Retrieval parameters (K02, issue #32; plan 22 section 7).
+#
+# Out of code because I10 keeps every tunable threshold in a reviewable file
+# with an owner. These are not policy values in the sense of a cap or an
+# eligibility: none of them decides an outcome for a customer. They decide
+# which text an answer is grounded in, which is why they still belong here
+# rather than as constants: changing what the assistant reads before it answers
+# should be a reviewed change, not a commit a reader has to go looking for.
+#
+# top_k is **PROPOSED TARGET - REQUIRES HUTCH VALIDATION**: plan 22 section 7
+# gives 4 to 6 as an ASSUMPTION, not a measurement.
+
+version: 1
+
+# How many chunks reach the answer step. Plan 22 section 7: top-k 4 to 6.
+#
+# 5 rather than 4 or 6 because the release gate is recall@5 (config/ai/
+# gates.yaml), and a retriever tuned to a different k than the one it is
+# measured at is being measured on something it was not built for.
+top_k: 5
+
+# Candidates carried into the rerank before the top-k cut. Larger than top_k on
+# purpose: a rerank that only sees the final five cannot change the answer.
+candidates: 24
+
+# A hit scoring below this is dropped even when top_k is not full.
+#
+# Returning a weak match to fill the quota is how a grounded answer ends up
+# citing something irrelevant: K03 refuses when there is no source, and that
+# refusal is worth more than a padded context. Normalised, so it is a share of
+# the best hit's score rather than a raw BM25 value, which is not comparable
+# across queries.
+min_relative_score: 0.08
+
+bm25:
+  # Okapi BM25. k1 controls how fast term frequency saturates; b controls how
+  # much document length is penalised. These are the standard values and are
+  # not tuned on HUTCH traffic.
+  k1: 1.2
+  b: 0.75
+
+hybrid:
+  # Weights for fusing the lexical and semantic rankings (plan 22 section 7:
+  # pgvector plus BM25 in the full profile).
+  #
+  # Only the lexical half exists today. There is no embedding model in the
+  # system: `ModelRole.EMBED` is a declared role name, `local-bge` is bound to
+  # the template provider as a stand-in, and `RoleRouter.invoke` returns text,
+  # which cannot carry a vector. So the semantic weight is unused and the
+  # hybrid runs lexical-only, which ADR-0009 makes a supported state rather
+  # than a degradation. See the K02 devlog.
+  lexical: 0.5
+  semantic: 0.5
+
+rerank:
+  # A deterministic rerank over the fused candidates (plan 22 section 7).
+  # Nothing here is a model: a cross-encoder is the production answer and needs
+  # the same missing infrastructure as the embeddings.
+  #
+  # Each bonus is a share of the top lexical score, so they nudge an ordering
+  # rather than replacing it.
+  #
+  # A chunk whose text carries a clause reference is preferred, because a cited
+  # clause is checkable and an uncited paragraph is not (K03's verifier).
+  clause_bonus: 0.06
+  # A chunk in the query's own language is preferred over a translation of the
+  # same policy, so an answer is composed in the language it was asked in.
+  language_bonus: 0.10
+  # A chunk scoped to a product in the case is preferred over general text.
+  product_bonus: 0.08

@@ -33,22 +33,40 @@ from clarity.ai.evaluation import (
     Labelled,
     Measurement,
     Report,
+    Retrieved,
     build_release,
     by_language,
     load_intake,
+    load_rag,
+    load_rag_corpus,
     load_safety,
     ratio,
+    recall_at_k,
+    recall_by_language,
     slot_signature,
 )
 from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world, ref_for
 from clarity.kernel.common import Channel
 from clarity.modules.conversation.public import extract_intake, handle_turn
+from clarity.modules.knowledge.public import (
+    Audience,
+    KnowledgeRegistry,
+    KnowledgeRetriever,
+    KnowledgeSource,
+    RetrievalConfig,
+)
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
 GATES = REPO / "config" / "ai" / "gates.yaml"
 DATASETS = BACKEND / "tests" / "evaluation" / "datasets"
+RETRIEVAL = REPO / "config" / "ai" / "retrieval.yaml"
+
+#: Fixed dates for the RAG gate. Retrieval filters on the effective window, so
+#: a moving "now" would make the gate's number depend on the day it ran (I11).
+RAG_AS_OF = datetime(2026, 10, 3, tzinfo=UTC)
+RAG_EFFECTIVE_FROM = datetime(2025, 1, 1, tzinfo=UTC)
 
 #: The subscriber the safety run opens its cases against (simulated world).
 SUBJECT = "+94771234567"
@@ -61,8 +79,9 @@ UNBUILT: Mapping[str, str] = {
         "flow registry is C02 (#21). Nothing to score yet"
     ),
     "rag": (
-        "no RAG dataset: the knowledge module is a scaffold. Ingestion is K01 "
-        "(#31), retrieval K02 (#32), grounded answers K03 (#33)"
+        "the retrieval golden set landed with K02 (#32), so recall_at_5 is "
+        "measured. citation_accuracy stays unevaluable: nothing composes a "
+        "grounded answer until K03 (#33), so there are no citations to check"
     ),
     "language_review": (
         "no ratings file: scores come from native speakers against a rubric, "
@@ -141,12 +160,67 @@ def measure_safety() -> dict[str, Measurement]:
     return {"executes_refused": ratio("executes_refused", held=held, total=len(dataset.held))}
 
 
+def measure_rag() -> dict[str, Measurement]:
+    """Recall@5 over the retrieval golden set (K02, #32).
+
+    The corpus is `datasets/rag_corpus.jsonl`, published into a fresh registry
+    rather than read from a running deployment: the gate measures the retriever,
+    and a deployment's corpus is whatever happens to be in it.
+
+    ``AS_OF`` is fixed. Retrieval filters on effective date, so a moving "now"
+    would make the gate's number depend on the day it ran (I11).
+
+    ``citation_accuracy`` is deliberately absent and stays UNEVALUABLE: nothing
+    composes a grounded answer until K03 (#33), so there are no citations to
+    check and reporting a number here would be reporting one for a step that
+    does not exist.
+    """
+    corpus = load_rag_corpus(DATASETS / "rag_corpus.jsonl")
+    dataset = load_rag(DATASETS / "rag.jsonl")
+
+    registry = KnowledgeRegistry(clock=lambda: RAG_AS_OF)
+    for document in corpus:
+        registry.publish(KnowledgeSource(effective_from=RAG_EFFECTIVE_FROM, **document))
+
+    retriever = KnowledgeRetriever(registry, RetrievalConfig.from_file(RETRIEVAL))
+    retriever.index(registry.chunks_as_of(RAG_AS_OF, audience=Audience.STAFF))
+
+    rows = [
+        Retrieved(
+            language=example.language,
+            expected=example.expect,
+            ranked=tuple(
+                dict.fromkeys(
+                    hit.chunk.source_id
+                    for hit in retriever.search(
+                        example.text, audience=Audience.CUSTOMER, moment=RAG_AS_OF
+                    ).hits
+                )
+            ),
+        )
+        for example in dataset.examples
+    ]
+
+    return {
+        "recall_at_5": Measurement(
+            metric="recall_at_5",
+            overall=recall_at_k(rows, k=5),
+            per_language=recall_by_language(rows, k=5),
+        )
+    }
+
+
 def build_report(*, mode: str, run_at: datetime) -> Report:
     gates = GateSet.from_file(GATES)
     intake = load_intake(DATASETS / "intake.jsonl")
     safety = load_safety(DATASETS / "safety.jsonl")
 
-    measured = {"intake": measure_intake(), "safety": measure_safety()}
+    rag = load_rag(DATASETS / "rag.jsonl")
+    measured = {
+        "intake": measure_intake(),
+        "safety": measure_safety(),
+        "rag": measure_rag(),
+    }
     release = build_release(gates, measured, reasons=UNBUILT)
 
     return Report(
@@ -158,7 +232,7 @@ def build_report(*, mode: str, run_at: datetime) -> Report:
             "intake": intake.counts_per_language,
             "safety": safety.counts_per_language,
             "flow": {},
-            "rag": {},
+            "rag": rag.counts_per_language,
             "language_review": {},
         },
         notes=(

@@ -1,0 +1,50 @@
+// RAG retrieval golden set (K02, issue #32; gate `rag.recall_at_5`).
+//
+// Each line is a query and the source the answer must be grounded in. The
+// corpus is `rag_corpus.jsonl` in this directory and every entry in it is
+// SIMULATED (I16); see that file's header.
+//
+// `expect` is a list of `source_id` values, and recall counts a hit when any
+// of them appears in the top k. Several queries list more than one because the
+// question genuinely has more than one right source: "why was my pack charged
+// but not activated" is answered by the activation clause and by the duplicate
+// charge clause, and an answer citing either is grounded.
+//
+// `language` is the language the query is *written* in, declared by whoever
+// wrote the line, not the output of a detector: the detector is part of what is
+// being measured. `si-en` is Singlish, Sinhala words in Latin script, which is
+// the case acceptance 2 covers.
+//
+// Queries are written the way customers write, not the way the corpus is
+// written. A set phrased in the corpus's own words measures nothing: it would
+// pass against a substring match.
+{"id": "rag-en-001", "language": "en", "text": "why did my speed drop on the unlimited pack", "expect": ["SIM-TC-FUP"]}
+{"id": "rag-en-002", "language": "en", "text": "will my speed come back next month", "expect": ["SIM-TC-FUP"]}
+{"id": "rag-en-003", "language": "en", "text": "I bought a data pack and it never turned on", "expect": ["SIM-TC-PACK-ACTIVATE"]}
+{"id": "rag-en-004", "language": "en", "text": "charged for a pack that failed to activate", "expect": ["SIM-TC-PACK-ACTIVATE"]}
+{"id": "rag-en-005", "language": "en", "text": "do I lose leftover data when the pack runs out", "expect": ["SIM-TC-PACK-EXPIRY"]}
+{"id": "rag-en-006", "language": "en", "text": "if I buy the same pack again do the gigabytes add up", "expect": ["SIM-TC-PACK-EXPIRY"]}
+{"id": "rag-en-007", "language": "en", "text": "pack says active but no internet", "expect": ["SIM-HELP-PACK-NOT-WORKING"]}
+{"id": "rag-en-008", "language": "en", "text": "I was billed twice for the same thing", "expect": ["SIM-TC-DOUBLE-CHARGE"]}
+{"id": "rag-en-009", "language": "en", "text": "do I need to prove a duplicate charge", "expect": ["SIM-TC-DOUBLE-CHARGE"]}
+{"id": "rag-en-010", "language": "en", "text": "how many days until the money is back", "expect": ["SIM-TC-REFUND-TIMING"]}
+{"id": "rag-en-011", "language": "en", "text": "refund went to my card not my balance", "expect": ["SIM-TC-REFUND-TIMING"]}
+{"id": "rag-en-012", "language": "en", "text": "I never agreed to this subscription service", "expect": ["SIM-TC-VAS-CONSENT"]}
+{"id": "rag-en-013", "language": "en", "text": "renewed without telling me first", "expect": ["SIM-TC-VAS-CONSENT"]}
+{"id": "rag-en-014", "language": "en", "text": "reload has not come through yet", "expect": ["SIM-HELP-RELOAD-MISSING"]}
+{"id": "rag-en-015", "language": "en", "text": "I topped up the wrong number by mistake", "expect": ["SIM-HELP-RELOAD-MISSING"]}
+{"id": "rag-en-016", "language": "en", "text": "how do I install the esim profile", "expect": ["SIM-HELP-ESIM"]}
+{"id": "rag-en-017", "language": "en", "text": "can I reuse my activation code", "expect": ["SIM-HELP-ESIM"]}
+{"id": "rag-en-018", "language": "en", "text": "what happens to charges when I travel overseas", "expect": ["SIM-HELP-ROAMING"]}
+{"id": "rag-en-019", "language": "en", "text": "can I cap how much I spend per month", "expect": ["SIM-TC-SPEND-CAP"]}
+{"id": "rag-en-020", "language": "en", "text": "will I still be able to call support if I hit my limit", "expect": ["SIM-TC-SPEND-CAP"]}
+{"id": "rag-en-021", "language": "en", "text": "when does my monthly allowance reset", "expect": ["SIM-TC-BILLING-CYCLE"]}
+{"id": "rag-en-022", "language": "en", "text": "internet is crawling in the evenings", "expect": ["SIM-HELP-NETWORK-SLOW"]}
+{"id": "rag-si-001", "language": "si", "text": "අසීමිත පැකේජයේ වේගය අඩු වුණේ ඇයි", "expect": ["SIM-TC-FUP-SI", "SIM-TC-FUP"]}
+{"id": "rag-si-002", "language": "si", "text": "ඊළඟ බිල්පත් කාලයේ වේගය නැවත ලැබෙනවාද", "expect": ["SIM-TC-FUP-SI", "SIM-TC-FUP"]}
+{"id": "rag-ta-001", "language": "ta", "text": "பணத்திரும்பல் எத்தனை நாட்களில் கிடைக்கும்", "expect": ["SIM-TC-REFUND-TIMING-TA", "SIM-TC-REFUND-TIMING"]}
+{"id": "rag-si-en-001", "language": "si-en", "text": "Mage wegaya adu karala ai?", "expect": ["SIM-TC-FUP", "SIM-TC-FUP-SI"]}
+{"id": "rag-si-en-002", "language": "si-en", "text": "Mama 100 reload kala but enne naththa", "expect": ["SIM-HELP-RELOAD-MISSING"]}
+{"id": "rag-si-en-003", "language": "si-en", "text": "Data pack eka activate karanna barida", "expect": ["SIM-TC-PACK-ACTIVATE"]}
+{"id": "rag-si-en-004", "language": "si-en", "text": "Nodanne service ekakata gaasthu gewila", "expect": ["SIM-TC-VAS-CONSENT"]}
+{"id": "rag-si-en-005", "language": "si-en", "text": "Salli kawada apahu enawada", "expect": ["SIM-TC-REFUND-TIMING", "SIM-TC-REFUND-TIMING-TA"]}

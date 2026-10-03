@@ -77,7 +77,12 @@ from clarity.modules.iam.public import (
     TokenIssuer,
     TokenVerifier,
 )
-from clarity.modules.knowledge.public import KnowledgeRegistry
+from clarity.modules.knowledge.public import (
+    Audience,
+    KnowledgeRegistry,
+    KnowledgeRetriever,
+    RetrievalConfig,
+)
 from clarity.modules.notifications.public import (
     CONSUMED_EVENTS as NOTIFICATION_EVENTS,
 )
@@ -181,6 +186,17 @@ def default_policy_dir(configured: Path | None = None) -> Path:
 def default_flow_dir(configured: Path | None = None) -> Path:
     """Conversation flows: policy content, published like a rule pack (C02)."""
     return _shared_dir(configured, "config", "flows")
+
+
+def default_retrieval_file(configured: Path | None = None) -> Path:
+    """Retrieval parameters (K02): top-k, BM25 constants, rerank bonuses.
+
+    The setting names a **file**, not a directory, so a configured value is
+    used as given rather than having a filename appended to it.
+    """
+    if configured is not None:
+        return configured
+    return _shared_dir(None, "config", "ai") / "retrieval.yaml"
 
 
 def _world_for_profile(
@@ -617,6 +633,17 @@ class Clarity:
         self.knowledge = KnowledgeRegistry(
             open_unit=self.open_unit,
             clock=self.case_aggregate._now,
+        )
+        # Retrieval over whatever has been published (K02, #32). The lexical
+        # index only: there is no embedding model in the system, so no semantic
+        # ranker is wired and the hybrid weights renormalise onto BM25. ADR-0009
+        # makes that a supported state rather than a degradation.
+        self.retrieval_config = RetrievalConfig.from_file(
+            default_retrieval_file(self.settings.retrieval_file)
+        )
+        self.retriever = KnowledgeRetriever(self.knowledge, self.retrieval_config)
+        self.retriever.index(
+            self.knowledge.chunks_as_of(audience=Audience.STAFF),
         )
 
         # The stateful turn pipeline (C01) driving the published flows (C02).

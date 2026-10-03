@@ -42,6 +42,35 @@ REMOTE_CACHES = frozenset(
     }
 )
 
+#: Derived indexes: recomputable from a repository this system already owns.
+#:
+#: Not business state, and not a remote cache either. The test's own reason for
+#: existing does not apply to these: a module keeping a dict of cases cannot be
+#: deployed twice or recovered after a restart, whereas an index **can** be
+#: deployed twice (each replica builds its own from the same records) and **is**
+#: recovered after a restart (rebuilt from the repository). Losing one costs
+#: CPU, never a fact.
+#:
+#: Two conditions, and an attribute that does not meet both belongs in
+#: ``DEFERRED`` instead:
+#:
+#: 1. Every entry is derived from records in a repository, so the index is a
+#:    pure function of committed state. Ingestion is deterministic (K01), which
+#:    is what makes two replicas' indexes agree.
+#: 2. A lookup for something not in the index populates it rather than missing,
+#:    so a cold or stale index returns the same answer as a warm one. Without
+#:    this an index is a cache that can silently serve less than the truth,
+#:    which is business state wearing an index's name.
+DERIVED_INDEXES = frozenset(
+    {
+        # BM25 term frequencies and document lengths per chunk (K02, #32).
+        # Derived from `knowledge.chunks`; `BM25Index.scores` indexes any
+        # candidate it has not seen, so a cold index scores the same.
+        "_frequencies",
+        "_lengths",
+    }
+)
+
 #: Attributes that hold injected collaborators or configuration, not state.
 #: A mapping of configuration is fine: it is read, never accumulated.
 CONFIGURATION = frozenset(
@@ -117,6 +146,7 @@ def test_no_module_accumulates_business_state_in_an_attribute() -> None:
             if attribute not in COORDINATION
             and attribute not in CONFIGURATION
             and attribute not in REMOTE_CACHES
+            and attribute not in DERIVED_INDEXES
             and f"{relative}:{attribute}" not in DEFERRED
         ]
         if kept:
