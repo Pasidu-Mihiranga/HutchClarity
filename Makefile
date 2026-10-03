@@ -12,6 +12,7 @@ COMPOSE := deploy/compose/full.yml
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
 .PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed eval \
+	load chaos \
         up-full down-full test-full dev-e2e e2e e2e-install channel-gateway \
         contracts contracts-check \
         licences secrets \
@@ -121,6 +122,26 @@ dev-e2e:
 	@# OTEL off so the output stays readable in the suite's logs.
 	cd $(BACKEND) && CLARITY_PROFILE=lite OTEL_EXPORTER=none \
 		$(PY)/uvicorn clarity.entrypoints.asgi:app --host 127.0.0.1 --port 8100
+
+chaos:
+	@# The degradation ladder (plan 15 section 39). Pure Python, no services.
+	cd $(BACKEND) && $(PY)/pytest tests/chaos -v
+
+load:
+	@# The journeys at 10x pilot load (X02). Needs k6 and a running API.
+	@#
+	@# Start a FRESH api first: the OTP rate limit and the refund-velocity
+	@# policy are per subscriber and do not reset, so a second run against the
+	@# same process measures those protections rather than the journey.
+	@#
+	@#   make load-api    # in one terminal
+	@#   make load        # in another
+	@command -v k6 >/dev/null || { echo "k6 is not installed: brew install k6"; exit 1; }
+	cd $(BACKEND) && BASE_URL=$${BASE_URL:-http://127.0.0.1:8101} k6 run tests/load/journeys.js
+
+load-api:
+	cd $(BACKEND) && CLARITY_PROFILE=lite OTEL_EXPORTER=none \
+		$(PY)/uvicorn clarity.entrypoints.asgi:app --host 127.0.0.1 --port 8101
 
 e2e:
 	cd frontend && npm run e2e
