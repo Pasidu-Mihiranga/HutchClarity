@@ -4,6 +4,43 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Fixed (C05, #24)
+
+- **The customer chat never ran the server-side flows.** `POST
+  /v1/conversation/turn` reads `case_id` from the top level of the body and
+  only then takes the stateful pipeline; the client sent it inside `facts`,
+  where the route never looks, so every turn took the stateless path. C01 to
+  C03 and K03 all landed behind a route the UI was calling in a mode that
+  skipped them. The client now sends it at the top level.
+- Accessibility: the chat composer had no accessible name (a placeholder is not
+  one), the sign-in labels were not bound to their inputs, and the transcript
+  was not a live region so a reply arriving while focus was in the composer was
+  never announced. All three fixed.
+- A pre-existing type error in `apps/customer-web/app/cases/page.tsx`, invisible
+  because `npm run typecheck` covers only `packages/sdk` and never the apps.
+
+### Added (C05, #24)
+
+- Flow artefacts rendered in the chat: the journey and its current step, a
+  confirm card from the proposal, the citations K03 verified, a handoff notice
+  and a refusal notice. `components/FlowCards.tsx`.
+- 42 strings in en, si and ta in the shared `@clarity/i18n` package, and `t`
+  now interpolates `{placeholders}`.
+- `packages/i18n/test/catalogues.test.mjs`: the three catalogues must carry the
+  same keys, no string may be empty or left as its own key, no language may be
+  mostly copied English, and placeholders must match across languages. Uses
+  `node:test`, so no new dependency.
+- `frontend/e2e/dispute-charge.spec.ts` and `playwright.config.ts`: the browser
+  journey for acceptance 1, plus `make e2e`, `make e2e-install` and
+  `make dev-e2e`. **The suite has not been executed**: the browser binary could
+  not be downloaded in the environment this change was made in. It compiles and
+  its three tests are discovered; the selectors are believed correct, not known
+  correct.
+
+No `/v1` contract change and no OpenAPI snapshot change: the route already
+returned everything rendered here.
+
+
 ### Added (C04, #23)
 
 - `clarity.ai.language`: the Singlish lexicon, tokenising and folding, moved

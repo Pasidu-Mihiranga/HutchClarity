@@ -6,6 +6,9 @@
 .keys/
 .mypy_cache/
 .next/
+# TypeScript's incremental build cache. Committed by accident in e238558 and
+# rewritten by every build, so it showed up as a diff in unrelated changes.
+*.tsbuildinfo
 .pytest_cache/
 .ruff_cache/
 .venv/

@@ -2,9 +2,17 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { supportedLangs, type Lang } from "@clarity/i18n";
+import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
+import {
+  Citations,
+  ConfirmCard,
+  FlowProgress,
+  HandoffNotice,
+  RefusedNotice,
+  type FlowCopy,
+} from "@/components/FlowCards";
 import type { CardActions } from "@/components/ClarityMessageCard";
 import {
   makeInitialState,
@@ -211,7 +219,10 @@ export default function ClarityPage() {
         product: cs.contextProduct,
         amount_lkr: cs.contextAmount ?? cs.decision?.amount_lkr,
       };
-      const turn = await fetchTurn(typed, lang, intentOverride, facts, app);
+      // `cs.caseId` at the top level is what puts this turn on the stateful
+      // pipeline. Passing it only inside `facts`, as this did until C05, left
+      // every turn stateless and no flow ever ran (C05 devlog).
+      const turn = await fetchTurn(typed, lang, intentOverride, facts, app, cs.caseId);
 
       let clientIntent = turn?.client_intent ?? turn?.intake?.client_intent ?? intentForQuestion(questionKey, typed);
       const route = turn?.route ?? turn?.intake?.route ?? "account";
@@ -220,6 +231,13 @@ export default function ClarityPage() {
       const chatIntent = turn?.intake?.intent ?? intentOverride ?? null;
 
       const update1: Partial<ClarityState> = { chatIntent, followUps };
+      // The flow's own output, rendered rather than discarded (C05).
+      if (turn?.state) update1.flow = turn.state;
+      if (turn?.citations) update1.citations = turn.citations;
+      if (turn?.verifier) update1.verifier = turn.verifier;
+      if (turn?.handoff) update1.handoff = turn.handoff;
+      if (turn?.proposal_id) update1.planId = turn.proposal_id;
+      update1.refused = Boolean(turn?.refused);
       if (turn?.intake?.slots?.product) update1.contextProduct = turn.intake.slots.product;
       if (turn?.intake?.slots?.amount_lkr) update1.contextAmount = turn.intake.slots.amount_lkr;
       if (articles) update1.articles = articles;
@@ -407,6 +425,27 @@ export default function ClarityPage() {
     setShowTopics(false);
     fetchSuggestions(lang, app).then((suggestions) => setCs((s) => ({ ...s, suggestions })));
   }
+
+  // Every string from the shared i18n package (C05 scope), so a translator
+  // changes one file rather than hunting through components. `t` falls back to
+  // English and then to the key, so a missing string is visible rather than
+  // rendering as a blank control.
+  const flowCopy: FlowCopy = {
+    flowLabel: (flow) => t(lang, `flow.${flow}`),
+    stateLabel: (state) => t(lang, `state.${state}`),
+    confirmTitle: t(lang, "confirm.title"),
+    confirmBody: t(lang, "confirm.body"),
+    confirmCta: t(lang, "confirm.cta"),
+    confirmPending: t(lang, "confirm.pending"),
+    sourcesTitle: t(lang, "sources.title"),
+    sourcesNote: t(lang, "sources.note"),
+    handoffTitle: t(lang, "handoff.title"),
+    handoffBody: (queue) => t(lang, "handoff.body", { queue }),
+    refusedTitle: t(lang, "refused.title"),
+    refusedBody: t(lang, "refused.body"),
+    receiptCta: t(lang, "receipt.cta"),
+    stepOf: (position, total) => t(lang, "flow.step", { position, total }),
+  };
 
   const cardActions: CardActions = {
     onAction: (a) => {
@@ -601,7 +640,16 @@ export default function ClarityPage() {
             </div>
           ) : (
             /* ── Transcript ── */
-            <div style={{ paddingTop: 16, display: "grid", gap: 12 }}>
+            <div
+              // Polite, not assertive: a reply should be read when the screen
+              // reader finishes what it is saying, not interrupt the customer
+              // mid-sentence. Without this, an answer that arrives while focus
+              // is in the composer is never announced at all (C05 scope).
+              role="log"
+              aria-live="polite"
+              aria-label={t(lang, "chat.transcript")}
+              style={{ paddingTop: 16, display: "grid", gap: 12 }}
+            >
               {cs.messages.map((msg, i) => {
                 if (msg.role === "user") {
                   return (
@@ -615,10 +663,37 @@ export default function ClarityPage() {
                     </div>
                   );
                 }
+                const isLast = i === cs.messages.length - 1;
                 return (
                   <div key={i} style={{ display: "flex", justifyContent: "flex-start" }}>
-                    <div style={{ maxWidth: "90%", width: "100%" }}>
+                    <div style={{ maxWidth: "90%", width: "100%", display: "grid", gap: 8 }}>
+                      {/* The flow artefacts go on the newest card only. On
+                          every card they would repeat the same journey state
+                          down the whole transcript, and a screen reader would
+                          read it once per turn. */}
+                      {isLast && cs.flow ? <FlowProgress flow={cs.flow} copy={flowCopy} /> : null}
                       <ClarityMessageCard kind={msg.kind} state={cs} actions={cardActions} />
+                      {isLast && cs.citations.length > 0 ? (
+                        <Citations citations={cs.citations} copy={flowCopy} />
+                      ) : null}
+                      {isLast && cs.refused ? <RefusedNotice copy={flowCopy} /> : null}
+                      {isLast && cs.planId && !cs.receiptDoc ? (
+                        <ConfirmCard
+                          planId={cs.planId}
+                          amount={cs.decision?.amount_lkr != null ? String(cs.decision.amount_lkr) : null}
+                          summary={cs.decision?.explanation ?? null}
+                          busy={busy}
+                          // The server's own confirm step, through the same
+                          // action the existing card uses. Nothing here marks
+                          // a plan done locally: the confirmation token is
+                          // minted server side (ADR-0007).
+                          onConfirm={() => cardActions.onAction("confirmFix")}
+                          copy={flowCopy}
+                        />
+                      ) : null}
+                      {isLast && cs.handoff?.handoff ? (
+                        <HandoffNotice handoff={cs.handoff} copy={flowCopy} />
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -647,6 +722,10 @@ export default function ClarityPage() {
             <textarea
               ref={textareaRef}
               rows={1}
+              // A placeholder is not an accessible name: it disappears on the
+              // first keystroke and some screen readers never announce it, so
+              // the one control on this screen had no name at all (C05 scope).
+              aria-label={tl(lang, "askClarityAnything")}
               placeholder={tl(lang, "askClarityAnything")}
               value={input}
               onChange={(e) => setInput(e.target.value)}

@@ -12,7 +12,7 @@ COMPOSE := deploy/compose/full.yml
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
 .PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed eval \
-        up-full down-full test-full contracts contracts-check \
+        up-full down-full test-full dev-e2e e2e e2e-install contracts contracts-check \
         licences secrets \
         web-install web-build web-customer web-console web-verify
 
@@ -31,6 +31,7 @@ help:
 	@echo "make up-full - start the full profile's components (Kafka); needs Docker"
 	@echo "make down-full - stop them and remove their volumes"
 	@echo "make test-full - run the parity suites against the full profile"
+	@echo "make e2e      - browser journeys (needs: make e2e-install once)"
 	@echo "make contracts - re-export contracts/openapi.json and regenerate the SDK types"
 	@echo "make contracts-check - fail if the committed schema or SDK types are stale"
 	@echo "make licences - check every dependency licence is neutral and OSI-approved"
@@ -105,6 +106,19 @@ down-full:
 
 # The parity suites against the real drivers. Each one skips unless its
 # component is reachable, so this is honest about what it actually verified.
+dev-e2e:
+	@# The API the browser suite drives (C05). A fixed port so Playwright can
+	@# wait on it, the lite profile so it needs no services (ADR-0006), and
+	@# OTEL off so the output stays readable in the suite's logs.
+	cd $(BACKEND) && CLARITY_PROFILE=lite OTEL_EXPORTER=none \
+		$(PY)/uvicorn clarity.entrypoints.asgi:app --host 127.0.0.1 --port 8100
+
+e2e:
+	cd frontend && npm run e2e
+
+e2e-install:
+	cd frontend && npm install && npm run e2e:install
+
 test-full:
 	$(PY)/pip install -e "$(BACKEND)[dev,kafka,postgres]"
 	cd $(BACKEND) && \

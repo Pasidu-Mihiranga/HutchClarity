@@ -48,7 +48,12 @@ export default function CasesPage() {
             ? (window.sessionStorage.getItem("clarity_token") ?? undefined)
             : undefined;
         client.setToken(token);
-        const data = await (client as unknown as Record<string, unknown>).getCases?.();
+        // Typed through a narrow shape rather than `Record<string, unknown>`,
+        // whose values are `unknown` and so not callable. Pre-existing error,
+        // invisible because `npm run typecheck` only covers packages/sdk and
+        // never the apps (C05 devlog).
+        const withCases = client as unknown as { getCases?: () => Promise<unknown> };
+        const data = await withCases.getCases?.();
         if (!cancelled && Array.isArray(data) && data.length > 0) {
           setCases(data as CaseItem[]);
         } else {

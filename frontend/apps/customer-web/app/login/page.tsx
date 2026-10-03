@@ -95,10 +95,16 @@ export default function LoginPage() {
         {step === "request" ? (
           <form onSubmit={onRequest} style={{ display: "grid", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+              <label
+                htmlFor="msisdn"
+                style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}
+              >
                 Hutch number
               </label>
               <input
+                id="msisdn"
+                name="msisdn"
+                autoComplete="tel"
                 inputMode="tel"
                 placeholder="07XXXXXXXX"
                 value={msisdn}
@@ -129,10 +135,16 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={onVerify} style={{ display: "grid", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+              <label
+                htmlFor="otp"
+                style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}
+              >
                 6-digit code
               </label>
               <input
+                id="otp"
+                name="otp"
+                autoComplete="one-time-code"
                 inputMode="numeric"
                 placeholder="123456"
                 value={code}

@@ -13,12 +13,16 @@
     "lint": "npm run lint --workspaces --if-present",
     "sdk:generate": "openapi-typescript ../contracts/openapi.json -o packages/sdk/src/generated/schema.ts",
     "sdk:check": "node scripts/check-sdk.mjs",
-    "typecheck": "tsc -p packages/sdk/tsconfig.json --noEmit"
+    "typecheck": "tsc -p packages/sdk/tsconfig.json --noEmit",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install --with-deps chromium",
+    "test": "npm run test --workspaces --if-present"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
-    "openapi-typescript": "^7.13.0"
+    "openapi-typescript": "^7.13.0",
+    "@playwright/test": "^1.56.0"
   }
 }

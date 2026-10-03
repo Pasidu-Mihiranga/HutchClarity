@@ -449,7 +449,19 @@ function ReceiptCard({ state, lang, onViewReceipt }: { state: ClarityState; lang
   const verified = state.receiptCheck && ((state.receiptCheck as Record<string, unknown>).valid || (state.receiptCheck as Record<string, unknown>).ok);
   return (
     <div style={card}>
-      <span style={{ ...verdict, background: "#f0fdf4", color: "#15803d" }}>
+      <span
+        // A stable hook for the e2e, and the verdict as data rather than as
+        // wording, so the assertion does not depend on the display language.
+        // `verified` is the backend's answer from POST /v1/receipts/{id}/verify,
+        // which recomputes the hash chain: the UI never decides this (C05).
+        data-testid="receipt-verified"
+        data-verified={verified ? "true" : "false"}
+        style={{
+          ...verdict,
+          background: verified ? "#f0fdf4" : "#fef2f2",
+          color: verified ? "#15803d" : "#b91c1c",
+        }}
+      >
         {verified ? tl(lang, "verified") : tl(lang, "notVerified")}
       </span>
       <h3 style={cardH3}>{tl(lang, "trustReceipt")}</h3>

@@ -5,7 +5,7 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | ID | Walkthrough | Journey / plan ref | Status | Last verified |
 |---|---|---|---|---|
 | WT-01 | Local setup (`make setup`, `make dev`, `lite` profile) and repository tour | AGENTS.md §13 | to write (flow works) | - |
-| WT-02 | [VAS charge without consent → one-tap fix → receipt](walkthroughs/WT-02-vas-journey.md) | 03 §6.1 | verified by the team (old layout); re-verify on `dev` | 2026-10-02 |
+| WT-02 | [VAS charge without consent → one-tap fix → receipt](walkthroughs/WT-02-vas-journey.md) | 03 §6.1 | API path verified by the acceptance suite; browser steps unverified until the Playwright suite is run (C05) | 2026-10-04 |
 | WT-03 | Duplicate reload → zero-contact refund | 03 §6.2 | to write (flow works) | - |
 | WT-04 | "Unlimited" data stopped → explain-only (FUP disclosed) | 03 §6.4 | to write (flow works) | - |
 | WT-05 | Large disputed reload → staff approval with step-up, four-eyes above policy threshold | 03 §6.5 | to write (flow works) | - |

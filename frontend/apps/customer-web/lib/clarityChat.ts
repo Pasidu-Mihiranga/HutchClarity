@@ -14,7 +14,11 @@ export type ResultKind =
   | "network"
   | "handoff"
   | "success"
-  | "receipt";
+  | "receipt"
+  // C05: the flow's own artefacts.
+  | "confirm"
+  | "grounded"
+  | "refused";
 
 export type ChatMessage =
   | { role: "user"; text: string }
@@ -52,7 +56,40 @@ export type Timeline = {
   sources?: TimelineSource[];
 };
 
-export type Article = { title: string; body: string };
+export type Article = { title: string; body: string; citation?: string; owner?: string };
+
+// ─── flow artefacts (C05, #24) ────────────────────────────────────────────────
+
+// Where the server-side flow has the conversation. Plan 22 step 10 asks the UI
+// to render this, and until C05 the client threw it away: `fetchTurn` never
+// sent `case_id` at the top level of the body, so every turn took the stateless
+// path and no flow ever ran. That is why the chat rendered single responses.
+export type FlowSnapshot = {
+  case_id?: string;
+  flow?: string;
+  state?: string;
+  turn_no?: number;
+  language?: string;
+  last_proposal_id?: string | null;
+  channels?: string[];
+};
+
+// A citation is `source@version` with an optional `#clause`, which is what the
+// K03 verifier checked and what a reader can look up. Rendered whole: dropping
+// the version would leave a reference to "the terms" with no way to tell which.
+export type Citation = string;
+
+export type Verifier = {
+  ok?: boolean;
+  failures?: string[];
+  warnings?: string[];
+};
+
+export type Handoff = {
+  handoff?: boolean;
+  reason?: string | null;
+  queue?: string | null;
+};
 
 export type FollowUp = { id: string; i18n_key: string; intent?: string };
 
@@ -123,6 +160,12 @@ export type ClarityState = {
   contextAmount: string | number | null;
   progressStep: number;
   thinkingLabel: string;
+  // C05: what the server-side flow said, rendered rather than discarded.
+  flow: FlowSnapshot | null;
+  citations: Citation[];
+  verifier: Verifier | null;
+  handoff: Handoff | null;
+  refused: boolean;
 };
 
 export type SuggestionChip = {
@@ -222,6 +265,11 @@ export function makeInitialState(): ClarityState {
     contextAmount: null,
     progressStep: -1,
     thinkingLabel: "",
+    flow: null,
+    citations: [],
+    verifier: null,
+    handoff: null,
+    refused: false,
   };
 }
 
@@ -278,12 +326,23 @@ type TurnResponse = {
     reply?: string;
     route?: string;
     client_intent?: string;
+    case_id?: string | null;
     follow_ups?: FollowUp[];
     articles?: Article[];
+    // Added by C01 to C03 and K03, and read by the client since C05.
+    state?: FlowSnapshot;
+    citations?: Citation[];
+    proposal_id?: string | null;
+    refused?: boolean;
+    verifier?: Verifier;
+    handoff?: Handoff;
     intake?: {
       intent?: string;
       client_intent?: string;
       route?: string;
+      language?: string;
+      confidence?: number;
+      assisted?: boolean;
       slots?: { product?: string; amount_lkr?: string };
     };
   };
@@ -294,7 +353,8 @@ export async function fetchTurn(
   lang: string,
   intentOverride: string | null,
   facts: Record<string, unknown>,
-  app: AppState
+  app: AppState,
+  caseId?: string | null
 ): Promise<TurnResponse["turn"]> {
   try {
     const payload = await apiFetch<TurnResponse>("/v1/conversation/turn", "POST", {
@@ -302,6 +362,15 @@ export async function fetchTurn(
       language: lang,
       intent: intentOverride,
       facts,
+      // Top level, not inside `facts`: the route reads it from the body and
+      // only then takes the stateful pipeline. Passing it in `facts` left
+      // every turn stateless, which is the bug C05 fixes.
+      //
+      // Null on the first turn of a conversation, because the case does not
+      // exist yet. The server answers statelessly and keeps nothing, which is
+      // correct: there is nothing to attach state to.
+      case_id: caseId ?? null,
+      channel: "app",
       snapshot: {
         pack: app.pack || {},
         subscriptions: app.subscriptions || [],

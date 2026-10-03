@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\""
   }
 }

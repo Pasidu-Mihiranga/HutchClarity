@@ -6,8 +6,26 @@
 |---|---|
 | Audience | developers / demo presenters / judges |
 | Journey | Customer asks (chip or free-form) about an unexpected VAS charge; Clarity Investigation Card → confirm modal → refund → Trust Receipt |
-| Status | verified |
-| Last verified | 2026-10-02 |
+| Status | API path verified; browser steps unverified (see note) |
+| Last verified | 2026-10-04 (API path only) |
+
+> **C05 (#24), 2026-10-04.** The journey's API path is re-verified: the
+> acceptance suite drives this exact flow over `/v1` and ends at a receipt the
+> backend verifies (`test_the_dispute_charge_script_for_dilani_ends_with_a_verified_receipt`
+> and `tests/acceptance/test_assistant.py`), and `make check` is green.
+>
+> **The browser steps below are not re-verified.** C05 added a Playwright suite
+> for exactly this journey (`frontend/e2e/dispute-charge.spec.ts`), and the
+> browser binary could not be downloaded in the environment this change was
+> made in, so the suite has never been executed. Running
+> `make e2e-install && make e2e` on a machine with network access is what
+> clears this, and until somebody does the steps below are "believed correct",
+> which is not the same thing.
+>
+> What did change in the browser path: the chat now sends `case_id` at the top
+> level of the turn request, so the server-side flow actually runs. Before C05
+> it was sent only inside `facts` and every turn took the stateless path, which
+> means the "progress trail" step below was driven entirely client side.
 
 ## 1. What you will see
 
