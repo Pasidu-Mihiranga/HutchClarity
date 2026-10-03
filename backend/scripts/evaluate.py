@@ -47,7 +47,7 @@ from clarity.ai.evaluation import (
 )
 from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world, ref_for
-from clarity.kernel.common import Channel
+from clarity.kernel.common import Channel, Language
 from clarity.modules.conversation.public import extract_intake, handle_turn
 from clarity.modules.knowledge.public import (
     Audience,
@@ -55,6 +55,7 @@ from clarity.modules.knowledge.public import (
     KnowledgeRetriever,
     KnowledgeSource,
     RetrievalConfig,
+    compose_answer,
 )
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -77,11 +78,6 @@ UNBUILT: Mapping[str, str] = {
     "flow": (
         "no flow dataset: the conversation orchestrator is C01 (#19) and the "
         "flow registry is C02 (#21). Nothing to score yet"
-    ),
-    "rag": (
-        "the retrieval golden set landed with K02 (#32), so recall_at_5 is "
-        "measured. citation_accuracy stays unevaluable: nothing composes a "
-        "grounded answer until K03 (#33), so there are no citations to check"
     ),
     "language_review": (
         "no ratings file: scores come from native speakers against a rubric, "
@@ -185,28 +181,48 @@ def measure_rag() -> dict[str, Measurement]:
     retriever = KnowledgeRetriever(registry, RetrievalConfig.from_file(RETRIEVAL))
     retriever.index(registry.chunks_as_of(RAG_AS_OF, audience=Audience.STAFF))
 
+    traces = [
+        (
+            example,
+            retriever.search(example.text, audience=Audience.CUSTOMER, moment=RAG_AS_OF),
+        )
+        for example in dataset.examples
+    ]
     rows = [
         Retrieved(
             language=example.language,
             expected=example.expect,
-            ranked=tuple(
-                dict.fromkeys(
-                    hit.chunk.source_id
-                    for hit in retriever.search(
-                        example.text, audience=Audience.CUSTOMER, moment=RAG_AS_OF
-                    ).hits
-                )
-            ),
+            ranked=tuple(dict.fromkeys(hit.chunk.source_id for hit in trace.hits)),
         )
-        for example in dataset.examples
+        for example, trace in traces
     ]
+
+    # Citation accuracy (K03, #33). Not "did the citations verify", which the
+    # template path satisfies by construction and would be the vacuous version
+    # A05 built UNEVALUABLE for. What is measured is whether the answer cited a
+    # source the golden set says would ground it: a citation that verifies but
+    # names the wrong document is a real failure and the one retrieval
+    # precision actually causes.
+    answered = 0
+    correct = 0
+    for example, trace in traces:
+        answer = compose_answer(
+            trace, audience=Audience.CUSTOMER, moment=RAG_AS_OF, language=Language.EN
+        )
+        if not answer.grounded:
+            continue
+        answered += 1
+        cited_sources = {citation.split("@", 1)[0] for citation in answer.citations}
+        if cited_sources & example.expect:
+            correct += 1
 
     return {
         "recall_at_5": Measurement(
             metric="recall_at_5",
             overall=recall_at_k(rows, k=5),
             per_language=recall_by_language(rows, k=5),
-        )
+        ),
+        "citation_accuracy": ratio("citation_accuracy", held=correct, total=answered),
     }
 
 

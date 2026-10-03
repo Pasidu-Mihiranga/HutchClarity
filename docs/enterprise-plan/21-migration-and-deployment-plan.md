@@ -329,6 +329,7 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `risk.detected` | proactive | case (open zero-contact case), notifications | exists |
 | `notification.sent` / `.failed` | notifications | insights, audit | planned |
 | `policy.published` / `rule.published` | governance | detection, decision (reload artefacts), audit | exists |
+| `knowledge.published` | knowledge | knowledge (answer cache invalidation, re-index), audit | exists |
 | `switch.changed` | platform config | decision, ai gateway, audit | planned |
 | `mcp.invoked` | interfaces.mcp | audit, security alerts | exists |
 | `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |

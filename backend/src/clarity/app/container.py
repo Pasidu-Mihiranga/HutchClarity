@@ -30,11 +30,12 @@ from clarity.ai.local import LOCAL_IMPLEMENTATIONS
 from clarity.ai.roles import LOCAL_PROVIDERS, ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
 from clarity.app.flow_tools import FlowToolAdapter
+from clarity.app.knowledge_seed import seed_help_articles
 from clarity.app.mcp_view import ResolutionServiceMCPView
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
 from clarity.contracts.decision import Outcome
-from clarity.contracts.events import RiskDetectedV1
+from clarity.contracts.events import KnowledgePublishedV1, RiskDetectedV1
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
 from clarity.integration.ports import DriverMode
@@ -78,9 +79,11 @@ from clarity.modules.iam.public import (
     TokenVerifier,
 )
 from clarity.modules.knowledge.public import (
+    AnswerCache,
     Audience,
     KnowledgeRegistry,
     KnowledgeRetriever,
+    KnowledgeService,
     RetrievalConfig,
 )
 from clarity.modules.notifications.public import (
@@ -642,8 +645,26 @@ class Clarity:
             default_retrieval_file(self.settings.retrieval_file)
         )
         self.retriever = KnowledgeRetriever(self.knowledge, self.retrieval_config)
-        self.retriever.index(
-            self.knowledge.chunks_as_of(audience=Audience.STAFF),
+        # The corpus (K03). The simulated help articles already served by
+        # /v1/knowledge/search, published here so that route can be served by
+        # the module without regressing to answering nothing. Nothing is
+        # invented: see app/knowledge_seed.py.
+        seed_help_articles(self.knowledge)
+        self.retriever.index(self.knowledge.chunks_as_of(audience=Audience.STAFF))
+        # Grounded answers (K03). No composer: with no model configured the
+        # template path quotes the source verbatim and cites it, which is the
+        # floor ADR-0009 requires and is never worse than correct.
+        self.answer_cache = AnswerCache()
+        self.answers = KnowledgeService(
+            self.knowledge,
+            self.retriever,
+            cache=self.answer_cache,
+            clock=self.case_aggregate._now,
+        )
+        self.consumers.register(
+            EventType.KNOWLEDGE_PUBLISHED,
+            group="knowledge-cache",
+            handler=self._invalidate_answer_cache,
         )
 
         # The stateful turn pipeline (C01) driving the published flows (C02).
@@ -657,7 +678,7 @@ class Clarity:
         self.conversation = ConversationOrchestrator(
             flow=FlowRouter(
                 self.flows,
-                tools=FlowToolAdapter(self.mcp_view),
+                tools=FlowToolAdapter(self.mcp_view, answers=self.answers),
                 # The bounded agent step (C03, #22). With no model configured
                 # this is an agent with no planner, which leaves an agentic
                 # state behaving exactly like a deterministic one.
@@ -666,6 +687,20 @@ class Clarity:
             audit=self.audit,
             open_unit=self.open_unit,
         )
+
+    def _invalidate_answer_cache(self, event: Event) -> None:
+        """Drop cached answers composed against an older corpus (K03).
+
+        Housekeeping, not correctness: the corpus fingerprint is part of the
+        cache key, so a stale entry is already unreachable. This stops a
+        long-lived process carrying dead ones, and re-indexes the new chunks.
+        """
+        payload = event.payload()
+        if not isinstance(payload, KnowledgePublishedV1):
+            return
+        self.retriever.index(self.knowledge.chunks_as_of(audience=Audience.STAFF))
+        if payload.corpus_version:
+            self.answers.on_knowledge_published(payload.corpus_version)
 
     def _open_zero_contact_case(self, event: Event) -> None:
         payload = event.payload()

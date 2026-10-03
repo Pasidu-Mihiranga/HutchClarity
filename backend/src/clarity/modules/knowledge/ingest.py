@@ -175,6 +175,7 @@ def ingest(source: KnowledgeSource) -> tuple[Chunk, ...]:
                     version=source.version,
                     ordinal=len(chunks),
                     text=window,
+                    title=source.title,
                     clause_ref=clause_ref,
                     kind=source.kind,
                     owner=source.owner,

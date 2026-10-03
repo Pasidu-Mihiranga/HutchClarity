@@ -235,19 +235,43 @@ def test_the_case_status_script_answers_without_proposing(api, me):
     assert turn["proposal_id"] is None
 
 
-def test_the_knowledge_script_offers_a_person_when_there_is_no_source(api, me):
-    """No knowledge base yet (K01-K03), so the honest exit is the only exit.
+def test_the_knowledge_script_answers_from_the_corpus_with_citations(api, me):
+    """K03 (#33): retrieval landed, so this script now reaches `answered`.
 
-    When retrieval lands this test should start reaching `answered`, which is
-    the signal to extend the script rather than relax it.
+    Until K03 this test asserted `offer_person` and said in its docstring that
+    reaching `answered` would be the signal to extend it rather than relax it.
+    That is what happened: the corpus holds a fair-use article, the flow
+    retrieves it, and the reply quotes it with a citation.
     """
     case_id = _open(api, me, DILANI, channel="app", language="en")
 
     turn = _turn(api, me, case_id, "What is the fair use policy?", language="en")
 
     assert turn["state"]["flow"] == "KNOWLEDGE_QA"
+    assert turn["state"]["state"] == "answered"
+    assert turn["citations"], "an answered knowledge turn must cite its source"
+    assert all("@" in citation for citation in turn["citations"]), (
+        f"a citation must name a version a reader can look up: {turn['citations']}"
+    )
+
+
+def test_the_knowledge_script_still_offers_a_person_when_there_is_no_source(api, me):
+    """The other exit, which is the one that must never be papered over.
+
+    A question the published corpus does not cover gets "I do not know" and a
+    person (plan 22 section 7). The failure mode this guards against is the
+    generic intent template answering instead, which reads as though the
+    question was understood.
+    """
+    case_id = _open(api, me, DILANI, channel="app", language="en")
+
+    turn = _turn(api, me, case_id, "What is the capital of France?", language="en")
+
+    assert turn["state"]["flow"] == "KNOWLEDGE_QA"
     assert turn["state"]["state"] == "offer_person"
     assert turn["citations"] == []
+    assert turn["handoff"]["handoff"] is True
+    assert turn["handoff"]["reason"] == "no_published_source"
 
 
 def test_the_safeguard_script_proposes_only_once_a_safeguard_is_chosen(api, me):

@@ -6,8 +6,8 @@
 | Layer | L4 domain (`clarity.modules.knowledge`) |
 | Deployable | `clarity-api` today (modular monolith); a candidate for extraction (plan 21 section 179) |
 | Owner | TBD |
-| Status | built (`lite`): source registry and governed ingestion K01 (#31), lexical index and retrieval K02 (#32), both 2026-10-03. The `full` profile's pgvector hybrid is blocked on there being no embedding model (see section 7). Grounded answers are K03 (#33) |
-| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `terms.py`, `bm25.py`, `config.py`, `retrieval.py`, `public.py` |
+| Status | built (`lite`): registry and ingestion K01 (#31), lexical retrieval K02 (#32), grounded answers K03 (#33), all 2026-10-03. The `full` profile's pgvector hybrid and the semantic half of retrieval are blocked on there being no embedding model (section 7) |
+| Files | `sources.py`, `ingest.py`, `registry.py`, `repository.py`, `terms.py`, `bm25.py`, `config.py`, `retrieval.py`, `citations.py`, `answers.py`, `cache.py`, `service.py`, `public.py` |
 
 ## 1. Purpose
 
@@ -21,9 +21,9 @@ an owner, an effective window, an audience and a language, old versions stay
 readable, and every retrievable chunk carries enough metadata to be filtered
 without a join.
 
-`KnowledgeRegistry` is the way in and the way out for content. Publish a
-version; read back the chunks in force at a moment for a given audience.
-`KnowledgeRetriever` ranks what the registry allows.
+`KnowledgeRegistry` is the way in for content: publish a version, read back the
+chunks in force at a moment for a given audience. `KnowledgeService.ask` is the
+way out: retrieve, compose, verify, cache, or refuse.
 
 ## 2. Public surface (`public.py`)
 
@@ -37,12 +37,19 @@ Retrieval (K02): `KnowledgeRetriever`, `RewritingRetriever`, `Hit`,
 `BM25Params`, `HybridWeights`, `RerankBonuses`, `RetrievalConfigInvalid`,
 `tokens`, `query_terms`.
 
+Grounded answers (K03): `KnowledgeService`, `Answer`, `GroundedAnswer`,
+`AnswerKind`, `Composer`, `compose_answer`, `refuse`, `verify_citations`,
+`CitationReport`, `CitationCheck`, `CitationFault`, `citations_in`,
+`malformed_citations`, `all_faults`, `sources_of`, `AnswerCache`, `CacheKey`,
+`NO_SOURCE`, `ACCORDING_TO`, `QUOTED_IN_TEMPLATE`.
+
 ## 3. Used by
 
-`clarity.app.container`, which constructs the registry. Nothing else yet: K02
-(#32) adds the index and retrieval over `chunks_as_of`, and K03 (#33) the
-grounded answer and citation verifier. The MCP `search_knowledge` tool still
-answers from the rule catalogue (see Known gaps).
+`clarity.app.container`, which constructs the registry, the retriever and the
+service; `clarity.interfaces.http` for `GET /v1/knowledge/search`; and
+`clarity.app.flow_tools`, which gives `KNOWLEDGE_QA` its `search_knowledge`
+tool. The MCP `search_knowledge` tool still answers from the rule catalogue
+(see Known gaps).
 
 ## 4. Depends on
 
@@ -98,6 +105,26 @@ and happens on the query, never on the corpus: expanding the corpus would bake
 one lexicon into stored chunks, so improving it would mean re-indexing and old
 chunks would keep the old expansion.
 
+## 5d. Grounded answers (K03)
+
+Three paths, chosen by what is available rather than by configuration:
+
+| Retrieved | Model | Answer |
+|---|---|---|
+| nothing | either | **refusal**: does not know, offers a person |
+| something | none | **template**: the source's own words, cited |
+| something | `fast-text` | model wording, verified, template on failure |
+
+Every citation is checked against the retrieval behind it: retrieved,
+effective, audience-allowed, well formed. A model answer that fails falls back
+to the template, because the sources were real and withholding a correct answer
+is the wrong failure; its fault codes go in the audit either way.
+
+The cache holds generic grounded answers only, keyed by the corpus fingerprint,
+the language and the audience. Publishing anything changes the fingerprint, so
+an answer composed from superseded text is unreachable rather than merely
+invalidated.
+
 ## 6. Invariants
 
 - **One version in force at a time.** Publishing a version whose effective
@@ -146,6 +173,21 @@ chunks would keep the old expansion.
   rather than composing from an irrelevant source.
 - **`RetrievalTrace.semantic` reports whether the semantic half ran**, so a
   caller cannot describe a lexical result as hybrid.
+- **Cite or refuse.** An answer either cites a version a reader can look up or
+  says it does not know and offers a person. There is no third state, and a
+  reply carrying a citation it did not earn is the one outcome that would make
+  the whole trust story false.
+- **A failed verification replaces the answer, never degrades it.** No dropping
+  the bad citation and sending the rest: a sentence whose support was removed is
+  a sentence with no support.
+- **The template quotes verbatim and never paraphrases** (I15). A paraphrase of
+  a policy clause is a new claim about policy.
+- **A model is not asked to answer with no sources.** It would answer from its
+  training, which is a guess in a confident voice.
+- **`grounded` requires verification, not citations.** An empty report means
+  nothing was checked, and must not read as checked.
+- **Nothing case-specific, ungrounded or refused is cached**, and the cache
+  stores no customer text: the key is a hash of normalised terms.
 - Time comes from the injected clock (I11). `chunks_as_of` takes the moment
   explicitly, and for a dispute that moment is the event time, not now.
 - Simulated content is labelled (I16). The registry ships **empty**: the corpus
@@ -181,12 +223,17 @@ gap rather than an oversight.
 
 ## 8. Events
 
-None produced or consumed yet. Plan 22 section 7 specifies a
-`knowledge.published` event to invalidate the semantic cache and re-index
-affected chunks. Neither the cache nor the index exists until K02 and K03, so
-the event is deliberately not declared here: an event with no consumer is a
-contract to maintain for nothing. It belongs with whichever of those introduces
-the thing that has to react.
+| Event | Direction | Notes |
+|---|---|---|
+| `knowledge.published@v1` | produced | One source version published, through the outbox in the same unit of work as the write (I7). Carries the source's identity and window, never its text. Consumers: the `knowledge-cache` group (re-index, drop cached answers), audit. |
+
+K01 deliberately did not declare this event, because nothing consumed it and an
+event with no consumer is a contract maintained for nothing. K03 added the
+cache, which is the consumer.
+
+Correctness does not depend on delivery: the corpus fingerprint is part of the
+cache key, so a stale entry is unreachable rather than merely marked. The event
+is how a long-lived process stops carrying dead entries.
 
 ## 9. Tests
 
@@ -196,6 +243,9 @@ the thing that has to react.
 - `backend/tests/unit/test_knowledge_terms.py` - folding, tokenisation per script, the Singlish lexicon, and that a cold index scores like a warm one
 - `backend/tests/contract/test_retriever_parity.py` - the retriever port's contract; the hybrid driver skips
 - `backend/tests/evaluation/test_rag_retrieval.py` - recall@5 against the golden set (K02 acceptance 1) and Singlish queries (acceptance 2)
+- `backend/tests/unit/test_citation_verifier.py` - the citation verifier (K03 acceptance 1)
+- `backend/tests/unit/test_knowledge_cache.py` - staleness, the key, and what may not be cached
+- `backend/tests/acceptance/test_assistant.py` - no source means a person, over `/v1` (K03 acceptance 2)
 
 ## 10. Change history
 
@@ -204,3 +254,4 @@ the thing that has to react.
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Scaffold: `public.py` and `MODULE.md` stubs to satisfy the architecture tests |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K01-knowledge-source-registry.md` | Source registry, effective dating, audience filtering and governed ingestion |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K02-index-and-retrieval.md` | BM25 index, Singlish query expansion, rerank, top-k from config, and the `rag` release gate made evaluable |
+| 2026-10-03 | `docs/devlog/2026/2026-10-03-K03-grounded-answers.md` | Citation verifier, template and model composition, refusal, answer cache, `knowledge.published`, and `/v1/knowledge/search` served by this module |

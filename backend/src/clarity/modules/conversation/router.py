@@ -151,6 +151,22 @@ class FlowRouter:
                 tools_called.extend(trace.tools_called)
                 produced.update(trace.facts)
 
+            # The deterministic retrieval (K03, #33). A state that may search
+            # the corpus does so with the customer's own words, whether or not
+            # a planner ran: ADR-0009 requires every step to work with no model
+            # configured, and without this `KNOWLEDGE_QA.retrieve` is agentic,
+            # unplanned and therefore silent, so the flow always took its
+            # `no_source` exit and offered a person for questions the corpus
+            # answers.
+            #
+            # Skipped when the agent already produced citations, so a planned
+            # search is not repeated.
+            if "search_knowledge" in node.tools and not produced.get("citations"):
+                found = self._retrieve(flow, node, intake)
+                if found is not None:
+                    tools_called.append("search_knowledge")
+                    produced.update(found)
+
             if node.proposes and proposal_id is None:
                 plan = self._propose(flow, node, facts)
                 if plan is not None:
@@ -158,7 +174,14 @@ class FlowRouter:
                     proposal_id = str(plan.get("plan_id") or "") or None
                     produced.update(plan)
 
-            nxt = self._next(node, intake, facts, proposal_id=proposal_id)
+            # A state's own output has to be visible to its own transitions,
+            # or a state can never act on what it just did: `answer_found`
+            # reads `citations`, and a retrieval that produced them this turn
+            # is exactly the case the condition exists for. C02 threaded
+            # `proposal_id` separately for the same reason; this generalises it
+            # so the next produced fact needs no new argument.
+            known = {**facts, **produced}
+            nxt = self._next(node, intake, known, proposal_id=proposal_id)
             if nxt is None or nxt == current:
                 break
             current = nxt
@@ -169,8 +192,8 @@ class FlowRouter:
             )
 
         node = flow.state(current)
-        found = produced.get("citations") or facts.get("citations") or ()
-        citations = tuple(str(entry) for entry in found)
+        cited = produced.get("citations") or facts.get("citations") or ()
+        citations = tuple(str(entry) for entry in cited)
         return FlowOutcome(
             flow=flow.flow_id,
             state=current,
@@ -221,10 +244,25 @@ class FlowRouter:
 
     @staticmethod
     def _entry_state(flow: Flow, state: ConversationState) -> str:
-        """Where this turn starts: where we were, or the flow's initial state."""
-        if state.flow == flow.flow_id and state.state in flow.state_names:
-            return state.state
-        return flow.initial
+        """Where this turn starts: where we were, or the flow's initial state.
+
+        **A finished flow restarts rather than resuming.** A terminal state has
+        no transitions, so resuming there leaves the conversation unable to
+        move: the customer who asked one knowledge question could never ask a
+        second, because the flow sat in `answered` or `offer_person` and no
+        state ran. C02 handled the cross-flow case ("a flow already in a
+        terminal state does not trap anyone") and missed this one, where the
+        same flow claims the new intent.
+
+        Found by an acceptance test asking two knowledge questions in one case
+        (K03, #33).
+        """
+        if state.flow != flow.flow_id or state.state not in flow.state_names:
+            return flow.initial
+        if flow.state(state.state).terminal:
+            # A finished journey plus a new message is a new journey.
+            return flow.initial
+        return state.state
 
     def _next(
         self,
@@ -310,6 +348,32 @@ class FlowRouter:
             agentic=node.agentic,
             call_tool=call,
         )
+
+    def _retrieve(self, flow: Flow, node: FlowState, intake: IntakeResult) -> dict[str, Any] | None:
+        """Search the corpus with the customer's words, through the allowlist.
+
+        ``None`` when there is no tool surface or nothing to search for, which
+        leaves the flow to take its `no_source` exit. The text is the masked
+        text the orchestrator already produced, so nothing unmasked reaches the
+        knowledge module.
+        """
+        query = intake.raw_text.strip()
+        if self._tools is None or not query:
+            return None
+        try:
+            return self.call_tool(
+                flow.flow_id, node.name, "search_knowledge", case_id="", query=query
+            )
+        except ToolNotAllowed:
+            # The state declares the tool, so this cannot happen from a flow
+            # file that loaded. Re-raised rather than swallowed: it would mean
+            # the allowlist and this call disagree, which is a bug to see.
+            raise
+        except Exception:
+            # Retrieval is not the turn. A corpus that cannot be read leaves
+            # the flow with no citations, which is the `no_source` exit and a
+            # person, rather than a failed conversation.
+            return None
 
     def call_tool(self, flow_id: str, state_name: str, tool: str, **args: Any) -> dict[str, Any]:
         """Call a tool on behalf of a state, enforcing the allowlist.

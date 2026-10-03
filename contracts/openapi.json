@@ -3466,7 +3466,7 @@
     },
     "/v1/knowledge/search": {
       "get": {
-        "description": "Keyword search over how-to articles. Never opens a charge case.",
+        "description": "Grounded search over the published corpus. Never opens a charge case.\n\nServed by `clarity.modules.knowledge` since K03 (#33), where it used to\nread the mock store directly. The module applies the effective-date and\naudience filters, ranks, composes a cited answer and verifies every\ncitation against what was actually retrieved.\n\n**The response is additive.** `articles` keeps its shape and its place,\nbecause `/v1/clarity/route` and `/v1/conversation/turn` both read it and\nthe frontend SDK is generated from this schema. `answer`, `citations`,\n`grounded` and `needs_person` are new keys.\n\nThe audience is `customer` and is not a parameter. A staff caller would\nneed a staff permission and a different route; accepting an audience\nfrom the query string would let anyone ask for staff sources (I9).",
         "operationId": "knowledge_search_v1_knowledge_search_get",
         "parameters": [
           {

@@ -32,6 +32,13 @@ candidates: 24
 # across queries.
 min_relative_score: 0.08
 
+# NOTE: there is deliberately no term-coverage or absolute-score floor.
+# Both were tried and measured against the golden set, and both cost more
+# recall than they bought precision: half the correct hits match a single term,
+# and the correct and incorrect score distributions overlap completely. See the
+# comment in modules/knowledge/retrieval.py and the K03 devlog. Separating a
+# relevant hit from an irrelevant one needs meaning, not word overlap.
+
 bm25:
   # Okapi BM25. k1 controls how fast term frequency saturates; b controls how
   # much document length is penalised. These are the standard values and are

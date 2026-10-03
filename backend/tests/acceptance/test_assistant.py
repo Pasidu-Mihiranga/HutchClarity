@@ -168,3 +168,67 @@ def test_the_stateful_turn_keeps_every_field_the_stateless_one_had(api, me):
     assert missing == [], f"the stateful turn dropped {missing}"
     for added in ("state", "verifier", "refused"):
         assert added in stateful
+
+
+# -- K03 acceptance 2: no source means a person --------------------------- #
+
+
+def test_a_question_with_no_source_says_so_and_offers_a_person(api, me):
+    """K03 (#33) acceptance 2, black box over `/v1`.
+
+    Plan 22 section 7: no source means "I do not know" plus a person. The
+    failure this guards against is not a crash, it is the assistant answering
+    anyway, which is the whole thing the knowledge module exists to prevent
+    (I2: missing evidence goes to a person, never a guess).
+
+    Two assertions, and both are needed. The reply has to *say* it does not
+    know, and the turn has to actually route to a person: a reply that says
+    "let me get someone" while the handoff flag is false has told the customer
+    something untrue and left them waiting.
+    """
+    case_id = _open_case(api, me, DILANI)
+
+    turn = _turn(api, me, case_id, "What is the capital of France?", channel="app")
+
+    assert turn["citations"] == [], "an ungrounded answer cited something"
+    assert turn["handoff"]["handoff"] is True, "no source, so a person is owed"
+    assert turn["handoff"]["reason"] == "no_published_source"
+    assert "do not have a published source" in turn["reply"]
+
+
+def test_a_question_the_corpus_answers_is_answered_with_a_citation(api, me):
+    """The other half, without which the test above passes by refusing always.
+
+    A module that offered a person for everything would satisfy acceptance 2
+    and be useless.
+    """
+    case_id = _open_case(api, me, DILANI)
+
+    turn = _turn(api, me, case_id, "What is the fair use policy?", channel="app")
+
+    assert turn["citations"], "the corpus holds a fair-use article and it was not cited"
+    assert all("@" in citation for citation in turn["citations"])
+    assert turn["handoff"]["handoff"] is False
+    assert "do not have a published source" not in turn["reply"]
+
+
+def test_an_ungrounded_answer_is_never_sent_with_a_citation_attached(api, me):
+    """The property that matters across both halves.
+
+    Either the reply is grounded and cites a version a reader can look up, or
+    it is a refusal and cites nothing. There is no third state, and a reply
+    carrying a citation it did not earn is the one outcome that would make the
+    whole trust story false.
+    """
+    case_id = _open_case(api, me, DILANI)
+
+    for question in (
+        "What is the capital of France?",
+        "What is the fair use policy?",
+        "How do I convert my SIM to an eSIM?",
+    ):
+        turn = _turn(api, me, case_id, question, channel="app")
+        refused = "do not have a published source" in turn["reply"]
+        assert refused != bool(turn["citations"]), (
+            f"{question!r}: refused={refused} citations={turn['citations']}"
+        )

@@ -25,6 +25,8 @@ import threading
 from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 
+from clarity.contracts.events import KnowledgePublishedV1
+from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, utc_now
 from clarity.modules.knowledge.ingest import ingest
 from clarity.modules.knowledge.repository import (
@@ -34,6 +36,8 @@ from clarity.modules.knowledge.repository import (
     StoredKnowledgeRepository,
 )
 from clarity.modules.knowledge.sources import Audience, Chunk, KnowledgeSource
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.persistence import (
     MemoryStore,
     MemoryUnitOfWork,
@@ -62,6 +66,7 @@ class KnowledgeRegistry:
         open_unit: UnitOfWorkFactory | None = None,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
+        supplied_unit = open_unit
         if open_unit is None:
             store = MemoryStore()
 
@@ -72,6 +77,11 @@ class KnowledgeRegistry:
         self._open_unit = open_unit
         self._clock = clock
         self._lock = threading.Lock()
+        # The default in-memory store has no outbox table, so a registry built
+        # without one (a test, a script) records no events. Not a silent
+        # downgrade: the flag is set only when the caller supplied no unit of
+        # work factory at all, so a real deployment always announces.
+        self._events_disabled = supplied_unit is None
 
     @staticmethod
     def _repository_for(unit: UnitOfWork) -> KnowledgeRepository:
@@ -88,7 +98,9 @@ class KnowledgeRegistry:
         script never reaches the store.
         """
         with self._lock, self._open_unit() as unit:
-            chunks = self._publish_in(self._repository_for(unit), source)
+            repository = self._repository_for(unit)
+            chunks = self._publish_in(repository, source)
+            self._announce(unit, repository, source, len(chunks))
             unit.commit()
         return chunks
 
@@ -112,8 +124,49 @@ class KnowledgeRegistry:
                 repository.save_source(closed)
                 repository.replace_chunks(closed.source_id, closed.version, ingest(closed))
             chunks = self._publish_in(repository, source)
+            self._announce(unit, repository, source, len(chunks))
             unit.commit()
         return chunks
+
+    def _announce(
+        self,
+        unit: UnitOfWork,
+        repository: KnowledgeRepository,
+        source: KnowledgeSource,
+        chunk_count: int,
+    ) -> None:
+        """Record `knowledge.published` in the same unit as the write (I7).
+
+        Through the outbox, so the event and the state change commit together:
+        an event announcing a publication that rolled back is a lie, and a
+        publication nobody was told about leaves a cache serving the old text.
+
+        Carries the source's identity and window, never its text. An event is
+        a notification that something changed, and copying a clause into the
+        bus would put governed content somewhere nobody owns its version.
+        """
+        if self._events_disabled:
+            return
+        outbox_in(unit).append(
+            Event.of(
+                KnowledgePublishedV1(
+                    source_id=source.source_id,
+                    source_version=source.version,
+                    kind=source.kind.value,
+                    owner=source.owner,
+                    audience=source.audience.value,
+                    language=source.language.value,
+                    effective_from=source.effective_from,
+                    effective_to=source.effective_to,
+                    chunk_count=chunk_count,
+                    corpus_version=_fingerprint(repository.all_sources()),
+                ),
+                # The subject is the source, not a subscriber: governed content
+                # has no customer, and partitioning by source keeps a busy
+                # source's publications in order.
+                subject=source.source_id,
+            )
+        )
 
     @staticmethod
     def _publish_in(repository: KnowledgeRepository, source: KnowledgeSource) -> tuple[Chunk, ...]:
@@ -184,6 +237,36 @@ class KnowledgeRegistry:
     def sources(self) -> list[KnowledgeSource]:
         with self._open_unit() as unit:
             return self._repository_for(unit).all_sources()
+
+    def corpus_version(self) -> str:
+        """A fingerprint of everything published, for cache keying.
+
+        Changes whenever any source version is added or its window is changed,
+        which is what makes a cached answer composed from superseded text
+        unreachable rather than merely invalidated. See `cache.py`.
+        """
+        with self._open_unit() as unit:
+            return _fingerprint(self._repository_for(unit).all_sources())
+
+
+def _fingerprint(sources: Sequence[KnowledgeSource]) -> str:
+    """A stable hash of every published version and its window.
+
+    Sorted, so two replicas that stored the same sources in a different order
+    agree. The window is included because closing a version changes what is in
+    force without adding one, and a cache keyed only on the set of refs would
+    not notice.
+    """
+    refs = sorted(
+        (
+            source.source_id,
+            source.version,
+            source.effective_from.isoformat(),
+            source.effective_to.isoformat() if source.effective_to else "",
+        )
+        for source in sources
+    )
+    return hash_payload({"corpus": refs})
 
 
 def _in_force(versions: Sequence[KnowledgeSource], moment: datetime) -> KnowledgeSource | None:

@@ -376,7 +376,22 @@ class ConversationOrchestrator:
         known.update(outcome.facts)
 
         # -- 6. Compose ---------------------------------------------------- #
-        reply = compose_reply(intake, facts=known)
+        #
+        # A grounded knowledge answer wins over the intent template (K03, #33).
+        # The template answers from the intent alone, which is the right thing
+        # when nothing was retrieved and the wrong thing when the corpus has an
+        # answer: "Tell me more about the charge" is not a reply to "what does
+        # fair use mean" when the published clause is in hand.
+        #
+        # The refusal wins for the same reason in the other direction. Plan 22
+        # section 7 requires "I do not know" plus a person when there is no
+        # source, and the intent template would otherwise paper over it with a
+        # generic prompt that implies the question was understood.
+        grounded = str(outcome.facts.get("answer") or "")
+        reply = grounded if grounded else compose_reply(intake, facts=known)
+        if outcome.facts.get("needs_person") and not handoff.get("handoff"):
+            # No source, so the honest next step is a person (I2).
+            handoff = {"handoff": True, "reason": "no_published_source", "queue": "cx-knowledge"}
 
         # -- 7. Verify ----------------------------------------------------- #
         verifier = verify_reply(

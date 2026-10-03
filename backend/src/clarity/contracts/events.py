@@ -55,6 +55,7 @@ class DomainEventType(StrEnum):
     MCP_INVOKED = "mcp.invoked"
     RULE_PUBLISHED = "rule.published"
     POLICY_PUBLISHED = "policy.published"
+    KNOWLEDGE_PUBLISHED = "knowledge.published"
     RECONCILIATION_MISMATCH = "reconciliation.mismatch"
     CONVERSATION_TURN_COMPLETED = "conversation.turn.completed"
 
@@ -309,6 +310,34 @@ class PolicyPublishedV1(EventPayload):
     effective_from: datetime | None = None
 
 
+class KnowledgePublishedV1(EventPayload):
+    """A knowledge source version was published (K03, plan 22 section 7).
+
+    Consumers re-index the affected chunks and drop any cached answer that was
+    composed from the old corpus. Carries the source's identity and window, not
+    its text: an event is a notification that something changed, and copying
+    the clause into it would put governed content in the message bus where
+    nobody owns its version.
+
+    K01 deliberately did not declare this event, because nothing consumed it
+    and an event with no consumer is a contract maintained for nothing. K03
+    adds the answer cache, which is the consumer.
+    """
+
+    event_type = DomainEventType.KNOWLEDGE_PUBLISHED
+    source_id: str
+    source_version: int
+    kind: str
+    owner: str
+    audience: str
+    language: str
+    effective_from: datetime
+    effective_to: datetime | None = None
+    chunk_count: int = 0
+    corpus_version: str = ""
+    """The corpus fingerprint after this publication, for cache keying."""
+
+
 class ReconciliationMismatchV1(EventPayload):
     event_type = DomainEventType.RECONCILIATION_MISMATCH
     plan_id: str
@@ -375,6 +404,7 @@ _PAYLOADS: tuple[type[EventPayload], ...] = (
     McpInvokedV1,
     RulePublishedV1,
     PolicyPublishedV1,
+    KnowledgePublishedV1,
     ReconciliationMismatchV1,
     ConversationTurnCompletedV1,
 )
@@ -426,6 +456,7 @@ __all__ = [
     "DomainEventType",
     "EventPayload",
     "InvalidEventPayload",
+    "KnowledgePublishedV1",
     "McpInvokedV1",
     "PackExpiringV1",
     "PaymentRecordedV1",

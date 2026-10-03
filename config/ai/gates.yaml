@@ -74,9 +74,18 @@ gates:
         min: 0.90
         per_language: false
       citation_accuracy:
-        # Still UNEVALUABLE: nothing composes a grounded answer until K03
-        # (issue #33), so there are no citations to check. Declared so the gate
-        # exists and blocks, rather than being absent and silently satisfied.
+        # Measured since K03 (issue #33). What is counted is whether a grounded
+        # answer cited a source the golden set says would ground it, **not**
+        # whether its citations verified: the template path makes every
+        # citation verify by construction, so that number would be 1.00 and
+        # would be the vacuous measurement this gate layer exists to refuse.
+        #
+        # It currently FAILS at 0.931. That is the honest state: two of 29
+        # answered queries cite a source that is real, effective and
+        # audience-allowed but is the wrong document. Lexical retrieval cannot
+        # tell those apart on this corpus and the fix is the embedding model
+        # the system does not have, so the gate blocks rather than being
+        # lowered to the number we happen to achieve (K02 and K03 devlogs).
         min: 0.98
         per_language: false
 

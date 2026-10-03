@@ -15,6 +15,31 @@ candidate set both build on.
 
 from __future__ import annotations
 
+from clarity.modules.knowledge.answers import (
+    ACCORDING_TO,
+    NO_SOURCE,
+    QUOTED_IN_TEMPLATE,
+    AnswerKind,
+    Composer,
+    GroundedAnswer,
+    compose_answer,
+    refuse,
+)
+from clarity.modules.knowledge.cache import (
+    DEFAULT_CAPACITY,
+    AnswerCache,
+    CacheKey,
+)
+from clarity.modules.knowledge.citations import (
+    CitationCheck,
+    CitationFault,
+    CitationReport,
+    all_faults,
+    citations_in,
+    malformed_citations,
+    sources_of,
+    verify_citations,
+)
 from clarity.modules.knowledge.config import (
     BM25Params,
     HybridWeights,
@@ -50,6 +75,7 @@ from clarity.modules.knowledge.retrieval import (
     RewritingRetriever,
     SemanticRanker,
 )
+from clarity.modules.knowledge.service import Answer, KnowledgeService
 from clarity.modules.knowledge.sources import (
     Audience,
     Chunk,
@@ -59,19 +85,33 @@ from clarity.modules.knowledge.sources import (
 from clarity.modules.knowledge.terms import query_terms, tokens
 
 __all__ = [
+    "ACCORDING_TO",
     "CHUNKS",
+    "DEFAULT_CAPACITY",
+    "NO_SOURCE",
+    "QUOTED_IN_TEMPLATE",
     "SOURCES",
     "WORDS_OF_OVERLAP",
     "WORDS_PER_CHUNK",
+    "Answer",
+    "AnswerCache",
+    "AnswerKind",
     "Audience",
     "BM25Params",
+    "CacheKey",
     "Chunk",
+    "CitationCheck",
+    "CitationFault",
+    "CitationReport",
+    "Composer",
+    "GroundedAnswer",
     "Hit",
     "HybridWeights",
     "IngestionRefused",
     "KnowledgeRegistry",
     "KnowledgeRepository",
     "KnowledgeRetriever",
+    "KnowledgeService",
     "KnowledgeSource",
     "PublicationRefused",
     "QueryRewriter",
@@ -83,11 +123,18 @@ __all__ = [
     "SemanticRanker",
     "SourceKind",
     "StoredKnowledgeRepository",
+    "all_faults",
     "check_language",
+    "citations_in",
     "clean",
+    "compose_answer",
     "dominant_script",
     "ingest",
+    "malformed_citations",
     "publish_all",
     "query_terms",
+    "refuse",
+    "sources_of",
     "tokens",
+    "verify_citations",
 ]

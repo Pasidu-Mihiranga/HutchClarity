@@ -152,6 +152,14 @@ class Chunk(ClarityModel):
     """Position within the source version, so chunks can be read back in order."""
 
     text: str
+    title: str = ""
+    """The source's title, copied for display alongside a citation.
+
+    Copied like the rest of the metadata rather than joined back to the source,
+    for the same reason: a result that has to fetch another record to be shown
+    is a result that gets shown without it.
+    """
+
     clause_ref: str = ""
     """The clause this came from, for example ``4.2``. Empty when unstructured."""
 

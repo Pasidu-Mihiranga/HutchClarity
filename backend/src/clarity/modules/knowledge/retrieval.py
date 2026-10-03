@@ -205,24 +205,52 @@ class KnowledgeRetriever:
         best = reranked[ordered[0]] if ordered else 0.0
         floor = best * self._config.min_relative_score
 
-        hits = tuple(
-            Hit(
-                chunk=by_id[cid],
-                score=reranked[cid],
-                lexical=lexical.get(cid, 0.0),
-                semantic=semantic.get(cid) if self._semantic else None,
-                matched=self._lexical.matched_terms(terms, cid),
+        # **There is no term-coverage or absolute-score guard here, and that is
+        # a measured decision rather than an omission.**
+        #
+        # A query sharing one incidental word with a document gets a cited
+        # answer from it: "what is the share price of the company?" retrieves
+        # the pack-activation article because "price" appears in it. Two guards
+        # were tried against the golden set and both were reverted:
+        #
+        # - a minimum share or count of the query's words matched. Half the
+        #   *correct* hits in the golden set match exactly one term (25 of 51),
+        #   so any such rule removes as many right answers as wrong ones.
+        #   Measured: recall@5 fell from 0.967 to 0.900 at a third coverage and
+        #   to 0.733 at two words, with Tamil reaching 0.000.
+        # - an absolute score floor. The distributions overlap completely:
+        #   correct hits run from 0.438 up and wrong hits reach 1.160, so there
+        #   is no cut that separates them.
+        #
+        # What separates a relevant hit from an irrelevant one here is meaning,
+        # not word overlap, and that is the embedding model the system does not
+        # have (K02 and K03 devlogs). So retrieval recall is gated and good,
+        # precision is weak and ungated, and this is the honest place to say so
+        # rather than a number that looks fine.
+        hits: list[Hit] = []
+        for cid in ordered:
+            if len(hits) >= wanted:
+                break
+            if reranked[cid] < floor:
+                continue
+            matched = self._lexical.matched_terms(terms, cid)
+            hits.append(
+                Hit(
+                    chunk=by_id[cid],
+                    score=reranked[cid],
+                    lexical=lexical.get(cid, 0.0),
+                    semantic=semantic.get(cid) if self._semantic else None,
+                    matched=matched,
+                )
             )
-            for cid in ordered[:wanted]
-            if reranked[cid] >= floor
-        )
+        hits_tuple = tuple(hits)
         return RetrievalTrace(
             query=query,
             terms=tuple(terms),
             candidates=len(candidates),
-            returned=len(hits),
+            returned=len(hits_tuple),
             semantic=bool(semantic),
-            hits=hits,
+            hits=hits_tuple,
         )
 
     # ------------------------------------------------------------------ #

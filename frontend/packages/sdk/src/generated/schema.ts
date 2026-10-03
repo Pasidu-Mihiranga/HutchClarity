@@ -753,7 +753,21 @@ export interface paths {
         };
         /**
          * Knowledge Search
-         * @description Keyword search over how-to articles. Never opens a charge case.
+         * @description Grounded search over the published corpus. Never opens a charge case.
+         *
+         *     Served by `clarity.modules.knowledge` since K03 (#33), where it used to
+         *     read the mock store directly. The module applies the effective-date and
+         *     audience filters, ranks, composes a cited answer and verifies every
+         *     citation against what was actually retrieved.
+         *
+         *     **The response is additive.** `articles` keeps its shape and its place,
+         *     because `/v1/clarity/route` and `/v1/conversation/turn` both read it and
+         *     the frontend SDK is generated from this schema. `answer`, `citations`,
+         *     `grounded` and `needs_person` are new keys.
+         *
+         *     The audience is `customer` and is not a parameter. A staff caller would
+         *     need a staff permission and a different route; accepting an audience
+         *     from the query string would let anyone ask for staff sources (I9).
          */
         get: operations["knowledge_search_v1_knowledge_search_get"];
         put?: never;

@@ -88,6 +88,7 @@ from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
 from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
+from clarity.modules.knowledge.public import Audience as KnowledgeAudience
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
 from clarity.platform.messaging.correlation import correlated
@@ -1334,40 +1335,49 @@ def _register_routes(app: FastAPI) -> None:
         return rows
 
     @app.get("/v1/knowledge/search", tags=["knowledge"])
-    def knowledge_search(q: str = "") -> dict[str, Any]:
-        """Keyword search over how-to articles. Never opens a charge case."""
-        from clarity.integration.drivers.mock.store.knowledge import (
-            KNOWLEDGE_ARTICLES,
-            classify_intent,
-        )
+    def knowledge_search(clarity: ClarityDep, q: str = "") -> dict[str, Any]:
+        """Grounded search over the published corpus. Never opens a charge case.
 
-        articles: list[dict[str, Any]] = []
-        try:
-            from clarity.integration.drivers.mock.store import search_knowledge, session_scope
+        Served by `clarity.modules.knowledge` since K03 (#33), where it used to
+        read the mock store directly. The module applies the effective-date and
+        audience filters, ranks, composes a cited answer and verifies every
+        citation against what was actually retrieved.
 
-            with session_scope() as session:
-                articles = search_knowledge(session, q)
-        except Exception:
-            articles = []
-        if not articles:
-            # In-memory fallback for DEMO profile (no DB).
-            hay = q.lower()
-            scored: list[tuple[int, dict[str, Any]]] = []
-            for article in KNOWLEDGE_ARTICLES:
-                blob = (
-                    f"{article['title']} {article['body']} {' '.join(article['keywords'])}"
-                ).lower()
-                score = sum(
-                    2 for token in hay.replace("?", " ").split() if len(token) > 1 and token in blob
-                )
-                if score:
-                    scored.append((score, article))
-            scored.sort(key=lambda item: item[0], reverse=True)
-            articles = [item for _, item in scored[:5]]
-        return {"query": q, "intent": classify_intent(q), "articles": articles}
+        **The response is additive.** `articles` keeps its shape and its place,
+        because `/v1/clarity/route` and `/v1/conversation/turn` both read it and
+        the frontend SDK is generated from this schema. `answer`, `citations`,
+        `grounded` and `needs_person` are new keys.
+
+        The audience is `customer` and is not a parameter. A staff caller would
+        need a staff permission and a different route; accepting an audience
+        from the query string would let anyone ask for staff sources (I9).
+        """
+        from clarity.integration.drivers.mock.store.knowledge import classify_intent
+
+        found = clarity.answers.ask(q, audience=KnowledgeAudience.CUSTOMER)
+        articles = [
+            {
+                "article_id": hit.chunk.source_id,
+                "title": hit.chunk.title,
+                "body": hit.chunk.text,
+                "language": hit.chunk.language.value,
+                "citation": hit.citation,
+                "owner": hit.chunk.owner,
+            }
+            for hit in found.trace.hits
+        ]
+        return {
+            "query": q,
+            "intent": classify_intent(q),
+            "articles": articles,
+            "answer": found.text,
+            "citations": list(found.citations),
+            "grounded": found.grounded,
+            "needs_person": found.needs_person,
+        }
 
     @app.post("/v1/clarity/route", tags=["knowledge"])
-    def clarity_route(body: dict[str, Any]) -> dict[str, Any]:
+    def clarity_route(body: dict[str, Any], clarity: ClarityDep) -> dict[str, Any]:
         """Server intent: account vs knowledge vs both (legacy) + chat taxonomy."""
         from clarity.integration.drivers.mock.store.knowledge import classify_intent
         from clarity.modules.conversation.public import handle_turn
@@ -1376,7 +1386,7 @@ def _register_routes(app: FastAPI) -> None:
         legacy = classify_intent(question)
         articles: list[dict[str, Any]] = []
         if legacy in {"knowledge", "both"}:
-            articles = knowledge_search(question).get("articles") or []
+            articles = knowledge_search(clarity, question).get("articles") or []
         turn = handle_turn(question, language_hint=str(body.get("language") or "") or None)
         return {
             "question": question,
@@ -1457,7 +1467,7 @@ def _register_routes(app: FastAPI) -> None:
 
         # Attach knowledge articles when route needs them.
         if route in {"knowledge", "both"}:
-            payload["articles"] = knowledge_search(text).get("articles") or []
+            payload["articles"] = knowledge_search(clarity, text).get("articles") or []
         return {"turn": payload}
 
     @app.post("/v1/conversation/suggestions", tags=["conversation"])

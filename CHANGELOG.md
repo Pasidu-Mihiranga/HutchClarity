@@ -4,6 +4,62 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (K03, #33)
+
+- Grounded answers. `KnowledgeService.ask` retrieves, composes, verifies and
+  caches; `compose_answer` quotes the source verbatim with its citation when no
+  model is configured, uses model wording when one is and it verifies, and
+  refuses with "I do not know" plus a person when there is no source.
+  `KnowledgeService`, `Answer`, `GroundedAnswer`, `AnswerKind`, `Composer`,
+  `compose_answer` and `refuse` are on the knowledge module's public surface.
+- The citation verifier. Every citation in an answer is checked against the
+  retrieval behind it: retrieved, effective, audience-allowed. A citation
+  attempt with no version is reported as malformed rather than passed through
+  as prose. `verify_citations`, `CitationReport`, `CitationFault`,
+  `citations_in` and `malformed_citations` are public.
+- The answer cache, keyed by corpus fingerprint, language and audience, so a
+  publication makes every earlier entry unreachable rather than merely
+  invalidated. Refuses refusals, ungrounded answers and case-specific ones.
+- `knowledge.published@v1`, produced by the knowledge registry through the
+  outbox. Consumed by the `knowledge-cache` group, which re-indexes and drops
+  cached answers from an older corpus. K01 deliberately did not declare it
+  because nothing consumed it.
+- The simulated help articles already served by `/v1/knowledge/search` are now
+  published into the registry (`app/knowledge_seed.py`), labelled with the
+  `hutch-sim` owner. Nothing new is invented (I16).
+- `rag.citation_accuracy` is now measured. It **fails** at 0.931 against a gate
+  of 0.980: two of 29 answered queries cite a real, effective, allowed source
+  that is the wrong document. Left failing, because the cause is the missing
+  embedding model and not a threshold to lower.
+
+### Changed (K03, #33)
+
+- **`/v1/knowledge/search` is served by `clarity.modules.knowledge`**, not the
+  mock store. The response is additive: `articles` keeps its shape and place
+  because two other routes and the frontend SDK read it, and `answer`,
+  `citations`, `grounded` and `needs_person` are new. The OpenAPI snapshot was
+  regenerated; the only change is the route's description, since the handler
+  returns an untyped object.
+- `KNOWLEDGE_QA` now reaches its `answered` exit. `FlowRouter` performs a
+  deterministic retrieval in any state that allows `search_knowledge`, so the
+  step works with no model configured (ADR-0009); before this the state was
+  agentic, unplanned and therefore silent.
+- A grounded knowledge answer, or the no-source refusal, now wins over the
+  intent template in the turn reply, and a turn with no source routes to a
+  person with reason `no_published_source`.
+- `Chunk` carries its source's `title`, for display beside a citation.
+- **A flow in a terminal state restarts rather than resuming.** A terminal
+  state has no transitions, so a customer who asked one knowledge question
+  could never ask a second. C02 handled the cross-flow case and missed this
+  one.
+- `GroundedAnswer.grounded` requires every claimed citation to appear in the
+  report's verified set. An empty `CitationReport` means "nothing was checked"
+  and `all([])` is true, so an answer carrying citations with a default report
+  read as verified without anything having verified it.
+- A state's own output is visible to its own transitions, so `answer_found` can
+  see citations produced in the same turn.
+
+
 ### Added (K02, #32)
 
 - Lexical retrieval over the knowledge corpus. `KnowledgeRetriever` filters with
