@@ -45,6 +45,6 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | clarity-signer | service | `services/signer/` | R4 |
 | clarity-ai-gateway | service | `services/ai-gateway/` | R4 |
 | clarity-channel-gateway (WhatsApp, SMS/USSD) | service | `services/channel-gateway/` | R4 |
-| knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 |
+| knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 (K01 built: source registry and governed ingestion; K02-K03 pending) |
 | insights | module | `backend/src/clarity/modules/insights/` | R6 |
 | desk-ops (bulk fix, merchant watch, regulator pack) | module | `backend/src/clarity/modules/deskops/` | R6 |

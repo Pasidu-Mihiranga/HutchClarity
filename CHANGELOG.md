@@ -4,6 +4,34 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (K01, #31)
+
+- The `knowledge` module, previously a scaffold. Governed knowledge content:
+  one record per `(source_id, version)` with a required owner, effective
+  window, audience and language, and the chunks ingestion makes of it.
+  `KnowledgeRegistry`, `KnowledgeSource`, `Chunk`, `Audience`, `SourceKind`,
+  `ingest`, `PublicationRefused` and `IngestionRefused` are on its public
+  surface.
+- Effective dating. `chunks_as_of(moment, audience=...)` returns what was in
+  force at that moment, so a dispute about a March charge is answered with
+  March's terms. Publishing a version whose window overlaps a sibling's is
+  refused, and `supersede` closes the predecessor at the successor's start in
+  one unit of work.
+- Audience filtering, enforced in three places: `Audience.may_read` is
+  asymmetric, `chunks_as_of` requires the audience with no default, and a
+  `STAFF_SOP` cannot be published as customer audience at all.
+- Structure-aware ingestion: legal text per clause so a citation identifies its
+  text, a catalogue entry as one chunk whatever its length, an over-long clause
+  windowed with overlap while keeping its clause reference.
+- A script check against the declared language, asymmetric on purpose: Sinhala
+  or Tamil script declared `en` is refused, Latin script declared `si` or `ta`
+  is not, because that is Singlish.
+- Collections `knowledge.sources` and `knowledge.chunks`.
+
+The registry ships empty: the corpus is HUTCH content and inventing T&C or
+Gazette text would be inventing HUTCH regulations (I16).
+
+
 ### Added (C03, #22)
 
 - The bounded agent step. In a flow state marked `agentic: true`, a planner may

@@ -77,6 +77,7 @@ from clarity.modules.iam.public import (
     TokenIssuer,
     TokenVerifier,
 )
+from clarity.modules.knowledge.public import KnowledgeRegistry
 from clarity.modules.notifications.public import (
     CONSUMED_EVENTS as NOTIFICATION_EVENTS,
 )
@@ -608,6 +609,15 @@ class Clarity:
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
+
+        # Governed knowledge content (K01, #31). The registry is wired here and
+        # starts empty: the corpus is HUTCH content (catalogue, T&C, Gazette
+        # text, help articles) and inventing any of it would be inventing HUTCH
+        # regulations (I16). K02 (#32) ranks whatever has been published.
+        self.knowledge = KnowledgeRegistry(
+            open_unit=self.open_unit,
+            clock=self.case_aggregate._now,
+        )
 
         # The stateful turn pipeline (C01) driving the published flows (C02).
         # Conversation state is keyed by case, so a customer continues the same

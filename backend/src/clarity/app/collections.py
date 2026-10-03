@@ -17,6 +17,7 @@ from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
+from clarity.modules.knowledge.public import CHUNKS, SOURCES
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
 from clarity.modules.proactive.public import RISKS, SIGNALS
 from clarity.modules.receipts.public import (
@@ -64,6 +65,9 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     RISKS,
     # conversation
     CONVERSATION_STATES,
+    # knowledge
+    SOURCES,
+    CHUNKS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,
