@@ -15,6 +15,7 @@ from clarity.contracts.events import (
     CauseDetectedV1,
     ChargeAppliedV1,
     ComplaintCreatedV1,
+    ConversationTurnCompletedV1,
     DecisionGeneratedV1,
     DomainEventType,
     EventPayload,
@@ -150,6 +151,19 @@ SAMPLES: dict[DomainEventType, EventPayload] = {
             action_id="ACT-1",
             expected_lkr="49.00",
             reason="no adapter confirmation",
+        ),
+        ConversationTurnCompletedV1(
+            case_id="CASE-1",
+            turn_no=2,
+            channel=Channel.WHATSAPP,
+            flow="vas_dispute",
+            flow_state="awaiting_confirmation",
+            intent="UNEXPECTED_CHARGE",
+            language=Language.SI,
+            resumed=True,
+            tools_called=["get_case_timeline"],
+            chunk_ids=["chunk-7"],
+            verifier_ok=True,
         ),
     )
 }

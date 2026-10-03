@@ -114,8 +114,9 @@ Full list in [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITA
 3. **No persistence.** A restart loses every case and receipt.
 4. **`clarity-mcp` reads in-process, not over `/v1`.** The network transport landed (A04), but the deployable reads through the narrow MCP view rather than calling `clarity-api` over HTTP as plan 07 §10.6 wants. The authorization boundary is real either way and the RFC 8693 token exchange is implemented and tested; the HTTP adapter is not, because no generated Python client exists yet.
 5. **Sinhala and Tamil wording is not native-speaker reviewed.** The `language_review` gate in `config/ai/gates.yaml` exists and blocks for exactly this reason: the harness cannot score fluency, so the ratings have to come from people (A05).
-6. **Three of five evaluation datasets have no subject built.** `flow` needs C01/C02, `rag` needs K01-K03, `language_review` needs native speakers. Their gates are declared and **block**, rather than being absent and therefore silently satisfied. The intake set holds 20 utterances per language against the 300 plan 22 §10 requires, so that gate blocks too while still reporting its score (si 0.559, ta 0.520, en 0.688, si-en 0.305 against a 0.90 gate).
-7. **Foresight is uncalibrated** and says so in every report.
+6. **Three of five evaluation datasets have no subject built.** `flow` needs C02 (C01 landed the pipeline), `rag` needs K01-K03, `language_review` needs native speakers. Their gates are declared and **block**, rather than being absent and therefore silently satisfied. The intake set holds 20 utterances per language against the 300 plan 22 §10 requires, so that gate blocks too while still reporting its score (si 0.559, ta 0.520, en 0.688, si-en 0.305 against a 0.90 gate).
+7. **The assistant has a pipeline but no flows.** C01 landed the turn pipeline, conversation state per case (24h TTL) and the turn audit, so a conversation now resumes across channels and every turn is recorded. The `FlowEngine` seam is empty until C02 (#21), so every turn sits in `none/start`; retrieval ids are carried and verified but nothing produces them until K01-K03 (#31-#33), and no model composes a reply yet, so the verifier is not under real load.
+8. **Foresight is uncalibrated** and says so in every report.
 
 ## 8. Keeping this file true
 

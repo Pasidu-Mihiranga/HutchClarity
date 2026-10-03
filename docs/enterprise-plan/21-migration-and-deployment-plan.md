@@ -333,6 +333,7 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `mcp.invoked` | interfaces.mcp | audit, security alerts | exists |
 | `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |
 | `complaint.created` | channels / case | autopsy | exists |
+| `conversation.turn.completed` | conversation | insights, audit | exists |
 | `payment.recorded`, `charge.applied`, `usage.threshold_reached`, `pack.expiring`, `vas.renewed` | integration (HUTCH feeds) | proactive, timeline cache | exists |
 
 ### 11.4 Delivery rules

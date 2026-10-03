@@ -4,6 +4,35 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (C01, #19)
+
+- Stateful turn pipeline `ConversationOrchestrator` (plan 22 section 4): guard,
+  mask, intake, handoff check, flow step, compose, verify, record.
+- Conversation state per **case** with a 24 hour TTL, through the unit of work
+  so `lite` uses memory and `full` uses PostgreSQL. Holds no message history.
+- Reply verifier: figures in a reply must appear in FACTS; forbidden content,
+  unauthorised promises and missing citations block the reply, and an English
+  fallback is recorded as a warning rather than blocking.
+- `conversation.turn.completed@v1` event, and `AuditEventType.TURN_RECORDED`
+  carrying flow state, tool and chunk ids, model role and verifier result.
+- `FlowEngine` protocol: the seam C02 (#21) fills.
+
+### Changed (C01, #19)
+
+- **`/v1` contract.** `POST /v1/conversation/turn` now declares an optional
+  `authorization` header. With a `case_id` the turn goes through the stateful
+  pipeline and the route is subject bound (`CASE_READ` plus the case's own
+  subscriber); without one the stateless path answers as before, with no
+  credentials. The response is a strict superset of the previous shape, so no
+  existing consumer loses a field. Snapshot and SDK regenerated.
+
+### Fixed (C01, #19)
+
+- The guard built in A03 had no call site: nothing in a request path inspected
+  customer text. The pipeline now runs it on every turn, and a held injection
+  is neutralised (intent becomes FALLBACK) rather than being allowed to steer
+  the conversation.
+
 ### Added (A05, #9)
 
 - Evaluation harness `clarity.ai.evaluation`: JSONL datasets, pure metric

@@ -51,6 +51,7 @@ from clarity.modules.case.public import (
     CaseAggregate,
     StoredCaseRepository,
 )
+from clarity.modules.conversation.public import ConversationOrchestrator
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.detection.public import RuleEngine, load_packs
 from clarity.modules.governance.public import (
@@ -398,6 +399,13 @@ class Clarity:
         # sign everyone out mid-demonstration, so these carry over.
         self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
         self.otp = otp or OtpService(open_unit=self.open_unit)
+        # The stateful turn pipeline (C01). Conversation state is keyed by
+        # case, so a customer continues the same conversation on any
+        # channel. No flow engine yet: C02 (#21) supplies one.
+        self.conversation = ConversationOrchestrator(
+            audit=self.audit,
+            open_unit=self.open_unit,
+        )
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

@@ -44,6 +44,9 @@ class AuditEventType(StrEnum):
     STAFF_ACTION = "staff.action"
     OVERRIDE_RECORDED = "override.recorded"
     RULE_PUBLISHED = "rule.published"
+    TURN_RECORDED = "turn.recorded"
+    """One assistant turn: flow state, tools, chunks, model and verifier
+    result (C01, plan 22 section 4 step 11). Never the message text."""
 
 
 class AuditRecord(ClarityModel):

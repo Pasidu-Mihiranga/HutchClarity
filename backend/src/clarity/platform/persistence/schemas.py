@@ -20,6 +20,7 @@ OWNERS: dict[str, str] = {
     "iam": "iam",
     "notifications": "notifications",
     "proactive": "proactive",
+    "conversation": "conversation",
     "platform": "platform",
 }
 
@@ -40,6 +41,8 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
         "notifications.preferences",
         "proactive.risks",
         "proactive.signals",
+        # A conversation belongs to one case, so to one customer.
+        "conversation.states",
         "iam.otp_challenges",
         "iam.otp_requests",
         "iam.sessions",

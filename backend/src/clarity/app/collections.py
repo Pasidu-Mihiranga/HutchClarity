@@ -14,6 +14,7 @@ from __future__ import annotations
 from clarity.modules.actions.capability import ATTEMPTS as ACTION_ATTEMPTS
 from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
+from clarity.modules.conversation.public import CONVERSATION_STATES
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
@@ -61,6 +62,8 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # proactive
     SIGNALS,
     RISKS,
+    # conversation
+    CONVERSATION_STATES,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,

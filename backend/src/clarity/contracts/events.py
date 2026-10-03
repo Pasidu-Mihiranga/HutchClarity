@@ -56,6 +56,7 @@ class DomainEventType(StrEnum):
     RULE_PUBLISHED = "rule.published"
     POLICY_PUBLISHED = "policy.published"
     RECONCILIATION_MISMATCH = "reconciliation.mismatch"
+    CONVERSATION_TURN_COMPLETED = "conversation.turn.completed"
 
 
 #: Field-name segments that indicate personal data. Matched on ``_``-separated
@@ -317,6 +318,40 @@ class ReconciliationMismatchV1(EventPayload):
     reason: str
 
 
+class ConversationTurnCompletedV1(EventPayload):
+    """One assistant turn finished (C01, plan 22 section 4 step 11).
+
+    Carries what the assistant *did*, never what was said. There is no message
+    text here and no reply: the base class forbids personal data by field name,
+    and a turn payload that quoted conversations would turn every consumer's
+    store into a store of conversations.
+
+    `guard_codes` and `verifier_codes` are stable codes, so insights can count
+    held turns and failed verifications without reading any content.
+    """
+
+    event_type = DomainEventType.CONVERSATION_TURN_COMPLETED
+    case_id: str
+    turn_no: int
+    channel: Channel
+    flow: str
+    flow_state: str
+    intent: str
+    language: Language
+    resumed: bool = False
+    """Whether this turn continued an existing conversation, possibly on
+    another channel. The cross-channel handover is visible here."""
+    handoff: bool = False
+    refused: bool = False
+    guard_codes: list[str] = Field(default_factory=list)
+    tools_called: list[str] = Field(default_factory=list)
+    chunk_ids: list[str] = Field(default_factory=list)
+    model_role: str | None = None
+    """The model role that composed the reply, or None for a template."""
+    verifier_ok: bool = True
+    verifier_codes: list[str] = Field(default_factory=list)
+
+
 # --------------------------------------------------------------------------- #
 # Registry
 # --------------------------------------------------------------------------- #
@@ -341,6 +376,7 @@ _PAYLOADS: tuple[type[EventPayload], ...] = (
     RulePublishedV1,
     PolicyPublishedV1,
     ReconciliationMismatchV1,
+    ConversationTurnCompletedV1,
 )
 
 #: (event type, schema version) -> payload model.
@@ -385,6 +421,7 @@ __all__ = [
     "CauseDetectedV1",
     "ChargeAppliedV1",
     "ComplaintCreatedV1",
+    "ConversationTurnCompletedV1",
     "DecisionGeneratedV1",
     "DomainEventType",
     "EventPayload",

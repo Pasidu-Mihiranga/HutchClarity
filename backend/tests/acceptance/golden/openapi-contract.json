@@ -374,7 +374,9 @@
       "status": "200"
     },
     "POST /v1/conversation/turn": {
-      "parameters": [],
+      "parameters": [
+        "header:authorization?"
+      ],
       "request": "object",
       "response": "object",
       "status": "200"

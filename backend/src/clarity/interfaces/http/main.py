@@ -43,6 +43,7 @@ from clarity.interfaces.http.auth import (
     authorize_action,
     authorize_case_access,
     customer_can_act,
+    public,
     requires,
 )
 from clarity.interfaces.http.schemas import (
@@ -1337,22 +1338,74 @@ def _register_routes(app: FastAPI) -> None:
         }
 
     @app.post("/v1/conversation/turn", tags=["conversation"])
-    def conversation_turn(body: dict[str, Any]) -> dict[str, Any]:
+    def conversation_turn(
+        body: dict[str, Any],
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(public())],
+    ) -> dict[str, Any]:
+        """One assistant turn.
+
+        With a `case_id` the turn goes through the stateful pipeline (C01): the
+        conversation resumes wherever it was left, on whatever channel, and the
+        turn is guarded, verified and recorded. Without one there is nothing to
+        attach state to, so the stateless path answers and keeps no state.
+
+        The response is a superset either way: every field the stateless shape
+        carried is still there, with `state`, `verifier` and `refused` added
+        when a case is in play.
+        """
+        from clarity.kernel.common import Channel
         from clarity.modules.conversation.public import handle_turn
 
         text = str(body.get("text") or "").strip()
         if not text:
             raise HTTPException(status_code=422, detail="text is required")
-        result = handle_turn(
-            text,
-            case_id=body.get("case_id"),
-            facts=body.get("facts") if isinstance(body.get("facts"), dict) else {},
-            language_hint=body.get("language"),
-            intent_override=body.get("intent"),
-        )
-        payload = result.to_dict()
+        facts = body.get("facts") if isinstance(body.get("facts"), dict) else {}
+        case_id = body.get("case_id")
+
+        if case_id:
+            try:
+                channel = Channel(str(body.get("channel") or Channel.APP.value))
+            except ValueError:
+                raise HTTPException(status_code=422, detail="unknown channel") from None
+
+            # Conversation state is case scoped, so this path is subject bound
+            # like any other case route (I9). Without it the case id alone
+            # would read and extend another customer's conversation, which is
+            # the hole A04 found on the MCP side.
+            if not principal.has(Permission.CASE_READ):
+                raise HTTPException(
+                    status_code=401, detail="continuing a case conversation needs a session"
+                )
+            record = clarity.cases.get(str(case_id))
+            authorize_case_access(principal, record.subscriber_ref)
+
+            turn = clarity.conversation.handle(
+                str(case_id),
+                text,
+                channel=channel,
+                # From the case, never from the body: the caller does not get
+                # to choose who the audit records as the actor.
+                subscriber_ref=record.subscriber_ref,
+                language_hint=body.get("language"),
+                intent_override=body.get("intent"),
+                facts=facts,
+            )
+            payload = turn.to_dict()
+            route = turn.intake.route
+        else:
+            result = handle_turn(
+                text,
+                case_id=None,
+                facts=facts,
+                language_hint=body.get("language"),
+                intent_override=body.get("intent"),
+            )
+            payload = result.to_dict()
+            route = result.intake.route
+
         # Attach knowledge articles when route needs them.
-        if result.intake.route in {"knowledge", "both"}:
+        if route in {"knowledge", "both"}:
             payload["articles"] = knowledge_search(text).get("articles") or []
         return {"turn": payload}
 

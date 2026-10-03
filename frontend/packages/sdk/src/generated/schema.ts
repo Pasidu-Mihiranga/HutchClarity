@@ -560,7 +560,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Conversation Turn */
+        /**
+         * Conversation Turn
+         * @description One assistant turn.
+         *
+         *     With a `case_id` the turn goes through the stateful pipeline (C01): the
+         *     conversation resumes wherever it was left, on whatever channel, and the
+         *     turn is guarded, verified and recorded. Without one there is nothing to
+         *     attach state to, so the stateless path answers and keeps no state.
+         *
+         *     The response is a superset either way: every field the stateless shape
+         *     carried is still there, with `state`, `verifier` and `refused` added
+         *     when a case is in play.
+         */
         post: operations["conversation_turn_v1_conversation_turn_post"];
         delete?: never;
         options?: never;
@@ -2623,7 +2635,9 @@ export interface operations {
     conversation_turn_v1_conversation_turn_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };

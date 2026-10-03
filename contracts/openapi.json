@@ -3042,7 +3042,26 @@
     },
     "/v1/conversation/turn": {
       "post": {
+        "description": "One assistant turn.\n\nWith a `case_id` the turn goes through the stateful pipeline (C01): the\nconversation resumes wherever it was left, on whatever channel, and the\nturn is guarded, verified and recorded. Without one there is nothing to\nattach state to, so the stateless path answers and keeps no state.\n\nThe response is a superset either way: every field the stateless shape\ncarried is still there, with `state`, `verifier` and `refused` added\nwhen a case is in play.",
         "operationId": "conversation_turn_v1_conversation_turn_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
