@@ -27,7 +27,7 @@ from clarity.ai.gateway import (
 )
 from clarity.ai.guard import Guard
 from clarity.ai.local import LOCAL_IMPLEMENTATIONS
-from clarity.ai.roles import ModelCatalogue, ModelRole
+from clarity.ai.roles import LOCAL_PROVIDERS, ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
 from clarity.app.flow_tools import FlowToolAdapter
 from clarity.app.mcp_view import ResolutionServiceMCPView
@@ -53,8 +53,11 @@ from clarity.modules.case.public import (
     StoredCaseRepository,
 )
 from clarity.modules.conversation.public import (
+    BoundedAgent,
     ConversationOrchestrator,
     FlowRouter,
+    Planner,
+    PlannerReply,
     load_flows,
 )
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
@@ -283,6 +286,50 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
         if not step.is_local and step.provider in router.configured:
             return _RoleProvider(router, ModelRole.GUARD)
     return None
+
+
+def _planner(router: RoleRouter, catalogue: ModelCatalogue) -> Planner | None:
+    """The planner for agentic flow states, when a model is configured (C03).
+
+    Mirrors ``_guard_assist`` deliberately, including returning ``None``. A
+    template cannot choose a tool, so wiring one would mean a rejected plan and
+    a wasted call on every agentic state. ``None`` is the supported default
+    (ADR-0009): the deterministic step runs and the conversation completes.
+    """
+    chain = catalogue.routing(ModelRole.REASON).chain
+    for step in chain:
+        if not step.is_local and step.provider in router.configured:
+            return _RolePlanner(router)
+    return None
+
+
+class _RolePlanner:
+    """Adapts the ``reason`` role to the planner interface the agent expects.
+
+    No facts and no customer text go in the prompt: what the agent sends is the
+    state's tool list and the tool output it has gathered, already delimited as
+    untrusted. The reply is text, and validating it is the agent's job (I1).
+    """
+
+    def __init__(self, router: RoleRouter) -> None:
+        self._router = router
+
+    def propose(self, prompt: str) -> PlannerReply | None:
+        answer = self._router.invoke(
+            ModelRole.REASON,
+            Prompt(system=prompt, facts={}, user_masked="", language=Language.EN),
+        )
+        if answer.is_refusal or answer.provider in LOCAL_PROVIDERS:
+            # A template answered. It has nothing to say about which tool to
+            # use, and treating its wording as a plan would be a rejection
+            # dressed up as a decision.
+            return None
+        return PlannerReply(
+            text=answer.text,
+            tokens=answer.spent_tokens,
+            model_role=ModelRole.REASON.value,
+            model=answer.model,
+        )
 
 
 class _RoleProvider:
@@ -571,7 +618,14 @@ class Clarity:
         # strongest thing that can happen here (I1).
         self.flows = load_flows(default_flow_dir(self.settings.flows_dir))
         self.conversation = ConversationOrchestrator(
-            flow=FlowRouter(self.flows, tools=FlowToolAdapter(self.mcp_view)),
+            flow=FlowRouter(
+                self.flows,
+                tools=FlowToolAdapter(self.mcp_view),
+                # The bounded agent step (C03, #22). With no model configured
+                # this is an agent with no planner, which leaves an agentic
+                # state behaving exactly like a deterministic one.
+                agent=BoundedAgent(_planner(self.roles, self.models)),
+            ),
             audit=self.audit,
             open_unit=self.open_unit,
         )

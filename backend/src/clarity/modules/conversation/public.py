@@ -11,6 +11,18 @@ channel, and it records every turn.
 
 from __future__ import annotations
 
+from clarity.modules.conversation.agent import (
+    MAX_TOOL_CALLS_PER_TURN,
+    AgentLimits,
+    AgentPlan,
+    AgentTrace,
+    BoundedAgent,
+    Planner,
+    PlannerReply,
+    PlanRejected,
+    RejectionCode,
+    validate_plan,
+)
 from clarity.modules.conversation.flows import (
     Condition,
     Flow,
@@ -55,7 +67,12 @@ __all__ = [
     "CONVERSATION_STATES",
     "DEFAULT_TTL",
     "MAX_MESSAGE_CHARS",
+    "MAX_TOOL_CALLS_PER_TURN",
     "REFUSALS",
+    "AgentLimits",
+    "AgentPlan",
+    "AgentTrace",
+    "BoundedAgent",
     "Condition",
     "ConversationOrchestrator",
     "ConversationState",
@@ -70,6 +87,10 @@ __all__ = [
     "FlowRouter",
     "FlowState",
     "FlowStatus",
+    "PlanRejected",
+    "Planner",
+    "PlannerReply",
+    "RejectionCode",
     "ToolCaller",
     "ToolNotAllowed",
     "Turn",
@@ -82,5 +103,6 @@ __all__ = [
     "load_flows",
     "signals_from_snapshot",
     "suggest_for_snapshot",
+    "validate_plan",
     "verify_reply",
 ]

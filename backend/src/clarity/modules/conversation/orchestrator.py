@@ -104,6 +104,13 @@ class FlowOutcome:
     proposal_id: str | None = None
     facts: dict[str, Any] = field(default_factory=dict)
     requires_citations: bool = False
+    agent: dict[str, Any] = field(default_factory=dict)
+    """What the bounded agent step did in this turn, if one ran (C03, #22).
+
+    Empty when no agentic state was reached. A rejected plan is *not* empty: it
+    carries the rejection codes and says the deterministic step ran, because a
+    planner refused without a record is an audit gap.
+    """
 
 
 class FlowEngine(Protocol):
@@ -151,6 +158,7 @@ class TurnRecord:
     model_role: str | None
     model: str | None
     verifier: VerifierResult
+    agent: dict[str, Any] = field(default_factory=dict)
 
     def to_detail(self) -> dict[str, Any]:
         """The audit detail. Masked kinds, never masked values."""
@@ -174,6 +182,7 @@ class TurnRecord:
             "model_role": self.model_role,
             "model": self.model,
             "verifier": self.verifier.to_dict(),
+            **self.agent,
         }
 
 
@@ -408,6 +417,7 @@ class ConversationOrchestrator:
             masked_kinds=tuple(sorted(set(masked.tokens.values()))),
             tools_called=outcome.tools_called,
             chunk_ids=outcome.chunk_ids,
+            agent=dict(outcome.agent),
             # No model wrote this turn: composition used an approved template.
             # Recorded as None rather than omitted, so "which model said this"
             # always has an answer in the trail (ADR-0009).

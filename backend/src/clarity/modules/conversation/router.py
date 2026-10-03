@@ -27,6 +27,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Protocol
 
+from clarity.modules.conversation.agent import AgentTrace, BoundedAgent
 from clarity.modules.conversation.flows import Condition, Flow, FlowRegistry, FlowState
 from clarity.modules.conversation.intents import Intent
 from clarity.modules.conversation.orchestrator import FlowOutcome
@@ -107,10 +108,15 @@ class FlowRouter:
         registry: FlowRegistry,
         *,
         tools: ToolCaller | None = None,
+        agent: BoundedAgent | None = None,
         created_by: str = "assistant",
     ) -> None:
         self._registry = registry
         self._tools = tools
+        # No agent is the supported default (ADR-0009): an agentic state then
+        # behaves exactly like a deterministic one, which is the safe direction
+        # for the marker to fail in.
+        self._agent = agent or BoundedAgent()
         self._created_by = created_by
 
     @property
@@ -135,8 +141,15 @@ class FlowRouter:
         proposal_id: str | None = facts.get("plan_id")
         produced: dict[str, Any] = {}
 
+        agent_detail: dict[str, Any] = {}
         for _ in range(MAX_STEPS_PER_TURN):
             node = flow.state(current)
+
+            if node.agentic:
+                trace = self._plan(flow, node, facts)
+                agent_detail = trace.to_detail()
+                tools_called.extend(trace.tools_called)
+                produced.update(trace.facts)
 
             if node.proposes and proposal_id is None:
                 plan = self._propose(flow, node, facts)
@@ -156,7 +169,8 @@ class FlowRouter:
             )
 
         node = flow.state(current)
-        citations = tuple(str(entry) for entry in facts.get("citations") or ())
+        found = produced.get("citations") or facts.get("citations") or ()
+        citations = tuple(str(entry) for entry in found)
         return FlowOutcome(
             flow=flow.flow_id,
             state=current,
@@ -165,6 +179,7 @@ class FlowRouter:
             citations=citations,
             proposal_id=proposal_id,
             facts=dict(produced),
+            agent=agent_detail,
             # A knowledge state must cite. The verifier turns this into a
             # blocked reply, so a knowledge answer with no source cannot be
             # sent as though it were grounded (K03, #33).
@@ -275,6 +290,26 @@ class FlowRouter:
         if not flow.allows(node.name, "propose_action"):
             raise ToolNotAllowed(f"{flow.ref}: state {node.name!r} may not use 'propose_action'")
         return self._tools.call("propose_action", case_id=str(case_id), created_by=self._created_by)
+
+    def _plan(self, flow: Flow, node: FlowState, facts: Mapping[str, Any]) -> AgentTrace:
+        """Let the bounded agent choose among this state's tools (C03, #22).
+
+        Every call it makes goes through ``call_tool``, so the allowlist is
+        enforced on the agent's choices by the same code that enforces it on
+        the flow's own. The case id comes from the facts and never from the
+        plan: the subject is bound by the session (I9).
+        """
+        case_id = str(facts.get("case_id") or "")
+
+        def call(tool: str, args: dict[str, Any]) -> dict[str, Any]:
+            return self.call_tool(flow.flow_id, node.name, tool, case_id=case_id, **args)
+
+        return self._agent.run(
+            state_name=node.name,
+            allowed_tools=node.tools,
+            agentic=node.agentic,
+            call_tool=call,
+        )
 
     def call_tool(self, flow_id: str, state_name: str, tool: str, **args: Any) -> dict[str, Any]:
         """Call a tool on behalf of a state, enforcing the allowlist.

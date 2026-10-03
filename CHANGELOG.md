@@ -4,6 +4,29 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (C03, #22)
+
+- The bounded agent step. In a flow state marked `agentic: true`, a planner may
+  return `{tool, args, reason_code}` and have it run, after validation against
+  the state's tool list and a per-tool argument allowlist. `BoundedAgent`,
+  `validate_plan`, `AgentTrace`, `AgentLimits`, `Planner`, `PlannerReply`,
+  `PlanRejected` and `RejectionCode` are on the conversation module's public
+  surface.
+- Per-turn limits: 4 tool calls, 2000 planner tokens, 8 seconds wall clock.
+  Hitting one ends the step with what it has; it never fails the turn.
+- Arguments are deny by default. No tool schema accepts a money field or
+  `case_id`: an amount comes from the decision record and the subject is bound
+  by the session (I1, I9). Money-shaped argument names are additionally refused
+  by name so the audit records what was reached for.
+- Tool results reach the next prompt delimited, labelled as untrusted data and
+  length-capped, never as instructions.
+- The turn audit detail gained `agent_tools`, `agent_rejections`,
+  `agent_fell_back` and `agent_tokens`. No `/v1` schema change.
+- `FlowRouter` takes an optional `agent`. With no model configured, which stays
+  the default (ADR-0009), an agentic state behaves exactly like a deterministic
+  one.
+
+
 ### Fixed (messaging, follow-up to C02 #21)
 
 - `KafkaEventBus.drain` could report `is_clear` while an event that a handler

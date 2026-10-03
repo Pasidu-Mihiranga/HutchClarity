@@ -6,8 +6,8 @@
 | Layer | L4 domain (`clarity.modules.conversation`) |
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
-| Status | built (`lite` and `full`); turn pipeline C01 (#19), flow registry and seven flows C02 (#21), both 2026-10-03 |
-| Files | `intents.py`, `intent_routes.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `verify.py`, `flows.py`, `router.py`, `public.py` |
+| Status | built (`lite` and `full`); turn pipeline C01 (#19), flow registry and seven flows C02 (#21), bounded agent step C03 (#22), all 2026-10-03 |
+| Files | `intents.py`, `intent_routes.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `verify.py`, `flows.py`, `router.py`, `agent.py`, `public.py` |
 
 ## 1. Purpose
 Customer chat for the immersive "Clarity chat". Two paths:
@@ -21,6 +21,8 @@ No language model decides anything here. Intake is keyword rules; composition is
 `ConversationOrchestrator`, `ConversationState`, `ConversationStore`, `Turn`, `TurnRecord`, `VerifierResult`, `verify_reply`, `CONVERSATION_STATES`, `DEFAULT_TTL`, `MAX_MESSAGE_CHARS`, `REFUSALS`, `build_suggestions`, `extract_intake`, `handle_turn`, `signals_from_snapshot`, `suggest_for_snapshot`.
 
 Flows (C02): `Flow`, `FlowState`, `FlowStatus`, `FlowRegistry`, `FlowRouter`, `FlowEngine`, `FlowOutcome`, `Condition`, `FlowError`, `FlowNotFound`, `FlowLooped`, `ToolCaller`, `ToolNotAllowed`, `load_flow`, `load_flows`.
+
+Bounded agent step (C03): `BoundedAgent`, `AgentLimits`, `AgentPlan`, `AgentTrace`, `Planner`, `PlannerReply`, `PlanRejected`, `RejectionCode`, `validate_plan`, `MAX_TOOL_CALLS_PER_TURN`.
 
 **Note:** `FlowEngine.step` takes `(state, intake, facts)`. It took `(state, intake)` when C01 declared it with no implementation; C02 added the facts argument, because conditions are evaluated against the case's own records.
 
@@ -59,6 +61,29 @@ Seven flows, one per journey in plan 22 section 5, each claiming a disjoint set 
 
 The DSL field for edges is `transitions`, not `on`: in YAML 1.1 a bare `on` key parses as the boolean `True`, the same trap that bites GitHub Actions workflows.
 
+## 5b. The bounded agent step (C03)
+
+The only place a model chooses what Clarity does next, and only in a state
+marked `agentic: true`. Two of the 35 flow states are: `KNOWLEDGE_QA.retrieve`
+and `ACCOUNT_AND_POLICY.policy_context`. Neither proposes, and a test asserts no
+agentic state ever will.
+
+A planner returns one JSON object, `{tool, args, reason_code}`. It is validated
+against the state's own tool list and a per-tool **argument allowlist**, then
+the call goes through `FlowRouter.call_tool`, which is the same entry point the
+flow's deterministic step uses, so the allowlist is enforced by one piece of
+code for both.
+
+| Limit | Value |
+|---|---|
+| Tool calls per turn | 4 |
+| Planner tokens per turn | 2000 |
+| Wall clock per turn | 8 s |
+
+Rejected or limited, the result is the same: the deterministic step runs, the
+conversation completes, and the codes are in the turn audit under
+`agent_rejections` with `agent_fell_back: true`.
+
 ## 6. Invariants
 - Customer text is a hint, never evidence (I2). Intake selects a route and fills slots; causes and amounts still come from rule packs and the decision policy.
 - Handoff keywords always win, so a customer asking for a person is never kept in automation.
@@ -74,6 +99,18 @@ The DSL field for edges is `transitions`, not `on`: in YAML 1.1 a bare `on` key 
 - Every flow can reach a person: `request_handoff` is in every allowlist, because a journey with no way out to a human is a trap (I2).
 - Conditions are a closed vocabulary, never an expression. A flow file is content written by people not reviewing it as code.
 - A flow in progress is not abandoned by a vague turn: FALLBACK is an entry intent for `KNOWLEDGE_QA`, so taking the claim at face value would drop a mid-dispute customer into a knowledge answer.
+- A planner may only name a tool its current state declares, and may only send
+  arguments that tool accepts, by name. Deny by default (I9).
+- A planner never supplies an amount (I1). No tool schema accepts a money field,
+  and the money-shaped names are refused by name as well, so the audit records a
+  planner reaching for money rather than a generic schema miss.
+- A planner never supplies a subject. No tool schema accepts `case_id`; the
+  router fills it from the case record, because a planner that could choose a
+  case could read another customer's (I9, the hole A04 closed in MCP binding).
+- A rejected plan is never silent. The deterministic step runs and the rejection
+  code goes in the turn audit.
+- A tool result is untrusted data: delimited, labelled and length-capped before
+  it reaches the next prompt. It is never read as an instruction.
 - A reply only ever quotes a figure from FACTS. `compose_reply` used to fall back to the amount in the customer's own text, which read as agreement to a number nothing decided.
 
 ## 7. Migration status (enterprise-plan 21)
@@ -85,7 +122,8 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 
 **Seams not yet filled:**
 - `FlowOutcome.chunk_ids` and `citations` are carried, audited and verified but nothing produces them yet. K01-K03 (#31-#33) bring retrieval, so `KNOWLEDGE_QA` currently always takes its `offer_person` exit.
-- `agentic: true` is declared and validated on two states but no planner honours it. C03 (#22) brings the bounded agent step; until then an agentic state behaves exactly like a deterministic one.
+- With no model configured, which is the default (ADR-0009), an agentic state behaves exactly like a deterministic one: `_planner` in the container returns `None` rather than wiring a template, because a template cannot choose a tool and doing so would mean a rejected plan and a wasted call on every agentic state.
+- No planner prompt is a recorded cassette yet (A02), so the only planners exercised under `make check` are stubs. That is deliberate for the refusal tests, which need a hostile planner rather than a realistic one, but it means no test covers a *well-formed* plan from a real model.
 - `FlowToolAdapter` implements `propose_action`, `get_network_status` and `get_trust_receipt`. The other tools a flow names raise `ToolUnavailable` rather than returning nothing, so a state reaching for one fails loudly.
 - No model composes a reply yet, so `model_role` and `model` are recorded as `None` rather than omitted.
 
@@ -101,6 +139,8 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 - `backend/tests/acceptance/test_assistant.py` - cross-channel continuity (C01 acceptance 1) and subject binding
 - `backend/tests/unit/test_flow_registry.py` - flow DSL validation (C02 acceptance 2)
 - `backend/tests/acceptance/test_flows.py` - scripted conversations per flow (C02 acceptance 1)
+- `backend/tests/unit/test_agent_step.py` - plan validation, limits and fallback (C03 acceptance 1 and 2)
+- `backend/tests/evaluation/test_safety_set.py` - the injection set through a deliberately compromised planner (C03 acceptance 3)
 
 ## 10. Change history
 | Date | Devlog entry | Summary |
@@ -109,3 +149,4 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Ported into `clarity.modules.conversation` with a public surface |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C01-conversation-orchestrator.md` | Stateful turn pipeline, state store with TTL, verifier, turn audit and `conversation.turn.completed@v1` |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C02-flow-registry.md` | Flow DSL as policy content, the seven flows, the router, and the tool allowlist |
+| 2026-10-03 | `docs/devlog/2026/2026-10-03-C03-bounded-agent-step.md` | Bounded agent step: planner validation, argument allowlist, per-turn limits and the deterministic fallback |
