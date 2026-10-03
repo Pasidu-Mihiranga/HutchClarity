@@ -349,16 +349,26 @@ jobs:
           for deployable in api mcp channel-gateway; do
             kubectl rollout status "deployment/clarity-$deployable" --timeout=120s
           done
+          # `rollout status` returning is not the same as the Service having
+          # ready endpoints, and a pod that has just passed its first
+          # readiness probe can still refuse the next connection. Waiting on
+          # the pods, then retrying inside the smoke pod, is what makes this
+          # step report a broken deployable rather than a slow one.
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=clarity --timeout=120s
           kubectl run smoke --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- sh -c '
-            set -e
             for target in clarity-api:8000 clarity-mcp:8099 clarity-channel-gateway:8102; do
-              printf "%s -> " "$target"
-              curl -sf --max-time 10 "http://$target/health"
-              echo
+              attempt=1
+              while [ "$attempt" -le 30 ]; do
+                body=$(curl -sf --max-time 10 "http://$target/health" 2>/dev/null) && break
+                attempt=$((attempt + 1))
+                sleep 2
+              done
+              printf "%s -> %s\n" "$target" "${body:-UNREACHABLE}"
             done
           ' | tee /tmp/smoke.txt
-          # `kubectl run` exits 0 even when the command inside failed, so the
-          # output is checked rather than the exit status.
+          # `kubectl run` exits 0 even when the command inside the pod failed,
+          # so the output is checked rather than the exit status.
           test "$(grep -c '"status":"ok"' /tmp/smoke.txt)" -eq 3
 
       - name: Show what failed, if anything
