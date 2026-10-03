@@ -4,6 +4,33 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (F01, #27)
+
+- `clarity.modules.foresight.public` exports `Backtest`, `CalibrationReport`,
+  `CalibrationStatus`, `HistoricLaunch`, `ObservedOutcome`, `Provenance` and
+  `MIN_REAL_LAUNCHES`. `Backtest.run(launches)` replays recorded launch
+  outcomes through the statistical baseline and reports mean absolute and
+  signed **band-step** error (LOW=0, MEDIUM=1, HIGH=2), an exact-band rate and
+  a top-theme hit rate. Never a complaint count: bands are all the baseline
+  emits.
+- **A synthetic launch never moves the calibration status.** `CALIBRATED`
+  requires three launches with `Provenance.REAL` (plan 02 §3.4), of which the
+  prototype has none (**REQUIRES HUTCH CONFIRMATION**), so every report it can
+  produce today reads `not_calibrated`. Three SIMULATED `DEMO_LAUNCHES` ship so
+  the report can be run and read; the baseline scores 0.500 mean absolute band
+  error against them.
+- **Nothing comparable reports no error rather than a perfect one.** With zero
+  overlapping (theme, segment) pairs the error fields are `None` and
+  `summary()` says "not measurable", in the same shape as an `UNEVALUABLE`
+  evaluation gate. An observed theme the model never predicted is reported in
+  `unpredicted` instead of being scored as a LOW prediction, and a prediction
+  with no recorded outcome is reported in `unobserved`, because absence of a
+  record is not a LOW observation.
+- `Foresight.run` takes a keyword-only `calibration=None` (source compatible),
+  and `ForesightReport` gained `calibration`. `ForesightReport.backtested` is
+  now derived from that calibration instead of the hard-coded `False` it
+  carried before, so `is_decision_ready` opens on evidence and on nothing else.
+
 ### Added (N02, #40)
 
 - `clarity-channel-gateway`, a separate deployable for WhatsApp, SMS and USSD

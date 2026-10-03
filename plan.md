@@ -13,9 +13,9 @@
 >   code changes until the ADR is Accepted" applies to **this** work and
 >   nothing else.
 > - **Section 10, the GitHub issue backlog.** Building the modular monolith
->   itself, which ADR-0002 already accepted. Waves 0 to 3 are complete and
->   Wave 4 is all but done, so a great deal of code has landed, none of it
->   blocked by the gate above.
+>   itself, which ADR-0002 already accepted. Waves 0 to 4 are complete and
+>   only Wave 5, the ship gate, is left, so a great deal of code has landed,
+>   none of it blocked by the gate above.
 >
 > Reading the status line without that split suggests the whole repository is
 > frozen, which it plainly is not. Phase 1's audit gaps have also been closed
@@ -311,7 +311,7 @@ devlogs.
 - [x] #26 `[D01]` Desk operations: bulk fix with four-eyes, merchant watch, regulator pack, shift handover `p2`
 - [x] #30 `[I01]` Insights: projections and console dashboards `p2`
 - [x] #40 `[N02]` Channel gateway: WhatsApp sandbox, SMS and USSD simulator, verified webhooks `p2`
-- [ ] #27 `[F01]` Foresight: backtest and calibration report `p3`
+- [x] #27 `[F01]` Foresight: backtest and calibration report `p3`
 
 ### Wave 5 - Production readiness (ship gate)
 

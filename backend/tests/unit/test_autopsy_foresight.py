@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -14,6 +15,15 @@ from clarity.modules.autopsy.pipeline import (
     ComplaintAutopsy,
     canonicalise,
     detect_language,
+)
+from clarity.modules.foresight.backtest import (
+    DEMO_LAUNCHES,
+    MIN_REAL_LAUNCHES,
+    Backtest,
+    CalibrationStatus,
+    HistoricLaunch,
+    ObservedOutcome,
+    Provenance,
 )
 from clarity.modules.foresight.simulation import (
     DEMO_SEGMENTS,
@@ -597,3 +607,214 @@ def test_the_similarity_measure_is_replaceable_and_named_for_what_it_is():
     # Canonicalisation still groups known phrases, so this asserts the measure
     # is consulted rather than that clustering collapses entirely.
     assert apart.run(complaints(*texts)).noise, "the injected measure was ignored"
+
+
+# --------------------------------------------------------------------------- #
+# Foresight backtest and calibration (F01, plan 02 §3.4)
+# --------------------------------------------------------------------------- #
+
+
+def real(launch: HistoricLaunch) -> HistoricLaunch:
+    """The same launch, relabelled as a real one.
+
+    No real launch record exists in the prototype (REQUIRES HUTCH
+    CONFIRMATION). These tests relabel a simulated one purely to prove the
+    gate opens on real evidence and on nothing else.
+    """
+    return replace(launch, provenance=Provenance.REAL)
+
+
+def test_a_backtest_states_the_calibration_error_and_that_results_are_scenarios():
+    """Acceptance 1. The number and the hedge travel together or not at all."""
+    report = Backtest().run(DEMO_LAUNCHES)
+
+    assert report.compared > 0
+    assert report.mean_absolute_band_error is not None
+    assert str(report.mean_absolute_band_error) in report.summary()
+    assert "scenarios, not certainties" in report.summary().lower()
+    assert any("scenarios, not certainties" in c.lower() for c in report.caveats)
+
+
+def test_the_error_is_measured_in_band_steps_not_complaints():
+    report = Backtest().run(DEMO_LAUNCHES)
+
+    assert "band steps" in report.summary()
+    assert any("not in complaints" in c.lower() for c in report.caveats)
+    assert all(abs(m.step_error) <= 2 for m in report.misses)
+
+
+def test_a_synthetic_backtest_never_claims_calibration():
+    """I16: a launch we authored cannot validate the model that predicted it."""
+    report = Backtest().run(DEMO_LAUNCHES)
+
+    assert report.real_launches == 0
+    assert report.status is CalibrationStatus.NOT_CALIBRATED
+    assert not report.is_calibrated
+    assert any("validates nothing" in c.lower() for c in report.caveats)
+    assert any("simulated" in c.lower() for c in report.caveats)
+
+
+def test_real_launches_below_the_gate_are_insufficient_not_calibrated():
+    below = (real(DEMO_LAUNCHES[0]), real(DEMO_LAUNCHES[1]))
+
+    report = Backtest().run(below)
+
+    assert report.real_launches == 2 < MIN_REAL_LAUNCHES
+    assert report.status is CalibrationStatus.INSUFFICIENT
+    assert not report.is_calibrated
+    assert any(str(MIN_REAL_LAUNCHES) in c and "gate" in c for c in report.caveats)
+
+
+def test_the_gate_opens_only_at_three_real_launches():
+    report = Backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
+
+    assert report.real_launches == MIN_REAL_LAUNCHES
+    assert report.status is CalibrationStatus.CALIBRATED
+    assert report.is_calibrated
+
+
+def test_mixing_synthetic_launches_in_does_not_help_reach_the_gate():
+    mixed = (real(DEMO_LAUNCHES[0]), DEMO_LAUNCHES[1], DEMO_LAUNCHES[2])
+
+    assert Backtest().run(mixed).status is CalibrationStatus.INSUFFICIENT
+
+
+def test_an_observed_theme_the_model_missed_is_reported_not_dropped():
+    """Under-prediction is the dangerous direction, so it must stay visible."""
+    report = Backtest().run(DEMO_LAUNCHES)
+
+    missed = {(o.theme, o.segment) for o in report.unpredicted}
+    assert ("roaming bill shock", "tourists") in missed
+    assert all((m.theme, m.segment) != ("roaming bill shock", "tourists") for m in report.misses), (
+        "a theme the model never predicted cannot count towards its error"
+    )
+    assert any("never predicted" in c.lower() for c in report.caveats)
+
+
+def test_a_prediction_with_no_record_is_not_treated_as_a_quiet_launch():
+    report = Backtest().run(DEMO_LAUNCHES)
+
+    assert report.unobserved, "the demo launches record a few themes, not all of them"
+    assert any("absence of a record is not a low observation" in c.lower() for c in report.caveats)
+
+
+def test_nothing_comparable_reports_no_error_rather_than_a_perfect_one():
+    """A 0.000 over zero pairs would read as a flawless model."""
+    nothing = (
+        HistoricLaunch(
+            launch_id="SIM-LAUNCH-EMPTY",
+            scenario=Scenario(name="quiet", change_type=ChangeType.POLICY_CHANGE),
+            observed=(),
+        ),
+    )
+
+    report = Backtest().run(nothing)
+
+    assert report.compared == 0
+    assert report.mean_absolute_band_error is None
+    assert report.signed_band_error is None
+    assert report.exact_band_rate is None
+    assert report.top_theme_hit_rate is None
+    assert "not measurable" in report.summary()
+    assert any("no calibration error could be measured" in c.lower() for c in report.caveats)
+
+
+def test_an_exact_match_scores_zero_error():
+    perfect = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    launch = HistoricLaunch(
+        launch_id="SIM-LAUNCH-PERFECT",
+        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        observed=tuple(ObservedOutcome(p.theme, p.segment, p.band) for p in perfect.predictions),
+    )
+
+    report = Backtest().run((launch,))
+
+    assert report.mean_absolute_band_error == Decimal("0.000")
+    assert report.exact_band_rate == Decimal("1.000")
+    assert report.status is CalibrationStatus.NOT_CALIBRATED, "still synthetic"
+
+
+def test_under_prediction_is_called_out_as_the_dangerous_direction():
+    pessimistic = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    worse_than_predicted = HistoricLaunch(
+        launch_id="SIM-LAUNCH-WORSE",
+        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        observed=tuple(
+            ObservedOutcome(p.theme, p.segment, VolumeBand.HIGH) for p in pessimistic.predictions
+        ),
+    )
+
+    report = Backtest().run((worse_than_predicted,))
+
+    assert report.signed_band_error is not None
+    assert report.signed_band_error < 0
+    assert any("dangerous direction" in c.lower() for c in report.caveats)
+
+
+def test_over_prediction_is_not_called_dangerous():
+    optimistic = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    quieter_than_predicted = HistoricLaunch(
+        launch_id="SIM-LAUNCH-QUIET",
+        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        observed=tuple(
+            ObservedOutcome(p.theme, p.segment, VolumeBand.LOW) for p in optimistic.predictions
+        ),
+    )
+
+    report = Backtest().run((quieter_than_predicted,))
+
+    assert report.signed_band_error is not None
+    assert report.signed_band_error > 0
+    assert not any("dangerous direction" in c.lower() for c in report.caveats)
+
+
+def test_the_backtest_reads_no_individual_data():
+    """Deck S8, carried through from the simulation to the backtest."""
+    assert "no individual" in Backtest().run(DEMO_LAUNCHES).basis.lower()
+
+
+def test_the_backtest_is_deterministic():
+    first = Backtest().run(DEMO_LAUNCHES)
+    second = Backtest().run(DEMO_LAUNCHES)
+
+    assert first.mean_absolute_band_error == second.mean_absolute_band_error
+    assert first.exact_band_rate == second.exact_band_rate
+    assert first.caveats == second.caveats
+    assert first.run_id != second.run_id, "each run is its own record"
+
+
+def test_a_calibration_report_stays_advisory():
+    assert any("advisory only" in c.lower() for c in Backtest().run(DEMO_LAUNCHES).caveats)
+
+
+def test_a_foresight_report_is_decision_ready_only_with_a_calibrated_backtest():
+    """Plan §3.4: the gate is wired to evidence, not hard-coded shut."""
+    synthetic = Backtest().run(DEMO_LAUNCHES)
+    calibrated = Backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
+    scenario = Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE)
+
+    assert not Foresight().run(scenario, calibration=synthetic).is_decision_ready
+    assert Foresight().run(scenario, calibration=calibrated).is_decision_ready
+
+
+def test_a_foresight_report_carries_the_calibration_error_it_rests_on():
+    calibration = Backtest().run(DEMO_LAUNCHES)
+
+    report = Foresight().run(
+        Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
+        calibration=calibration,
+    )
+
+    assert report.calibration is calibration
+    assert any(str(calibration.mean_absolute_band_error) in c for c in report.caveats)
+    assert any("certaint" in c.lower() for c in report.caveats)
+
+
+def test_an_uncalibrated_foresight_report_says_it_is_not_launch_ready():
+    report = Foresight().run(
+        Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
+        calibration=Backtest().run(DEMO_LAUNCHES),
+    )
+
+    assert not report.is_decision_ready
+    assert any("not usable for a launch decision" in c.lower() for c in report.caveats)

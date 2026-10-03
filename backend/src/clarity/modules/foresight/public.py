@@ -7,6 +7,15 @@ this package is internal and may change without notice.
 
 from __future__ import annotations
 
+from clarity.modules.foresight.backtest import (
+    MIN_REAL_LAUNCHES,
+    Backtest,
+    CalibrationReport,
+    CalibrationStatus,
+    HistoricLaunch,
+    ObservedOutcome,
+    Provenance,
+)
 from clarity.modules.foresight.simulation import (
     ChangeType,
     Foresight,
@@ -18,10 +27,17 @@ from clarity.modules.foresight.simulation import (
 )
 
 __all__ = [
+    "MIN_REAL_LAUNCHES",
+    "Backtest",
+    "CalibrationReport",
+    "CalibrationStatus",
     "ChangeType",
     "Foresight",
     "ForesightReport",
+    "HistoricLaunch",
+    "ObservedOutcome",
     "Prediction",
+    "Provenance",
     "Scenario",
     "Segment",
     "VolumeBand",

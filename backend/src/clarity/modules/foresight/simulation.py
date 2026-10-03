@@ -28,9 +28,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from clarity.kernel.common import money
 from clarity.kernel.ids import new_id
+
+if TYPE_CHECKING:  # the backtest imports this module, so only for typing
+    from clarity.modules.foresight.backtest import CalibrationReport
 
 
 class ChangeType(StrEnum):
@@ -142,6 +146,8 @@ class ForesightReport:
     basis: str
     caveats: list[str] = field(default_factory=list)
     backtested: bool = False
+    calibration: CalibrationReport | None = None
+    """The backtest this report rests on, if any (plan 02 §3.4)."""
 
     @property
     def top_themes(self) -> list[str]:
@@ -178,7 +184,9 @@ class Foresight:
     _HIGH = Decimal("0.045")
     _MEDIUM = Decimal("0.015")
 
-    def run(self, scenario: Scenario) -> ForesightReport:
+    def run(
+        self, scenario: Scenario, *, calibration: CalibrationReport | None = None
+    ) -> ForesightReport:
         predictions: list[Prediction] = []
 
         for theme, weight, driver in _THEMES.get(scenario.change_type, ()):
@@ -213,14 +221,29 @@ class Foresight:
                 "Statistical baseline over aggregated segments. No individual "
                 "customer data was read."
             ),
-            caveats=[
-                "Scenarios, not certainties (deck S11).",
-                "Volume bands are relative within this run and are not complaint counts.",
-                "Segment shares and complaint rates are ASSUMPTIONS for the demo.",
-                "Not backtested against real launches, so not usable for a launch decision.",
-            ],
-            backtested=False,
+            caveats=self._caveats(calibration),
+            backtested=calibration is not None and calibration.is_calibrated,
+            calibration=calibration,
         )
+
+    def _caveats(self, calibration: CalibrationReport | None) -> list[str]:
+        caveats = [
+            "Scenarios, not certainties (deck S11).",
+            "Volume bands are relative within this run and are not complaint counts.",
+            "Segment shares and complaint rates are ASSUMPTIONS for the demo.",
+        ]
+        if calibration is None:
+            caveats.append(
+                "Not backtested against real launches, so not usable for a launch decision."
+            )
+            return caveats
+        caveats.append(f"Backtest: {calibration.summary()}")
+        if not calibration.is_calibrated:
+            caveats.append(
+                "The backtest did not reach the plan §3.4 gate, so this report is "
+                "still not usable for a launch decision."
+            )
+        return caveats
 
     def _band(self, score: Decimal) -> VolumeBand:
         if score >= self._HIGH:
