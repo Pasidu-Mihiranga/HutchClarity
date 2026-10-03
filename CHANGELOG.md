@@ -4,6 +4,40 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (D01, #26)
+
+- Desk operations, previously a scaffold. `DeskOps` carries a bulk fix with a
+  dry run and four-eyes, merchant watch scores, a regulator pack export and a
+  shift handover (plan 02 section 3.5).
+- **Bulk fix.** A batch names cases and a reason; a dry run says what would
+  happen to each and changes nothing; a second person approves **that dry
+  run**; execution then runs each case through the ordinary single-case path,
+  producing one receipt per case.
+- The approval is of a dry-run **fingerprint** over the eligible cases, their
+  plan ids and their amounts. Execution refuses a different one, so an
+  approval cannot drift onto work nobody reviewed: without it, four-eyes
+  approves a label.
+- Merchant watch scores, counted from case records and carrying what they were
+  counted from, so a reader can argue with the weighting rather than with the
+  number. Weights are **PROPOSED TARGET - REQUIRES HUTCH VALIDATION**.
+- A regulator pack keyed entirely by HMAC subscriber references, with no
+  MSISDN, name or customer text (I13), and a shift handover that leads with
+  what is still outstanding.
+- Collection `deskops.batches`, so an approval survives the request.
+- `clarity.app.desk`: the two adapters joining the desk to the case service.
+
+Constraints worth knowing, each enforced by a test: a bulk fix executes each
+case's own existing plan and cannot invent one (I1); maker is never checker at
+the batch level and again per case; **`ONE_TAP_FIX` is never bulk executed**,
+because that is the customer's tap and a desk cannot mint their confirmation
+token (ADR-0007), so only `AUTO_FIX` and `STAFF_APPROVAL` are actionable; a
+partial failure is reported and never rolled back; re-executing a batch does
+nothing further (I8); and a batch over 200 cases is refused because a batch
+nobody can read before approving is a batch nobody approved.
+
+No `/v1` surface yet, so the desk is reachable from code and tests only.
+
+
 ### Added (AU01, #13)
 
 - Complaint Autopsy runs as a service fed by `complaint.created`, instead of a

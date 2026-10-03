@@ -47,4 +47,4 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | clarity-channel-gateway (WhatsApp, SMS/USSD) | service | `services/channel-gateway/` | R4 |
 | knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 (K01-K03 built: registry, ingestion, lexical retrieval, grounded answers with a citation verifier; semantic retrieval blocked on an embedding model) |
 | insights | module | `backend/src/clarity/modules/insights/` | R6 |
-| desk-ops (bulk fix, merchant watch, regulator pack) | module | `backend/src/clarity/modules/deskops/` | R6 |
+| desk-ops (bulk fix, merchant watch, regulator pack) | module | `backend/src/clarity/modules/deskops/` | R6 (D01 built: bulk fix with a dry run and four-eyes, merchant watch, regulator pack, handover; no `/v1` surface yet) |

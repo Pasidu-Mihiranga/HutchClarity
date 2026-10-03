@@ -16,6 +16,7 @@ from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
 from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
+from clarity.modules.deskops.public import BATCHES
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
 from clarity.modules.knowledge.public import CHUNKS, SOURCES
@@ -72,6 +73,8 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # autopsy
     COMPLAINTS,
     CLUSTERS,
+    # deskops
+    BATCHES,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,

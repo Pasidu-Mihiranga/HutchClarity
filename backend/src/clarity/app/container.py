@@ -29,6 +29,7 @@ from clarity.ai.guard import Guard
 from clarity.ai.local import LOCAL_IMPLEMENTATIONS
 from clarity.ai.roles import LOCAL_PROVIDERS, ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
+from clarity.app.desk import ServiceCaseFixer, ServiceDeskCases
 from clarity.app.flow_tools import FlowToolAdapter
 from clarity.app.knowledge_seed import seed_help_articles
 from clarity.app.mcp_view import ResolutionServiceMCPView
@@ -65,6 +66,7 @@ from clarity.modules.conversation.public import (
     load_flows,
 )
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
+from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
 from clarity.modules.governance.public import (
     CHANGES,
@@ -762,6 +764,16 @@ class Clarity:
             EventType.COMPLAINT_CREATED,
             group="autopsy",
             handler=self.autopsy.on_complaint_created,
+        )
+
+        # Desk operations (D01, #26). The fixer is the ordinary single-case
+        # path, so a bulk fix cannot reach anything an operator could not do
+        # one case at a time, and it does not get its own execution code.
+        self.desk = DeskOps(
+            fixer=ServiceCaseFixer(self.cases),
+            cases=ServiceDeskCases(self.cases),
+            open_unit=self.open_unit,
+            clock=self.case_aggregate._now,
         )
 
         # The stateful turn pipeline (C01) driving the published flows (C02).
