@@ -4,6 +4,40 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (I01, #30)
+
+- The `insights` module, previously a scaffold. Read models folded from the
+  event log: top causes, where the assistant stops, drop-offs and refunds by
+  rule. `InsightsService`, `Insights`, `apply`, `rebuild` and `PROJECTED` are
+  on its public surface.
+- **Replaying the log rebuilds the same numbers**, which is the property that
+  makes a dashboard worth reading. Three things get it: folding an event twice
+  counts it once (at-least-once, I7); joins happen at read time, so a refund
+  whose `cause.detected` has not arrived is still attributed once it does; and
+  anything "latest" is decided by `turn_no` in the event rather than by arrival
+  order.
+- The `insights` consumer group, whose subscription is derived from the
+  projection's own `PROJECTED` tuple so the fold and the subscription cannot
+  drift.
+- Collection `insights.projections`, one row holding the read model.
+
+### Fixed (I01, #30)
+
+- **`GET /v1/demo/ops` read live objects**, so its numbers were whatever was in
+  one process: a restart lost them and a second replica disagreed with the
+  first. It now reads the stored projection.
+- **That route summed money with `float`** (`money += float(stake)`). I3 allows
+  no float anywhere on a money path and a dashboard is on one, because a figure
+  a desk acts on has to be the figure the ledger holds. The projection keeps
+  `Decimal` and serialises as a string.
+- `events_folded` counted events the projection ignored, so a live fold and a
+  replay of the same history reported different totals. It now counts the
+  events the projection used, which is also the more useful number.
+
+The console does not render any of this yet, so the demo route is the only
+surface.
+
+
 ### Added (D01, #26)
 
 - Desk operations, previously a scaffold. `DeskOps` carries a bulk fix with a

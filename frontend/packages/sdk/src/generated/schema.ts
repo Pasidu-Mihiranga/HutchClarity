@@ -663,7 +663,21 @@ export interface paths {
         };
         /**
          * Demo Ops
-         * @description Case counts already in memory. Empty until someone creates demo cases.
+         * @description Console dashboards, folded from the event log (I01, #30).
+         *
+         *     This route used to read live objects, which is the context issue #30
+         *     starts from: the numbers were whatever happened to be in this process,
+         *     so a restart lost them and a second replica disagreed with the first.
+         *     It now reads the stored projection, which survives a restart and which
+         *     a replay of the log rebuilds exactly.
+         *
+         *     It also summed money with `money += float(stake)`. I3 allows no float
+         *     anywhere on a money path, and a dashboard is on one: a figure a desk
+         *     acts on has to be the figure the ledger holds. The projection keeps
+         *     `Decimal` and serialises as a string.
+         *
+         *     Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
+         *     own surface is the gap recorded in the I01 devlog.
          */
         get: operations["demo_ops_v1_demo_ops_get"];
         put?: never;

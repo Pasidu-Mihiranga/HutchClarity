@@ -83,6 +83,7 @@ from clarity.modules.iam.public import (
     TokenIssuer,
     TokenVerifier,
 )
+from clarity.modules.insights.public import PROJECTED, InsightsService
 from clarity.modules.knowledge.public import (
     AnswerCache,
     Audience,
@@ -311,6 +312,16 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
         if not step.is_local and step.provider in router.configured:
             return _RoleProvider(router, ModelRole.GUARD)
     return None
+
+
+#: The events the dashboards are built from (I01, #30).
+#:
+#: Derived from the projection's own `PROJECTED` tuple rather than listed here,
+#: so the subscription and the fold cannot drift: a type subscribed but not
+#: folded wastes deliveries, and a type folded but not subscribed makes a live
+#: projection disagree with a replay of the same history, which is the one
+#: thing acceptance 1 forbids.
+INSIGHT_EVENTS: tuple[EventType, ...] = tuple(payload.event_type for payload in PROJECTED)
 
 
 def _complaint_source() -> ComplaintSource | None:
@@ -765,6 +776,19 @@ class Clarity:
             group="autopsy",
             handler=self.autopsy.on_complaint_created,
         )
+
+        # Insights read models, folded from the event log (I01, #30). The
+        # dashboards used to read live objects, which meant whatever was in one
+        # process; a stored projection survives a restart and two replicas
+        # agree, and `rebuild_from` makes the model agree with the log again
+        # after a projection changes.
+        self.insights = InsightsService(open_unit=self.open_unit)
+        for projected in INSIGHT_EVENTS:
+            self.consumers.register(
+                projected,
+                group="insights",
+                handler=self.insights.on_event,
+            )
 
         # Desk operations (D01, #26). The fixer is the ordinary single-case
         # path, so a bulk fix cannot reach anything an operator could not do

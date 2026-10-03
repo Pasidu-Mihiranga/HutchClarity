@@ -3255,7 +3255,7 @@
     },
     "/v1/demo/ops": {
       "get": {
-        "description": "Case counts already in memory. Empty until someone creates demo cases.",
+        "description": "Console dashboards, folded from the event log (I01, #30).\n\nThis route used to read live objects, which is the context issue #30\nstarts from: the numbers were whatever happened to be in this process,\nso a restart lost them and a second replica disagreed with the first.\nIt now reads the stored projection, which survives a restart and which\na replay of the log rebuilds exactly.\n\nIt also summed money with `money += float(stake)`. I3 allows no float\nanywhere on a money path, and a dashboard is on one: a figure a desk\nacts on has to be the figure the ledger holds. The projection keeps\n`Decimal` and serialises as a string.\n\nStill a `tags=[\"demo\"]` route behind `DESK_QUEUE_READ`. The console's\nown surface is the gap recorded in the I01 devlog.",
         "operationId": "demo_ops_v1_demo_ops_get",
         "parameters": [
           {

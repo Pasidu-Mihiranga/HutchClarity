@@ -1497,28 +1497,30 @@ def _register_routes(app: FastAPI) -> None:
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
     def demo_ops(clarity: ClarityDep) -> dict[str, Any]:
-        """Case counts already in memory. Empty until someone creates demo cases."""
-        records = [record for record in clarity.cases.all_cases() if record.decision is not None]
-        by_outcome: dict[str, int] = {}
-        by_reason: dict[str, int] = {}
-        money = 0.0
-        for record in records:
-            assert record.decision is not None
-            key = record.decision.outcome.value
-            by_outcome[key] = by_outcome.get(key, 0) + 1
-            stake = record.case.money_at_stake_lkr
-            if stake is not None:
-                money += float(stake)
-            if record.decision.handoff_reason is not None:
-                reason = record.decision.handoff_reason.value
-                by_reason[reason] = by_reason.get(reason, 0) + 1
+        """Console dashboards, folded from the event log (I01, #30).
+
+        This route used to read live objects, which is the context issue #30
+        starts from: the numbers were whatever happened to be in this process,
+        so a restart lost them and a second replica disagreed with the first.
+        It now reads the stored projection, which survives a restart and which
+        a replay of the log rebuilds exactly.
+
+        It also summed money with `money += float(stake)`. I3 allows no float
+        anywhere on a money path, and a dashboard is on one: a figure a desk
+        acts on has to be the figure the ledger holds. The projection keeps
+        `Decimal` and serialises as a string.
+
+        Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
+        own surface is the gap recorded in the I01 devlog.
+        """
+        boards = clarity.insights.dashboards()
         return {
-            "cases": len(clarity.cases.all_cases()),
-            "decided": len(records),
-            "money_at_stake_lkr": f"{money:.2f}",
-            "by_outcome": by_outcome,
-            "handoff_reasons": by_reason,
-            "note": "Counts from cases in this process. Create demo cases if this is empty.",
+            **boards,
+            "note": (
+                "Folded from the event log, not read from live objects. A replay "
+                "of the log rebuilds these numbers exactly; `events_folded` counts "
+                "the events this projection used."
+            ),
         }
 
     @app.get(
