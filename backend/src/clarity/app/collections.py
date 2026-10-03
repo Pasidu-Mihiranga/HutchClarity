@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from clarity.modules.actions.capability import ATTEMPTS as ACTION_ATTEMPTS
 from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
+from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
 from clarity.modules.governance.public import CHANGES
@@ -68,6 +69,9 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # knowledge
     SOURCES,
     CHUNKS,
+    # autopsy
+    COMPLAINTS,
+    CLUSTERS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,

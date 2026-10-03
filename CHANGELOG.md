@@ -4,6 +4,44 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (AU01, #13)
+
+- Complaint Autopsy runs as a service fed by `complaint.created`, instead of a
+  batch over demo data per request. `AutopsyService` masks and keeps each
+  complaint as it arrives and redraws clusters on `rerun`, which is also the
+  batch entry point, so the event feed and the batch cannot drift.
+- The review workflow. `ClusterReview` is an immutable record with a reviewer,
+  a time and a note; a second verdict is refused rather than overwriting one,
+  and `supersede` changes a verdict while keeping the one it replaced and
+  requires a reason.
+- `staff_view`, the only sanctioned representation of a cluster for a person.
+  It always carries `hypothesis`, `status_label` and `acted_on`, so an
+  unreviewed cluster cannot reach a screen without saying nobody has checked it
+  (I16). A `suggested_rule_id` travels with `suggested_rule_is_a_guess`.
+- Persistence: `autopsy.complaints` and `autopsy.clusters`. Only **masked**
+  complaints are stored (I13), and a complaint quoting a credential is never
+  stored at all. Before this a verdict died with the request that gave it.
+- A `Similarity` seam for the `embed` role, defaulting to `TrigramSimilarity`,
+  named for what it is so nobody reads a cluster as semantically grouped.
+  There is still no embedding model in the system.
+
+### Changed (AU01, #13)
+
+- **Removed `ComplaintAutopsy.confirm`.** It recorded a verdict by appending
+  `(reviewed by X)` to the cluster's label, which put audit data in display
+  text, appended twice if it ran twice, kept no time or note, and had nowhere
+  to persist. `ClusterReviews.record` replaces it.
+- `GET /v1/demo/autopsy` is served by the service and returns the labelled
+  staff views. The response shape changed and the OpenAPI snapshot was
+  regenerated: it is a demo route behind `DESK_QUEUE_READ` with no frontend
+  consumer.
+- `ComplaintAutopsy.recluster` clusters already-masked complaints, which is the
+  seam the event feed needs.
+
+Nothing produces `complaint.created` yet: the producer is the channels work, so
+the consumer is wired and idle.
+
+
 ### Fixed (C05, #24)
 
 - **The customer chat never ran the server-side flows.** `POST

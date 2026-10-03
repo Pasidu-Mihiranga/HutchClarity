@@ -589,7 +589,21 @@ export interface paths {
         };
         /**
          * Demo Autopsy
-         * @description Run Complaint Autopsy on generated historical complaints when seeded.
+         * @description Complaint Autopsy's current clusters, as a reviewer may be shown them.
+         *
+         *     Served by the autopsy service since AU01 (#13), where it used to build
+         *     a throwaway report per request. The service is fed by
+         *     `complaint.created` and keeps its clusters and their reviews, so a
+         *     verdict given here survives the request that gave it.
+         *
+         *     Every cluster goes through `staff_view`, which is the only sanctioned
+         *     way to put one in front of a person: it always carries `hypothesis` and
+         *     a `status_label`, so an unreviewed cluster cannot reach a screen
+         *     without saying that nobody has checked it (AU01 acceptance 1, I16).
+         *
+         *     The seeded demo complaints are accepted on first call when the store is
+         *     empty, so the demo path still shows something without a channel having
+         *     published any events yet.
          */
         get: operations["demo_autopsy_v1_demo_autopsy_get"];
         put?: never;

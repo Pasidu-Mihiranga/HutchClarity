@@ -24,6 +24,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Protocol
 
 from clarity.ai.pii import ForbiddenContent, Masker
 from clarity.kernel.common import Language, utc_now
@@ -169,6 +170,50 @@ def _trigrams(text: str) -> Counter[str]:
     return Counter(cleaned[i : i + 3] for i in range(max(len(cleaned) - 2, 0)))
 
 
+class Similarity(Protocol):
+    """How alike two masked complaints are, from 0 to 1 (AU01, #13).
+
+    **The seam for the `embed` role, which has no implementation.** Plan 02
+    section 3.3 and issue #13 both say embeddings through the AI gateway, and
+    there is no embedding model anywhere in the system: `ModelRole.EMBED` is a
+    declared role name, `local-bge` is bound to the template provider as a
+    stand-in, and `RoleRouter.invoke` returns `str`, which cannot carry a
+    vector. K02 hit the same wall for retrieval.
+
+    So the default is `TrigramSimilarity`, character trigram cosine, and it is
+    **not** a semantic measure: it groups complaints that share letters, which
+    is why the pipeline canonicalises first so that Sinhala, Tamil and Singlish
+    complaints about one thing reach a common English form before they are
+    compared. That canonicalisation is doing the work embeddings would do, by
+    a keyword table, and it only covers the phrases in the table.
+
+    Anything comparing text is accepted here, so an embedding-backed
+    implementation drops in without touching the clustering. Whatever it is, it
+    produces **hypotheses**: a better similarity measure makes a cluster more
+    likely to be right and never makes it reviewed.
+    """
+
+    def score(self, left: str, right: str) -> float: ...
+
+
+class TrigramSimilarity:
+    """Character trigram cosine. Deterministic, and needs no model.
+
+    Named for what it is rather than for what it stands in for, so nobody
+    reads a cluster as semantically grouped.
+
+    Holds no state. The first version memoised the trigram vectors, which
+    `tests/architecture/test_module_state.py` refuses, and rightly: the
+    exemption K02 added for a derived index requires state recomputable from a
+    repository, and this was a memo of a pure function keyed by its own
+    argument. Bending the rule for a micro-optimisation on a batch job is a bad
+    trade, so the memo is gone.
+    """
+
+    def score(self, left: str, right: str) -> float:
+        return _cosine(_trigrams(left), _trigrams(right))
+
+
 def _cosine(a: Counter[str], b: Counter[str]) -> float:
     if not a or not b:
         return 0.0
@@ -185,9 +230,18 @@ def _cosine(a: Counter[str], b: Counter[str]) -> float:
 class ComplaintAutopsy:
     """Runs the pipeline. Produces hypotheses, never published changes."""
 
-    def __init__(self, *, masker: Masker | None = None, similarity: float = 0.45) -> None:
+    def __init__(
+        self,
+        *,
+        masker: Masker | None = None,
+        similarity: float = 0.45,
+        measure: Similarity | None = None,
+    ) -> None:
         self._masker = masker or Masker()
         self._similarity = similarity
+        # Trigrams unless something better is supplied. See `Similarity` for
+        # why the something better does not exist yet.
+        self._measure = measure or TrigramSimilarity()
 
     # -- step 1: clean and protect -------------------------------------- #
 
@@ -239,6 +293,30 @@ class ComplaintAutopsy:
             noise=noise,
         )
 
+    def recluster(self, cleaned: list[CleanComplaint]) -> AutopsyReport:
+        """Cluster complaints that are already masked and canonicalised (AU01).
+
+        The seam the event-fed service needs. Complaints are masked and kept as
+        they arrive, one at a time, because masking must happen before anything
+        reads a complaint (I13) and because a single complaint is not a
+        cluster. Clustering is then a pass over everything kept, and this is
+        that pass.
+
+        Deliberately the same clustering code as `run`, so the batch job and
+        the event feed cannot drift into two answers for one corpus.
+        `duplicates_removed` is zero here because deduplication happened on the
+        way in; reporting the number again would double-count it.
+        """
+        clusters, noise = self._cluster(cleaned)
+        return AutopsyReport(
+            run_id=new_id("AUT"),
+            total_received=len(cleaned),
+            duplicates_removed=0,
+            refused=0,
+            clusters=sorted(clusters, key=lambda c: c.size, reverse=True),
+            noise=noise,
+        )
+
     def _cluster(self, cleaned: list[CleanComplaint]) -> tuple[list[Cluster], list[str]]:
         """Group by canonical form, then split loose groups by similarity."""
         by_canonical: dict[str, list[CleanComplaint]] = defaultdict(list)
@@ -269,13 +347,12 @@ class ComplaintAutopsy:
     def _group_by_similarity(
         self, members: list[CleanComplaint]
     ) -> tuple[list[Cluster], list[str]]:
-        vectors = {m.complaint_id: _trigrams(m.masked_text) for m in members}
         groups: list[list[CleanComplaint]] = []
 
         for member in members:
             placed = False
             for group in groups:
-                if _cosine(vectors[member.complaint_id], vectors[group[0].complaint_id]) >= (
+                if self._measure.score(member.masked_text, group[0].masked_text) >= (
                     self._similarity
                 ):
                     group.append(member)
@@ -306,10 +383,17 @@ class ComplaintAutopsy:
         )
 
     # -- step 5: review ------------------------------------------------- #
-
-    @staticmethod
-    def confirm(cluster: Cluster, *, reviewer: str, accept: bool) -> Cluster:
-        """A CX engineer's verdict. Nothing is acted on before this."""
-        cluster.status = ClusterStatus.CONFIRMED if accept else ClusterStatus.REJECTED
-        cluster.label = f"{cluster.label} (reviewed by {reviewer})"
-        return cluster
+    #
+    # Removed by AU01 (#13). It was:
+    #
+    #     cluster.status = CONFIRMED if accept else REJECTED
+    #     cluster.label = f"{cluster.label} (reviewed by {reviewer})"
+    #
+    # which wrote audit data into a display string, appended twice if it ran
+    # twice, kept no time and no note, and left nothing to look up. It also
+    # had nowhere to persist to, so a verdict died with the request.
+    #
+    # `ClusterReviews` in `review.py` records a verdict as its own immutable
+    # record and `AutopsyService.review` keeps it. Left as a comment rather
+    # than deleted silently, because a reader of the old API should find out
+    # where it went.

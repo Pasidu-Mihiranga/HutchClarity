@@ -47,6 +47,7 @@ from clarity.modules.actions.capability import (
     StoredPlanRepository,
     ToolLayer,
 )
+from clarity.modules.autopsy.public import AutopsyService, ComplaintSource
 from clarity.modules.case.public import (
     CASE_SEQUENCE,
     CASES,
@@ -308,6 +309,35 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
         if not step.is_local and step.provider in router.configured:
             return _RoleProvider(router, ModelRole.GUARD)
     return None
+
+
+def _complaint_source() -> ComplaintSource | None:
+    """Where autopsy reads complaint text from (AU01).
+
+    The simulated complaint store, which is where complaints live in every
+    synthetic profile. ``None`` when it cannot be read, which leaves the
+    consumer recording "no_text" and the relay redelivering: a store that is
+    not there is not a reason to lose an event.
+    """
+
+    class MockStoreComplaints:
+        def text_for(self, complaint_id: str) -> str | None:
+            try:
+                from clarity.integration.drivers.mock.store import (
+                    list_complaints,
+                    session_scope,
+                )
+
+                with session_scope() as session:
+                    for row in list_complaints(session):
+                        if str(row.get("id") or row.get("complaint_id")) == complaint_id:
+                            text = row.get("text")
+                            return str(text) if text else None
+            except Exception:
+                return None
+            return None
+
+    return MockStoreComplaints()
 
 
 def _intake_assist(router: RoleRouter, catalogue: ModelCatalogue) -> IntakeAssist | None:
@@ -716,6 +746,22 @@ class Clarity:
             EventType.KNOWLEDGE_PUBLISHED,
             group="knowledge-cache",
             handler=self._invalidate_answer_cache,
+        )
+
+        # Complaint Autopsy, fed by events rather than run as a batch over
+        # demo data (AU01, #13). The event carries no complaint text, so the
+        # service fetches it through a source the composition root supplies:
+        # putting customer words in the bus is what `complaint.created` was
+        # shaped to avoid.
+        self.autopsy = AutopsyService(
+            open_unit=self.open_unit,
+            source=_complaint_source(),
+            clock=self.case_aggregate._now,
+        )
+        self.consumers.register(
+            EventType.COMPLAINT_CREATED,
+            group="autopsy",
+            handler=self.autopsy.on_complaint_created,
         )
 
         # The stateful turn pipeline (C01) driving the published flows (C02).

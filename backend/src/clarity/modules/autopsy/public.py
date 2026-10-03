@@ -14,17 +14,53 @@ from clarity.modules.autopsy.pipeline import (
     ClusterStatus,
     Complaint,
     ComplaintAutopsy,
+    Similarity,
+    TrigramSimilarity,
     canonicalise,
     detect_language,
 )
+from clarity.modules.autopsy.repository import (
+    CLUSTERS,
+    COMPLAINTS,
+    AutopsyRepository,
+    StoredAutopsyRepository,
+)
+from clarity.modules.autopsy.review import (
+    CONFIRMED_LABEL,
+    HYPOTHESIS_LABEL,
+    REJECTED_LABEL,
+    ClusterReview,
+    ClusterReviews,
+    ReviewedCluster,
+    ReviewRefused,
+    staff_view,
+)
+from clarity.modules.autopsy.service import AutopsyService, ComplaintSource, Intake
 
 __all__ = [
+    "CLUSTERS",
+    "COMPLAINTS",
+    "CONFIRMED_LABEL",
+    "HYPOTHESIS_LABEL",
+    "REJECTED_LABEL",
     "AutopsyReport",
+    "AutopsyRepository",
+    "AutopsyService",
     "CleanComplaint",
     "Cluster",
+    "ClusterReview",
+    "ClusterReviews",
     "ClusterStatus",
     "Complaint",
     "ComplaintAutopsy",
+    "ComplaintSource",
+    "Intake",
+    "ReviewRefused",
+    "ReviewedCluster",
+    "Similarity",
+    "StoredAutopsyRepository",
+    "TrigramSimilarity",
     "canonicalise",
     "detect_language",
+    "staff_view",
 ]

@@ -146,13 +146,26 @@ def test_clusters_start_as_hypotheses():
 
 
 def test_a_reviewer_confirms_or_rejects_a_cluster():
-    autopsy = ComplaintAutopsy()
-    report = autopsy.run(complaints("reload taken twice", "reload was taken twice"))
+    """Moved to the review workflow by AU01 (#13).
 
-    confirmed = autopsy.confirm(report.clusters[0], reviewer="cx-eng-1", accept=True)
+    This used to call `ComplaintAutopsy.confirm`, which recorded the verdict by
+    appending "(reviewed by cx-eng-1)" to the cluster's **label** and asserted
+    the reviewer's name was in it. That is why the assertion changed shape: the
+    verdict is now a record with a time and a note, and the label is left
+    alone.
+    """
+    from clarity.modules.autopsy.public import ClusterReviews, ReviewedCluster
+
+    report = ComplaintAutopsy().run(complaints("reload taken twice", "reload was taken twice"))
+    held = ReviewedCluster(cluster=report.clusters[0])
+
+    confirmed = ClusterReviews().record(held, reviewer="cx-eng-1", accept=True)
 
     assert confirmed.status is ClusterStatus.CONFIRMED
-    assert "cx-eng-1" in confirmed.label
+    assert confirmed.cluster.label == held.cluster.label
+    assert confirmed.latest is not None
+    assert confirmed.latest.reviewer == "cx-eng-1"
+    assert confirmed.latest.at
 
 
 def test_the_report_counts_what_happened_to_everything():
@@ -263,3 +276,324 @@ def test_every_complaint_is_accounted_for_somewhere():
     assert clustered + len(report.noise) + report.duplicates_removed + report.refused == (
         report.total_received
     )
+
+
+# -- AU01 (#13): event-fed, and labelled as a hypothesis ------------------ #
+
+
+class FakeComplaints:
+    """The complaint store the service reads text from.
+
+    A seam rather than the event, because `ComplaintCreatedV1` carries no text:
+    putting customer words in the message bus is what that shape avoids.
+    """
+
+    def __init__(self, **rows: str) -> None:
+        self.rows = dict(rows)
+        self.asked: list[str] = []
+
+    def text_for(self, complaint_id: str) -> str | None:
+        self.asked.append(complaint_id)
+        return self.rows.get(complaint_id)
+
+
+TWICE = {
+    "c1": "my reload was taken twice",
+    "c2": "reload taken twice again",
+    "c3": "the reload got taken twice",
+}
+
+
+def fed(**rows: str):
+    """A service with complaints already accepted and clustered."""
+    from clarity.modules.autopsy.public import AutopsyService
+
+    source = FakeComplaints(**rows)
+    service = AutopsyService(source=source)
+    for complaint_id in rows:
+        service.accept(complaint_id)
+    service.rerun()
+    return service, source
+
+
+def test_an_unreviewed_cluster_is_labelled_as_a_hypothesis():
+    """AU01 acceptance 1, and the reason the module exists in this shape.
+
+    A cluster is a machine's guess that several complaints share one cause.
+    Shown to a CX engineer labelled as a hypothesis it is useful; shown without
+    that label it is a finding nobody established, which I16 forbids.
+
+    The assertion is on the staff-facing representation rather than on the
+    status enum, because the status being right while the screen says nothing
+    about it is exactly the failure this guards against.
+    """
+    from clarity.modules.autopsy.public import HYPOTHESIS_LABEL
+
+    service, _source = fed(**TWICE)
+
+    views = service.for_staff()
+
+    assert views, "nothing was clustered, so nothing below is tested"
+    for view in views:
+        assert view["hypothesis"] is True
+        assert view["status_label"] == HYPOTHESIS_LABEL
+        assert view["status"] == "hypothesis"
+        assert view["reviewed_by"] is None
+        # Nothing has been acted on, and the surface says so rather than
+        # leaving a reader to assume either way.
+        assert view["acted_on"] is False
+
+
+def test_a_suggested_rule_on_an_unreviewed_cluster_is_marked_a_guess():
+    """A rule id beside a cluster reads as "this is caused by that".
+
+    On an unreviewed cluster nothing has established that, so the flag travels
+    with the id. Dropping the id instead would lose the one thing a reviewer
+    most wants to see.
+    """
+    service, _source = fed(**TWICE)
+
+    with_rules = [v for v in service.for_staff() if v["suggested_rule_id"]]
+
+    assert with_rules, "no cluster suggested a rule, so this asserts nothing"
+    for view in with_rules:
+        assert view["suggested_rule_is_a_guess"] is True
+
+
+def test_a_confirmed_cluster_is_still_not_a_published_rule():
+    """Confirmed is a person agreeing, not a change being made.
+
+    Turning a confirmed cause into a rule goes through the policy lifecycle
+    (plan 20), so the surface must not imply the loop is closed.
+    """
+    from clarity.modules.autopsy.public import CONFIRMED_LABEL
+
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True, note="real")
+
+    view = next(v for v in service.for_staff() if v["cluster_id"] == cluster_id)
+    assert view["hypothesis"] is False
+    assert view["status_label"] == CONFIRMED_LABEL
+    assert view["acted_on"] is False
+    assert view["suggested_rule_is_a_guess"] is False
+
+
+# -- the review workflow -------------------------------------------------- #
+
+
+def test_a_verdict_is_a_record_and_not_a_label_edit():
+    """The first version of `confirm` wrote the reviewer into the label.
+
+    That put audit data in display text, appended twice if it ran twice, and
+    kept no time, no note and nothing to look up. A verdict is evidence about
+    who decided what and when.
+    """
+    service, _source = fed(**TWICE)
+    before = service.for_staff()[0]
+    cluster_id = before["cluster_id"]
+
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True, note="matches VAS consent")
+
+    after = next(v for v in service.for_staff() if v["cluster_id"] == cluster_id)
+    assert after["label"] == before["label"], "the label was mutated by a review"
+    assert after["reviewed_by"] == "cx-eng-1"
+    assert after["reviewed_at"]
+    assert len(after["reviews"]) == 1
+    assert after["reviews"][0]["note"] == "matches VAS consent"
+
+
+def test_a_second_verdict_is_refused_rather_than_silently_overwriting():
+    """The first verdict was somebody's professional judgement."""
+    from clarity.modules.autopsy.public import ReviewRefused
+
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True)
+
+    with pytest.raises(ReviewRefused, match="already reviewed"):
+        service.review(cluster_id, reviewer="cx-eng-2", accept=False)
+
+
+def test_superseding_a_verdict_keeps_the_one_it_replaced():
+    """Changing a decision is allowed; erasing the previous one is not."""
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True)
+
+    service.review(
+        cluster_id,
+        reviewer="cx-lead",
+        accept=False,
+        note="two causes, not one",
+        supersede=True,
+    )
+
+    view = next(v for v in service.for_staff() if v["cluster_id"] == cluster_id)
+    assert view["status"] == "rejected"
+    assert len(view["reviews"]) == 2
+    assert view["reviews"][0]["reviewer"] == "cx-eng-1"
+    assert view["reviews"][1]["supersedes"] == view["reviews"][0]["review_id"]
+
+
+def test_superseding_needs_a_reason():
+    """An unexplained reversal is the thing an auditor asks about."""
+    from clarity.modules.autopsy.public import ReviewRefused
+
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True)
+
+    with pytest.raises(ReviewRefused, match="reason"):
+        service.review(cluster_id, reviewer="cx-lead", accept=False, note="", supersede=True)
+
+
+def test_an_anonymous_verdict_is_refused():
+    from clarity.modules.autopsy.public import ReviewRefused
+
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+
+    with pytest.raises(ReviewRefused, match="reviewer"):
+        service.review(cluster_id, reviewer="   ", accept=True)
+
+
+def test_a_rerun_keeps_reviewed_clusters_and_redraws_the_rest():
+    """A re-run may not discard somebody's recorded judgement.
+
+    Leaving the old hypotheses instead would show a reviewer two overlapping
+    guesses about the same complaints, so unreviewed ones are redrawn.
+    """
+    service, _source = fed(**TWICE)
+    cluster_id = service.for_staff()[0]["cluster_id"]
+    service.review(cluster_id, reviewer="cx-eng-1", accept=True, note="real")
+
+    service.rerun()
+
+    kept = [v for v in service.for_staff() if v["cluster_id"] == cluster_id]
+    assert len(kept) == 1, "the reviewed cluster was dropped by a re-run"
+    assert kept[0]["reviewed_by"] == "cx-eng-1"
+
+
+# -- the event feed ------------------------------------------------------- #
+
+
+def test_the_consumer_reads_the_text_from_the_store_not_the_event():
+    """`ComplaintCreatedV1` carries no text, deliberately.
+
+    Putting a customer's words in the message bus would copy complaint content
+    somewhere nobody owns its retention, which is the same reason
+    `conversation.turn.completed` carries no message text.
+    """
+    from clarity.contracts.events import ComplaintCreatedV1
+    from clarity.kernel.common import Channel, Language
+    from clarity.modules.autopsy.public import AutopsyService
+    from clarity.platform.messaging.envelope import Event
+
+    source = FakeComplaints(**TWICE)
+    service = AutopsyService(source=source)
+
+    service.on_complaint_created(
+        Event.of(
+            ComplaintCreatedV1(complaint_id="c1", channel=Channel.APP, language=Language.EN),
+            subject="sub_x",
+        )
+    )
+
+    assert source.asked == ["c1"], "the consumer did not ask the store for the text"
+    assert "text" not in ComplaintCreatedV1.model_fields, (
+        "the event gained a text field; autopsy would then be storing bus content"
+    )
+
+
+def test_a_redelivered_event_does_not_inflate_a_cluster():
+    """Consumers are idempotent (I7), and a cluster's size is a claim.
+
+    The same complaint counted twice makes three complaints look like four,
+    which is the number a reviewer decides on.
+    """
+    service, _source = fed(**TWICE)
+    before = sorted(v["size"] for v in service.for_staff())
+
+    for complaint_id in TWICE:
+        service.accept(complaint_id)
+    service.rerun()
+
+    assert sorted(v["size"] for v in service.for_staff()) == before
+
+
+def test_only_masked_text_is_stored():
+    """Masking happens before anything else reads a complaint (I13).
+
+    What reaches the repository is the masked form, so the store holds no raw
+    customer words.
+    """
+    from clarity.modules.autopsy.public import AutopsyService
+
+    source = FakeComplaints(c9="call me on 0771234567 about the double charge")
+    service = AutopsyService(source=source)
+
+    service.accept("c9")
+
+    with service._open_unit() as unit:
+        stored = unit.repository("autopsy.complaints").values()
+    assert stored, "nothing was stored"
+    assert "0771234567" not in stored[0].masked_text
+    assert not hasattr(stored[0], "text"), "the raw text travelled with the record"
+
+
+def test_a_complaint_quoting_a_credential_is_never_stored():
+    """The pipeline's existing rule, asserted on the way into the store.
+
+    A message containing a PIN is not evidence about a billing pattern, and
+    masking it would still leave it in a store of complaints.
+    """
+    from clarity.modules.autopsy.public import AutopsyService
+
+    service = AutopsyService(source=FakeComplaints(c9="my PIN is 4321 and I was charged twice"))
+
+    outcome = service.accept("c9")
+
+    assert outcome.stored is False
+    assert outcome.refused
+    assert service.clusters() == []
+
+
+def test_a_complaint_with_no_text_is_not_an_error():
+    """It may not have reached the store the relay reads yet.
+
+    At-least-once means a redelivery will find it, so losing the event would
+    be worse than returning nothing.
+    """
+    from clarity.modules.autopsy.public import AutopsyService
+
+    service = AutopsyService(source=FakeComplaints())
+
+    outcome = service.accept("missing")
+
+    assert outcome.stored is False
+    assert outcome.reason == "no_text"
+
+
+def test_the_similarity_measure_is_replaceable_and_named_for_what_it_is():
+    """The `embed` role seam. There is no embedding model in the system.
+
+    `TrigramSimilarity` is character overlap and is named so nobody reads a
+    cluster as semantically grouped. An embedding-backed measure drops in here
+    without touching the clustering, and still produces hypotheses.
+    """
+    from clarity.modules.autopsy.public import ComplaintAutopsy, TrigramSimilarity
+
+    class NothingIsAlike:
+        def score(self, left: str, right: str) -> float:
+            return 0.0
+
+    alike = ComplaintAutopsy(measure=TrigramSimilarity())
+    apart = ComplaintAutopsy(measure=NothingIsAlike())
+    texts = ["the thing is totally broken today", "that thing is totally broken today"]
+
+    assert alike.run(complaints(*texts)).clusters, "trigrams found nothing alike"
+    # Canonicalisation still groups known phrases, so this asserts the measure
+    # is consulted rather than that clustering collapses entirely.
+    assert apart.run(complaints(*texts)).noise, "the injected measure was ignored"

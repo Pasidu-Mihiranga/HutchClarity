@@ -1527,41 +1527,41 @@ def _register_routes(app: FastAPI) -> None:
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
     def demo_autopsy(clarity: ClarityDep) -> dict[str, Any]:
-        """Run Complaint Autopsy on generated historical complaints when seeded."""
-        from clarity.modules.autopsy.public import Complaint, ComplaintAutopsy
+        """Complaint Autopsy's current clusters, as a reviewer may be shown them.
 
-        texts: list[str] = list(_DEMO_COMPLAINTS)
-        try:
-            from clarity.integration.drivers.mock.store import list_complaints, session_scope
+        Served by the autopsy service since AU01 (#13), where it used to build
+        a throwaway report per request. The service is fed by
+        `complaint.created` and keeps its clusters and their reviews, so a
+        verdict given here survives the request that gave it.
 
-            with session_scope() as session:
-                stored = list_complaints(session)
-            if stored:
-                texts = [row["text"] for row in stored]
-        except Exception:
-            texts = list(_DEMO_COMPLAINTS)
+        Every cluster goes through `staff_view`, which is the only sanctioned
+        way to put one in front of a person: it always carries `hypothesis` and
+        a `status_label`, so an unreviewed cluster cannot reach a screen
+        without saying that nobody has checked it (AU01 acceptance 1, I16).
 
-        complaints = [
-            Complaint(complaint_id=f"c-{index}", text=text)
-            for index, text in enumerate(texts, start=1)
-        ]
-        report = ComplaintAutopsy().run(complaints)
+        The seeded demo complaints are accepted on first call when the store is
+        empty, so the demo path still shows something without a channel having
+        published any events yet.
+        """
+        if not clarity.autopsy.clusters():
+            for index, text in enumerate(_DEMO_COMPLAINTS, start=1):
+                # The text is passed because this path has it in hand and no
+                # store to fetch it from. The event path never does.
+                clarity.autopsy.accept(f"demo-{index}", channel="whatsapp", text=text)
+            clarity.autopsy.rerun()
+
+        views = clarity.autopsy.for_staff()
         return {
-            "run_id": report.run_id,
-            "total_received": report.total_received,
-            "duplicates_removed": report.duplicates_removed,
-            "hypothesis": True,
-            "clusters": [
-                {
-                    "label": cluster.label,
-                    "size": cluster.size,
-                    "status": cluster.status.value,
-                    "suggested_rule_id": cluster.suggested_rule_id,
-                }
-                for cluster in report.clusters
-            ],
-            "noise": len(report.noise),
-            "note": "Hypotheses until a person reviews them. Clustering here is not embeddings.",
+            "clusters": views,
+            # Kept at the top level as well as on each cluster: a caller
+            # reading only the envelope still learns that none of this is
+            # established.
+            "hypothesis": any(view["hypothesis"] for view in views),
+            "note": (
+                "Hypotheses until a person reviews them. Clustering is character "
+                "overlap over a canonical form, not embeddings: there is no "
+                "embedding model in the system (AU01 devlog)."
+            ),
         }
 
     @app.get(
