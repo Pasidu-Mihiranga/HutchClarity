@@ -11,7 +11,7 @@ COMPOSE := deploy/compose/full.yml
 # 5440, not 5432: a developer machine usually already runs PostgreSQL there.
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
-.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed \
+.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed eval \
         up-full down-full test-full contracts contracts-check \
         licences secrets \
         web-install web-build web-customer web-console web-verify
@@ -25,6 +25,7 @@ help:
 	@echo "make format  - apply formatting and safe lint fixes"
 	@echo "make demo    - walk the four journeys in the terminal"
 	@echo "make tokens  - measured AI usage per journey"
+	@echo "make eval    - run the evaluation sets and apply the release gates"
 	@echo "make keys    - generate a local Ed25519 signing key into .keys/"
 	@echo "make seed    - load the synthetic world into DATABASE_URL (full profile)"
 	@echo "make up-full - start the full profile's components (Kafka); needs Docker"
@@ -81,6 +82,12 @@ demo:
 
 tokens:
 	cd $(BACKEND) && $(PY)/python scripts/measure_tokens.py
+
+# The evaluation harness (A05, plan 22 section 10). Exits non-zero when any
+# gate fails or could not be evaluated, which is what blocks a release. No
+# live model call in the default mode; the nightly job passes --mode live.
+eval:
+	cd $(BACKEND) && $(PY)/python scripts/evaluate.py
 
 keys:
 	cd $(BACKEND) && $(PY)/python scripts/keys.py

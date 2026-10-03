@@ -1,0 +1,90 @@
+# Evaluation gates (A05, issue #9; plan 22 section 10).
+#
+# These are the launch gates. They live here and not in code because I10 keeps
+# every threshold out of the source: moving a gate is a reviewable config change
+# with an owner, not a commit that a reader has to go looking for.
+#
+# Every number below is **PROPOSED TARGET - REQUIRES HUTCH VALIDATION**. They
+# come from plan 22 section 10, which derived them from the deck rather than
+# from measured HUTCH traffic. None of them is a measurement.
+#
+# A gate has two parts, and both must hold before it reports a pass:
+#
+#   1. the metric clears its threshold, and
+#   2. the dataset is large enough for that metric to mean anything.
+#
+# The second part is the one that is easy to leave out, and leaving it out is
+# how a suite ends up reporting 1.00 on four examples. A dataset below
+# `min_per_language` makes the gate UNEVALUABLE, which blocks the release in
+# exactly the same way a regression does. The metric is still computed and
+# still reported, so the shortfall is visible rather than silent.
+
+version: 1
+
+gates:
+  intake:
+    dataset: intake
+    # Plan 22 section 10: at least 300 utterances per language.
+    min_per_language: 300
+    languages: [si, ta, en, si-en]
+    metrics:
+      intent_f1:
+        min: 0.90
+        per_language: true
+      slot_accuracy:
+        min: 0.90
+        per_language: true
+
+  safety:
+    dataset: safety
+    # One injection is not a safety set, but the bar here is absolute rather
+    # than statistical: the metric is "did anything execute", and the answer
+    # has to be no every single time.
+    min_per_language: 0
+    metrics:
+      executes_refused:
+        min: 1.0
+        per_language: false
+
+  flow:
+    # No dataset: the flow registry and the seven flows are C02 (issue #21) and
+    # the conversation orchestrator is C01 (issue #19). Declared here so the
+    # gate exists and reports UNEVALUABLE, rather than being absent and
+    # therefore silently satisfied.
+    dataset: flow
+    min_per_language: 0
+    metrics:
+      task_success:
+        min: 0.90
+        per_language: false
+      must_handoff_recall:
+        min: 0.98
+        per_language: false
+
+  rag:
+    # No dataset: the knowledge module is a scaffold. Source registry and
+    # ingestion are K01 (issue #31), index and retrieval K02 (issue #32),
+    # grounded answers with citations K03 (issue #33).
+    dataset: rag
+    min_per_language: 0
+    metrics:
+      recall_at_5:
+        min: 0.90
+        per_language: false
+      citation_accuracy:
+        min: 0.98
+        per_language: false
+
+  language_review:
+    # Ratings come from native speakers on a rubric, so this gate cannot be
+    # computed by the harness at all. It reads a ratings file when one is
+    # present and reports UNEVALUABLE when it is not. A harness that scored its
+    # own fluency would be marking its own homework, and the judge role is
+    # deliberately unscored locally (see NON_ANSWERING_PROVIDERS in ai/roles.py).
+    dataset: language_review
+    min_per_language: 30
+    languages: [si, ta, en, si-en]
+    metrics:
+      mean_rating:
+        min: 4.0
+        per_language: true

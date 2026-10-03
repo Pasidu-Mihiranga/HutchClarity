@@ -255,7 +255,7 @@ devlogs.
 - [x] #3 `[A02]` Recorded responses (cassettes): no live model calls in CI `p0`
 - [x] #4 `[A03]` Safety: PII masking coverage per language and the guard role `p0`
 - [x] #8 `[A04]` MCP server over the network: SDK, Streamable HTTP, OAuth 2.1 resource server, new tools `p0`
-- [ ] #9 `[A05]` Evaluation harness: per-language golden sets, metrics and release gates `p1`
+- [x] #9 `[A05]` Evaluation harness: per-language golden sets, metrics and release gates `p1`
 
 ### Wave 3 - Conversation and knowledge (RAG, flows, chat UI)
 

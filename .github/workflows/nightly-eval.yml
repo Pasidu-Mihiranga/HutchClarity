@@ -1,0 +1,78 @@
+# Nightly evaluation (A05, issue #9; plan 22 section 10).
+#
+# Separate from `ci.yml` on purpose. The pull-request lanes have to stay fast
+# and they must never depend on a model provider, so the gates that need a
+# longer run, or a configured provider, live here.
+#
+# The job blocks on regression, which is the whole point: `scripts/evaluate.py`
+# exits non-zero when any gate fails **or could not be evaluated**, and nothing
+# here is `continue-on-error`. A check that cannot fail is documentation.
+#
+# Today several gates cannot be evaluated (the intake set is below its required
+# size; flow and RAG have no dataset because their subjects are not built). So
+# this job is red, deliberately, and the report says which gate and why. It
+# turns green when the datasets land, not when the gate is relaxed.
+
+name: nightly-eval
+
+on:
+  schedule:
+    # 02:00 UTC, which is 07:30 in Sri Lanka: a failure is waiting at the start
+    # of the working day rather than during it.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "recorded (no live calls) or live (needs a provider)"
+        type: choice
+        options: [recorded, live]
+        default: recorded
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  evaluate:
+    name: evaluation gates (plan 22 section 10)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: The datasets load and every declared language is measured
+        # Run before the gates, so a broken dataset reports as a broken dataset
+        # rather than as a regression in whatever it was supposed to measure.
+        run: pytest tests/evaluation -q -ra
+
+      - name: Run the evaluation sets and apply the gates
+        id: gates
+        run: python scripts/evaluate.py --mode "${{ inputs.mode || 'recorded' }}"
+
+      - name: Report
+        # Always, because the report is most wanted on the run that failed.
+        if: always()
+        run: cat .eval/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-report
+          path: backend/.eval/
+
+      - name: Name the failing gate in the job log
+        if: failure() && steps.gates.outcome == 'failure'
+        run: |
+          echo "::error::a release gate did not pass; see the report artefact and the job summary"
+          exit 1

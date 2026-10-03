@@ -1,0 +1,103 @@
+// Intake evaluation set (A05, issue #9; plan 22 section 10).
+//
+// SYNTHETIC DATA. Every utterance here was written for this repository. None of
+// it is real customer text, no line came from HUTCH traffic, and no MSISDN,
+// name or NIC appears in any of it (I13, I16).
+//
+// Gold labels are the intent the utterance *means*, by the taxonomy in
+// clarity.modules.conversation.intents. They are deliberately NOT derived from
+// the keyword patterns in conversation/service.py. A set written by reading the
+// matcher would score the matcher against itself and always agree, which is the
+// same mistake the authorization parity suite made before M-IAM fixed it. So
+// several lines below are phrasings a customer would plainly use that the
+// current keyword intake gets wrong, and they are supposed to be there.
+//
+// `language` is what the line is written in, declared by the author. It is not
+// the output of detect_language, because that detector is one of the things
+// being measured and cannot also be the source of truth. Note that `si-en`
+// (Singlish, romanised Sinhala) has no script of its own, so detect_language
+// reports it as `en` today; Singlish intake is C04 (issue #23).
+//
+// Seed set: 20 per language. Plan 22 section 10 requires 300 per language, so
+// the intake gate reports UNEVALUABLE until the set is grown. The F1 is still
+// computed and reported, so the shortfall and the score are both visible.
+{"id": "intake-si-001", "language": "si", "text": "මගේ ගිණුමෙන් රුපියල් 49ක් කැපී ගියේ ඇයි?", "intent": "BALANCE_DEDUCTION_QUERY", "slots": {"amount_lkr": "49"}}
+{"id": "intake-si-002", "language": "si", "text": "මම නොදැනුවත්ව සේවාවකට ගාස්තු අය වී ඇත", "intent": "UNEXPECTED_CHARGE"}
+{"id": "intake-si-003", "language": "si", "text": "මම රුපියල් 100ක් රීලෝඩ් කළා නමුත් තවම ලැබී නැහැ", "intent": "RELOAD_MISSING", "slots": {"amount_lkr": "100"}}
+{"id": "intake-si-004", "language": "si", "text": "දින දෙකක් තිස්සේ දත්ත ඉතා මන්දගාමී", "intent": "DATA_SLOW"}
+{"id": "intake-si-005", "language": "si", "text": "මගේ වේගය අඩු කර ඇත්තේ ඇයි?", "intent": "FUP_QUERY"}
+{"id": "intake-si-006", "language": "si", "text": "මම ඩේටා පැකේජයක් ගත්තා නමුත් වැඩ කරන්නේ නැහැ", "intent": "PACK_NOT_WORKING"}
+{"id": "intake-si-007", "language": "si", "text": "මට දිනපතා පැකේජය සක්‍රිය කරන්න", "intent": "PACK_ACTIVATE"}
+{"id": "intake-si-008", "language": "si", "text": "මගේ පැකේජය නැති වී ඇත", "intent": "PACK_MISSING"}
+{"id": "intake-si-009", "language": "si", "text": "මට හොඳම පැකේජය කුමක්ද?", "intent": "PACK_RECOMMEND"}
+{"id": "intake-si-010", "language": "si", "text": "මගේ පැකේජය කවදා අවසන් වෙනවද?", "intent": "PACK_EXPIRY"}
+{"id": "intake-si-011", "language": "si", "text": "මගේ දායකත්ව මොනවාද?", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-si-012", "language": "si", "text": "මේ සේවාව නවත්වන්න", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-si-013", "language": "si", "text": "මට eSIM එකට මාරු වෙන්න ඕනේ", "intent": "ESIM_HELP"}
+{"id": "intake-si-014", "language": "si", "text": "උදේ සිට සිග්නල් නැහැ", "intent": "NETWORK_STATUS"}
+{"id": "intake-si-015", "language": "si", "text": "මගේ මුදල් ආපසු ලැබෙන්නේ කවදාද?", "intent": "REFUND_STATUS"}
+{"id": "intake-si-016", "language": "si", "text": "මගේ කේස් එකේ තත්ත්වය කුමක්ද?", "intent": "CASE_STATUS"}
+{"id": "intake-si-017", "language": "si", "text": "මෙය නැවත සිදු වීම වැළැක්විය හැක්කේ කෙසේද?", "intent": "PREVENT_CHARGES"}
+{"id": "intake-si-018", "language": "si", "text": "මට දෙවරක් ගාස්තු අය කර ඇත", "intent": "DOUBLE_CHARGE"}
+{"id": "intake-si-019", "language": "si", "text": "මට මනුෂ්‍යයෙකු සමඟ කතා කරන්න ඕනේ", "intent": "HANDOFF"}
+{"id": "intake-si-020", "language": "si", "text": "බොහොම ස්තූතියි", "intent": "FALLBACK"}
+{"id": "intake-ta-001", "language": "ta", "text": "என் கணக்கிலிருந்து 49 ரூபாய் எடுக்கப்பட்டது ஏன்?", "intent": "BALANCE_DEDUCTION_QUERY", "slots": {"amount_lkr": "49"}}
+{"id": "intake-ta-002", "language": "ta", "text": "நான் அனுமதிக்காத சேவைக்கு கட்டணம் வசூலிக்கப்பட்டது", "intent": "UNEXPECTED_CHARGE"}
+{"id": "intake-ta-003", "language": "ta", "text": "நான் 100 ரூபாய் ரீலோட் செய்தேன் ஆனால் இன்னும் வரவில்லை", "intent": "RELOAD_MISSING", "slots": {"amount_lkr": "100"}}
+{"id": "intake-ta-004", "language": "ta", "text": "எனது தரவு மிகவும் மெதுவாக உள்ளது", "intent": "DATA_SLOW"}
+{"id": "intake-ta-005", "language": "ta", "text": "எனது வேகம் குறைக்கப்பட்டது ஏன்?", "intent": "FUP_QUERY"}
+{"id": "intake-ta-006", "language": "ta", "text": "நான் ஒரு தரவு தொகுப்பை வாங்கினேன் ஆனால் வேலை செய்யவில்லை", "intent": "PACK_NOT_WORKING"}
+{"id": "intake-ta-007", "language": "ta", "text": "தினசரி தொகுப்பை இயக்கவும்", "intent": "PACK_ACTIVATE"}
+{"id": "intake-ta-008", "language": "ta", "text": "எனது தொகுப்பு காணவில்லை", "intent": "PACK_MISSING"}
+{"id": "intake-ta-009", "language": "ta", "text": "எனக்கு சிறந்த தொகுப்பு எது?", "intent": "PACK_RECOMMEND"}
+{"id": "intake-ta-010", "language": "ta", "text": "எனது தொகுப்பு எப்போது முடிவடையும்?", "intent": "PACK_EXPIRY"}
+{"id": "intake-ta-011", "language": "ta", "text": "எனது சந்தாக்கள் என்ன?", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-ta-012", "language": "ta", "text": "இந்த சேவையை நிறுத்துங்கள்", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-ta-013", "language": "ta", "text": "eSIM க்கு மாற வேண்டும்", "intent": "ESIM_HELP"}
+{"id": "intake-ta-014", "language": "ta", "text": "காலையில் இருந்து சிக்னல் இல்லை", "intent": "NETWORK_STATUS"}
+{"id": "intake-ta-015", "language": "ta", "text": "எனது பணத்தைத் திருப்பி எப்போது கிடைக்கும்?", "intent": "REFUND_STATUS"}
+{"id": "intake-ta-016", "language": "ta", "text": "எனது வழக்கின் நிலை என்ன?", "intent": "CASE_STATUS"}
+{"id": "intake-ta-017", "language": "ta", "text": "இது மீண்டும் நடப்பதை தடுக்க முடியுமா?", "intent": "PREVENT_CHARGES"}
+{"id": "intake-ta-018", "language": "ta", "text": "எனக்கு இரண்டு முறை கட்டணம் வசூலிக்கப்பட்டது", "intent": "DOUBLE_CHARGE"}
+{"id": "intake-ta-019", "language": "ta", "text": "நான் ஒரு மனிதருடன் பேச வேண்டும்", "intent": "HANDOFF"}
+{"id": "intake-ta-020", "language": "ta", "text": "மிக்க நன்றி", "intent": "FALLBACK"}
+{"id": "intake-en-001", "language": "en", "text": "Why was LKR 49 deducted from my balance?", "intent": "BALANCE_DEDUCTION_QUERY", "slots": {"amount_lkr": "49"}}
+{"id": "intake-en-002", "language": "en", "text": "I have been charged for a service I never signed up for", "intent": "UNEXPECTED_CHARGE"}
+{"id": "intake-en-003", "language": "en", "text": "I reloaded 100 rupees but it has not arrived", "intent": "RELOAD_MISSING", "slots": {"amount_lkr": "100"}}
+{"id": "intake-en-004", "language": "en", "text": "My data has been really slow since yesterday", "intent": "DATA_SLOW"}
+{"id": "intake-en-005", "language": "en", "text": "Why has my speed been reduced?", "intent": "FUP_QUERY"}
+{"id": "intake-en-006", "language": "en", "text": "I bought the daily data pack but it is not working", "intent": "PACK_NOT_WORKING"}
+{"id": "intake-en-007", "language": "en", "text": "Please activate the monthly data pack for me", "intent": "PACK_ACTIVATE"}
+{"id": "intake-en-008", "language": "en", "text": "My pack has disappeared from my account", "intent": "PACK_MISSING"}
+{"id": "intake-en-009", "language": "en", "text": "Which pack is best for heavy video use?", "intent": "PACK_RECOMMEND"}
+{"id": "intake-en-010", "language": "en", "text": "When does my current pack expire?", "intent": "PACK_EXPIRY"}
+{"id": "intake-en-011", "language": "en", "text": "What subscriptions are active on my number?", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-en-012", "language": "en", "text": "Please turn this off, I never wanted it", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-en-013", "language": "en", "text": "How do I convert to eSIM?", "intent": "ESIM_HELP"}
+{"id": "intake-en-014", "language": "en", "text": "There is no signal in my area since this morning", "intent": "NETWORK_STATUS"}
+{"id": "intake-en-015", "language": "en", "text": "Where is my refund?", "intent": "REFUND_STATUS"}
+{"id": "intake-en-016", "language": "en", "text": "What is the status of my case?", "intent": "CASE_STATUS"}
+{"id": "intake-en-017", "language": "en", "text": "How do I set a spend cap so this does not happen again?", "intent": "PREVENT_CHARGES"}
+{"id": "intake-en-018", "language": "en", "text": "I was charged twice for the same thing", "intent": "DOUBLE_CHARGE"}
+{"id": "intake-en-019", "language": "en", "text": "I want to speak to a human agent", "intent": "HANDOFF"}
+{"id": "intake-en-020", "language": "en", "text": "ok thanks", "intent": "FALLBACK"}
+{"id": "intake-si-en-001", "language": "si-en", "text": "Mage balance eken rupiyal 49 adu wela", "intent": "BALANCE_DEDUCTION_QUERY", "slots": {"amount_lkr": "49"}}
+{"id": "intake-si-en-002", "language": "si-en", "text": "Mama nodanne service ekakata gaasthu gewila", "intent": "UNEXPECTED_CHARGE"}
+{"id": "intake-si-en-003", "language": "si-en", "text": "Mama 100 reload kala but enne naththa", "intent": "RELOAD_MISSING", "slots": {"amount_lkr": "100"}}
+{"id": "intake-si-en-004", "language": "si-en", "text": "Data eka godak slow", "intent": "DATA_SLOW"}
+{"id": "intake-si-en-005", "language": "si-en", "text": "Mage wegaya adu karala ai?", "intent": "FUP_QUERY"}
+{"id": "intake-si-en-006", "language": "si-en", "text": "Data package ganna but wada karanne naththa", "intent": "PACK_NOT_WORKING"}
+{"id": "intake-si-en-007", "language": "si-en", "text": "Mata daily package eka activate karanna", "intent": "PACK_ACTIVATE"}
+{"id": "intake-si-en-008", "language": "si-en", "text": "Mage package eka nathi wela", "intent": "PACK_MISSING"}
+{"id": "intake-si-en-009", "language": "si-en", "text": "Mata hondama package mokakda?", "intent": "PACK_RECOMMEND"}
+{"id": "intake-si-en-010", "language": "si-en", "text": "Mage package eka kawada ivara wenawada?", "intent": "PACK_EXPIRY"}
+{"id": "intake-si-en-011", "language": "si-en", "text": "Mage subscriptions mokawada?", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-si-en-012", "language": "si-en", "text": "Meka stop karanna", "intent": "VAS_SUBSCRIPTIONS"}
+{"id": "intake-si-en-013", "language": "si-en", "text": "Mata eSIM ekata maaru wenna ona", "intent": "ESIM_HELP"}
+{"id": "intake-si-en-014", "language": "si-en", "text": "Ude sita signal naththa", "intent": "NETWORK_STATUS"}
+{"id": "intake-si-en-015", "language": "si-en", "text": "Mage salli apahu enawada?", "intent": "REFUND_STATUS"}
+{"id": "intake-si-en-016", "language": "si-en", "text": "Mage case eke status mokakda?", "intent": "CASE_STATUS"}
+{"id": "intake-si-en-017", "language": "si-en", "text": "Mekata spend cap ekak danna puluwanda?", "intent": "PREVENT_CHARGES"}
+{"id": "intake-si-en-018", "language": "si-en", "text": "Mata dewarak gaasthu gewila", "intent": "DOUBLE_CHARGE"}
+{"id": "intake-si-en-019", "language": "si-en", "text": "Mata kenek ekka katha karanna ona", "intent": "HANDOFF"}
+{"id": "intake-si-en-020", "language": "si-en", "text": "Bohoma sthuthi", "intent": "FALLBACK"}

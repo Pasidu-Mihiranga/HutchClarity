@@ -112,9 +112,10 @@ Full list in [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITA
 1. **Single process only.** Correctness under concurrency holds inside one process (1,500 of 1,500 concurrent double confirms give one refund and one receipt); a second replica would not share that state until R3.
 2. **Identity is ours, not HUTCH's.** Permission checks are real; the issuer key is generated at startup, so a restart signs everyone out; no refresh, revocation or session store. Development sign-in routes return 404 in the `prod` profile.
 3. **No persistence.** A restart loses every case and receipt.
-4. **MCP has no network transport yet.**
-5. **Sinhala and Tamil wording is not native-speaker reviewed.**
-6. **Foresight is uncalibrated** and says so in every report.
+4. **`clarity-mcp` reads in-process, not over `/v1`.** The network transport landed (A04), but the deployable reads through the narrow MCP view rather than calling `clarity-api` over HTTP as plan 07 §10.6 wants. The authorization boundary is real either way and the RFC 8693 token exchange is implemented and tested; the HTTP adapter is not, because no generated Python client exists yet.
+5. **Sinhala and Tamil wording is not native-speaker reviewed.** The `language_review` gate in `config/ai/gates.yaml` exists and blocks for exactly this reason: the harness cannot score fluency, so the ratings have to come from people (A05).
+6. **Three of five evaluation datasets have no subject built.** `flow` needs C01/C02, `rag` needs K01-K03, `language_review` needs native speakers. Their gates are declared and **block**, rather than being absent and therefore silently satisfied. The intake set holds 20 utterances per language against the 300 plan 22 §10 requires, so that gate blocks too while still reporting its score (si 0.559, ta 0.520, en 0.688, si-en 0.305 against a 0.90 gate).
+7. **Foresight is uncalibrated** and says so in every report.
 
 ## 8. Keeping this file true
 

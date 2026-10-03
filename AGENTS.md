@@ -175,6 +175,7 @@ Run from the repository root. The default `lite` profile needs only Python.
 | Apply formatting and safe fixes | `make format` |
 | Walk the four journeys in the terminal | `make demo` |
 | Measured AI usage per journey | `make tokens` |
+| Run the evaluation sets and apply the release gates | `make eval` |
 | Local signing key / seed the `full` profile | `make keys` / `make seed` |
 | Frontend: install, build, run one app | `make web-install`, `make web-build`, `make web-customer` (or `web-console`, `web-verify`) |
 

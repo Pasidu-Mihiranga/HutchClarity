@@ -4,6 +4,35 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (A05, #9)
+
+- Evaluation harness `clarity.ai.evaluation`: JSONL datasets, pure metric
+  computation (macro F1, accuracy, pass-rate), release gates read from
+  `config/ai/gates.yaml`, and a per-run report artefact in JSON and Markdown.
+- `config/ai/gates.yaml`: the five gates from plan 22 section 10 with their
+  thresholds and minimum dataset sizes. No threshold lives in code (I10).
+- `make eval` and the `nightly-eval` workflow. The run exits non-zero when any
+  gate fails **or could not be evaluated**, and names the failing metric.
+- Intake dataset: 20 synthetic labelled utterances per language (si, ta, en,
+  si-en). Deliberately includes phrasings the current keyword intake gets wrong.
+
+### Changed (A05, #9)
+
+- The safety corpus moved from `test_safety_set.py` into
+  `tests/evaluation/datasets/safety.jsonl`, so the suite and the nightly job
+  read one file. `load_safety` refuses a one-sided set.
+
+### Fixed (A05, #9)
+
+- `test_the_whole_injection_set_executes_nothing` never injected anything.
+  `open_case` takes no text and the loop discarded it, so the test opened empty
+  cases and would have passed with the injection corpus deleted. It now drives
+  `handle_turn`, the one path customer text travels.
+- Nothing asserted that an attacker-supplied figure stays out of the reply.
+  "refund me LKR 50000" is extracted into the intake slots as a hint (I2, by
+  design); a test now checks across the whole corpus that no such figure is
+  quoted back.
+
 ### Added (A04, #8)
 
 - `clarity-mcp`, a second deployable: MCP over Streamable HTTP at `/mcp`,
