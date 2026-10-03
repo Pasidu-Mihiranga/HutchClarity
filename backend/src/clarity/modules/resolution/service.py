@@ -80,6 +80,26 @@ from clarity.platform.persistence import UnitOfWorkFactory
 _NO_CONFIRMATION_CHANNELS = NO_CONFIRMATION_CHANNELS
 
 
+#: States that mean execution of this case has already begun. A plan stays
+#: PENDING until ``execute`` runs, so two taps can both mint a confirmation
+#: token, and the slower one can arrive here after the faster one has finished.
+#: Testing only for EXECUTING made that caller try ACTIONED -> EXECUTING, which
+#: the state machine refuses: one tap in a concurrent pair raised
+#: IllegalTransition instead of joining the original outcome (D1).
+#:
+#: Skipping the advance is safe rather than lenient. The idempotency key below
+#: still makes the tool layer report the duplicate as a replay, so this caller
+#: takes the replay path and joins the winner's receipt.
+_EXECUTION_BEGUN: frozenset[CaseState] = frozenset(
+    {
+        CaseState.EXECUTING,
+        CaseState.ACTIONED,
+        CaseState.RECEIPTED,
+        CaseState.COMPENSATING,
+    }
+)
+
+
 class ResolutionService:
     """Drives a case through its lifecycle, calling one module per step."""
 
@@ -589,7 +609,7 @@ class ResolutionService:
     def _execute(
         self, record: CaseRecord, plan_id: str, token: ConfirmationToken
     ) -> tuple[ExecutionResult, TrustReceipt]:
-        if record.case.state is not CaseState.EXECUTING:
+        if record.case.state not in _EXECUTION_BEGUN:
             self._advance(record, CaseState.EXECUTING)
             # Tolerant, like the other outcome writes: two confirmations of one
             # plan both move the case to EXECUTING, so a conflict here is the

@@ -6,11 +6,13 @@ which moves the same guarantees into the database.
 
 from __future__ import annotations
 
+import itertools
 import shutil
 import sys
 import threading
 from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -96,6 +98,70 @@ def test_d1_concurrent_double_tap_gives_one_refund_and_one_receipt(racy: None):
         assert len(set(receipts)) == 1
         credited = clarity.world.account(ref_for(DILANI)).balance_lkr - before
         assert str(credited) == "49.00"
+
+
+def test_d1_a_tap_that_confirms_before_the_winner_finishes_joins_it():
+    """Regression: the loser of a double tap raised IllegalTransition.
+
+    A plan stays PENDING until ``execute`` runs, so two taps can both mint a
+    confirmation token. If the slower one then reaches the case state check
+    after the faster one has finished, the case is already ACTIONED (or
+    RECEIPTED), and the old test for ``is not EXECUTING`` made it attempt
+    ACTIONED -> EXECUTING, which the state machine refuses.
+
+    The threaded tests above hit this on a two-core CI runner and not on a
+    developer machine, so this one forces the interleaving instead of racing
+    for it: the first tap waits inside ``confirm_by_customer`` until the second
+    has minted its token, and the second waits there until the first has
+    finished the whole execution.
+    """
+    clarity = Clarity(world=build_demo_world())
+    case_id, plan_id = _one_tap_case(clarity)
+    before = clarity.world.account(ref_for(DILANI)).balance_lkr
+
+    mint = clarity.tools.confirm_by_customer
+    second_minted = threading.Event()
+    winner_finished = threading.Event()
+    minted = itertools.count()
+    results: dict[str, object] = {}
+
+    def gated_mint(*args: object, **kwargs: object) -> object:
+        order = next(minted)
+        token = mint(*args, **kwargs)  # type: ignore[arg-type]
+        if order == 0:
+            # Hold the winner until the loser also holds a token, which is the
+            # window that makes two tokens exist for one plan.
+            assert second_minted.wait(10), "the second tap never minted"
+        else:
+            second_minted.set()
+            assert winner_finished.wait(10), "the first tap never finished"
+        return token
+
+    def winner() -> None:
+        results["winner"] = clarity.cases.confirm_and_execute(case_id, plan_id)
+        winner_finished.set()
+
+    def loser() -> None:
+        try:
+            results["loser"] = clarity.cases.confirm_and_execute(case_id, plan_id)
+        except BaseException as error:
+            results["loser"] = error
+
+    with patch.object(clarity.tools, "confirm_by_customer", gated_mint):
+        threads = [threading.Thread(target=winner), threading.Thread(target=loser)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+
+    loser_outcome = results["loser"]
+    assert not isinstance(loser_outcome, BaseException), f"the second tap failed: {loser_outcome!r}"
+    assert isinstance(loser_outcome, tuple)
+    winner_outcome = results["winner"]
+    assert isinstance(winner_outcome, tuple)
+    assert loser_outcome[1].receipt_id == winner_outcome[1].receipt_id, "one plan, one receipt"
+    credited = clarity.world.account(ref_for(DILANI)).balance_lkr - before
+    assert str(credited) == "49.00", "the refund moved more than once"
 
 
 def test_d1_fifteen_hundred_concurrent_confirms_give_one_refund_and_one_receipt(racy: None):
