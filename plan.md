@@ -260,7 +260,7 @@ devlogs.
 ### Wave 3 - Conversation and knowledge (RAG, flows, chat UI)
 
 - [x] #19 `[C01]` Conversation orchestrator and state store `p0`
-- [ ] #21 `[C02]` Flow registry and the seven flows `p0`
+- [x] #21 `[C02]` Flow registry and the seven flows `p0`
 - [ ] #22 `[C03]` Bounded agent step: planner with tool allowlist, limits and fallback `p0`
 - [ ] #31 `[K01]` Knowledge module: source registry and governed ingestion `p0`
 - [ ] #32 `[K02]` Index and retrieval: BM25 (lite), pgvector hybrid (full), filters and rerank `p0`

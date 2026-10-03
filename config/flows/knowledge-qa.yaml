@@ -1,0 +1,56 @@
+# Answering a policy or product question from published sources (plan 22 section 5).
+#
+# The whole point of this flow is that it cannot answer without a source. The
+# `answer` state allows `search_knowledge`, which makes the turn verifier
+# require citations: a reply with no source is blocked rather than sent as
+# though it were grounded (K03, #33). When retrieval finds nothing the flow
+# takes the honest exit and offers a person.
+flow_id: KNOWLEDGE_QA
+version: 1
+status: active
+owner: cx-knowledge
+description: "Answer a question from published sources, with citations, or offer a person."
+
+entry_intents:
+  - FUP_QUERY
+  - PACK_EXPIRY
+  - ESIM_HELP
+  - PACK_RECOMMEND
+  - FALLBACK
+
+tools:
+  - search_knowledge
+  - request_handoff
+
+initial: retrieve
+exits: [answered, offer_person, handoff]
+
+states:
+  - name: retrieve
+    description: "Search the published catalogue for something citable."
+    tools: [search_knowledge]
+    agentic: true
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: answer_found, to: answer }
+      - { when: no_source, to: offer_person }
+
+  - name: answer
+    description: "Answer from the sources found. Citations are required here."
+    tools: [search_knowledge]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: always, to: answered }
+
+  - name: answered
+    description: "Answered with citations."
+    terminal: true
+
+  - name: offer_person
+    description: "No citable source, so do not guess. Offer a person."
+    tools: [request_handoff]
+    terminal: true
+
+  - name: handoff
+    tools: [request_handoff]
+    terminal: true

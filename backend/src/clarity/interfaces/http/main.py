@@ -32,7 +32,7 @@ from fastapi.staticfiles import StaticFiles
 
 from clarity.app.container import Clarity, Profile
 from clarity.contracts.case import CaseState
-from clarity.contracts.decision import Outcome
+from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
 from clarity.interfaces.http.auth import (
@@ -346,6 +346,56 @@ def _authorize_receipt_access(principal: Principal, receipt: Any) -> None:
     owned = {principal.subscriber_ref, *principal.delegations} - {None}
     if receipt.payload.subject.subscriber_ref_hash not in {hash_payload(ref) for ref in owned}:
         raise HTTPException(status_code=403, detail="this account may not read that receipt")
+
+
+#: Context keys a client may contribute to a turn's facts.
+#:
+#: Deliberately no figures. The facts a turn is composed from are also the set
+#: the verifier checks the reply against, so a client that could add
+#: `amount_lkr` could have its own number quoted back to it as though Clarity
+#: had agreed to it. These three are UI selections (which product is being
+#: discussed, which chip was tapped, which safeguard was chosen), not money.
+_CLIENT_CONTEXT_KEYS = frozenset({"product", "chat_intent", "safeguard"})
+
+
+def _client_context(facts: dict[str, Any]) -> dict[str, Any]:
+    """The part of a client's facts that may influence a turn."""
+    return {
+        key: value
+        for key, value in facts.items()
+        if key in _CLIENT_CONTEXT_KEYS and isinstance(value, str)
+    }
+
+
+def _case_facts(record: Any) -> dict[str, Any]:
+    """The authoritative facts for a turn, read from the case itself.
+
+    This is what the flow's conditions are evaluated against and what the
+    verifier checks the reply's figures against, so every value here comes from
+    a system record (I2) and none of it from the request.
+    """
+    decision = record.decision
+    pending = [
+        plan_id
+        for plan_id, plan in (record.plans or {}).items()
+        if plan.status is PlanStatus.PENDING_CONFIRMATION
+    ]
+    facts: dict[str, Any] = {
+        "case_id": record.case_id,
+        "decision_outcome": decision.outcome.value if decision is not None else None,
+        "plan_id": pending[0] if pending else None,
+        "receipt_id": record.receipt.receipt_id if record.receipt is not None else None,
+        "citations": [],
+    }
+    if decision is not None:
+        # The amount the decision settled on, which is the only amount a reply
+        # may quote (I1).
+        amount = getattr(decision, "amount_lkr", None)
+        if amount is not None:
+            facts["amount_lkr"] = str(amount)
+        if decision.top_cause_ref is not None:
+            facts["rule_id"] = decision.top_cause_ref
+    return facts
 
 
 def _plan_view(plan: Any) -> PlanView:
@@ -1360,7 +1410,8 @@ def _register_routes(app: FastAPI) -> None:
         text = str(body.get("text") or "").strip()
         if not text:
             raise HTTPException(status_code=422, detail="text is required")
-        facts = body.get("facts") if isinstance(body.get("facts"), dict) else {}
+        raw_facts = body.get("facts")
+        facts: dict[str, Any] = dict(raw_facts) if isinstance(raw_facts, dict) else {}
         case_id = body.get("case_id")
 
         if case_id:
@@ -1389,7 +1440,7 @@ def _register_routes(app: FastAPI) -> None:
                 subscriber_ref=record.subscriber_ref,
                 language_hint=body.get("language"),
                 intent_override=body.get("intent"),
-                facts=facts,
+                facts=_case_facts(record) | _client_context(facts),
             )
             payload = turn.to_dict()
             route = turn.intake.route

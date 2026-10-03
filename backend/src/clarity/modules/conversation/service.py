@@ -232,7 +232,12 @@ def compose_reply(intake: IntakeResult, *, facts: dict[str, Any] | None = None) 
         key = Intent.HANDOFF.value
     bundle = _REPLY_TEMPLATES.get(key) or _REPLY_TEMPLATES[Intent.FALLBACK.value]
     template = bundle.get(lang) or bundle["en"]
-    amount = facts.get("amount_lkr") or intake.slots.get("amount_lkr")
+    # Only a figure from FACTS, never the one the customer typed. The slot is
+    # still filled, because it narrows which charges are worth looking at (I2),
+    # but quoting it back reads as agreement to an amount nothing decided. The
+    # turn verifier refuses a reply carrying a figure outside FACTS, so the
+    # fallback that used to be here made correct-looking replies unsendable.
+    amount = facts.get("amount_lkr")
     if amount and key in {
         Intent.UNEXPECTED_CHARGE.value,
         Intent.BALANCE_DEDUCTION_QUERY.value,

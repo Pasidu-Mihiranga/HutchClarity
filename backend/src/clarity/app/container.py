@@ -29,6 +29,7 @@ from clarity.ai.guard import Guard
 from clarity.ai.local import LOCAL_IMPLEMENTATIONS
 from clarity.ai.roles import ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
+from clarity.app.flow_tools import FlowToolAdapter
 from clarity.app.mcp_view import ResolutionServiceMCPView
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
@@ -51,7 +52,11 @@ from clarity.modules.case.public import (
     CaseAggregate,
     StoredCaseRepository,
 )
-from clarity.modules.conversation.public import ConversationOrchestrator
+from clarity.modules.conversation.public import (
+    ConversationOrchestrator,
+    FlowRouter,
+    load_flows,
+)
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.detection.public import RuleEngine, load_packs
 from clarity.modules.governance.public import (
@@ -167,6 +172,11 @@ def default_rules_dir(configured: Path | None = None) -> Path:
 def default_policy_dir(configured: Path | None = None) -> Path:
     """Policy artefacts: caps, thresholds and windows that change without a deploy."""
     return _shared_dir(configured, "config", "policy")
+
+
+def default_flow_dir(configured: Path | None = None) -> Path:
+    """Conversation flows: policy content, published like a rule pack (C02)."""
+    return _shared_dir(configured, "config", "flows")
 
 
 def _world_for_profile(
@@ -399,13 +409,6 @@ class Clarity:
         # sign everyone out mid-demonstration, so these carry over.
         self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
         self.otp = otp or OtpService(open_unit=self.open_unit)
-        # The stateful turn pipeline (C01). Conversation state is keyed by
-        # case, so a customer continues the same conversation on any
-        # channel. No flow engine yet: C02 (#21) supplies one.
-        self.conversation = ConversationOrchestrator(
-            audit=self.audit,
-            open_unit=self.open_unit,
-        )
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(
@@ -558,6 +561,20 @@ class Clarity:
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
+
+        # The stateful turn pipeline (C01) driving the published flows (C02).
+        # Conversation state is keyed by case, so a customer continues the same
+        # conversation on any channel.
+        #
+        # The router reaches tools through FlowToolAdapter over the narrow MCP
+        # view, which has no execute capability at all. A flow proposing is the
+        # strongest thing that can happen here (I1).
+        self.flows = load_flows(default_flow_dir(self.settings.flows_dir))
+        self.conversation = ConversationOrchestrator(
+            flow=FlowRouter(self.flows, tools=FlowToolAdapter(self.mcp_view)),
+            audit=self.audit,
+            open_unit=self.open_unit,
+        )
 
     def _open_zero_contact_case(self, event: Event) -> None:
         payload = event.payload()

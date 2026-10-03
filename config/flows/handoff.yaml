@@ -1,0 +1,34 @@
+# Getting a person, on purpose (plan 22 section 5).
+#
+# Reached two ways: the customer asked, or a guard tripped. Either way this
+# flow does one thing, and it is the one thing automation must never argue
+# with. A customer asking for a human is not a routing problem to be solved.
+#
+# The summary handed to the Desk is masked: the agent gets the case id, the
+# intent and the reason code, and reads the evidence from the case itself.
+flow_id: HANDOFF
+version: 1
+status: active
+owner: cx-desk
+description: "Summarise, masked, and route to the Desk with a reason code."
+
+entry_intents:
+  - HANDOFF
+
+tools:
+  - request_handoff
+
+initial: summarise
+exits: [handed_off]
+
+states:
+  - name: summarise
+    description: "Masked summary plus a reason code. No message text travels."
+    tools: [request_handoff]
+    transitions:
+      - { when: always, to: handed_off }
+
+  - name: handed_off
+    description: "With the Desk. Automation stops here."
+    tools: [request_handoff]
+    terminal: true

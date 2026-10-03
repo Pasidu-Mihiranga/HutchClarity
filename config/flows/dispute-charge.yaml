@@ -1,0 +1,89 @@
+# The charge dispute journey (plan 22 section 5, and the state diagram there).
+#
+# "The bank took 3,500 for my 90-day pack twice." (deck S2). This is the flow
+# that explains a charge from evidence, offers the remedy the decision already
+# allows, and ends in a signed receipt.
+#
+# The flow proposes; it never executes. `offer_remedy` creates a pending plan
+# and stops. The customer's tap goes to /v1/cases/{id}/confirm, which mints and
+# spends the confirmation token server side (ADR-0007, I1). There is no
+# transition out of `await_confirm` that this flow can take on its own.
+flow_id: DISPUTE_CHARGE
+version: 1
+status: active
+owner: cx-resolution
+description: "Explain a charge from evidence, offer the allowed remedy, prove the fix."
+
+entry_intents:
+  - UNEXPECTED_CHARGE
+  - BALANCE_DEDUCTION_QUERY
+  - DOUBLE_CHARGE
+  - RELOAD_MISSING
+  - VAS_SUBSCRIPTIONS
+
+tools:
+  - get_case_timeline
+  - get_cause_assessment
+  - explain_rule
+  - propose_action
+  - get_trust_receipt
+  - request_handoff
+
+initial: identify
+exits: [receipt, done, handoff]
+
+states:
+  - name: identify
+    description: "Find the charge the customer means, from the case evidence."
+    tools: [get_case_timeline]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: case_present, to: evaluate }
+
+  - name: evaluate
+    description: "Wait for the decision. Stays here while the case is unevaluated."
+    tools: [get_cause_assessment]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: outcome_handoff, to: handoff }
+      - { when: outcome_auto_fix, to: receipt }
+      - { when: outcome_one_tap, to: explain }
+      - { when: outcome_staff_approval, to: explain }
+      - { when: outcome_explain_only, to: explain }
+
+  - name: explain
+    description: "Say what caused the charge, citing the rule that found it."
+    tools: [get_cause_assessment, explain_rule]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: outcome_explain_only, to: done }
+      - { when: outcome_one_tap, to: offer_remedy }
+      - { when: outcome_staff_approval, to: offer_remedy }
+
+  - name: offer_remedy
+    description: "Propose the remedy the decision allows. Creates a pending plan."
+    tools: [propose_action]
+    proposes: true
+    transitions:
+      - { when: receipt_ready, to: receipt }
+      - { when: plan_pending, to: await_confirm }
+
+  - name: await_confirm
+    description: "Waiting for the customer's tap. The flow cannot move itself."
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: receipt_ready, to: receipt }
+
+  - name: receipt
+    description: "Show the signed Trust Receipt for what was done."
+    tools: [get_trust_receipt]
+    terminal: true
+
+  - name: done
+    description: "Explained, with nothing to fix."
+    terminal: true
+
+  - name: handoff
+    description: "A person takes it from here, with a reason code."
+    tools: [request_handoff]
+    terminal: true

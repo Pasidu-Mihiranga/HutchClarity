@@ -1,0 +1,55 @@
+# Turning on a customer protection (plan 22 section 5).
+#
+# A safeguard is an L2 action: low risk, still confirmed. The flow proposes and
+# the customer taps, same as any remedy, because a spend cap the customer did
+# not ask for is as unwelcome as a charge they did not ask for.
+flow_id: SAFEGUARD_SETUP
+version: 1
+status: active
+owner: cx-resolution
+description: "Help the customer choose a safeguard, propose it, and prove it is on."
+
+entry_intents:
+  - PREVENT_CHARGES
+
+tools:
+  - get_customer_safeguards
+  - propose_action
+  - get_trust_receipt
+  - request_handoff
+
+initial: choose
+exits: [safeguard_on, handoff]
+
+states:
+  - name: choose
+    description: "Show what is already protecting them, and what else is available."
+    tools: [get_customer_safeguards]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: receipt_ready, to: safeguard_on }
+      - { when: safeguard_chosen, to: propose }
+
+  - name: propose
+    description: "Propose the chosen safeguard. Creates a pending plan."
+    tools: [propose_action]
+    proposes: true
+    slots_required: [safeguard]
+    transitions:
+      - { when: receipt_ready, to: safeguard_on }
+      - { when: plan_pending, to: await_confirm }
+
+  - name: await_confirm
+    description: "Waiting for the tap. The flow cannot confirm for them."
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: receipt_ready, to: safeguard_on }
+
+  - name: safeguard_on
+    description: "On, with a receipt that proves when and by what authority."
+    tools: [get_trust_receipt]
+    terminal: true
+
+  - name: handoff
+    tools: [request_handoff]
+    terminal: true

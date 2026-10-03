@@ -1,0 +1,49 @@
+# Account facts plus policy context: the `both` route (plan 22 section 5).
+#
+# "Why did my data stop?" needs two halves. The account half says what happened
+# on this subscriber; the policy half says what the rule is. Answering with
+# only one is how a customer gets a true sentence that does not help them.
+flow_id: ACCOUNT_AND_POLICY
+version: 1
+status: active
+owner: cx-resolution
+description: "Combine what happened on the account with the policy that governs it."
+
+entry_intents:
+  - PACK_NOT_WORKING
+  - PACK_MISSING
+  - PACK_ACTIVATE
+
+tools:
+  - get_case_timeline
+  - get_cause_assessment
+  - explain_rule
+  - search_knowledge
+  - request_handoff
+
+initial: account_facts
+exits: [answered, handoff]
+
+states:
+  - name: account_facts
+    description: "What the records show for this subscriber."
+    tools: [get_case_timeline, get_cause_assessment]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: always, to: policy_context }
+
+  - name: policy_context
+    description: "The rule or policy that explains it, cited."
+    tools: [explain_rule, search_knowledge]
+    agentic: true
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: answer_found, to: answered }
+      - { when: no_source, to: handoff }
+
+  - name: answered
+    terminal: true
+
+  - name: handoff
+    tools: [request_handoff]
+    terminal: true

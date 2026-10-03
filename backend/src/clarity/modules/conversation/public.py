@@ -11,6 +11,17 @@ channel, and it records every turn.
 
 from __future__ import annotations
 
+from clarity.modules.conversation.flows import (
+    Condition,
+    Flow,
+    FlowError,
+    FlowNotFound,
+    FlowRegistry,
+    FlowState,
+    FlowStatus,
+    load_flow,
+    load_flows,
+)
 from clarity.modules.conversation.orchestrator import (
     MAX_MESSAGE_CHARS,
     REFUSALS,
@@ -19,6 +30,12 @@ from clarity.modules.conversation.orchestrator import (
     FlowOutcome,
     Turn,
     TurnRecord,
+)
+from clarity.modules.conversation.router import (
+    FlowLooped,
+    FlowRouter,
+    ToolCaller,
+    ToolNotAllowed,
 )
 from clarity.modules.conversation.service import (
     extract_intake,
@@ -39,17 +56,30 @@ __all__ = [
     "DEFAULT_TTL",
     "MAX_MESSAGE_CHARS",
     "REFUSALS",
+    "Condition",
     "ConversationOrchestrator",
     "ConversationState",
     "ConversationStore",
+    "Flow",
     "FlowEngine",
+    "FlowError",
+    "FlowLooped",
+    "FlowNotFound",
     "FlowOutcome",
+    "FlowRegistry",
+    "FlowRouter",
+    "FlowState",
+    "FlowStatus",
+    "ToolCaller",
+    "ToolNotAllowed",
     "Turn",
     "TurnRecord",
     "VerifierResult",
     "build_suggestions",
     "extract_intake",
     "handle_turn",
+    "load_flow",
+    "load_flows",
     "signals_from_snapshot",
     "suggest_for_snapshot",
     "verify_reply",

@@ -18,6 +18,9 @@ keep safe for seven years.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 
 from clarity.kernel.common import Channel
@@ -46,7 +49,12 @@ class _Flow:
     def __init__(self, *, requires_citations: bool = False) -> None:
         self._requires_citations = requires_citations
 
-    def step(self, state: ConversationState, intake: IntakeResult) -> FlowOutcome:
+    def step(
+        self,
+        state: ConversationState,
+        intake: IntakeResult,
+        facts: Mapping[str, Any],
+    ) -> FlowOutcome:
         return FlowOutcome(
             flow="vas_dispute",
             state="awaiting_confirmation",
@@ -243,8 +251,8 @@ def test_a_turn_whose_citations_are_required_but_missing_fails_verification(ledg
     """K03 (#33) will set this. The gate exists now so it cannot be forgotten."""
 
     class _NoCitations(_Flow):
-        def step(self, state, intake):
-            outcome = super().step(state, intake)
+        def step(self, state, intake, facts):
+            outcome = super().step(state, intake, facts)
             return FlowOutcome(
                 flow=outcome.flow,
                 state=outcome.state,

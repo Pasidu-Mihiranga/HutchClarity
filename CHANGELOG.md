@@ -4,6 +4,44 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (C02, #21)
+
+- Flow DSL as policy content: versioned YAML in `config/flows/`, loaded
+  strictly like a rule pack, with a `flow_hash` per flow. States declare their
+  tools, their transitions and an `agentic` marker; conditions are a closed
+  vocabulary, never an expression.
+- The seven flows from plan 22 section 5. All 19 intents are claimed by exactly
+  one flow, and only `DISPUTE_CHARGE` and `SAFEGUARD_SETUP` may propose.
+- `FlowRouter`, filling the `FlowEngine` seam C01 left, and `FlowToolAdapter`,
+  the tool surface a flow may reach. Built over the narrow MCP view, so a flow
+  having no execute capability is a property of the surface.
+- Validation refuses: a state using a tool outside its flow's allowlist, an
+  unknown transition target, an unreachable state, a non-terminal exit, a flow
+  with no terminal state, a duplicate condition, an unreal entry intent, and two
+  flows claiming one intent.
+- `CLARITY_FLOWS_DIR`.
+
+### Changed (C02, #21)
+
+- `FlowEngine.step` takes `(state, intake, facts)`. It took `(state, intake)`
+  when C01 declared it with no implementation; conditions are evaluated against
+  the case's own records, so the facts argument is required.
+- `POST /v1/conversation/turn` derives a turn's facts from the case record. A
+  client may now contribute only context keys (`product`, `chat_intent`,
+  `safeguard`), never a figure. No `/v1` schema change: the response is an
+  untyped object and gained keys.
+
+### Fixed (C02, #21)
+
+- `compose_reply` fell back to the amount in the customer's own text when the
+  facts carried none, so "why was LKR 49 deducted" came back quoting 49 as
+  Clarity's finding before anything had been evaluated. Only FACTS may supply an
+  amount now (I1). The C01 turn verifier is what caught it.
+- A vague follow-up pulled a customer out of their dispute: `FALLBACK` is an
+  entry intent for `KNOWLEDGE_QA`, so a mid-dispute "has it been sorted?"
+  switched flows. An active flow is no longer abandoned by a vague or
+  low-confidence turn, while a confident switch still works.
+
 ### Added (C01, #19)
 
 - Stateful turn pipeline `ConversationOrchestrator` (plan 22 section 4): guard,

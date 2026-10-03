@@ -114,7 +114,12 @@ class FlowEngine(Protocol):
     a guess at one.
     """
 
-    def step(self, state: ConversationState, intake: IntakeResult) -> FlowOutcome: ...
+    def step(
+        self,
+        state: ConversationState,
+        intake: IntakeResult,
+        facts: Mapping[str, Any],
+    ) -> FlowOutcome: ...
 
 
 @dataclass(frozen=True)
@@ -350,7 +355,7 @@ class ConversationOrchestrator:
             intake.client_intent = "human"
 
         # -- 5. Flow step -------------------------------------------------- #
-        outcome = self._step(state, intake)
+        outcome = self._step(state, intake, known)
         state.flow = outcome.flow
         state.state = outcome.state
         state.slots.update(outcome.slots)
@@ -453,10 +458,15 @@ class ConversationOrchestrator:
             return self._guard.check(text)
         return inspect(text)
 
-    def _step(self, state: ConversationState, intake: IntakeResult) -> FlowOutcome:
+    def _step(
+        self,
+        state: ConversationState,
+        intake: IntakeResult,
+        facts: Mapping[str, Any],
+    ) -> FlowOutcome:
         if self._flow is None:
             return FlowOutcome(flow=state.flow, state=state.state)
-        return self._flow.step(state, intake)
+        return self._flow.step(state, intake, facts)
 
     def _refuse(
         self,

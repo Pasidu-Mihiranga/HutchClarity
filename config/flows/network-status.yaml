@@ -1,0 +1,59 @@
+# Coverage and outage questions (plan 22 section 5).
+#
+# The honest-ETA flow. If there is an incident, say so and give what is known;
+# if there is not, do not invent one, and offer a person rather than guessing at
+# a fault on one subscriber's line.
+#
+# Every figure this flow reports is simulated (hutch-sim) and labelled as such
+# by the tool that returns it (I16).
+flow_id: NETWORK_STATUS
+version: 1
+status: active
+owner: cx-network
+description: "Report known coverage or outage state, or route to a person."
+
+entry_intents:
+  - NETWORK_STATUS
+  - DATA_SLOW
+
+tools:
+  - get_network_status
+  - request_handoff
+
+initial: lookup
+exits: [answered, ticket, handoff]
+
+states:
+  - name: lookup
+    description: "Check the known incident state for this subscriber."
+    tools: [get_network_status]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: network_incident, to: incident }
+      - { when: network_clear, to: no_incident }
+
+  - name: incident
+    description: "Known outage: say what is known, including that it is simulated."
+    tools: [get_network_status]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: always, to: answered }
+
+  - name: no_incident
+    description: "Nothing known. Offer a ticket rather than guessing at a cause."
+    tools: [request_handoff]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: always, to: ticket }
+
+  - name: answered
+    terminal: true
+
+  - name: ticket
+    description: "Raised for a person to look at the individual line."
+    tools: [request_handoff]
+    terminal: true
+
+  - name: handoff
+    tools: [request_handoff]
+    terminal: true

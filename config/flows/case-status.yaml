@@ -1,0 +1,52 @@
+# "What is happening with my case?" (plan 22 section 5).
+#
+# The shortest flow that matters: a customer who has already reported something
+# and wants to know where it got to. If there is a receipt, the answer is the
+# receipt, because that is the thing they can check themselves.
+flow_id: CASE_STATUS
+version: 1
+status: active
+owner: cx-resolution
+description: "Report where a case stands, and link the receipt when there is one."
+
+entry_intents:
+  - CASE_STATUS
+  - REFUND_STATUS
+
+tools:
+  - get_case_timeline
+  - get_trust_receipt
+  - request_handoff
+
+initial: find_case
+exits: [answered, receipt_shown, handoff]
+
+states:
+  - name: find_case
+    description: "Locate the case this customer is asking about."
+    tools: [get_case_timeline]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: no_case, to: handoff }
+      - { when: receipt_ready, to: receipt_shown }
+      - { when: case_present, to: status }
+
+  - name: status
+    description: "Say where it is: waiting on evidence, on a person, or done."
+    tools: [get_case_timeline]
+    transitions:
+      - { when: handoff_requested, to: handoff }
+      - { when: receipt_ready, to: receipt_shown }
+      - { when: always, to: answered }
+
+  - name: receipt_shown
+    description: "The receipt is the answer: verifiable without trusting us."
+    tools: [get_trust_receipt]
+    terminal: true
+
+  - name: answered
+    terminal: true
+
+  - name: handoff
+    tools: [request_handoff]
+    terminal: true
