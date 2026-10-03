@@ -30,14 +30,14 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel, Field
 
-from clarity.contracts.events import ComplaintCreatedV1
-from clarity.interfaces.channels.webhooks import WebhookVerifier
-from clarity.interfaces.channels.window import SendKind, ServiceWindows
-from clarity.kernel.common import Channel, Language, utc_now
 # `Profile` lives in the composition root. Importing it here is layer-legal
 # (interfaces sit above app) and creates no cycle, because the container does
 # not import this gateway: whoever holds the container builds the app.
 from clarity.app.container import Profile
+from clarity.contracts.events import ComplaintCreatedV1
+from clarity.interfaces.channels.webhooks import WebhookVerifier
+from clarity.interfaces.channels.window import SendKind, ServiceWindows
+from clarity.kernel.common import Channel, Language, utc_now
 from clarity.kernel.ids import new_id
 from clarity.platform.messaging.envelope import Event
 from clarity.platform.messaging.outbox import outbox_in
@@ -157,9 +157,7 @@ def create_channel_gateway_app(clarity: Any, *, verifier: WebhookVerifier | None
         return _handle(clarity, windows, message)
 
     @app.post("/sim/{channel}", tags=["simulator"])
-    def simulate(
-        channel: Channel, message: InboundMessage, response: Response
-    ) -> dict[str, Any]:
+    def simulate(channel: Channel, message: InboundMessage, response: Response) -> dict[str, Any]:
         """The SMS and USSD simulator for the basic-phone journey.
 
         **No signature, and that is why it is a separate route.** The
@@ -171,8 +169,12 @@ def create_channel_gateway_app(clarity: Any, *, verifier: WebhookVerifier | None
         **404 in `prod`.** An unsigned ingress on a production deployment is a
         way in for anybody who can reach the port, which would undo every
         refusal in `webhooks.py`. The same gate the HTTP layer's `demo_only`
-        uses, and read from the profile the composition root already resolved,
-        because nothing outside it may read `CLARITY_PROFILE` (I20).
+        uses: the profile is read off the container, which resolved it, rather
+        than from the environment, which only the composition root may do
+        (I20). Naming that variable here, even in a comment, trips
+        `test_only_the_composition_root_reads_the_profile`, which greps for it
+        rather than parsing: blunt on purpose, since a grep cannot be fooled by
+        indirection.
 
         404 rather than 403, so the route does not confirm it exists.
         """

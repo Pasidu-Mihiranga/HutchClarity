@@ -140,6 +140,16 @@ verifier, which the simulator also calls and which a non-HTTP transport could
 call later, so the test moved to the verifier and the route test now sends
 non-hex ASCII, which is what a real probe looks like.
 
+**An architecture test caught my own docstring.**
+`test_only_the_composition_root_reads_the_profile` greps every file under
+`clarity/` for the literal `CLARITY_PROFILE` and allows it only in
+`app/settings.py` and `app/container.py`. My `/sim/*` docstring explained that
+nothing outside the composition root may read that variable, and named it,
+which tripped the test. The check greps rather than parses, which is blunt and
+right: a grep cannot be fooled by `getattr(os.environ, ...)` or a name built at
+runtime. The docstring was reworded; the HTTP layer avoids naming it for the
+same reason.
+
 **`msisdn_masked` is on `case.customer`, not on `case`.** My assertion read
 `record.case.msisdn_masked` and pydantic said so plainly. Worth noting only
 because the masked number being one level deeper is easy to get wrong in a
@@ -179,8 +189,8 @@ green by never executing.
 
 ## Tests run
 
-- `make check`: **1773 passed, 544 skipped** (1745 before N02).
-- `backend/tests/unit/test_channel_gateway.py`, 28 tests.
+- `make check`: **1775 passed, 544 skipped** (1745 before N02).
+- `backend/tests/unit/test_channel_gateway.py`, 30 tests.
 - Acceptance 1: a bad signature is rejected, asserted on the **world** as well
   as the status, because a 401 returned after the conversation had already run
   would satisfy a status check and still have opened a case for an
@@ -197,6 +207,7 @@ green by never executing.
 - The simulator needs no signature and is not reachable as a bypass.
 - The deployable boots: `services/channel-gateway/src/main.py` imported and
   `/health` called, reporting `signing_configured: false` with no secret set.
+- The simulator is 404 in `prod` and reachable in the synthetic profiles.
 - Non-vacuity: removing the signature comparison fails the three signature
   tests, acceptance 1 among them.
 
@@ -221,13 +232,19 @@ green by never executing.
 - **No rate limiting.** A public endpoint without it is a free denial of
   service, and the signature check runs an HMAC per request. X01 (#42) and X02
   (#43) own that.
-- `/sim/*` is not profile-gated in the app itself. The comment says the
-  composition root should refuse it outside the synthetic profiles (I20) and
-  nothing does yet, so a `prod` deployment of this service would expose an
-  unsigned ingress. **That is the one gap here I would not ship without.**
+- ~~`/sim/*` is not profile-gated.~~ **Fixed before committing.** I wrote this
+  up as "the one gap here I would not ship without" and then did not ship it:
+  an unsigned ingress on a `prod` deployment would undo every refusal above,
+  so `/sim/*` now returns 404 when `clarity.profile is Profile.PROD`, using the
+  same gate the HTTP layer's `demo_only` uses and reading the profile the
+  composition root already resolved (I20). 404 rather than 403, so the route
+  does not confirm it exists. Two tests: blocked in `prod` while the signed
+  route still works, and reachable in the synthetic profiles so the gate
+  cannot be "always 404".
 
 ## Next step
 
 Wave 4 has one item left: #27 F01, foresight backtest and calibration. Then
 Wave 5, where #28 FE01 and #42 X01 both touch this gateway: the unreviewed
-template wording and the missing rate limiting and profile gate.
+template wording, and the missing rate limiting on a public endpoint that runs
+an HMAC per request.

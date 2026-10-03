@@ -4,6 +4,44 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (N02, #40)
+
+- `clarity-channel-gateway`, a separate deployable for WhatsApp, SMS and USSD
+  ingress (`make channel-gateway`, port 8102). The version it replaces was
+  deleted in `3cca478`: a standalone app with its own in-memory thread store
+  that minted case ids like `CASE-{uuid4}`, so a WhatsApp conversation was
+  backed by no case, no decision and no receipt.
+- Signature-verified webhooks. `sha256=<hex>` of
+  `HMAC-SHA256(secret, "<timestamp>.<raw body>")`, with six refusals: no secret
+  configured, missing or malformed signature, unknown scheme, wrong signature,
+  a timestamp outside a five-minute window in either direction, and a delivery
+  id already seen. Constant-time comparison, verified over the **raw bytes**
+  before parsing, and a rejection echoes nothing from its payload.
+- **No secret configured refuses every webhook** (I9). `/health` reports
+  `signing_configured`, because a gateway that accepted unsigned webhooks for
+  want of a secret looks like it works.
+- The 24-hour customer service window. Outside it only an approved template is
+  sent (I15), the composed reply is dropped and the response says so rather
+  than substituting silently. Sending never extends the window, and each
+  `(channel, thread)` has its own.
+- The gateway drives the real conversation: it resolves the number, finds the
+  subscriber's open case or opens one, and hands the text to C01's
+  orchestrator, so a WhatsApp thread is one case rather than one per message.
+  An unknown number opens nothing and reveals nothing.
+- **It produces `complaint.created`**, which plan 21 section 11.3 names
+  channels as the producer of. AU01 wired the autopsy consumer for it with
+  nothing producing it; this closes that loop, and the event still carries no
+  message text.
+- `POST /sim/{sms|ussd}`, the basic-phone simulator, as a separate unsigned
+  path rather than a bypass flag on `/webhooks/*`. **404 in `prod`**, because
+  an unsigned ingress there would undo every refusal above.
+- `CLARITY_CHANNEL_WEBHOOK_SECRET`, and `clarity.interfaces.channels` added to
+  the interface independence contract, which now covers three interfaces.
+
+No `/v1` change and no OpenAPI snapshot change: the gateway is its own ASGI app
+on its own port.
+
+
 ### Added (I01, #30)
 
 - The `insights` module, previously a scaffold. Read models folded from the

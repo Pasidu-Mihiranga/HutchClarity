@@ -310,7 +310,7 @@ devlogs.
 - [x] #13 `[AU01]` Autopsy: event-fed, embeddings via the embed role, review workflow `p2`
 - [x] #26 `[D01]` Desk operations: bulk fix with four-eyes, merchant watch, regulator pack, shift handover `p2`
 - [x] #30 `[I01]` Insights: projections and console dashboards `p2`
-- [ ] #40 `[N02]` Channel gateway: WhatsApp sandbox, SMS and USSD simulator, verified webhooks `p2`
+- [x] #40 `[N02]` Channel gateway: WhatsApp sandbox, SMS and USSD simulator, verified webhooks `p2`
 - [ ] #27 `[F01]` Foresight: backtest and calibration report `p3`
 
 ### Wave 5 - Production readiness (ship gate)

@@ -464,9 +464,7 @@ def test_the_simulator_is_not_reachable_in_prod(core):
         open_unit = core.open_unit
 
     api = TestClient(
-        create_channel_gateway_app(
-            InProd(), verifier=WebhookVerifier(SECRET, clock=lambda: NOW)
-        ),
+        create_channel_gateway_app(InProd(), verifier=WebhookVerifier(SECRET, clock=lambda: NOW)),
         raise_server_exceptions=False,
     )
 
