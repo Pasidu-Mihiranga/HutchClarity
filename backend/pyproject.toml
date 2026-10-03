@@ -169,9 +169,13 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "HTTP and MCP are independent interfaces"
+name = "HTTP, MCP and the channel gateway are independent interfaces"
 type = "independence"
-modules = ["clarity.interfaces.http", "clarity.interfaces.mcp"]
+modules = [
+    "clarity.interfaces.http",
+    "clarity.interfaces.mcp",
+    "clarity.interfaces.channels",
+]
 ignore_imports = [
     # The ops route that lists MCP tools reads the MCP tool registry.
     "clarity.interfaces.http.main -> clarity.interfaces.mcp.server",

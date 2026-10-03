@@ -128,6 +128,15 @@ class Settings(BaseSettings):
     policy_dir: Path | None = Field(default=None, alias="CLARITY_POLICY_DIR")
     flows_dir: Path | None = Field(default=None, alias="CLARITY_FLOWS_DIR")
     retrieval_file: Path | None = Field(default=None, alias="CLARITY_RETRIEVAL_FILE")
+    channel_webhook_secret: str | None = Field(
+        default=None,
+        alias="CLARITY_CHANNEL_WEBHOOK_SECRET",
+        description=(
+            "HMAC secret the channel gateway verifies inbound webhooks against "
+            "(N02). Unset: every webhook is refused, which is the safe "
+            "direction. The simulator routes do not use it."
+        ),
+    )
 
     # -- AI --------------------------------------------------------------- #
 

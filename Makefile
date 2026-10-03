@@ -12,7 +12,8 @@ COMPOSE := deploy/compose/full.yml
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
 .PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed eval \
-        up-full down-full test-full dev-e2e e2e e2e-install contracts contracts-check \
+        up-full down-full test-full dev-e2e e2e e2e-install channel-gateway \
+        contracts contracts-check \
         licences secrets \
         web-install web-build web-customer web-console web-verify
 
@@ -20,6 +21,7 @@ help:
 	@echo "make setup   - create .venv and install the backend with dev tools"
 	@echo "make dev     - run the app (UI + API) on http://localhost:8000 (lite profile)"
 	@echo "make mcp     - run clarity-mcp (MCP over Streamable HTTP) on :8099"
+	@echo "make channel-gateway - WhatsApp/SMS/USSD ingress on :8102 (N02)"
 	@echo "make check   - everything CI runs: lint, types, import contracts, tests"
 	@echo "make test    - tests only"
 	@echo "make format  - apply formatting and safe lint fixes"
@@ -106,6 +108,13 @@ down-full:
 
 # The parity suites against the real drivers. Each one skips unless its
 # component is reachable, so this is honest about what it actually verified.
+channel-gateway:
+	@# The clarity-channel-gateway deployable (N02, #40), on :8102. Refuses
+	@# every webhook unless CLARITY_CHANNEL_WEBHOOK_SECRET is set, which is
+	@# the safe direction; /sim/* needs no signature for the demo journey.
+	cd $(BACKEND) && $(PY)/uvicorn --app-dir ../services/channel-gateway/src \
+		main:app --host 127.0.0.1 --port 8102
+
 dev-e2e:
 	@# The API the browser suite drives (C05). A fixed port so Playwright can
 	@# wait on it, the lite profile so it needs no services (ADR-0006), and
