@@ -1,9 +1,16 @@
 """The in-process bus driver's own guarantees (issue #11, B03).
 
 Everything in ``tests/contract/test_bus_parity.py`` holds for this driver too.
-What is here is what this driver promises *beyond* the port, because it keeps
-one queue per subject rather than per partition: a failure delays exactly one
-customer. Kafka cannot promise that, so it does not belong in the shared suite.
+What is here is what this driver promises *beyond* the port. Two things, both
+because the queue is in memory and no network sits between publish and drain:
+
+- **A failure delays exactly one customer**, since there is one queue per
+  subject rather than per partition.
+- **One drain delivers everything already published.**
+
+Kafka can promise neither, so neither belongs in the shared suite. The second
+one used to be assumed throughout it, which is what made its Kafka runs fail
+about three times in five (2026-10-03).
 """
 
 from __future__ import annotations
@@ -95,3 +102,27 @@ def test_groups_lists_what_subscribed() -> None:
 
 def _always_fails(event: Event) -> None:
     raise RuntimeError("this consumer is broken")
+
+
+def test_one_drain_delivers_everything_already_published() -> None:
+    """The timing promise the shared parity suite must not assume.
+
+    The port says only that a later drain offers what a drain did not (see
+    ``EventBus.drain``), because a networked driver has to fetch. This driver
+    has the events in memory, so for it the weaker promise would hide a real
+    regression: anything published before a drain is delivered by that drain,
+    in one call, with no retry and nothing left pending.
+    """
+    bus = InProcessEventBus()
+    seen: list[str] = []
+    bus.subscribe(CASE_CREATED, group="timeline", handler=lambda e: seen.append(e.id))
+    published = [an_event(DILANI) for _ in range(3)] + [an_event(NIMAL) for _ in range(3)]
+    for event in published:
+        bus.publish(event)
+
+    report = bus.drain()
+
+    assert report.delivered == len(published)
+    assert report.is_clear
+    assert sorted(seen) == sorted(event.id for event in published)
+    assert bus.pending("timeline") == []

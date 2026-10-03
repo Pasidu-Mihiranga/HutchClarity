@@ -4,6 +4,47 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Fixed (messaging, follow-up to C02 #21)
+
+- `KafkaEventBus.drain` could report `is_clear` while an event that a handler
+  had failed was still undelivered. `seek` is asynchronous, so the first poll
+  after a blocked partition is rewound can return nothing while the retry is in
+  flight, and the drain read that as "idle". A relay would have logged all
+  clear with the event outstanding. The drain now checks the partition's cached
+  high watermark against how far it has read and keeps polling while a rewind is
+  outstanding, bounded by `rewind_grace_seconds`; a rewind that does not land is
+  reported as stalled, never as clear.
+- A consumer group that subscribed to a second event type could permanently lose
+  events published afterwards, measured at four losses in five. Adding a topic
+  rebalances the group, and the driver pinned each partition's start offset by
+  seeking after `consumer.assignment()` looked settled, which it does while a
+  rebalance is still in flight: the seek was discarded with the revoked
+  partition and the consumer then resolved `auto.offset.reset=latest` at fetch
+  time, after the publish. Offsets are now pinned in the `on_assign` rebalance
+  callback, where they survive, and a partition the driver already tracked
+  resumes exactly where it was. `notifications` and `proactive` both subscribe
+  per event type in a loop, so both were affected in the `full` profile.
+- Subscribing a second handler for a type a group already has no longer calls
+  the broker: the topic list is unchanged, so the rebalance it used to trigger
+  bought nothing.
+
+### Changed (messaging, follow-up to C02 #21)
+
+- **`EventBus.drain`'s documented promise is narrower.** It was "returns once
+  there is nothing deliverable left"; it is now "offers what has arrived", and
+  how much has arrived is explicitly not part of the contract. No driver
+  behaviour changed and the port's three guarantees (order per subject, at least
+  once, order survives failure) are untouched, but a caller must no longer read
+  one quiet drain as "the backlog is empty". The outbox relay already drains on
+  a schedule and is unaffected.
+- **`DeliveryReport.delivered` and `.failed` are documented as what the drivers
+  actually count.** `delivered` was described as "handler calls that returned
+  without raising"; both drivers count once per event per *group*, however many
+  handlers that group has, and `failed` counts blocked subjects per group rather
+  than raises. The drivers agreed with each other, so the documentation was
+  wrong. No behaviour or signature change.
+- `KafkaEventBus` takes an optional `rewind_grace_seconds` (default 15).
+
 ### Added (C02, #21)
 
 - Flow DSL as policy content: versioned YAML in `config/flows/`, loaded

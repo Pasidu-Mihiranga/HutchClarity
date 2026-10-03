@@ -35,7 +35,7 @@ PLAN_TABLE = "clarity_actions.plans"
 #: and the taps land on different processes. The claim is a conditional insert,
 #: which is the shape M-ACT will use for the real plan row.
 WORKER = """
-import json, sys
+import json, sys, time
 from sqlalchemy import create_engine, text
 from clarity.platform.persistence.postgres import PostgresStore
 from clarity.platform.persistence.errors import ConcurrentUpdate
@@ -43,6 +43,24 @@ from clarity.platform.persistence.errors import ConcurrentUpdate
 url, plan_count, worker = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 engine = create_engine(url, future=True)
 store = PostgresStore(engine)
+
+# Start together, or there is no contention to measure. Without this the
+# first process spawned can claim every plan before the second has finished
+# importing, and then the test fails on its own "both replicas did work"
+# guard rather than on anything about correctness.
+with store.unit() as unit:
+    unit.repository("actions.plans").put(f"BARRIER-{worker}", {"ready": True})
+    unit.commit()
+deadline = time.monotonic() + 60
+while time.monotonic() < deadline:
+    with store.unit() as unit:
+        ready = unit.repository("actions.plans")
+        if all(ready.get(f"BARRIER-{name}") for name in ("replica-a", "replica-b")):
+            break
+    time.sleep(0.01)
+else:
+    raise SystemExit(f"{worker}: the other replica never arrived at the barrier")
+
 won = []
 for index in range(plan_count):
     plan_id = f"PLAN-{index:04d}"
@@ -101,12 +119,16 @@ def test_two_processes_each_plan_is_claimed_exactly_once(engine: Engine) -> None
     # And the database agrees: one row per plan, no duplicates.
     with engine.begin() as connection:
         connection.execute(text(f"SET LOCAL ROLE {APP_ROLE}"))
-        rows = connection.execute(text(f"SELECT count(*), count(DISTINCT key) FROM {PLAN_TABLE}"))
+        rows = connection.execute(
+            text(f"SELECT count(*), count(DISTINCT key) FROM {PLAN_TABLE} WHERE key LIKE 'PLAN-%'")
+        )
         total, distinct = rows.one()
     assert total == plan_count
     assert distinct == plan_count
 
     # Both replicas did real work, or the test proved nothing about contention.
+    # The workers wait at a barrier before claiming, so this is a real
+    # assertion about contention rather than a race on process start-up.
     per_replica = {result["worker"]: len(result["won"]) for result in results}  # type: ignore[arg-type]
     assert all(count > 0 for count in per_replica.values()), (
         f"one replica claimed nothing, so there was no contention: {per_replica}"
