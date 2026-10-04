@@ -83,6 +83,7 @@ from clarity.modules.iam.public import (
     AuthorizationPolicy,
     CompositeTokenVerifier,
     GrantAwareAuthorizationPolicy,
+    HttpSmsDelivery,
     KeycloakTokenVerifier,
     OidcLogin,
     OidcSettings,
@@ -90,6 +91,8 @@ from clarity.modules.iam.public import (
     OtpDelivery,
     OtpService,
     PythonAuthorizationPolicy,
+    RoutedOtpDelivery,
+    SimulatedInbox,
     StaffDirectory,
     StaffDirectoryInvalid,
     TokenIssuer,
@@ -724,13 +727,41 @@ class Clarity:
                 self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
             ),
         )
-        # One-time code delivery (B6). The simulated inbox is the default and
-        # is correct for the synthetic profiles; a gateway is configured where
-        # codes have to reach a real handset. The port is the same either way,
-        # and both drivers pass `tests/contract/test_otp_delivery_parity.py`.
-        self.otp = otp or OtpService(
-            delivery=_otp_delivery(self.settings), open_unit=self.open_unit
-        )
+        # Real phones the operator tied to a synthetic customer. They are the
+        # only numbers that get a real SMS in the synthetic profiles: the
+        # synthetic customers' numbers belong to strangers, so those codes stay
+        # on the sign-in page.
+        linked = self.settings.linked_phone_pairs()
+        for phone, synthetic in linked:
+            customer = self.world.account_by_msisdn(synthetic)
+            if customer is None:
+                raise ValueError(f"CLARITY_LINKED_PHONES names no synthetic customer: {synthetic}")
+            self.world.link_phone(phone, customer.ref)
+        # One-time code delivery (B6). A configured SMS gateway delivers every
+        # code, which is what `prod` needs. Without one, codes are routed per
+        # number: the simulated inbox for synthetic customers, httpSMS for
+        # linked phones when it is configured. The port is the same either way,
+        # and the drivers pass `tests/contract/test_otp_delivery_parity.py`.
+        gateway = _otp_delivery(self.settings)
+        if gateway is None:
+            sms = (
+                HttpSmsDelivery(
+                    api_key=self.settings.httpsms_api_key,
+                    sender=self.settings.httpsms_sender,
+                    base_url=self.settings.httpsms_base_url,
+                    timeout_seconds=self.settings.httpsms_timeout_seconds,
+                )
+                if self.settings.httpsms_api_key and self.settings.httpsms_sender
+                else None
+            )
+            world = self.world
+            gateway = RoutedOtpDelivery(
+                inbox=SimulatedInbox(),
+                sms=sms,
+                sms_numbers=frozenset(phone for phone, _ in linked),
+                known=lambda msisdn: world.account_by_msisdn(msisdn) is not None,
+            )
+        self.otp = otp or OtpService(delivery=gateway, open_unit=self.open_unit)
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

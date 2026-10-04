@@ -176,16 +176,21 @@ def test_requesting_a_code_does_not_reveal_who_is_a_subscriber(client: TestClien
 
 
 def test_a_code_for_an_unknown_number_still_cannot_sign_anyone_in(client: TestClient):
-    """Indistinguishable up front must not mean a way in at the end."""
+    """Indistinguishable up front must not mean a way in at the end.
+
+    Deliberate change (SMS02): an unknown number is now sent no code at all,
+    not even to the inbox, so nobody can make the server deliver a code to an
+    arbitrary number. A guessed code still cannot sign anyone in.
+    """
     started = client.post("/v1/auth/otp/request", json={"msisdn": "+94770000001"}).json()
-    code = client.get("/v1/demo/inbox", params={"msisdn": "+94770000001"}).json()["code"]
+    assert client.get("/v1/demo/inbox", params={"msisdn": "+94770000001"}).status_code == 404
 
     refused = client.post(
         "/v1/auth/otp/verify",
-        json={"challenge_id": started["challenge_id"], "code": code},
+        json={"challenge_id": started["challenge_id"], "code": "000000"},
     )
 
-    assert refused.status_code == 404
+    assert refused.status_code in {401, 404}
 
 
 def test_the_demo_inbox_is_labelled_as_simulated():
