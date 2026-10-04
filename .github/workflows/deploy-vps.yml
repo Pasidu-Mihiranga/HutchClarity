@@ -28,13 +28,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Decide what to do. Needs no secrets, so it does not touch the environment.
+  release:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    environment: demo-vps
+    outputs:
+      operation: ${{ steps.release.outputs.operation }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - name: Resolve the CI-approved release
         id: release
@@ -75,41 +78,75 @@ jobs:
           echo "operation=deploy" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+  # One runner per image, in parallel: the release waits for the slowest image
+  # rather than the sum of all five. Each image keeps its own cache scope so
+  # the builds do not evict one another's layers.
+  build:
+    needs: release
+    if: needs.release.outputs.operation == 'deploy'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: backend
+            dockerfile: deploy/docker/Dockerfile
+            app: ""
+          - image: customer
+            dockerfile: deploy/docker/Dockerfile.frontend
+            app: customer-web
+          - image: console
+            dockerfile: deploy/docker/Dockerfile.frontend
+            app: console
+          - image: verify
+            dockerfile: deploy/docker/Dockerfile.frontend
+            app: verify
+          - image: whatsapp
+            dockerfile: deploy/docker/Dockerfile.whatsapp
+            app: ""
+    steps:
       - uses: actions/checkout@v4
-        if: steps.release.outputs.operation == 'deploy'
         with:
-          ref: ${{ steps.release.outputs.sha }}
-
+          ref: ${{ needs.release.outputs.sha }}
       - uses: docker/setup-buildx-action@v3
-        if: steps.release.outputs.operation == 'deploy'
-
       - uses: docker/login-action@v3
-        if: steps.release.outputs.operation == 'deploy'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-
-      - name: Build and push immutable images
-        if: steps.release.outputs.operation == 'deploy'
+      - name: Build and push ${{ matrix.image }}
         env:
-          SHA: ${{ steps.release.outputs.sha }}
+          SHA: ${{ needs.release.outputs.sha }}
           REGISTRY: ghcr.io/pasidu-mihiranga
         run: |
           set -euo pipefail
-          docker buildx build --push --cache-from type=gha --cache-to type=gha,mode=max \
-            -f deploy/docker/Dockerfile -t "$REGISTRY/hutch-clarity-backend:$SHA" .
-          for spec in customer:customer-web console:console verify:verify; do
-            image=${spec%%:*}
-            app=${spec#*:}
-            docker buildx build --push --cache-from type=gha --cache-to type=gha,mode=max \
-              --build-arg "APP=$app" --build-arg NEXT_PUBLIC_API_BASE= \
-              -f deploy/docker/Dockerfile.frontend \
-              -t "$REGISTRY/hutch-clarity-$image:$SHA" .
-          done
+          args=()
+          if [[ -n "${{ matrix.app }}" ]]; then
+            args+=(--build-arg "APP=${{ matrix.app }}" --build-arg NEXT_PUBLIC_API_BASE=)
+          fi
+          docker buildx build --push \
+            --cache-from "type=gha,scope=${{ matrix.image }}" \
+            --cache-to "type=gha,scope=${{ matrix.image }},mode=max" \
+            "${args[@]}" -f "${{ matrix.dockerfile }}" \
+            -t "$REGISTRY/hutch-clarity-${{ matrix.image }}:$SHA" .
+
+  deploy:
+    needs: [release, build]
+    # Rollback skips the build; a deploy needs every image built.
+    if: >-
+      always() &&
+      (needs.release.outputs.operation == 'rollback' ||
+       (needs.release.outputs.operation == 'deploy' && needs.build.result == 'success'))
+    runs-on: ubuntu-latest
+    environment: demo-vps
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.release.outputs.operation == 'deploy'
+        with:
+          ref: ${{ needs.release.outputs.sha }}
 
       - name: Configure pinned SSH
-        if: steps.release.outputs.operation != 'skip'
+        if: needs.release.outputs.operation != 'skip'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
           KNOWN_HOSTS: ${{ secrets.HETZNER_KNOWN_HOSTS }}
@@ -121,19 +158,19 @@ jobs:
           chmod 0600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
       - name: Roll back without rebuilding
-        if: steps.release.outputs.operation == 'rollback'
+        if: needs.release.outputs.operation == 'rollback'
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER }}
         run: ssh "$USER@$HOST" /opt/hutch-clarity/deploy/scripts/rollback.sh
 
       - name: Upload deployment metadata and deploy
-        if: steps.release.outputs.operation == 'deploy'
+        if: needs.release.outputs.operation == 'deploy'
         env:
           GHCR_TOKEN: ${{ github.token }}
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER }}
-          SHA: ${{ steps.release.outputs.sha }}
+          SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
           tar -czf /tmp/clarity-deploy.tgz deploy/compose/vps.yml deploy/nginx deploy/scripts deploy/systemd config/keycloak config/opa
@@ -143,7 +180,7 @@ jobs:
           ssh "$USER@$HOST" "/opt/hutch-clarity/deploy/scripts/deploy.sh $SHA"
 
       - name: Remove the registry login from the server
-        if: always() && steps.release.outputs.operation == 'deploy'
+        if: always() && needs.release.outputs.operation == 'deploy'
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER }}

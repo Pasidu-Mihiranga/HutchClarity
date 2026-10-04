@@ -1,0 +1,27 @@
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /src
+COPY services/whatsapp-baileys/package.json services/whatsapp-baileys/package-lock.json ./
+RUN npm ci
+COPY services/whatsapp-baileys/tsconfig.json ./
+COPY services/whatsapp-baileys/src ./src
+RUN npm run build \
+ && test -f dist/src/main.js \
+ && test -f dist/src/pair.js \
+ && npm prune --omit=dev
+
+FROM node:20-bookworm-slim AS runtime
+
+RUN useradd --system --create-home --uid 10002 whatsapp \
+ && install -d -o whatsapp -g whatsapp -m 0700 /var/lib/clarity-whatsapp/auth
+WORKDIR /app
+COPY --from=build --chown=whatsapp:whatsapp /src/package.json /src/package-lock.json ./
+COPY --from=build --chown=whatsapp:whatsapp /src/node_modules ./node_modules
+COPY --from=build --chown=whatsapp:whatsapp /src/dist ./dist
+
+ENV NODE_ENV=production \
+    WHATSAPP_AUTH_DIR=/var/lib/clarity-whatsapp/auth \
+    WHATSAPP_HEALTH_PORT=8104
+USER whatsapp
+EXPOSE 8104
+CMD ["node", "dist/src/main.js"]

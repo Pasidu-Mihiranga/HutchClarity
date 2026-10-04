@@ -7,7 +7,7 @@
 | Audience | developers / demo presenters / judges |
 | Journey | Customer asks (chip or free-form) about an unexpected VAS charge; Clarity Investigation Card → confirm modal → refund → Trust Receipt |
 | Status | verified, API path and browser steps |
-| Last verified | 2026-10-04 (browser suite and live VPS release `01d1762`: trusted HTTPS, synthetic OTP, evidence, LKR 49 action and persisted verified receipt) |
+| Last verified | 2026-10-04 (two-turn browser flow: one case, flow-owned plan, LKR 49 action and verified receipt) |
 
 > **FE01 (#28), 2026-10-04.** Both halves are now verified. The acceptance
 > suite drives this flow over `/v1` and ends at a receipt the backend verifies
@@ -52,7 +52,7 @@ Demo subscriber (synthetic): MSISDN `0781234567` (Dilani) / VAS silent renewal.
 | 1 | Sign in as Dilani, open Clarity | immersive chat | `GET /v1/me/app` | iam, customer | Welcome + suggestion cards via `POST /v1/conversation/suggestions` |
 | 2 | Tap card **or** type "Why was Rs 49 deducted?" / Sinhala | Clarity chat | `POST /v1/conversation/turn` | conversation | Intent `UNEXPECTED_CHARGE` or `BALANCE_*`, route `account`; thinking + progress steps |
 | 3 | Wait for Investigation Card | transcript | `POST /v1/cases` + `.../evaluate` | case, detection, decision | Evidence checklist + finding + Refund & Disable CTA |
-| 4 | Confirm in modal | Confirm Disable modal | proposals + confirm / auto-fix | actions | Money moved only by tool layer after Confirm |
+| 4 | Ask a follow-up, then confirm the displayed plan in the modal | Confirm Disable modal | existing flow proposal + confirm | actions | The plan and case IDs remain paired; money moves only by the tool layer after Confirm |
 | 5 | View Trust Receipt | Success + TrustReceipt cards | receipt verify | receipts | Ed25519 verify OK; follow-ups shown; New chat resets welcome |
 
 ## 4. Under the hood
