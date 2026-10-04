@@ -86,13 +86,22 @@ test.describe("the Foresight rehearsal workspace", () => {
     ).toBeVisible();
   });
 
-  test("CX can read a rehearsal and cannot ask for one", async ({ page }) => {
+  test("CX is offered the link, can read a rehearsal, and cannot ask for one", async ({
+    page,
+  }) => {
     // `foresight:read` without `foresight:run`. The split is deliberate and
     // this is the test that keeps the page honest about it.
     await signInOnDesk(page, "CX", false);
+
+    // Reached by clicking the nav rather than by typing the address: that is
+    // the half that proves the nav offers the link to a role that can use it.
+    // Navigating directly would pass with the link missing entirely, which is
+    // the mirror of the defect E2 fixed in the other direction.
+    await page.getByRole("link", { name: "Foresight", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Foresight rehearsal" })).toBeVisible({
       timeout: 30_000,
     });
+
     await expect(page.getByText(/foresight:run/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Rehearse" })).toHaveCount(0);
   });

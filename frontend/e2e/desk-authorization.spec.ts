@@ -41,6 +41,12 @@ test.describe("navigation and the API agree about what a role may open", () => {
     await expect(page.getByRole("button", { name: /approve as/i })).toHaveCount(0);
     // And the nav agrees: no link to it.
     await expect(page.getByRole("link", { name: "Desk", exact: true })).toHaveCount(0);
+
+    // The same refusal on the other workspace the desk's permission opens. An
+    // auditor reads receipts and the trail; neither workspace is theirs.
+    await page.goto(`${CONSOLE}/autopsy`);
+    await expect(page.getByText(/desk:queue:read/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("autopsy-cluster")).toHaveCount(0);
   });
 
   test("a supervisor is not offered Foresight, because the page would refuse", async ({

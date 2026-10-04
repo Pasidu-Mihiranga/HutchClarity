@@ -142,9 +142,11 @@ const LOGIN_BY_LABEL: Record<string, { username: string; password: string }> = {
   Auditor: { username: "auditor", password: "auditor-clarity" },
   Security: { username: "security", password: "security-clarity" },
   Platform: { username: "platform", password: "platform-clarity" },
-  // CX engineering holds `foresight:read` and `config:draft`, which no other
-  // synthetic account does, so Policy Studio can only be reached as this
-  // person (WT-13 steps 7 and 8).
+  // CX engineering is the only synthetic account holding `config:draft`, so
+  // Policy Studio can only be reached as this person (WT-13 steps 8 and 10).
+  // Verified against `POST /v1/auth/staff/login`, which answers with role
+  // `cx_engineer`. It also holds `foresight:read`, so it can read a rehearsal
+  // and not ask for one.
   CX: { username: "cx", password: "cx-clarity" },
   // Product holds `foresight:run` and `foresight:scenario:draft` and nothing
   // else does, so a rehearsal can only be asked for as this person. The
