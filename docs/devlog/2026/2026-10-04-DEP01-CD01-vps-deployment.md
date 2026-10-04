@@ -38,6 +38,10 @@ can start. The existing `full.yml` remains development-only.
 - `make check`: 1,998 passed, 544 skipped; Ruff, strict mypy and three import contracts clean.
 - Three Next.js standalone builds passed; generic customer image built, started and served as uid 10001.
 - VPS Compose configuration validated after bootstrap.
+- First live start failed because PostgreSQL 18 rejects the pre-18 child volume
+  mount. First-deployment rollback restored all ten previously running
+  BikeRentHub containers healthy; the mount was corrected to the versioned
+  cluster parent before retry.
 
 ## Open issues / next step
 
