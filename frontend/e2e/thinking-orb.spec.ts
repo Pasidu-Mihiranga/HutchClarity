@@ -11,6 +11,10 @@ import { customerToken, signedIn } from "./session";
  * keeps the waiting state on screen long enough to assert on and to audit.
  * The request is released unchanged afterwards, so the journey still ends on
  * the real backend's answer.
+ *
+ * Both turn routes are held: the chat asks over `/v1/conversation/turn/stream`
+ * and falls back to the JSON route, and holding only one let the stream's
+ * stage events replace the first label before the assertion ran.
  */
 
 async function holdTurns(page: Page): Promise<() => void> {
@@ -18,7 +22,7 @@ async function holdTurns(page: Page): Promise<() => void> {
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/v1/conversation/turn", async (route) => {
+  await page.route("**/v1/conversation/turn{,/stream}", async (route) => {
     await gate;
     await route.continue();
   });
