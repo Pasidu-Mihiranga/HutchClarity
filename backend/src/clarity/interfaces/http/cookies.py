@@ -22,4 +22,30 @@ STAFF_COOKIE = "clarity_staff_session"
 #: skip. It is never read as proof of anything.
 ID_TOKEN_COOKIE = "clarity_staff_idt"
 
-__all__ = ["ID_TOKEN_COOKIE", "STAFF_COOKIE"]
+#: The customer session, for the same reason as the staff one: a token in
+#: `sessionStorage` is readable by any script on the page, and this one can
+#: open a dispute and confirm a refund.
+CUSTOMER_COOKIE = "clarity_customer_session"
+
+#: The CSRF token. Deliberately **not** `HttpOnly`: the page has to read it to
+#: echo it back in a header, which is the whole mechanism. It is not a
+#: credential on its own and proves nothing by itself; what it proves is that
+#: the request came from a page that could read this origin's cookies, which a
+#: cross-site form cannot.
+#:
+#: `SameSite=Lax` already stops a cross-site POST carrying the session cookie,
+#: so this is the second line. It covers what Lax does not: a sibling
+#: subdomain an attacker controls is same-site, and a browser that does not
+#: implement Lax defaults sends the cookie anyway.
+CSRF_COOKIE = "clarity_csrf"
+
+#: The header the page echoes it in.
+CSRF_HEADER = "X-CSRF-Token"
+
+__all__ = [
+    "CSRF_COOKIE",
+    "CSRF_HEADER",
+    "CUSTOMER_COOKIE",
+    "ID_TOKEN_COOKIE",
+    "STAFF_COOKIE",
+]

@@ -22,7 +22,7 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from clarity.interfaces.http.cookies import STAFF_COOKIE
+from clarity.interfaces.http.cookies import CUSTOMER_COOKIE, STAFF_COOKIE
 from clarity.modules.iam.public import (
     AuthorizationPolicy,
     TokenInvalid,
@@ -89,7 +89,9 @@ def principal_from(request: Request, authorization: str | None) -> Principal:
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
     else:
-        token = (request.cookies.get(STAFF_COOKIE) or "").strip()
+        token = (
+            request.cookies.get(STAFF_COOKIE) or request.cookies.get(CUSTOMER_COOKIE) or ""
+        ).strip()
     if not token:
         return ANONYMOUS
 

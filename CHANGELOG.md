@@ -21,6 +21,9 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **CSRF protection for cookie-borne sessions** (B4). A double-submit token: the API sets a readable `clarity_csrf` cookie beside the session, and a state-changing request relying on a cookie must echo it in `X-CSRF-Token`. A request carrying a bearer token is exempt, because another origin cannot make a browser send a header it does not know. Sign-in routes and the POSTs the trail already declares read-only are exempt too.
+- **The customer session is an `HttpOnly` cookie**, set by `POST /v1/auth/otp/verify`. The token stayed in `sessionStorage`, readable by any script on the page, and it is the credential that opens a dispute and confirms a refund. The response body still carries the token, because the WhatsApp gateway and the MCP server are not browsers.
+
 - **The issuer key can be rotated** (`TokenIssuer.rotate()`). A retired key keeps verifying for `KEY_OVERLAP_WINDOW`, so rotation is not an outage: without an overlap, changing the key signs out everyone holding a token. Key ids are derived from the key itself rather than the fixed `clarity-iam-dev`, so a token says which key signed it. `/.well-known/clarity-keys.json` publishes the whole ring, and the ring is written to the shared key volume so a rotation performed by one replica is honoured by the others.
 
 - **An SMS driver for one-time codes** (`CLARITY_SMS_URL`, `CLARITY_SMS_TOKEN`). `OtpDelivery` had one implementation, `SimulatedInbox`, so in `prod` a customer's code was generated into an inbox nobody can reach and sign-in could not complete. Both drivers pass `tests/contract/test_otp_delivery_parity.py`, which asserts the code never reaches a log or an exception and that a delivery failure says nothing about whether the number exists. The gateway interface is **REQUIRES HUTCH CONFIRMATION**.

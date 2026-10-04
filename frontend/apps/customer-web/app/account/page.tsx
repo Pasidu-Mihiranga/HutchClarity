@@ -22,7 +22,7 @@ export default function AccountPage() {
   const router = useRouter();
 
   function signOut() {
-    try { window.sessionStorage.removeItem("clarity_token"); } catch {}
+    // The session is an HttpOnly cookie now; only the API can clear it (B4).
     router.push("/login");
   }
 

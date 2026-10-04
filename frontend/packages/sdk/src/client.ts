@@ -312,6 +312,18 @@ function resolveBase(baseUrl?: string): string {
   return (baseUrl ?? fromEnv ?? "http://localhost:8000").replace(/\/$/, "");
 }
 
+/** The CSRF cookie the API sets beside a session cookie. Readable by design. */
+const CSRF_COOKIE = "clarity_csrf";
+const CSRF_HEADER = "X-CSRF-Token";
+
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const found = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+  return found ? decodeURIComponent(found.slice(CSRF_COOKIE.length + 1)) : null;
+}
+
 export class ClarityClient {
   private baseUrl: string;
   private token?: string;
@@ -342,10 +354,19 @@ export class ClarityClient {
     if (this.token) {
       headers.set("Authorization", `Bearer ${this.token}`);
     }
+    // The session may instead be an HttpOnly cookie (B4), which the browser
+    // only sends cross-origin when credentials are asked for. The API pins
+    // CORS to the apps' own origins, which is what makes that safe, and
+    // echoes the CSRF token back from the cookie the page can read.
+    const csrf = readCsrfCookie();
+    if (csrf && !headers.has(CSRF_HEADER)) {
+      headers.set(CSRF_HEADER, csrf);
+    }
 
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
       headers,
+      credentials: "include",
     });
 
     if (!res.ok) {

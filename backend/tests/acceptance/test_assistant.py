@@ -125,6 +125,11 @@ def test_another_customer_cannot_continue_my_conversation(api, me):
 def test_continuing_a_case_conversation_needs_a_session(api, me):
     case_id = _open_case(api, me, DILANI)
 
+    # Genuinely anonymous. The client signed in to open the case, so it holds
+    # a session cookie; since B4 that cookie authenticates on its own, which is
+    # the point of it. Sending no header is no longer the same as having no
+    # session, and this test is about having no session.
+    api.cookies.clear()
     anonymous = api.post(
         "/v1/conversation/turn",
         json={"text": "what is happening?", "case_id": case_id, "channel": "app"},
@@ -158,6 +163,11 @@ def test_the_stateful_turn_keeps_every_field_the_stateless_one_had(api, me):
     Checked against the stateless shape rather than a hand-written list, so
     this keeps holding if the stateless shape gains a field.
     """
+    # The `me` fixture has already signed in, so the client holds a session
+    # cookie and a real browser would echo its CSRF token. This call is
+    # standing in for one that has neither, so it drops the cookie rather than
+    # carrying half a browser's state.
+    api.cookies.clear()
     stateless = api.post("/v1/conversation/turn", json={"text": "charged LKR 49 twice"})
     assert stateless.status_code == 200, stateless.text
 

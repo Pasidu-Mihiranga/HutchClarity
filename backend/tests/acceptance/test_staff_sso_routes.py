@@ -23,7 +23,12 @@ from fastapi.testclient import TestClient
 from clarity.app.container import Clarity
 from clarity.app.settings import Settings
 from clarity.integration.drivers.mock.world import build_demo_world
-from clarity.interfaces.http.cookies import ID_TOKEN_COOKIE, STAFF_COOKIE
+from clarity.interfaces.http.cookies import (
+    CSRF_COOKIE,
+    CSRF_HEADER,
+    ID_TOKEN_COOKIE,
+    STAFF_COOKIE,
+)
 from clarity.interfaces.http.main import create_app
 
 ISSUER = "http://127.0.0.1:8081/realms/clarity"
@@ -201,12 +206,20 @@ def test_the_header_wins_over_a_stale_cookie() -> None:
 
 
 def _signed_in() -> tuple[TestClient, Clarity, str]:
+    """A console signed in by cookie, as a browser is.
+
+    Including the CSRF pair: a browser that holds a session cookie also holds
+    the token it echoes, and a state-changing call without it is refused (B4).
+    Setting only the session here would be testing a browser that cannot exist.
+    """
     from clarity.platform.security.principal import Role
 
     clarity = Clarity(world=build_demo_world())
     api = TestClient(create_app(clarity))
     issued = clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
     api.cookies.set(STAFF_COOKIE, issued.value)
+    api.cookies.set(CSRF_COOKIE, "development-csrf-token")
+    api.headers.update({CSRF_HEADER: "development-csrf-token"})
     return api, clarity, issued.value
 
 
