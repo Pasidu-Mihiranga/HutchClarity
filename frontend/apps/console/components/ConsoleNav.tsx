@@ -15,6 +15,8 @@ const links = [
     label: "Insights",
     anyOf: ["desk:queue:read"],
   },
+  { href: "/autopsy", label: "Complaint Autopsy", anyOf: ["desk:queue:read"] },
+  { href: "/foresight", label: "Foresight", anyOf: ["desk:queue:read"] },
   {
     href: "/studio",
     label: "Studio",

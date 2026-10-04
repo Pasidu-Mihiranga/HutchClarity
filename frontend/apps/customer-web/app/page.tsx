@@ -104,7 +104,7 @@ export default function HomePage() {
         </div>
         {usedPct >= 80 && (
           <p style={{ fontSize: 12, color: "#f59e0b", margin: "6px 0 0", fontWeight: 600 }}>
-            Fair use cap active — speed reduced
+            Fair use cap active - speed reduced
           </p>
         )}
       </div>

@@ -83,8 +83,11 @@ flowchart LR
 | [P01](issues/P01-proactive-module-stream-detectors-and-risk-detec.md) | Proactive module: stream detectors and risk.detected | `proactive` | P1 | B03, B04 |
 | [I01](issues/I01-insights-projections-and-console-dashboards.md) | Insights: projections and console dashboards | `insights` | P2 | B04 |
 | [D01](issues/D01-desk-operations-bulk-fix-with-four-eyes-merchant.md) | Desk operations: bulk fix with four-eyes, merchant watch, regulator pack, shift handover | `deskops` | P2 | M-ACT, M-GOV |
+| [DATA01](issues/DATA01-synthetic-telecom-dataset-foundation.md) | Synthetic telecom dataset foundation | `integration` | P0 | H01 |
 | [AU01](issues/AU01-autopsy-event-fed-embeddings-via-the-embed-role.md) | Autopsy: event-fed, embeddings via the embed role, review workflow | `autopsy` | P2 | A01, B04 |
+| [AU02](issues/AU02-autopsy-synthetic-dataset-hardening.md) | Complaint Autopsy: synthetic dataset hardening | `autopsy` | P0 | DATA01, AU01, M-GOV |
 | [F01](issues/F01-foresight-backtest-and-calibration-report.md) | Foresight: backtest and calibration report | `foresight` | P3 | AU01 |
+| [F02](issues/F02-foresight-synthetic-scenario-rehearsal.md) | Foresight: complete synthetic scenario rehearsal | `foresight` | P0 | DATA01, F01, AU02 |
 | [H01](issues/H01-hutch-sim-as-an-http-service-with-http-drivers.md) | hutch-sim as an HTTP service with HTTP drivers | `integration` | P1 | B07 |
 
 ## W5 Frontend and hardening
@@ -93,6 +96,7 @@ flowchart LR
 |---|---|---|---|---|
 | [FE01](issues/FE01-frontend-verified-build-static-ui-retired-next-j.md) | Frontend: verified build, static UI retired, Next.js 14, accessibility and language review | `frontend` | P1 | B09 |
 | [FE02](issues/FE02-next-js-16-upgrade-behind-the-browser-suite.md) | Next.js 16 upgrade, gated on the browser suite | `frontend` | P3 | FE01 |
+| [UI02](issues/UI02-enterprise-clarity-desk-autopsy-foresight.md) | Enterprise Clarity Desk: Autopsy and Foresight workspaces | `frontend` | P1 | FE01, AU02, F02 |
 | [X01](issues/X01-security-hardening-threat-model-checks-dast-depe.md) | Security hardening: threat-model checks, DAST, dependency and licence scanning | `security` | P1 | B10 |
 | [X02](issues/X02-performance-and-resilience-load-and-chaos-tests.md) | Performance and resilience: load and chaos tests | `platform` | P2 | B05, B04 |
 | [X03](issues/X03-deployment-artefacts-images-compose-full-helm-op.md) | Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges | `deploy` | P1 | B05, H01 |

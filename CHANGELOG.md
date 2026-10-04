@@ -49,6 +49,22 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - The same page read `kid` where the API sends `key_id`, so a verified
   receipt's key id never appeared.
 
+### Added (F02)
+
+- Foresight exports a deterministic aggregate `ScenarioRehearsal` with a
+  swappable `PersonaSimulator`, relative-band baseline comparison, seed and
+  simulator version. It carries no individual records or execution capability.
+- The Foresight demo includes synthetic backtest status and prominently states
+  `SCENARIO, NOT CERTAINTY` and `NOT CALIBRATED ON REAL HUTCH LAUNCHES`.
+
+### Added (AU02)
+
+- `clarity.modules.autopsy.public` exports `BatchComplaint`; `AutopsyService`
+  adds mask-first dataset `ingest` and a reviewer `workspace` with masked
+  examples, language counts, synthetic trends and clustering diagnostics.
+- `GET /v1/demo/autopsy` now ingests DATA01 instead of a twelve-line tuple and
+  explicitly identifies `TrigramSimilarity` as non-semantic clustering.
+
 ### Added (F01, #27)
 
 - `clarity.modules.foresight.public` exports `Backtest`, `CalibrationReport`,

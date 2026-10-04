@@ -43,6 +43,13 @@ class ChangeType(StrEnum):
     FUP_TIGHTENED = "fup_tightened"
     POLICY_CHANGE = "policy_change"
     OUTAGE = "outage"
+    PACK_MIGRATION = "pack_migration"
+    FUP_DISCLOSURE_CHANGE = "fup_disclosure_change"
+    VAS_CONSENT_CHANGE = "vas_consent_change"
+    SOCIAL_PACK_SCOPE_CHANGE = "social_pack_scope_change"
+    PAYG_PRICE_CHANGE = "payg_price_change"
+    NEW_PACK = "new_pack"
+    PROMOTION_END = "promotion_end"
 
 
 class VolumeBand(StrEnum):
@@ -106,6 +113,16 @@ _THEMES: dict[ChangeType, tuple[tuple[str, Decimal, str], ...]] = {
     ),
 }
 
+_THEME_ALIASES: dict[ChangeType, ChangeType] = {
+    ChangeType.PACK_MIGRATION: ChangeType.PACK_RETIRED,
+    ChangeType.FUP_DISCLOSURE_CHANGE: ChangeType.FUP_TIGHTENED,
+    ChangeType.VAS_CONSENT_CHANGE: ChangeType.POLICY_CHANGE,
+    ChangeType.SOCIAL_PACK_SCOPE_CHANGE: ChangeType.PACK_RETIRED,
+    ChangeType.PAYG_PRICE_CHANGE: ChangeType.PRICE_INCREASE,
+    ChangeType.NEW_PACK: ChangeType.PACK_RETIRED,
+    ChangeType.PROMOTION_END: ChangeType.PRICE_INCREASE,
+}
+
 
 @dataclass
 class Scenario:
@@ -118,6 +135,9 @@ class Scenario:
     severity: Decimal = Decimal("1.0")
     """How big the change is, relative to a typical one of its type."""
     segments: tuple[Segment, ...] = DEMO_SEGMENTS
+    affected_products: tuple[str, ...] = ()
+    effective_date: str | None = None
+    business_context: str = ""
 
     @property
     def scenario_id(self) -> str:
@@ -189,7 +209,8 @@ class Foresight:
     ) -> ForesightReport:
         predictions: list[Prediction] = []
 
-        for theme, weight, driver in _THEMES.get(scenario.change_type, ()):
+        theme_type = _THEME_ALIASES.get(scenario.change_type, scenario.change_type)
+        for theme, weight, driver in _THEMES.get(theme_type, ()):
             for segment in scenario.segments:
                 sensitivity = getattr(segment, driver, Decimal("1.0"))
                 score = (

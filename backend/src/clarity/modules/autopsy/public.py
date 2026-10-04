@@ -35,7 +35,7 @@ from clarity.modules.autopsy.review import (
     ReviewRefused,
     staff_view,
 )
-from clarity.modules.autopsy.service import AutopsyService, ComplaintSource, Intake
+from clarity.modules.autopsy.service import AutopsyService, BatchComplaint, ComplaintSource, Intake
 
 __all__ = [
     "CLUSTERS",
@@ -46,6 +46,7 @@ __all__ = [
     "AutopsyReport",
     "AutopsyRepository",
     "AutopsyService",
+    "BatchComplaint",
     "CleanComplaint",
     "Cluster",
     "ClusterReview",

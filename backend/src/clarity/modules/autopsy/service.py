@@ -27,7 +27,8 @@ event feed the same code path rather than two implementations that drift.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -85,6 +86,15 @@ class Intake:
     @property
     def refused(self) -> bool:
         return not self.stored and self.reason == "forbidden_content"
+
+
+@dataclass(frozen=True)
+class BatchComplaint:
+    """Synthetic or approved complaint supplied to the mask-first batch seam."""
+
+    complaint_id: str
+    text: str
+    channel: str
 
 
 class AutopsyService:
@@ -198,6 +208,12 @@ class AutopsyService:
             unit.commit()
         return report
 
+    def ingest(self, complaints: Iterable[BatchComplaint]) -> list[Intake]:
+        """Ingest a dataset through exactly the same mask-first path as events."""
+        return [
+            self.accept(row.complaint_id, channel=row.channel, text=row.text) for row in complaints
+        ]
+
     # -- the review surface ---------------------------------------------- #
 
     def clusters(self) -> list[ReviewedCluster]:
@@ -211,6 +227,40 @@ class AutopsyService:
         screen without saying that nobody has checked it.
         """
         return [staff_view(held) for held in self.clusters()]
+
+    def workspace(self) -> dict[str, Any]:
+        """Reviewer workspace metadata, derived only from masked stored text."""
+        with self._open_unit() as unit:
+            complaints = self._repository(unit).all_complaints()
+        by_id = {item.complaint_id: item for item in complaints}
+        views: list[dict[str, Any]] = []
+        for held, view in zip(self.clusters(), self.for_staff(), strict=True):
+            members = [by_id[item] for item in held.cluster.members if item in by_id]
+            daily = Counter(item.received_at.date().isoformat() for item in members)
+            views.append(
+                {
+                    **view,
+                    "representative_masked_complaints": [item.masked_text for item in members[:3]],
+                    "synthetic_demo_trend": dict(sorted(daily.items())),
+                    "trend_label": "Synthetic demo trend",
+                    "mapping_label": (
+                        "Suggested mapping is a hypothesis until reviewed"
+                        if view["suggested_rule_id"]
+                        else "NEW / UNMAPPED PATTERN"
+                    ),
+                }
+            )
+        return {
+            "clusters": views,
+            "complaint_count": len(complaints),
+            "languages": dict(Counter(item.language.value for item in complaints)),
+            "clustering_method": self._autopsy.clustering_method,
+            "clustering_disclosure": (
+                "Character trigram similarity over deterministic canonical forms; "
+                "not semantic embedding clustering."
+            ),
+            "synthetic": True,
+        }
 
     def review(
         self,
@@ -237,4 +287,4 @@ class AutopsyService:
         return updated
 
 
-__all__ = ["AutopsyService", "ComplaintSource", "Intake"]
+__all__ = ["AutopsyService", "BatchComplaint", "ComplaintSource", "Intake"]

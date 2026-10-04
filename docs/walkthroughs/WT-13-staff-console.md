@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Audience | developers / demo presenters / judges |
-| Journey | Switch demo staff roles in Next.js console; desk approve; kill switches |
+| Journey | Switch demo staff roles; Desk approve; Autopsy and Foresight; kill switches |
 | Status | verified |
 | Last verified | 2026-10-04 (browser, `frontend/e2e/staff-desk.spec.ts`) |
 
@@ -41,6 +41,8 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 | 6 | Switch to **Security** | Admin | GET switches | Can read switches; flip returns 403 (no `flags:kill_switch`) |
 | 7 | Switch to **VAS ops** + step-up → Suspend GameZone | Desk card | `POST /v1/admin/merchants/suspend` | Simulated block on Dilani |
 | 8 | Switch to **CX eng** / **Compliance** | Studio | local draft / export stub | Draft saves in sessionStorage; export downloads labelled JSON |
+| 9 | As **Supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/demo/autopsy` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
+| 10 | Open **Foresight** | Foresight | `GET /v1/demo/foresight` | SCENARIO, NOT CERTAINTY; baseline-vs-swarm bands; not calibrated warning |
 
 ## 4. Under the hood
 
@@ -55,5 +57,7 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 - CORS / network: confirm `NEXT_PUBLIC_API_BASE` and that `make dev` is up.
 - The queue and the approval path are covered by `frontend/e2e/staff-desk.spec.ts`,
   so `make e2e` reproduces steps 1 to 4 without a browser of your own.
+- Autopsy, Foresight and their denied role are covered by
+  `frontend/e2e/autopsy-foresight.spec.ts`.
 - Empty queue: Create demo cases while signed in as agent or supervisor.
 - Flip refused: enable Step-up MFA, then retry.
