@@ -177,9 +177,7 @@ def register(app: FastAPI) -> None:
         trail saying the cluster was always judged this way.
         """
         if not body.note.strip():
-            raise HTTPException(
-                status_code=422, detail="superseding a verdict needs a reason"
-            )
+            raise HTTPException(status_code=422, detail="superseding a verdict needs a reason")
         try:
             updated = clarity.autopsy.review(
                 cluster_id,
@@ -225,11 +223,7 @@ def register(app: FastAPI) -> None:
         review step decorative.
         """
         held = next(
-            (
-                item
-                for item in clarity.autopsy.clusters()
-                if item.cluster.cluster_id == cluster_id
-            ),
+            (item for item in clarity.autopsy.clusters() if item.cluster.cluster_id == cluster_id),
             None,
         )
         if held is None:

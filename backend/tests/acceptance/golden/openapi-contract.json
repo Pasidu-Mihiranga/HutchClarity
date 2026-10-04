@@ -194,14 +194,6 @@
       "response": "object",
       "status": "200"
     },
-    "GET /v1/demo/autopsy": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "GET /v1/demo/foresight": {
       "parameters": [
         "header:authorization?"
@@ -213,14 +205,6 @@
     "GET /v1/demo/inbox": {
       "parameters": [
         "query:msisdn"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/ops": {
-      "parameters": [
-        "header:authorization?"
       ],
       "request": null,
       "response": "object",

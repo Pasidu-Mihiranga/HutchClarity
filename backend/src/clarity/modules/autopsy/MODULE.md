@@ -38,10 +38,15 @@ not a cluster: a cluster is a claim that several complaints share a cause, so
 one arriving changes the answer for all of them.
 
 ## 3. Used by
-`clarity.app.container`, which constructs `AutopsyService` and registers it as
-the `autopsy` consumer group for `complaint.created`; and
-`clarity.interfaces.http` for `GET /v1/demo/autopsy`, which shows a reviewer
-the current clusters.
+`clarity.app.container`, which constructs `AutopsyService`, registers it as the
+`autopsy` consumer group for `complaint.created` and seeds the synthetic
+complaints in every non-`prod` profile (D4); and `clarity.interfaces.http` for
+the reviewer workspace, `GET /v1/autopsy/clusters` plus `POST .../review`,
+`.../supersede` and `.../rule-candidate`.
+
+`GET /v1/demo/autopsy` was retired in D4. It had seeded the demo dataset lazily
+on first read, so the seed moved to the composition root: a GET that writes is
+a surprise, and the real workspace route must never import a mock driver.
 
 ## 3a. Invariants
 
@@ -96,3 +101,5 @@ Batch logic in process. Runtime target: serverless batch job (ADR-0028).
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.autopsy` with a public surface (R1) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AU02-autopsy-dataset-hardening.md` | Replaced the tiny demo tuple with DATA01 ingestion and honest reviewer workspace metadata |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D1-autopsy-review-api.md` | Reviewer workspace over HTTP: confirm, reject, supersede-with-reason, and a governed rule candidate (D1) |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D4-retire-demo-routes.md` | `GET /v1/demo/autopsy` retired; the synthetic seed moved to the composition root (D4) |

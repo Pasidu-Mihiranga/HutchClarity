@@ -1283,40 +1283,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/demo/autopsy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Autopsy
-         * @description Complaint Autopsy's current clusters, as a reviewer may be shown them.
-         *
-         *     Served by the autopsy service since AU01 (#13), where it used to build
-         *     a throwaway report per request. The service is fed by
-         *     `complaint.created` and keeps its clusters and their reviews, so a
-         *     verdict given here survives the request that gave it.
-         *
-         *     Every cluster goes through `staff_view`, which is the only sanctioned
-         *     way to put one in front of a person: it always carries `hypothesis` and
-         *     a `status_label`, so an unreviewed cluster cannot reach a screen
-         *     without saying that nobody has checked it (AU01 acceptance 1, I16).
-         *
-         *     The seeded demo complaints are accepted on first call when the store is
-         *     empty, so the demo path still shows something without a channel having
-         *     published any events yet.
-         */
-        get: operations["demo_autopsy_v1_demo_autopsy_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/demo/foresight": {
         parameters: {
             query?: never;
@@ -1349,40 +1315,6 @@ export interface paths {
          * @description The simulated SMS inbox. Prototype only, and labelled everywhere.
          */
         get: operations["demo_inbox_v1_demo_inbox_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/ops": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Ops
-         * @description Console dashboards, folded from the event log (I01, #30).
-         *
-         *     This route used to read live objects, which is the context issue #30
-         *     starts from: the numbers were whatever happened to be in this process,
-         *     so a restart lost them and a second replica disagreed with the first.
-         *     It now reads the stored projection, which survives a restart and which
-         *     a replay of the log rebuilds exactly.
-         *
-         *     It also summed money with `money += float(stake)`. I3 allows no float
-         *     anywhere on a money path, and a dashboard is on one: a figure a desk
-         *     acts on has to be the figure the ledger holds. The projection keeps
-         *     `Decimal` and serialises as a string.
-         *
-         *     Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
-         *     own surface is the gap recorded in the I01 devlog.
-         */
-        get: operations["demo_ops_v1_demo_ops_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1488,9 +1420,9 @@ export interface paths {
          *
          *     The projection has existed since I01 and had no surface of its own:
          *     the only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,
-         *     which is not where an operations dashboard belongs. The numbers are
-         *     the same; what changes is that the console is no longer reading a
-         *     demonstration endpoint to run a desk.
+         *     which is not where an operations dashboard belongs. That route is gone
+         *     as of D4, and the numbers are unchanged; what changed is that the
+         *     console no longer reads a demonstration endpoint to run a desk.
          *
          *     Folded from the log rather than read from live objects, which is the
          *     property that matters: a restart does not lose the numbers, two
@@ -4619,39 +4551,6 @@ export interface operations {
             };
         };
     };
-    demo_autopsy_v1_demo_autopsy_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     demo_foresight_v1_demo_foresight_get: {
         parameters: {
             query?: never;
@@ -4691,39 +4590,6 @@ export interface operations {
                 msisdn: string;
             };
             header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_ops_v1_demo_ops_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
             path?: never;
             cookie?: never;
         };

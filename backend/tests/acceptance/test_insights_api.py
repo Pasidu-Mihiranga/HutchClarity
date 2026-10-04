@@ -1,8 +1,9 @@
 """Operations dashboards as a real resource (D2).
 
 The projection has existed since I01. Its only surface was `GET /v1/demo/ops`,
-a route tagged `demo`, which is not where a desk's dashboard belongs: a
-console running a shift was reading a demonstration endpoint.
+a route tagged `demo`, which is not where a desk's dashboard belongs: a console
+running a shift was reading a demonstration endpoint. That route was retired in
+D4 and these now own the surface.
 
 The numbers are unchanged. These assert the two properties that make them
 worth reading, and the one that makes them safe to act on.
@@ -85,12 +86,13 @@ def test_money_is_never_a_float(api: TestClient, desk: dict[str, str]) -> None:
             assert not isinstance(value, float), f"{key} came back as a float"
 
 
-def test_the_real_route_answers_the_same_numbers_as_the_demo_one(
-    api: TestClient, desk: dict[str, str]
-) -> None:
-    """The move is a change of address, not of arithmetic. Asserted so the
-    demo route can be retired without anybody wondering what changed."""
-    real = api.get("/v1/insights/dashboards", headers=desk).json()
-    demo = api.get("/v1/demo/ops", headers=desk).json()
+def test_the_demo_address_is_gone(api: TestClient, desk: dict[str, str]) -> None:
+    """`GET /v1/demo/ops` was retired in D4.
 
-    assert real == demo
+    This replaces the equivalence test that guarded the move: while both
+    routes existed it asserted they answered identically, which is what made
+    deleting one safe. Now the assertion worth keeping is that the old address
+    does not quietly come back, because two routes serving one dashboard is
+    how the console ends up reading the demo one again.
+    """
+    assert api.get("/v1/demo/ops", headers=desk).status_code == 404
