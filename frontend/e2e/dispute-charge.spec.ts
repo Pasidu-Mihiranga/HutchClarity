@@ -60,8 +60,12 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await signedIn(page, await customerToken(request));
         await page.goto("/clarity");
 
+    // A how-to, not a question about this customer's own account. "What is
+    // the fair use policy?" routes to `account` and is answered from the
+    // customer's own FUP status, which is a correct answer with nothing to
+    // cite. The knowledge route is for questions a document answers.
     await page.getByRole("textbox", { name: /ask|message|type/i }).fill(
-      "What is the fair use policy?",
+      "How do I activate a data package?",
     );
     await page.keyboard.press("Enter");
 
