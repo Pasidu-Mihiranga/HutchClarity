@@ -50,6 +50,7 @@
         "action:approve",
         "action:approve:high_value",
         "action:propose",
+        "autopsy:review",
         "case:evaluate",
         "case:read",
         "case:read:any",
@@ -79,6 +80,7 @@
         "receipt:read:any"
       ],
       "cx_engineer": [
+        "autopsy:review",
         "case:evaluate",
         "case:read",
         "case:read:any",

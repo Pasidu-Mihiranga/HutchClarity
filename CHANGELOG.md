@@ -4,9 +4,24 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
-### Fixed
+### Removed
 
-- **Every guardrail in the policy store was declared and none of them checked anything** (C6). Policy YAML quotes its numbers so they load as exact decimals rather than binary floats, so every value reaching `Guardrail.permits` was a `str`, and the first line returned `True` for anything that was not a `Decimal` or an `int`. A numeric string is now checked, so `detection.*.confidence_base`, the throttle limits and `foresight.calibration.min_real_launches` all enforce their bounds. A string that is not a number still passes, because some keys are genuinely textual. Nothing broke when it started checking: every existing value was already inside its declared bounds.
+- **`GET /v1/demo/ops` and `GET /v1/demo/autopsy`** (D4), breaking for any
+  caller outside this repository. `/v1/insights/dashboards` (D2) and
+  `/v1/autopsy/clusters` (D1) replace them and answer the same data; the
+  console reads the replacements and the SDK's `demoOps()` and `demoAutopsy()`
+  are gone with them. A console running a shift should not be reading a route
+  tagged `demo`.
+  - `demo/autopsy` also seeded the synthetic complaint dataset lazily on first
+    read. That seeding moved to `clarity.app.container`, which runs it in every
+    non-`prod` profile: a GET that writes to a store is a surprise, and the
+    reviewer workspace route must never import a mock driver.
+  - **`GET /v1/demo/foresight` stayed** when D4 landed, because Workstream C
+    had not reached `main` and the console would have had nothing to read.
+    Workstream C lands with this change, so that reason has expired: retiring
+    the route and moving the console onto `/v1/foresight` is the follow-up.
+  - `POST /v1/demo/reset`, `GET /v1/demo/inbox` and `GET /v1/demo/subscribers`
+    stay as `SYNTHETIC_ONLY`, unchanged.
 
 ### Added
 
@@ -45,6 +60,14 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
   - `record_launch` refuses `Provenance.REAL` until C6 wires the capability and the required external evidence reference, rather than leaving an ungated way to write the evidence the gate reads.
   - Public surface: `ForesightService`, `ForesightRepository`, `StoredForesightRepository`, the record types, and the seven collection names.
 
+### Fixed
+
+- **Every guardrail in the policy store was declared and none of them checked anything** (C6). Policy YAML quotes its numbers so they load as exact decimals rather than binary floats, so every value reaching `Guardrail.permits` was a `str`, and the first line returned `True` for anything that was not a `Decimal` or an `int`. A numeric string is now checked, so `detection.*.confidence_base`, the throttle limits and `foresight.calibration.min_real_launches` all enforce their bounds. A string that is not a number still passes, because some keys are genuinely textual. Nothing broke when it started checking: every existing value was already inside its declared bounds.
+- `frontend/scripts/check-sdk.mjs` ran at all on Windows. It shelled out to
+  `npx` through `execFileSync`, which does not resolve `PATHEXT`, so the guard
+  that compares the committed SDK types against the schema threw `ENOENT` on
+  every Windows machine and never once compared anything.
+
 ### Changed
 
 - **Foresight rehearses a change with real persona methods, not a hash** (C3/F04, F11). The previous "swarm" took the statistical baseline, hashed `seed:scenario:theme:segment`, took two hex digits modulo three minus one, shifted the band by that, and compared the result against a second run of the same baseline. It measured a hash. Its tests passed because a hash is reproducible.
@@ -76,6 +99,12 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
 
 ### Added
+
+- **Policy Studio drives the real governance lifecycle** (D3). The console page wrote drafts to `sessionStorage` and downloaded a JSON blob under the line "Publish is not connected yet.", while `/v1/admin/policy/changes` and its review, approve, schedule, activate and rollback routes had sat there since M-GOV with no caller at all. The page now opens changes, attaches the impact replay, approves, schedules and activates through those routes, and shows the state, the change class, the approvals given against the approvals needed and who gave each one. The SDK gains `policyChanges`, `draftPolicyChange`, `reviewPolicyChange`, `approvePolicyChange`, `schedulePolicyChange`, `activatePolicyChange` and `rollbackPolicyChange`. No `/v1` contract changed: this is wiring to routes that already existed.
+
+- **`GET /v1/insights/dashboards`** (D2). The projection has existed since I01 and its only surface was `GET /v1/demo/ops`, so a console running a shift was reading a route tagged `demo`. The numbers are unchanged, which a test asserts against the old route so it can be retired without anybody wondering what moved.
+
+- **The Complaint Autopsy reviewer workspace** (D1). `GET /v1/autopsy/clusters` plus `POST .../review`, `.../supersede` and `.../rule-candidate`. Autopsy had the whole domain, a repository, an event consumer and a review service with `record` and `supersede`, reachable only through a read-only demo route: a cluster could be looked at and never judged. Reading is `desk:queue:read`, ruling is the new `autopsy:review`, and proposing a policy change needs `rule:draft` as well, because reviewing and drafting a rule are different judgements. A proposal creates a draft `PolicyChange` and nothing else: activation goes through the governance lifecycle, approved by somebody else (AU02). The console page carries the actions instead of only rendering clusters.
 
 - **The staff console signs in through the provider** (B1, B2). `GET /v1/auth/sign-in-methods` reports which paths a deployment offers, so the console shows what the API will actually accept rather than what it was built expecting; where a provider is configured it offers "Sign in with HUTCH SSO", and a signed-in session that is not stepped up offers "Re-authenticate", which is the first caller the step-up route has ever had. Signing out now tells the API and follows the provider's logout, rather than only clearing what the page can see.
 

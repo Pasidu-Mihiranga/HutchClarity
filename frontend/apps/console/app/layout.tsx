@@ -6,6 +6,7 @@ import "@fontsource-variable/space-grotesk";
 import { ConsoleNav } from "@/components/ConsoleNav";
 import { RoleSwitcherBar } from "@/components/RoleSwitcherBar";
 import { StaffSessionProvider } from "@/components/StaffSessionProvider";
+import "@clarity/ui/tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

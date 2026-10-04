@@ -584,12 +584,12 @@ export default function ClarityPage() {
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: "#fafafa" }}>
+      <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: "rgb(var(--c-surface-2))" }}>
 
         {/* ── Header ── */}
         <header style={{
           position: "sticky", top: "env(safe-area-inset-top,0px)", zIndex: 30,
-          background: "#fff", borderBottom: "1px solid var(--line)",
+          background: "rgb(var(--c-surface))", borderBottom: "1px solid var(--line)",
           padding: "12px 14px", display: "flex", alignItems: "center", gap: 10,
         }}>
           {/* back button */}
@@ -605,8 +605,8 @@ export default function ClarityPage() {
 
           <div style={{
             width: 40, height: 40, borderRadius: 14,
-            background: "linear-gradient(145deg,#f26226,#c2410c)",
-            color: "#fff", display: "grid", placeItems: "center",
+            background: "linear-gradient(145deg,rgb(var(--c-brand)),rgb(var(--c-primary)))",
+            color: "rgb(var(--c-on-primary))", display: "grid", placeItems: "center",
             fontWeight: 800, fontSize: 18, flexShrink: 0,
           }} aria-hidden="true">C</div>
 
@@ -616,12 +616,12 @@ export default function ClarityPage() {
           </div>
 
           {/* lang switcher */}
-          <div style={{ display: "flex", gap: 2, background: "#f4f4f5", borderRadius: 10, padding: 2 }} role="group" aria-label="Language">
+          <div style={{ display: "flex", gap: 2, background: "rgb(var(--c-surface-2))", borderRadius: 10, padding: 2 }} role="group" aria-label="Language">
             {supportedLangs.map((l) => (
               <button key={l} type="button" onClick={() => setLang(l)} style={{
                 border: 0,
-                background: l === lang ? "#fff" : "transparent",
-                color: l === lang ? "var(--orange-ink)" : "#52525b",
+                background: l === lang ? "rgb(var(--c-surface))" : "transparent",
+                color: l === lang ? "var(--orange-ink)" : "rgb(var(--c-fg-muted))",
                 boxShadow: l === lang ? "0 1px 2px rgba(0,0,0,.06)" : "none",
                 fontSize: 11, fontWeight: 700, padding: "6px 8px", borderRadius: 8,
                 cursor: "pointer", fontFamily: "inherit",
@@ -646,8 +646,8 @@ export default function ClarityPage() {
               <div style={{ textAlign: "center", padding: "40px 8px 24px" }}>
                 <div style={{
                   width: 72, height: 72, margin: "0 auto 18px", borderRadius: 22,
-                  background: "linear-gradient(145deg,#fff1eb,#ffe4d6)",
-                  border: "1px solid #fdd5c0", display: "grid", placeItems: "center",
+                  background: "linear-gradient(145deg,rgb(var(--c-primary-soft)),rgb(var(--c-primary) / 0.2))",
+                  border: "1px solid rgb(var(--c-primary) / 0.3)", display: "grid", placeItems: "center",
                   color: "var(--orange)",
                 }} aria-hidden="true">
                   <svg width="36" height="36" viewBox="0 0 36 36" fill="currentColor">
@@ -657,7 +657,7 @@ export default function ClarityPage() {
                 <h1 style={{ fontSize: "clamp(24px,6vw,30px)", fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px", color: "var(--ink)" }}>
                   {tl(lang, "chatHi").replace("{name}", app.name ?? DEMO_NAME)}
                 </h1>
-                <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "#3f3f46" }}>{tl(lang, "howHelpToday")}</p>
+                <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "rgb(var(--c-fg-muted))" }}>{tl(lang, "howHelpToday")}</p>
                 <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 24px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
                   {tl(lang, "chatSubtitle")}
                 </p>
@@ -672,8 +672,8 @@ export default function ClarityPage() {
                     <button key={chip.id} onClick={() => ask(chip.i18n_key, label, chip.intent ?? null)}
                       style={{
                         width: "100%", textAlign: "left", padding: "14px 18px",
-                        borderRadius: 999, border: `1.5px solid ${personalized ? "var(--orange)" : "#fdd5c0"}`,
-                        background: personalized ? "var(--orange-soft)" : "#fff",
+                        borderRadius: 999, border: `1.5px solid ${personalized ? "var(--orange)" : "rgb(var(--c-primary) / 0.3)"}`,
+                        background: personalized ? "var(--orange-soft)" : "rgb(var(--c-surface))",
                         cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
                         fontSize: 15, color: "var(--ink)",
                         boxShadow: "0 1px 2px rgba(24,24,27,.04)",
@@ -703,7 +703,7 @@ export default function ClarityPage() {
                         style={{
                           border: "1.5px solid",
                           borderColor: topicCategory === cat.id ? "var(--orange)" : "var(--line)",
-                          background: topicCategory === cat.id ? "var(--orange-soft)" : "#fff",
+                          background: topicCategory === cat.id ? "var(--orange-soft)" : "rgb(var(--c-surface))",
                           color: topicCategory === cat.id ? "var(--orange-ink)" : "var(--ink)",
                           borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 600,
                           cursor: "pointer", fontFamily: "inherit",
@@ -725,7 +725,7 @@ export default function ClarityPage() {
                               style={{
                                 width: "100%", textAlign: "left", padding: "12px 16px",
                                 borderRadius: 12, border: "1px solid var(--line)",
-                                background: "#fff", cursor: "pointer", fontFamily: "inherit",
+                                background: "rgb(var(--c-surface))", cursor: "pointer", fontFamily: "inherit",
                                 fontWeight: 500, fontSize: 14, color: "var(--ink)",
                               }}
                             >{label}</button>
@@ -754,7 +754,7 @@ export default function ClarityPage() {
                   return (
                     <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
                       <div style={{
-                        background: "var(--orange-strong)", color: "#fff", borderRadius: "18px 18px 4px 18px",
+                        background: "var(--orange-strong)", color: "rgb(var(--c-on-primary))", borderRadius: "18px 18px 4px 18px",
                         padding: "10px 16px", maxWidth: "80%", fontSize: 15, fontWeight: 500,
                       }}>
                         {msg.text}
@@ -778,7 +778,7 @@ export default function ClarityPage() {
                         <div
                           data-testid="clarity-reply"
                           style={{
-                            background: "#fff",
+                            background: "rgb(var(--c-surface))",
                             border: "1px solid var(--line)",
                             borderRadius: "18px 18px 18px 4px",
                             padding: "10px 16px",
@@ -824,12 +824,12 @@ export default function ClarityPage() {
         {/* ── Composer ── */}
         <div style={{
           position: "fixed", left: 0, right: 0, bottom: "var(--safe-bottom,0px)", zIndex: 35,
-          background: "linear-gradient(to top,#fff 70%,rgba(255,255,255,0))",
+          background: "linear-gradient(to top,rgb(var(--c-surface)) 70%,rgba(255,255,255,0))",
           padding: "10px 16px 8px",
         }}>
           <div style={{
             maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "flex-end", gap: 8,
-            background: "#fff", border: "1px solid var(--line)", borderRadius: 22,
+            background: "rgb(var(--c-surface))", border: "1px solid var(--line)", borderRadius: 22,
             padding: "8px 10px", boxShadow: "0 8px 24px rgba(24,24,27,.08)",
           }}>
             {/* Shown only where the browser can turn speech into text, so
@@ -879,8 +879,8 @@ export default function ClarityPage() {
               disabled={!input.trim() || busy}
               style={{
                 width: 40, height: 40, borderRadius: 999, border: 0,
-                background: input.trim() && !busy ? "var(--orange-strong)" : "#e4e4e7",
-                color: input.trim() && !busy ? "#fff" : "#a1a1aa",
+                background: input.trim() && !busy ? "var(--orange-strong)" : "rgb(var(--c-border))",
+                color: input.trim() && !busy ? "rgb(var(--c-surface))" : "rgb(var(--c-fg-subtle))",
                 fontSize: 16, fontWeight: 700,
                 cursor: input.trim() && !busy ? "pointer" : "not-allowed",
                 display: "grid", placeItems: "center", flexShrink: 0, transition: "background .15s",
@@ -898,7 +898,7 @@ export default function ClarityPage() {
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             position: "absolute", top: 0, left: 0, bottom: 0, width: "min(320px,90vw)",
-            background: "#fff", display: "flex", flexDirection: "column",
+            background: "rgb(var(--c-surface))", display: "flex", flexDirection: "column",
             boxShadow: "4px 0 24px rgba(0,0,0,.12)", overflowY: "auto",
           }}>
             <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid var(--line)" }}>
@@ -946,7 +946,7 @@ export default function ClarityPage() {
           display: "grid", placeItems: "center", padding: 16,
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: "#fff", borderRadius: "var(--radius)", padding: "24px 20px",
+            background: "rgb(var(--c-surface))", borderRadius: "var(--radius)", padding: "24px 20px",
             maxWidth: 360, width: "100%", boxShadow: "var(--shadow)",
           }}>
             <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>{pendingConfirm.title}</h3>
@@ -955,11 +955,11 @@ export default function ClarityPage() {
             </ul>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setPendingConfirm(null)} style={{
-                flex: 1, border: "1px solid var(--line)", background: "#fff", borderRadius: 999,
+                flex: 1, border: "1px solid var(--line)", background: "rgb(var(--c-surface))", borderRadius: 999,
                 padding: "10px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "cancel")}</button>
               <button onClick={doConfirm} style={{
-                flex: 1, border: 0, background: "var(--orange-strong)", color: "#fff", borderRadius: 999,
+                flex: 1, border: 0, background: "var(--orange-strong)", color: "rgb(var(--c-on-primary))", borderRadius: 999,
                 padding: "10px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "confirm")}</button>
             </div>

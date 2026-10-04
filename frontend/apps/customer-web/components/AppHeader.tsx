@@ -21,7 +21,7 @@ export function AppHeader({ backHref, backLabel = "Back", title }: Props) {
         position: "sticky",
         top: "env(safe-area-inset-top, 0px)",
         zIndex: 30,
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         borderBottom: "1px solid var(--line)",
         padding: "12px 16px",
       }}
@@ -64,7 +64,7 @@ export function AppHeader({ backHref, backLabel = "Back", title }: Props) {
                 height: 36,
                 borderRadius: 12,
                 background: "var(--orange)",
-                color: "#fff",
+                color: "rgb(var(--c-on-primary))",
                 fontWeight: 800,
                 fontSize: 15,
                 display: "grid",
@@ -93,7 +93,7 @@ export function AppHeader({ backHref, backLabel = "Back", title }: Props) {
           style={{
             display: "flex",
             gap: 2,
-            background: "#f4f4f5",
+            background: "rgb(var(--c-surface-2))",
             borderRadius: 10,
             padding: 2,
             marginLeft: "auto",
@@ -108,8 +108,8 @@ export function AppHeader({ backHref, backLabel = "Back", title }: Props) {
               onClick={() => setLang(l)}
               style={{
                 border: 0,
-                background: l === lang ? "#fff" : "transparent",
-                color: l === lang ? "var(--orange-ink)" : "#52525b",
+                background: l === lang ? "rgb(var(--c-surface))" : "transparent",
+                color: l === lang ? "var(--orange-ink)" : "rgb(var(--c-fg-muted))",
                 boxShadow: l === lang ? "0 1px 2px rgba(0,0,0,.06)" : "none",
                 fontSize: 11,
                 fontWeight: 700,

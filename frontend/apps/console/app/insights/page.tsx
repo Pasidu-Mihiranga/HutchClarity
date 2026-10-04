@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card } from "@clarity/ui";
+import type { AutopsyWorkspace } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
@@ -9,7 +10,7 @@ export default function InsightsPage() {
   const { client, session, generation, hasPermission } = useStaffSession();
   const allowed = hasPermission("desk:queue:read");
   const [ops, setOps] = useState<Record<string, unknown> | null>(null);
-  const [autopsy, setAutopsy] = useState<Record<string, unknown> | null>(null);
+  const [autopsy, setAutopsy] = useState<AutopsyWorkspace | null>(null);
   const [foresight, setForesight] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,8 +20,10 @@ export default function InsightsPage() {
     void (async () => {
       try {
         const [o, a, f] = await Promise.all([
-          client.demoOps(),
-          client.demoAutopsy(),
+          client.insightsDashboards(),
+          // The reviewer workspace, not `demo/autopsy`: that route was
+          // retired in D4 and this one is the same clusters, typed.
+          client.autopsyClusters(),
           client.demoForesight(),
         ]);
         setOps(o);
@@ -37,12 +40,7 @@ export default function InsightsPage() {
   }
 
   const byOutcome = (ops?.by_outcome || {}) as Record<string, number>;
-  const clusters = (autopsy?.clusters || []) as Array<{
-    label: string;
-    size: number;
-    status: string;
-    suggested_rule_id?: string;
-  }>;
+  const clusters = autopsy?.clusters ?? [];
   const predictions = (foresight?.predictions || []) as Array<{
     band: string;
     segment: string;
@@ -106,10 +104,10 @@ export default function InsightsPage() {
 
       <Card>
         <h2 className="mb-2 font-medium">Complaint Autopsy</h2>
-        <p className="mb-2 text-xs text-slate-500">{String(autopsy?.note || "")}</p>
+        <p className="mb-2 text-xs text-slate-500">{autopsy?.note ?? ""}</p>
         <ul className="space-y-1 text-sm">
           {clusters.map((c) => (
-            <li key={c.label}>
+            <li key={c.cluster_id}>
               {c.label} · {c.size} · {c.status}
               {c.suggested_rule_id ? ` · ${c.suggested_rule_id}` : ""}
             </li>

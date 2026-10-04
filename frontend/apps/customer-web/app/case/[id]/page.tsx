@@ -49,7 +49,7 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
           <span
             style={{
               padding: "3px 8px", borderRadius: 999, fontSize: 11,
-              fontWeight: 700, background: "#f4f4f5", color: "#52525b",
+              fontWeight: 700, background: "rgb(var(--c-surface-2))", color: "rgb(var(--c-fg-muted))",
             }}
           >
             Offline placeholder

@@ -8,7 +8,7 @@ Lean npm workspaces monorepo for Phase **B5 / D2–D4 / D7**.
 frontend/
   package.json          # workspaces: packages/*, apps/*
   packages/
-    ui/                 # @clarity/ui - Button, Card, Badge, Input
+    ui/                 # @clarity/ui - design tokens (light/dark) + accessible components, tested with Vitest
     sdk/                # @clarity/sdk - ClarityClient → NEXT_PUBLIC_API_BASE
     i18n/               # @clarity/i18n - en / si / ta + t(lang, key)
     widget/             # @clarity/widget - <clarity-why-card> custom element
@@ -74,10 +74,10 @@ npm run dev -w @clarity/customer-web
 - Bottom **role switcher** (agent … security_admin) + step-up MFA toggle
 - `/` - home with permission-aware section cards
 - `/desk` - live queue + cockpit + approve (via `@clarity/sdk`)
-- `/insights` - `/v1/demo/ops` summary
-- `/autopsy` - DATA01-backed Complaint Autopsy reviewer workspace
+- `/insights` - `/v1/insights/dashboards` summary, with the autopsy clusters and the foresight rehearsal alongside
+- `/autopsy` - Complaint Autopsy reviewer workspace on `/v1/autopsy/clusters`: confirm, reject and supersede-with-reason, gated on `autopsy:review`
 - `/foresight` - synthetic baseline-vs-swarm scenario rehearsal workspace
-- `/studio` - role-aware draft / publish stub / regulator export stub
+- `/studio` - Policy Studio on `/v1/admin/policy/changes`: draft, replay, approve, schedule, activate and propose a reversal
 - `/admin` - kill switches (`/v1/admin/switches`)
 
 Walkthrough: [docs/walkthroughs/WT-02-staff-console.md](../docs/walkthroughs/WT-13-staff-console.md)
@@ -94,3 +94,12 @@ Shared packages are consumed via workspace `*` deps and `transpilePackages` in e
 
 - UI uses Tailwind class strings; each app includes Tailwind/PostCSS.
 - OTP and case/receipt screens degrade gracefully with placeholders when the API is offline so UI can be reviewed without a live backend.
+
+## Design system (`@clarity/ui`)
+
+One token layer and one component set serve all three apps (plan workstream E1).
+
+- **Tokens**: `packages/ui/src/tokens.css` defines colour (as RGB channels), spacing, radius, elevation, type and motion, with a light and a dark theme. Dark applies from `data-theme="dark"` on `<html>` or, when no theme was chosen, from the system preference. Every text-on-surface pair is contrast-tested (WCAG AA) in `packages/ui/test/tokens.test.ts`.
+- **Apps wire it** by importing `@clarity/ui/tokens.css` in the root layout and adding `presets: [require("@clarity/ui/tailwind-preset")]` to `tailwind.config.js`. Use semantic classes (`bg-surface`, `text-fg-muted`, `border-border`, `bg-primary`), never a literal colour. The preset also maps the legacy `slate` scale onto the tokens so older pages follow the theme while they are migrated.
+- **Components** (all `forwardRef`, ARIA wired): `Button`, `Card`, `Badge`, `Input`, `Textarea`, `Select`, `Field`, `Spinner`, `Skeleton`, `Alert`, `EmptyState`, `ErrorState`, `Dialog`, `Tooltip`, `ToastProvider`/`useToast`, `Table*`, `Tabs`/`TabList`/`Tab`/`TabPanel`, `Pagination`, `ThemeProvider`/`ThemeSwitcher`. Strings a component renders (close, dismiss, page labels) are props so the host app translates them.
+- **Tests**: `npm test -w @clarity/ui` (Vitest, jsdom, Testing Library) covers focus trapping, keyboard behaviour, roles and token contrast.

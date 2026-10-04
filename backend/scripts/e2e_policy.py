@@ -7,10 +7,14 @@ forty specs that each need a session, so the suite failed on 429s that had
 nothing to do with what it tests.
 
 The fix is a policy value, not a code path (I10): this copies `config/policy`
-and raises that one key to its guardrail maximum, so the limiter still runs
-and is still resolved from the policy store, just with a ceiling the suite
+and raises the rate limits to their guardrail maxima, so each limiter still
+runs and is still resolved from the policy store, just with a ceiling the suite
 cannot reach by accident. The committed policy is never changed, and only
 `make dev-e2e` points `CLARITY_POLICY_DIR` at the copy.
+
+**Guardrail maxima, not "off".** A suite that ran with the limiter disabled
+would not notice the day a limiter starts refusing a request it should allow,
+which is the regression this file is one bad commit away from.
 
 Usage: ``python scripts/e2e_policy.py <source dir> <target dir>``
 """
@@ -24,7 +28,21 @@ from pathlib import Path
 import yaml
 
 #: Raised for the suite only. Each is set to its guardrail maximum.
-RAISED = ("throttle.auth.per_minute",)
+#:
+#: **All four, not just the sign-in one.** Every limit counts per caller and
+#: every request the suite makes comes from 127.0.0.1, so the suite is a single
+#: very busy caller against all of them at once. Raising only
+#: `throttle.auth.per_minute` moves the failure to
+#: `throttle.anonymous.per_minute`, which is the ceiling for a caller with no
+#: session across every throttled route together, and the suite signs in before
+#: it has one. The chat specs then reach the conversation and knowledge limits
+#: the same way.
+RAISED = (
+    "throttle.auth.per_minute",
+    "throttle.anonymous.per_minute",
+    "throttle.conversation.per_minute",
+    "throttle.knowledge.per_minute",
+)
 
 
 def build(source: Path, target: Path) -> None:

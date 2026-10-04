@@ -78,9 +78,9 @@ export default function CasesPage() {
               key={i}
               style={{
                 height: 80,
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "var(--radius-card-sm)",
                 border: "1px solid var(--line)",
-                background: "#f4f4f5",
+                background: "rgb(var(--c-surface-2))",
                 animation: "pulse 1.5s infinite",
               }}
             />
@@ -91,7 +91,7 @@ export default function CasesPage() {
           style={{
             border: "1px dashed var(--line)",
             borderRadius: "var(--radius)",
-            background: "#fff",
+            background: "rgb(var(--c-surface))",
             padding: "32px 20px",
             textAlign: "center",
           }}

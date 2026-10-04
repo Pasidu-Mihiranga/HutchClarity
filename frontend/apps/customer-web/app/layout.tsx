@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { AppShell } from "@/components/AppShell";
+import "@clarity/ui/tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

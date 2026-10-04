@@ -128,7 +128,17 @@ dev-e2e:
 	@# The API the browser suite drives (C05). A fixed port so Playwright can
 	@# wait on it, the lite profile so it needs no services (ADR-0006), and
 	@# OTEL off so the output stays readable in the suite's logs.
+	@#
+	@# `CLARITY_POLICY_DIR` points at a generated copy of `config/policy` with
+	@# the sign-in limit raised to its guardrail ceiling. The limit counts per
+	@# caller and every request the suite makes comes from 127.0.0.1, so ten a
+	@# minute is right for one person and far too few for forty specs that each
+	@# need a session. Raising it is a policy value, not a code path (I10): the
+	@# limiter still runs and is still resolved from the policy store. The
+	@# committed policy is never changed and only this target reads the copy.
+	cd $(BACKEND) && $(PY)/python scripts/e2e_policy.py ../config/policy .e2e-policy
 	cd $(BACKEND) && CLARITY_PROFILE=lite OTEL_EXPORTER=none \
+		CLARITY_POLICY_DIR=.e2e-policy \
 		CLARITY_STAFF_DIRECTORY_FILE=../config/staff/synthetic-directory.json \
 		$(PY)/uvicorn clarity.entrypoints.asgi:app --host 127.0.0.1 --port 8100
 

@@ -865,6 +865,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/autopsy/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Clusters
+         * @description The reviewer workspace: clusters, and what is known about each.
+         *
+         *     Reading is `desk:queue:read`, not `autopsy:review`: the desk should be
+         *     able to see what the pattern engine thinks without being able to rule
+         *     on it. Every cluster goes through `staff_view`, so one nobody has
+         *     checked cannot reach a screen without saying so.
+         */
+        get: operations["list_clusters_v1_autopsy_clusters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Cluster
+         * @description Record a first verdict.
+         *
+         *     Refuses a cluster that already has one. A second `review` would
+         *     overwrite a judgement with no trace of the first, which is what
+         *     `supersede` is for.
+         *
+         *     The reviewer is the authenticated principal, never a field in the body:
+         *     an anonymous verdict is not an audit record, and a verdict attributed
+         *     to whoever the caller typed is worse than none.
+         */
+        post: operations["review_cluster_v1_autopsy_clusters__cluster_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/rule-candidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Rule
+         * @description Propose a policy change from a confirmed cluster (AU02).
+         *
+         *     **This publishes nothing.** It creates a policy change in the draft
+         *     state and returns its id; approval, scheduling and activation all
+         *     happen through the governance routes, by somebody else. A pattern
+         *     engine that could activate its own rule would be deciding causes from
+         *     complaint text, which is exactly what I2 forbids.
+         *
+         *     Refuses a cluster nobody has confirmed. A hypothesis is not grounds for
+         *     a rule, and letting an unreviewed cluster seed one would make the
+         *     review step decorative.
+         */
+        post: operations["propose_rule_v1_autopsy_clusters__cluster_id__rule_candidate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Supersede Review
+         * @description Change a verdict, keeping the one it replaces.
+         *
+         *     Both survive. A reversal that erased what it reversed would leave the
+         *     trail saying the cluster was always judged this way.
+         */
+        post: operations["supersede_review_v1_autopsy_clusters__cluster_id__supersede_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cases": {
         parameters: {
             query?: never;
@@ -1177,40 +1283,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/demo/autopsy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Autopsy
-         * @description Complaint Autopsy's current clusters, as a reviewer may be shown them.
-         *
-         *     Served by the autopsy service since AU01 (#13), where it used to build
-         *     a throwaway report per request. The service is fed by
-         *     `complaint.created` and keeps its clusters and their reviews, so a
-         *     verdict given here survives the request that gave it.
-         *
-         *     Every cluster goes through `staff_view`, which is the only sanctioned
-         *     way to put one in front of a person: it always carries `hypothesis` and
-         *     a `status_label`, so an unreviewed cluster cannot reach a screen
-         *     without saying that nobody has checked it (AU01 acceptance 1, I16).
-         *
-         *     The seeded demo complaints are accepted on first call when the store is
-         *     empty, so the demo path still shows something without a channel having
-         *     published any events yet.
-         */
-        get: operations["demo_autopsy_v1_demo_autopsy_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/demo/foresight": {
         parameters: {
             query?: never;
@@ -1243,40 +1315,6 @@ export interface paths {
          * @description The simulated SMS inbox. Prototype only, and labelled everywhere.
          */
         get: operations["demo_inbox_v1_demo_inbox_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/ops": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Ops
-         * @description Console dashboards, folded from the event log (I01, #30).
-         *
-         *     This route used to read live objects, which is the context issue #30
-         *     starts from: the numbers were whatever happened to be in this process,
-         *     so a restart lost them and a second replica disagreed with the first.
-         *     It now reads the stored projection, which survives a restart and which
-         *     a replay of the log rebuilds exactly.
-         *
-         *     It also summed money with `money += float(stake)`. I3 allows no float
-         *     anywhere on a money path, and a dashboard is on one: a figure a desk
-         *     acts on has to be the figure the ledger holds. The projection keeps
-         *     `Decimal` and serialises as a string.
-         *
-         *     Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
-         *     own surface is the gap recorded in the I01 devlog.
-         */
-        get: operations["demo_ops_v1_demo_ops_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1651,6 +1689,38 @@ export interface paths {
          * @description Early-warning spikes. C5 supplies the detector that fills this.
          */
         get: operations["list_spikes_v1_foresight_spikes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/insights/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insights Dashboards
+         * @description Console dashboards, folded from the event log (D2).
+         *
+         *     The projection has existed since I01 and had no surface of its own:
+         *     the only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,
+         *     which is not where an operations dashboard belongs. That route is gone
+         *     as of D4, and the numbers are unchanged; what changed is that the
+         *     console no longer reads a demonstration endpoint to run a desk.
+         *
+         *     Folded from the log rather than read from live objects, which is the
+         *     property that matters: a restart does not lose the numbers, two
+         *     replicas agree, and a replay of the log rebuilds them exactly. Money
+         *     stays `Decimal` and serialises as a string, because a figure a desk
+         *     acts on has to be the figure the ledger holds (I3).
+         */
+        get: operations["insights_dashboards_v1_insights_dashboards_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2486,6 +2556,41 @@ export interface components {
             /** Amount Lkr */
             amount_lkr: string;
         };
+        /**
+         * ReviewRequest
+         * @description A verdict on a cluster.
+         *
+         *     `accept` rather than a status string: the vocabulary of verdicts belongs to
+         *     the domain, and a route that took `"confirmed"` would be a second place
+         *     those names are written down.
+         */
+        ReviewRequest: {
+            /** Accept */
+            accept: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * RuleCandidateRequest
+         * @description A proposal that a confirmed cluster should change a detection parameter.
+         *
+         *     It names an **existing** policy key. Governance drafts changes to artefacts
+         *     that already exist, with a change class derived from that artefact's tags,
+         *     and inventing a key here would route around the thing that decides how
+         *     risky the change is. Authoring a brand-new rule pack is a different act
+         *     with a different lifecycle, and this route does not pretend to do it.
+         */
+        RuleCandidateRequest: {
+            /** Key */
+            key: string;
+            /** Rationale */
+            rationale: string;
+            /** Value */
+            value: string;
+        };
         /** RuledOutView */
         RuledOutView: {
             /** Reason */
@@ -2638,6 +2743,20 @@ export interface components {
             step_up: boolean;
             /** User Ref */
             user_ref: string;
+        };
+        /**
+         * SupersedeRequest
+         * @description A deliberate change to somebody else's verdict.
+         *
+         *     The note is required here and optional on a first review. Changing a
+         *     professional judgement is the case where the reason matters most, and an
+         *     unexplained reversal is the thing an auditor asks about.
+         */
+        SupersedeRequest: {
+            /** Accept */
+            accept: boolean;
+            /** Note */
+            note: string;
         };
         /**
          * SwitchFlipRequest
@@ -4185,6 +4304,156 @@ export interface operations {
             };
         };
     };
+    list_clusters_v1_autopsy_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_cluster_v1_autopsy_clusters__cluster_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_rule_v1_autopsy_clusters__cluster_id__rule_candidate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleCandidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supersede_review_v1_autopsy_clusters__cluster_id__supersede_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupersedeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     open_case_v1_cases_post: {
         parameters: {
             query?: never;
@@ -4721,39 +4990,6 @@ export interface operations {
             };
         };
     };
-    demo_autopsy_v1_demo_autopsy_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     demo_foresight_v1_demo_foresight_get: {
         parameters: {
             query?: never;
@@ -4793,39 +5029,6 @@ export interface operations {
                 msisdn: string;
             };
             header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_ops_v1_demo_ops_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
             path?: never;
             cookie?: never;
         };
@@ -5525,6 +5728,39 @@ export interface operations {
         };
     };
     list_spikes_v1_foresight_spikes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insights_dashboards_v1_insights_dashboards_get: {
         parameters: {
             query?: never;
             header?: {
