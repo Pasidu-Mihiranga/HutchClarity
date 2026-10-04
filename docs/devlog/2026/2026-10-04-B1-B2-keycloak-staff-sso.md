@@ -60,14 +60,55 @@ Added:
 - `backend/tests/unit/test_staff_sso.py` (15): the authorization request, PKCE, single-use state, expiry, step-up parameters, the nonce check, logout URLs.
 - `backend/tests/acceptance/test_staff_sso_routes.py` (12): off until configured, the redirect, open-redirect refusal, forged state, step-up needs a session, logout clears both cookies and is idempotent, and the cookie actually authenticates.
 - `backend/tests/acceptance/test_route_contract.py`: the included-router guard above.
+- `backend/tests/unit/test_keycloak_realm.py` (14): the realm config itself, so the three defects above cannot come back. These run everywhere, which the integration lane cannot: two of its checks need the password grant, and the realm deliberately leaves it off.
+- `backend/tests/integration/test_keycloak.py` (5 more): the same claims against the real provider.
 
 Run:
-- `pytest`: `2475 passed, 633 skipped`. No failures.
+- `pytest`: `2489 passed, 638 skipped`. No failures.
+- `pytest tests/integration` against a live Keycloak (`CLARITY_KEYCLOAK_URL`): `24 passed, 26 skipped`, the skips being the lanes that need PostgreSQL, OPA and OpenBao.
 - `ruff check` and `format --check`: clean. `mypy`: 241 source files. `lint-imports`: 3 contracts kept.
+
+## Verified against a real Keycloak, and what that found
+
+Run against Keycloak 26.4.7 with the realm imported. The realm and the step-up
+flow imported cleanly on the first attempt, including both conditional
+level-of-assurance subflows with their configs attached, which was the part
+expected to need adjustment. **Three defects turned up that no mock could
+show**, and all three fail silently: the realm imports, the provider issues
+tokens, and nothing complains until somebody tries to sign in.
+
+**1. The realm minted no `sub`.** A realm import treats `clientScopes` as the
+whole set rather than an addition, so declaring the three Clarity MCP scopes
+removed Keycloak's built-in ones. `basic` is what emits `sub` and `auth_time`,
+and `KeycloakTokenVerifier` requires `sub`. **Every staff sign-in would have
+been rejected by our own verifier.** This is the same shape as the audience
+defect this lane found before, and for the same reason.
+
+**2. The realm minted no `acr`.** Same cause, different scope. Without it a
+stepped-up session is indistinguishable from a password one, so the step-up
+would have asked for a one-time code and granted nothing for it.
+
+**3. `MFA_RECENT` was unreachable from any real provider.** The verifier
+required `acr == "mfa-recent"`, which no Keycloak sends: with a level map
+configured the provider returns the level's own name, and this realm calls its
+second factor `mfa`. Since `MFA_RECENT` is what an above-cap approval requires,
+a correctly completed step-up would still not have granted the assurance it
+exists to grant. Recency now comes from `auth_time` against `STEP_UP_WINDOW`,
+which is what that claim is for: the ACR says what was proven, `auth_time` says
+when.
+
+Also confirmed working: 9 staff accounts with their roles, OTP credentials on
+the five roles that can move money, `acr.loa.map`, the TOTP policy, and the
+provider refusing a password-only sign-in for an account that carries OTP.
 
 ## Open issues / next step
 
-1. **Nothing here has run against a real Keycloak.** The Docker daemon was not running on this machine, so `tests/integration/test_keycloak.py` skipped as designed. What is untested: the realm JSON actually imports, the step-up flow's conditional executions behave as intended, and the code exchange round trip. The realm's flow definitions are the part most likely to need adjustment, because Keycloak's import format for authentication flows is unforgiving and the `autheticatorFlow` key really is spelled that way. **Run `docker compose -f deploy/compose/full.yml up -d keycloak` and the integration lane before trusting this.**
+1. **The browser round trip is still unproven.** A headless probe could not
+   replay Keycloak's session cookie, so the code exchange and the OTP prompt
+   were not driven end to end. What was proven is everything either side of it:
+   the authorization request, the realm's behaviour, the claims in a real
+   token, and the exchange code path. The remaining gap closes when the console
+   is wired and the browser suite runs.
 2. **The console still signs in with the password form.** The backend is ready; the browser half is not wired. Until it is, staff SSO is reachable only by visiting `/v1/auth/staff/oidc/start` directly.
 3. **B3 is half done.** Logout and revocation landed here. The assurance cap on refresh and the session inventory have not.
 4. **B4 is half done.** The staff cookie and the CORS pin landed here. The customer app still keeps a bearer token in `sessionStorage`, and there is no CSRF token beyond `SameSite=Lax`.

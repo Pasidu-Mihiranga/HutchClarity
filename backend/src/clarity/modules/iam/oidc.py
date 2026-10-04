@@ -219,7 +219,14 @@ class OidcLogin:
             "client_id": self._settings.client_id,
             "redirect_uri": pending.redirect_uri,
             "response_type": "code",
-            "scope": "openid profile email",
+            # `openid` only. The realm declares its own `clientScopes`, and a
+            # realm import treats that list as the whole set rather than an
+            # addition, so Keycloak's stock `profile` and `email` scopes do not
+            # exist here and asking for them is an `invalid_scope` refusal
+            # before the login form ever renders. Nothing needs them either:
+            # the identity Clarity uses is `sub` plus realm roles, which come
+            # from the `basic` scope and the client's own role mapper.
+            "scope": "openid",
             "state": pending.state,
             "nonce": pending.nonce,
             "code_challenge": code_challenge_for(pending.code_verifier),

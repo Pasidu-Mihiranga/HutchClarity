@@ -56,6 +56,10 @@
             "userinfo.token.claim": "false"
           }
         }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
       ]
     },
     {
@@ -98,6 +102,10 @@
         "clarity.analytics",
         "clarity.customer-assist",
         "clarity.staff-assist"
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
       ]
     },
     {
@@ -149,6 +157,10 @@
             "userinfo.token.claim": "false"
           }
         }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
       ]
     }
   ],
@@ -429,6 +441,63 @@
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       }
+    },
+    {
+      "name": "basic",
+      "description": "sub and auth_time. Keycloak ships this; the realm's own clientScopes list replaces the built-in set rather than adding to it, so it has to be restated here.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "auth_time",
+            "jsonType.label": "long"
+          }
+        },
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "acr",
+      "description": "The authentication context class reference. This is what carries the level of assurance a step-up asked for; without it a stepped-up session is indistinguishable from a password one.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "acr loa level",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-acr-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "attributes": {

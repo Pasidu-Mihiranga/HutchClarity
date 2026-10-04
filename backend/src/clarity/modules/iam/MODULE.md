@@ -42,6 +42,8 @@ Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refre
 - **The browser never holds a provider token.** The API is the confidential client and the console carries an `HttpOnly` cookie holding the same Clarity staff token `TokenIssuer` has always minted, so revocation, the trail and `STEP_UP_WINDOW` work unchanged.
 - **A sign-in state is single use.** It is deleted when claimed, so a replayed callback finds nothing, and the id token's nonce is checked before anything is trusted.
 - **A step-up re-authenticates.** `prompt=login` and `max_age=0` with `acr_values`, against a realm that carries `acr.loa.map`: without the map the provider ignores the level, answers from its own cookie, and the token claims MFA for a password typed an hour ago.
+- **The realm must declare the `basic` and `acr` scopes explicitly.** A realm import replaces Keycloak's built-in client scopes rather than adding to them, so declaring the Clarity MCP scopes removed them. `basic` emits `sub`, which `KeycloakTokenVerifier` requires, and `acr` carries the level of assurance. Both failures are silent: the realm imports and tokens issue. `tests/unit/test_keycloak_realm.py` pins it.
+- **Recency comes from `auth_time`, never from the name of a level.** The ACR says what was proven; `auth_time` says when. Requiring `acr == "mfa-recent"` made `MFA_RECENT` unreachable from any real provider, so a completed step-up granted nothing.
 - **Staff SSO is off unless fully configured.** Issuer, client secret and callback, all three. A confidential client with no secret is a public client nobody decided to make public, and a half-configured SSO silently falling back to the development sign-in is the failure nobody notices.
 
 ## 7. Migration status (enterprise-plan 21)
@@ -53,6 +55,7 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 - `tests/acceptance/test_staff_sso_routes.py` (the routes, the cookie, logout)
 - `tests/contract/test_authz_parity.py` (real OPA in the `full` lane)
 - `tests/security/test_audit_grants.py`
+- `tests/unit/test_keycloak_realm.py` (the shipped realm's own configuration)
 - `tests/integration/test_keycloak.py` (real Keycloak, `CLARITY_KEYCLOAK_URL`)
 
 ## 9. Change history

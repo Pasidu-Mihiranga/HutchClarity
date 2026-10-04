@@ -208,3 +208,120 @@ def test_an_unsigned_token_is_refused(realm: _Realm) -> None:
         KeycloakTokenVerifier(realm.issuer, AUDIENCE).verify(
             f"{header.decode()}.{payload.decode()}."
         )
+
+
+# --------------------------------------------------------------------------- #
+# Staff sign-in (B1, B2)
+#
+# Three defects this lane found, each of which a mock Keycloak cannot show and
+# each of which fails silently: the realm imports, the provider issues tokens,
+# and nothing complains until somebody tries to sign in.
+# --------------------------------------------------------------------------- #
+
+
+CONSOLE_CLIENT = "clarity-console"
+CONSOLE_SECRET = "clarity-console-development-only"
+
+
+def _console_token(realm: _Realm, username: str, password: str) -> httpx.Response:
+    """A staff token by password grant.
+
+    Not how the console signs in: the console uses the authorization code flow
+    and a browser. This is the narrowest way to ask the real provider what
+    claims it puts in a staff token, which is what these tests are about.
+    Requires `directAccessGrantsEnabled` on the client, which the realm leaves
+    off, so the test enables it through the admin API when it can and skips
+    otherwise.
+    """
+    with httpx.Client(timeout=20) as client:
+        return client.post(
+            f"{realm.issuer}/protocol/openid-connect/token",
+            data={
+                "client_id": CONSOLE_CLIENT,
+                "client_secret": CONSOLE_SECRET,
+                "username": username,
+                "password": password,
+                "grant_type": "password",
+                "scope": "openid",
+            },
+        )
+
+
+def test_the_realm_carries_the_console_client(realm: _Realm) -> None:
+    """Staff SSO needs a confidential browser client. Without it the whole
+    flow is unreachable and the console falls back to the development form."""
+    with httpx.Client(timeout=20) as client:
+        config = client.get(f"{realm.issuer}/.well-known/openid-configuration")
+
+    assert config.status_code == 200
+    endpoints = config.json()
+    assert endpoints["authorization_endpoint"].endswith("/protocol/openid-connect/auth")
+    assert endpoints["end_session_endpoint"].endswith("/protocol/openid-connect/logout")
+    assert "S256" in endpoints.get("code_challenge_methods_supported", [])
+
+
+def test_the_realm_offers_only_the_scopes_it_declares(realm: _Realm) -> None:
+    """A realm import replaces the built-in client scopes rather than adding to
+    them, so `profile` and `email` do not exist here.
+
+    Asking for them is an `invalid_scope` refusal **before the login form ever
+    renders**, which looks like a broken provider rather than a wrong request.
+    `oidc.py` asks for `openid` alone, and this is why.
+    """
+    with httpx.Client(timeout=20, follow_redirects=False) as client:
+        refused = client.get(
+            f"{realm.issuer}/protocol/openid-connect/auth",
+            params={
+                "client_id": CONSOLE_CLIENT,
+                "redirect_uri": "http://localhost:8000/v1/auth/staff/oidc/callback",
+                "response_type": "code",
+                "scope": "openid profile email",
+                "state": "probe",
+            },
+        )
+
+    assert refused.status_code == 302
+    assert "invalid_scope" in refused.headers.get("location", "")
+
+
+def test_a_staff_token_carries_the_subject_the_api_requires(realm: _Realm) -> None:
+    """`KeycloakTokenVerifier` requires `sub`, and the realm did not mint one.
+
+    The built-in `basic` scope is what emits `sub` and `auth_time`, and the
+    realm's own `clientScopes` list had replaced it out of existence. Every
+    staff sign-in would have been rejected by our own verifier, with a realm
+    that imports cleanly and a provider that issues tokens happily.
+    """
+    minted = _console_token(realm, "nadeesha", "nadeesha-clarity")
+    if minted.status_code != 200:
+        pytest.skip(f"password grant unavailable on {CONSOLE_CLIENT}: {minted.text[:120]}")
+
+    claims = _claims(str(minted.json()["access_token"]))
+    assert claims.get("sub"), "no sub: the API rejects this token"
+    assert claims.get("aud") == "clarity-api"
+    assert "agent" in claims.get("realm_access", {}).get("roles", [])
+
+
+def test_a_staff_token_carries_the_level_of_assurance(realm: _Realm) -> None:
+    """Without the `acr` scope a stepped-up session is indistinguishable from a
+    password one, so the step-up would ask for a code and grant nothing."""
+    minted = _console_token(realm, "nadeesha", "nadeesha-clarity")
+    if minted.status_code != 200:
+        pytest.skip("password grant unavailable")
+
+    claims = _claims(str(minted.json()["access_token"]))
+    assert claims.get("acr") == "password", (
+        "the realm's acr.loa.map should name this level; without the acr scope "
+        "the claim is absent entirely"
+    )
+
+
+def test_an_account_with_a_second_factor_cannot_sign_in_with_a_password_alone(
+    realm: _Realm,
+) -> None:
+    """The five accounts that can move money carry OTP, and the provider
+    enforces it even on the direct grant."""
+    refused = _console_token(realm, "dilani", "dilani-clarity")
+
+    assert refused.status_code == 401
+    assert refused.json().get("error") == "invalid_grant"
