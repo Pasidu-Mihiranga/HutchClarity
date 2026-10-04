@@ -25,4 +25,5 @@ by default.
 - Core Clarity stays healthy with WhatsApp disabled.
 - A live synthetic direct-message journey and auth persistence are verified.
 
-GitHub: #59. Status: blocked on DEP01 and CD01.
+GitHub: #59. Status: implemented; live operator pairing and synthetic journey
+verification remain before closure.
