@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/space-grotesk";
 import { ConsoleNav } from "@/components/ConsoleNav";
 import { RoleSwitcherBar } from "@/components/RoleSwitcherBar";
+import { SessionGate } from "@/components/SessionGate";
 import { StaffSessionProvider } from "@/components/StaffSessionProvider";
 import "@clarity/ui/tokens.css";
 import "./globals.css";
@@ -58,7 +59,7 @@ export default function RootLayout({
             tabIndex={-1}
             className="mx-auto max-w-[1240px] px-4 py-8 focus:outline-none sm:px-6"
           >
-            {children}
+            <SessionGate>{children}</SessionGate>
           </main>
         </StaffSessionProvider>
       </body>
