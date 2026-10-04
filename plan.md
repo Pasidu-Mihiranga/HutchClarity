@@ -324,7 +324,7 @@ devlogs.
 
 ### Wave 5 - Production readiness (ship gate)
 
-- [ ] #28 `[FE01]` Frontend: verified build, static UI retired, accessibility and language review `p1`
+- [ ] #28 `[FE01]` Frontend: verified build, static UI retired, Next.js 14, accessibility and language review `p1`
 - [x] #42 `[X01]` Security hardening: threat-model checks, DAST, dependency and licence scanning `p1`
 - [x] #44 `[X03]` Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges `p1`
 - [x] #43 `[X02]` Performance and resilience: load and chaos tests `p2`

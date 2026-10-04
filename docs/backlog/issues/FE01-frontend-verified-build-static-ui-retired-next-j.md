@@ -1,4 +1,4 @@
-# [FE01] Frontend: verified build, static UI retired, accessibility and language review
+# [FE01] Frontend: verified build, static UI retired, Next.js 14, accessibility and language review
 
 | Field | Value |
 |---|---|
@@ -15,9 +15,11 @@ Next.js 14 apps; build not verified on dev; static UI still served.
 ## Scope
 - Green build in CI (blocking); retire `interfaces/http/static` once parity is shown
 - axe checks; native-speaker review of si/ta strings
-- The Next.js 16 upgrade was attempted here and reverted: it builds but fails 7
-  of 9 browser tests. It is [FE02](FE02-next-js-16-upgrade-behind-the-browser-suite.md)
-  now, with the browser suite as its gate (ADR-0031).
+- **Next.js 14 is the framework** (ADR-0031). This issue said "upgrade to
+  Next.js 16"; the upgrade was attempted here and reverted, because 16.3.8
+  builds and then fails 7 of the 9 browser tests that pass on 14. It is
+  [FE02](FE02-next-js-16-upgrade-behind-the-browser-suite.md) now, with the
+  browser suite as its gate rather than the build.
 
 ## Acceptance tests
 
