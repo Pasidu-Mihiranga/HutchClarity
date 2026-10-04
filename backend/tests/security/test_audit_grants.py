@@ -33,7 +33,7 @@ from clarity.platform.security.principal import (
     Role,
 )
 
-PRIYA = "+94774445555"
+from ..acceptance.conftest import PRIYA
 
 
 class Clock:

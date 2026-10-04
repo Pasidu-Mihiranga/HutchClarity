@@ -28,8 +28,7 @@ from clarity.interfaces.http.main import create_app
 from clarity.interfaces.http.trail import NOT_RECORDED_AS_REQUESTS, STATE_CHANGING
 from clarity.platform.audit.ledger import AuditEventType, AuditRecord
 
-DILANI = "+94771234567"
-PRIYA = "+94774445555"
+from ..acceptance.conftest import DILANI, PRIYA
 
 
 @pytest.fixture
@@ -263,7 +262,7 @@ def test_no_raw_phone_number_reaches_the_trail(api: TestClient, clarity: Clarity
 
     serialised = json.dumps([r.model_dump(mode="json") for r in clarity.audit.records])
 
-    assert "+94771234567" not in serialised
-    assert "0771234567" not in serialised
+    assert DILANI not in serialised
+    assert "0" + DILANI.removeprefix("+94") not in serialised
     assert "+94770000001" not in serialised
     assert clarity.audit.verify().intact

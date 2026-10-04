@@ -18,7 +18,7 @@ from clarity.interfaces.mcp.server import ClarityMCPServer, Principal, Profile
 from clarity.kernel.common import Channel
 from clarity.platform.audit.ledger import AUDIT, ActorKind, AuditEventType
 
-DILANI = "+94771234567"
+from ..acceptance.conftest import DILANI
 
 
 @pytest.fixture
