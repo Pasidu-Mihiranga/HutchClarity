@@ -567,6 +567,11 @@ export class ClarityClient {
     return this.request("/v1/demo/ops");
   }
 
+  /** Operations dashboards, folded from the event log (D2). */
+  insightsDashboards(): Promise<Record<string, unknown>> {
+    return this.request("/v1/insights/dashboards");
+  }
+
   demoAutopsy(): Promise<Record<string, unknown>> {
     return this.request("/v1/demo/autopsy");
   }

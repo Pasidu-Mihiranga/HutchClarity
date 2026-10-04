@@ -248,6 +248,14 @@
       "response": "array[object]",
       "status": "200"
     },
+    "GET /v1/insights/dashboards": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/knowledge/search": {
       "parameters": [
         "query:q?"

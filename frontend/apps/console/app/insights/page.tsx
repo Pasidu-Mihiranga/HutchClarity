@@ -19,7 +19,7 @@ export default function InsightsPage() {
     void (async () => {
       try {
         const [o, a, f] = await Promise.all([
-          client.demoOps(),
+          client.insightsDashboards(),
           client.demoAutopsy(),
           client.demoForesight(),
         ]);

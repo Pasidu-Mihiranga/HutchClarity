@@ -70,6 +70,8 @@ SIGNED_IN = {
     # ruling needs `autopsy:review`; proposing a policy change needs
     # `rule:draft`, which is a different judgement from reviewing.
     ("GET", "/v1/autopsy/clusters"),
+    # Operations dashboards, folded from the event log (D2).
+    ("GET", "/v1/insights/dashboards"),
     ("POST", "/v1/autopsy/clusters/{cluster_id}/review"),
     ("POST", "/v1/autopsy/clusters/{cluster_id}/supersede"),
     ("POST", "/v1/autopsy/clusters/{cluster_id}/rule-candidate"),
