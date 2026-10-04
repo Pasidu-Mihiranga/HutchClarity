@@ -131,3 +131,11 @@ jobs:
           ssh "$USER@$HOST" "tar -xzf /opt/hutch-clarity/releases/$SHA.tgz -C /opt/hutch-clarity"
           printf '%s' "$GHCR_TOKEN" | ssh "$USER@$HOST" docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           ssh "$USER@$HOST" "/opt/hutch-clarity/deploy/scripts/deploy.sh $SHA"
+
+      - name: Remove the registry login from the server
+        if: always() && steps.release.outputs.operation == 'deploy'
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER }}
+        # The job token expires with the job; leaving it on disk helps nobody.
+        run: ssh "$USER@$HOST" docker logout ghcr.io || true

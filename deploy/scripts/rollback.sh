@@ -9,8 +9,10 @@ if [[ -s $root/previous-release ]]; then
   [[ $previous =~ ^[0-9a-f]{7,40}$ ]]
   sed -i -E "s/^IMAGE_TAG=.*/IMAGE_TAG=$previous/" "$environment"
   export IMAGE_TAG=$previous
-  "${compose[@]}" pull
-  "${compose[@]}" up -d --wait
+  # The previous release's images are already on this host. Pulling again
+  # would need a registry login that expired with the deploy job, and a
+  # release built on the host has no registry copy at all.
+  "${compose[@]}" up -d --wait --pull missing
   "$root/deploy/scripts/healthcheck.sh"
   printf '%s\n' "$previous" > "$root/current-release"
   echo "rolled back Clarity to $previous"
