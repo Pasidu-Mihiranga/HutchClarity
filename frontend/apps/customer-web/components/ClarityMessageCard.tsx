@@ -172,8 +172,8 @@ function FollowUps({ items, lang, onFollow }: { items: FollowUp[]; lang: string;
           key={fu.id}
           onClick={() => onFollow(fu)}
           style={{
-            border: "1.5px solid #fdd5c0",
-            background: "#fff",
+            border: "1.5px solid rgb(var(--c-primary) / 0.3)",
+            background: "rgb(var(--c-surface))",
             borderRadius: 999,
             padding: "8px 14px",
             fontSize: 13,
@@ -213,7 +213,7 @@ function EvidenceList({ decision, timeline, lang }: { decision: Decision | null;
     <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 4 }}>
       {items.map((it, i) => (
         <li key={i} style={{ display: "flex", gap: 8, fontSize: 13 }}>
-          <span style={{ color: it.warn ? "#f59e0b" : "#22c55e", fontWeight: 700, flexShrink: 0 }}>
+          <span style={{ color: it.warn ? "rgb(var(--c-warning))" : "rgb(var(--c-success))", fontWeight: 700, flexShrink: 0 }}>
             {it.warn ? "⚠" : "✓"}
           </span>
           <span style={{ color: "var(--muted)" }}>{it.text}</span>
@@ -312,7 +312,7 @@ function InvestigationCard({
 
   return (
     <div style={card}>
-      <span style={{ ...verdict, background: outcome === "HANDOFF" ? "#fef3c7" : "#f0fdf4", color: outcome === "HANDOFF" ? "#92400e" : "#15803d" }}>
+      <span style={{ ...verdict, background: outcome === "HANDOFF" ? "rgb(var(--c-warning-soft))" : "rgb(var(--c-success-soft))", color: outcome === "HANDOFF" ? "rgb(var(--c-warning))" : "rgb(var(--c-success))" }}>
         {String(outcome).replace(/_/g, " ")}
       </span>
       <h3 style={cardH3}>{tl(lang, "foundReason")}</h3>
@@ -359,12 +359,12 @@ function Sources({ articles, lang }: { articles: Article[] | null; lang: string 
   return (
     <section
       aria-label={tl(lang, "sourcesTitle")}
-      style={{ marginTop: 12, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}
+      style={{ marginTop: 12, borderTop: "1px solid rgb(var(--c-border))", paddingTop: 10 }}
     >
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#64748b" }}>
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "rgb(var(--c-fg-muted))" }}>
         {tl(lang, "sourcesTitle")}
       </p>
-      <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12, color: "#475569" }}>
+      <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12, color: "rgb(var(--c-fg-muted))" }}>
         {cited.map((a) => (
           <li key={a.citation}>
             {a.title}
@@ -382,7 +382,7 @@ function KnowledgeCard({ state, lang, onFollow, onHandoff }: { state: ClaritySta
   const top = state.articles?.[0];
   return (
     <div style={card}>
-      <span style={{ ...verdict, background: "#eff6ff", color: "#1d4ed8" }}>HOW TO</span>
+      <span style={{ ...verdict, background: "rgb(var(--c-info-soft))", color: "rgb(var(--c-info))" }}>HOW TO</span>
       <h3 style={cardH3}>{top?.title ?? tl(lang, "unknown")}</h3>
       <p style={{ fontSize: 15, margin: "6px 0 0" }}>{top?.body ?? tl(lang, "intentHint")}</p>
       <Sources articles={state.articles ?? null} lang={lang} />
@@ -398,7 +398,7 @@ function MissCard({ state, lang, onRetry, onHandoff, onFollow }: { state: Clarit
   const finding = tl(lang, (INTENT_EMPTY[state.intent ?? ""] ?? "intentNone") as TranslationKey);
   return (
     <div style={card}>
-      <span style={{ ...verdict, background: "#fef3c7", color: "#92400e" }}>{tl(lang, "couldNotConfirm")}</span>
+      <span style={{ ...verdict, background: "rgb(var(--c-warning-soft))", color: "rgb(var(--c-warning))" }}>{tl(lang, "couldNotConfirm")}</span>
       <h3 style={cardH3}>{finding}</h3>
       <p style={{ fontSize: 14, color: "var(--muted)", margin: "6px 0 0" }}>{tl(lang, "intentHint")}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
@@ -421,8 +421,8 @@ function UsageCard({ state, lang, app, onFollow, onBuy }: { state: ClarityState;
       <p style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-.02em", margin: "4px 0 8px" }}>
         {left}{total ? ` / ${total}` : ""}
       </p>
-      <div style={{ height: 6, borderRadius: 999, background: "#f4f4f5", overflow: "hidden", margin: "4px 0 6px" }}>
-        <div style={{ height: "100%", width: `${Math.min(100, used)}%`, background: used >= 80 ? "#f59e0b" : "var(--orange)", borderRadius: 999 }} />
+      <div style={{ height: 6, borderRadius: 999, background: "rgb(var(--c-surface-2))", overflow: "hidden", margin: "4px 0 6px" }}>
+        <div style={{ height: "100%", width: `${Math.min(100, used)}%`, background: used >= 80 ? "rgb(var(--c-warning))" : "var(--orange)", borderRadius: 999 }} />
       </div>
       <p style={metaText}>{used >= 80 ? tl(lang, "fupActive") : tl(lang, "fupOk")}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
@@ -462,7 +462,7 @@ function NetworkCard({ state, lang, onFollow, onHandoff }: { state: ClarityState
       <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 4 }}>
         {[["ok", tl(lang, "accountOk")], ["ok", tl(lang, "packOk")], ["warn", tl(lang, "checkLocalSignal")]].map(([cls, text], i) => (
           <li key={i} style={{ display: "flex", gap: 8, fontSize: 13 }}>
-            <span style={{ color: cls === "warn" ? "#f59e0b" : "#22c55e", fontWeight: 700 }}>{cls === "warn" ? "⚠" : "✓"}</span>
+            <span style={{ color: cls === "warn" ? "rgb(var(--c-warning))" : "rgb(var(--c-success))", fontWeight: 700 }}>{cls === "warn" ? "⚠" : "✓"}</span>
             <span style={{ color: "var(--muted)" }}>{text}</span>
           </li>
         ))}
@@ -480,7 +480,7 @@ function HandoffCard({ state, lang, onViewCase }: { state: ClarityState; lang: s
   const id = state.caseId ?? "-";
   return (
     <div style={card}>
-      <span style={{ ...verdict, background: "#fef3c7", color: "#92400e" }}>HANDOFF</span>
+      <span style={{ ...verdict, background: "rgb(var(--c-warning-soft))", color: "rgb(var(--c-warning))" }}>HANDOFF</span>
       <h3 style={cardH3}>{tl(lang, "sentToSpecialist")}</h3>
       <p style={metaText}>{tl(lang, "caseNo").replace("{id}", id)}</p>
       <p style={{ fontSize: 14, margin: "6px 0 0" }}>{tl(lang, "humanFinding")}</p>
@@ -501,8 +501,8 @@ function SuccessCard({ state, lang, app, onViewReceipt, onFollow }: {
   const amount = state.decision?.amount_lkr ?? state.contextAmount ?? "";
   const bal = app.balance_lkr;
   return (
-    <div style={{ ...card, borderTop: "3px solid #22c55e" }}>
-      <h3 style={{ ...cardH3, color: "#15803d" }}>✓ {tl(lang, "resolvedTitle")}</h3>
+    <div style={{ ...card, borderTop: "3px solid rgb(var(--c-success))" }}>
+      <h3 style={{ ...cardH3, color: "rgb(var(--c-success))" }}>✓ {tl(lang, "resolvedTitle")}</h3>
       <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 4 }}>
         {amount && <li style={{ fontSize: 14 }}>{tl(lang, "refundedAmount").replace("{amount}", String(amount))}</li>}
         <li style={{ fontSize: 14 }}>{tl(lang, "subscriptionDisabled")}</li>
@@ -531,8 +531,8 @@ function ReceiptCard({ state, lang, onViewReceipt }: { state: ClarityState; lang
         data-verified={verified ? "true" : "false"}
         style={{
           ...verdict,
-          background: verified ? "#f0fdf4" : "#fef2f2",
-          color: verified ? "#15803d" : "#b91c1c",
+          background: verified ? "rgb(var(--c-success-soft))" : "rgb(var(--c-danger-soft))",
+          color: verified ? "rgb(var(--c-success))" : "rgb(var(--c-danger))",
         }}
       >
         {verified ? tl(lang, "verified") : tl(lang, "notVerified")}
@@ -552,7 +552,7 @@ const card: React.CSSProperties = {
   border: "1px solid var(--line)",
   borderRadius: "var(--radius)",
   padding: "16px 18px",
-  background: "#fff",
+  background: "rgb(var(--c-surface))",
   boxShadow: "var(--shadow)",
 };
 
@@ -580,7 +580,7 @@ const verdict: React.CSSProperties = {
 
 const btnPrimary: React.CSSProperties = {
   background: "var(--orange-strong)",
-  color: "#fff",
+  color: "rgb(var(--c-on-primary))",
   border: 0,
   borderRadius: 999,
   padding: "10px 20px",
@@ -591,7 +591,7 @@ const btnPrimary: React.CSSProperties = {
 };
 
 const btnSecondary: React.CSSProperties = {
-  background: "#f4f4f5",
+  background: "rgb(var(--c-surface-2))",
   color: "var(--ink)",
   border: 0,
   borderRadius: 999,

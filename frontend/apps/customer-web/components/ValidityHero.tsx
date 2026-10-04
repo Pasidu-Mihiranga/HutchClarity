@@ -4,9 +4,9 @@ type ValidityHeroProps = {
 };
 
 const TONES = {
-  valid: { accent: "#047857", glyph: "✓", title: "Valid", note: "Signature and chain verified" },
-  invalid: { accent: "#b91c1c", glyph: "✕", title: "Invalid", note: "Verification failed" },
-  unknown: { accent: "#b45309", glyph: "?", title: "Not checked", note: "We could not verify this receipt" },
+  valid: { accent: "rgb(var(--c-success))", glyph: "✓", title: "Valid", note: "Signature and chain verified" },
+  invalid: { accent: "rgb(var(--c-danger))", glyph: "✕", title: "Invalid", note: "Verification failed" },
+  unknown: { accent: "rgb(var(--c-warning))", glyph: "?", title: "Not checked", note: "We could not verify this receipt" },
 } as const;
 
 export function ValidityHero({ valid }: ValidityHeroProps) {
@@ -21,7 +21,7 @@ export function ValidityHero({ valid }: ValidityHeroProps) {
         justifyContent: "center",
         gap: 8,
         padding: "32px 16px",
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         border: "1px solid var(--line)",
         borderTop: `3px solid ${tone.accent}`,
         borderRadius: "var(--radius)",

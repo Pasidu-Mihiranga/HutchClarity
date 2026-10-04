@@ -57,7 +57,7 @@ export function BottomNav() {
         zIndex: 40,
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         borderTop: "1px solid var(--line)",
         padding: "6px 8px env(safe-area-inset-bottom, 0px)",
         minHeight: "var(--nav-h)",
