@@ -49,5 +49,23 @@ export default defineConfig({
       timeout: 120_000,
       env: { NEXT_PUBLIC_API_BASE: "http://127.0.0.1:8100" },
     },
+    // The console and the verify page are separate apps, and FE01 retires the
+    // static UI that used to serve all three from the backend. A suite that
+    // covered only customer-web would have retired `desk.html` and
+    // `verify.html` on no evidence at all.
+    {
+      command: "npm run dev -w @clarity/console -- --port 3101",
+      url: "http://127.0.0.1:3101/desk",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: { NEXT_PUBLIC_API_BASE: "http://127.0.0.1:8100" },
+    },
+    {
+      command: "npm run dev -w @clarity/verify -- --port 3102",
+      url: "http://127.0.0.1:3102",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: { NEXT_PUBLIC_API_BASE: "http://127.0.0.1:8100" },
+    },
   ],
 });

@@ -31,8 +31,8 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | autopsy | L4 | `backend/src/clarity/modules/autopsy/` | [MODULE.md](../backend/src/clarity/modules/autopsy/MODULE.md) | built | Serverless batch job (R6/R7) |
 | foresight | L4 | `backend/src/clarity/modules/foresight/` | [MODULE.md](../backend/src/clarity/modules/foresight/MODULE.md) | built | Serverless batch job (R6/R7) |
 | app (composition root, MCP view) | L5 | `backend/src/clarity/app/` | - | built | Profiles `full`, `prod` (R2) |
-| interfaces.http (`/v1`, static UI) | L6 | `backend/src/clarity/interfaces/http/` | - | built | Static UI retires once the Next.js apps are verified (R5) |
-| customer-web, console, verify (Next.js 14) | L7 apps | `frontend/apps/*` | `frontend/README.md` | built by the team (R5 started early); build not yet verified on `dev` | Verify build; align to Next.js 16 per plan 19 |
+| interfaces.http (`/v1`) | L6 | `backend/src/clarity/interfaces/http/` | - | built; serves `/v1` only, the static UI is retired (FE01) | Split read and command deployables (R7) |
+| customer-web, console, verify (Next.js 14) | L7 apps | `frontend/apps/*` | `frontend/README.md` | built by the team; the only UI, build and browser suite verified in CI (FE01) | Next.js 16 once it passes the browser suite (ADR-0031) |
 | ui, sdk, i18n, widget | packages | `frontend/packages/*` | `frontend/README.md` | built by the team | `sdk` has 2 methods with no backend route (`detect`, `decide`, marked) |
 | interfaces.mcp | L6 | `backend/src/clarity/interfaces/mcp/` | - | built (in-process only) | Real MCP server `clarity-mcp` (R4) |
 | entrypoints | L7 | `backend/src/clarity/entrypoints/` | - | built | Worker and stream entry points (R3) |

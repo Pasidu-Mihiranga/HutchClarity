@@ -13,14 +13,16 @@ hackathon submission asks and link it from the submission pack.
 3. Reset demo state:
 
 ```bash
-make up-lite
-make dev          # legacy UI+API on :8000  (or make dev-new for new API)
+make dev           # API on :8000
+make web-install   # once
+make web           # the three apps: :3000 customer, :3001 console, :3002 verify
 # optional: curl -X POST localhost:8000/v1/demo/reset
 ```
 
 4. Browser tabs pre-opened (do not show passwords):
-   - http://localhost:8000/          (customer Why?)
-   - http://localhost:8000/desk      (Clarity Desk)
+   - http://localhost:3000/          (customer app)
+   - http://localhost:3001/desk      (Clarity Desk, staff console)
+   - http://localhost:3002/          (public receipt verification)
    - http://localhost:8000/docs      (optional, 5 seconds)
 
 ## Click script (spoken beats in parentheses)
@@ -28,14 +30,14 @@ make dev          # legacy UI+API on :8000  (or make dev-new for new API)
 | Time | Click / action | Say |
 |---|---|---|
 | 0:00 | Title slide or README headline | "Hutch Clarity: explain every rupee, fix by rule, prove it." |
-| 0:20 | Open `/` Why? | "Customer Dilani sees a surprise VAS charge." |
+| 0:20 | Open the customer app on :3000 | "Customer Dilani sees a surprise VAS charge." |
 | 0:40 | Enter MSISDN / ask Why? | "She asks why - we never invent evidence." |
 | 1:10 | Show cause + evidence list | "Detector vas_silent_renewal: charge without fresh OTP." |
 | 1:40 | Show ruled-out causes | "Ruled out list keeps trust high." |
 | 2:00 | Tap Confirm / propose | "Rules decide the amount; LLM only explains." |
 | 2:30 | Show Trust Receipt + QR | "Signed receipt, QR opens the public verifier." |
-| 3:00 | Open `/v/...` verify page | "Anyone can check the signature." |
-| 3:30 | Open Desk `/desk` | "Staff queue sorted by money at stake." |
+| 3:00 | Scan the QR, or open `:3002/r/<receipt>` | "Anyone can check the signature, with no sign-in." |
+| 3:30 | Open the Desk on `:3001/desk` | "Staff queue sorted by money at stake." |
 | 4:10 | Open one case cockpit | "Same case, same evidence, supervisor path for L3." |
 | 4:50 | Optional: MCP mention | "Agents only propose via MCP; no execute tool." |
 | 5:20 | Show architecture.mmd or ADR slide | "Modular monolith, lite/full profiles, ports." |

@@ -4,6 +4,24 @@ export type ClarityClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
+/**
+ * An error the API answered with, carrying the status it answered.
+ *
+ * Without the status a caller cannot tell "this receipt does not exist" from
+ * "the API is unreachable", and the verify page needs that distinction: one is
+ * a real verdict about a receipt, the other is no verdict at all. It used to
+ * guess, and guessed "valid" for both (FE01).
+ */
+export class ClarityApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ClarityApiError";
+    this.status = status;
+  }
+}
+
 export type OtpRequestResult = {
   /** Required by `verifyOtp`: the challenge this code belongs to. */
   challenge_id: string;
@@ -39,6 +57,7 @@ export type ReceiptPayload = {
   valid?: boolean;
   chain_ok?: boolean;
   status?: string;
+  reason?: string;
   corrected_lkr?: string;
   key_id?: string;
   [key: string]: unknown;
@@ -222,7 +241,7 @@ export class ClarityClient {
       } catch {
         /* keep raw text */
       }
-      throw new Error(detail);
+      throw new ClarityApiError(detail, res.status);
     }
 
     if (res.status === 204) {

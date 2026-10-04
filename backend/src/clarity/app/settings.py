@@ -163,7 +163,7 @@ class Settings(BaseSettings):
 
     # -- interfaces ------------------------------------------------------- #
 
-    verify_base: str = Field(default="http://localhost:8000/v", alias="VERIFY_BASE")
+    verify_base: str = Field(default="http://localhost:3002/r", alias="VERIFY_BASE")
 
     # -- observability ---------------------------------------------------- #
 

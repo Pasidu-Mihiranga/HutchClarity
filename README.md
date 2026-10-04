@@ -47,20 +47,31 @@ make check     # lint, types, import contracts, tests
 ## How to run and test
 
 ```bash
-make demo      # walk the four journeys in the terminal
-make dev       # UI + API on http://localhost:8000
+make demo      # walk the four journeys in the terminal, Python only
+make dev       # the API on http://localhost:8000
 ```
+
+The journeys need no browser at all: `make demo` walks all four in the
+terminal, and `make check` covers them over `/v1`.
+
+For the UI, add Node 18+ and run the three Next.js apps next to the API
+(`make web-install` once, then `make web` for all three):
 
 | Page | What it is |
 |---|---|
-| <http://localhost:8000/> | Customer **Why?** journey: sign in with the simulated OTP inbox, see the cause with evidence, confirm in one tap, keep the receipt |
-| <http://localhost:8000/desk> | **Clarity Desk**: queue by money at stake, case cockpit, approvals (simulated staff sign-in; never available in `prod`) |
-| <http://localhost:8000/v/TR-2027-000001> | **Public receipt check**: what the QR code opens |
+| <http://localhost:3000/> | Customer app: sign in with the simulated OTP inbox, see the cause with evidence, confirm in one tap, keep the receipt |
+| <http://localhost:3001/desk> | **Clarity Desk**: queue by money at stake, case cockpit, approvals (simulated staff sign-in; never available in `prod`) |
+| <http://localhost:3002/r/TR-2027-000001> | **Public receipt check**: what the QR code opens, with no sign-in |
 | <http://localhost:8000/docs> | API reference (OpenAPI) |
+
+`make web-customer`, `make web-console` and `make web-verify` run one app each.
+See [frontend/README.md](frontend/README.md); the full storyboard is
+[docs/submission/DEMO_SCRIPT.md](docs/submission/DEMO_SCRIPT.md).
 
 `POST /v1/demo/reset` restores the synthetic data so the demo can run again.
 
-**Next.js apps (optional, Node 18+):** `make web-install`, then `make web-customer` (port 3000), `make web-console` (3001) or `make web-verify` (3002) against the API on port 8000. See [frontend/README.md](frontend/README.md). The full storyboard is [docs/submission/DEMO_SCRIPT.md](docs/submission/DEMO_SCRIPT.md).
+The API serves no pages: FE01 retired the static UI it used to carry, so the
+apps above are the only UI (ADR-0031).
 
 ## API / external services
 - **HUTCH systems:** none required; all are simulated (labelled in every response).

@@ -7,26 +7,27 @@
 | Audience | developers / demo presenters / judges |
 | Journey | Switch demo staff roles in Next.js console; desk approve; kill switches |
 | Status | verified |
-| Last verified | 2026-10-02 |
+| Last verified | 2026-10-04 (browser, `frontend/e2e/staff-desk.spec.ts`) |
 
 ## 1. What you will see
 
 The Clarity **console** (`:3001`) has a fixed bottom bar with every staff
 role. One tap signs in through the simulated staff issuer
 (`POST /v1/auth/staff/session`). Navigation and screens follow real
-permissions from `/v1/auth/me`. Desk queue and approve mirror the static
-Desk; Admin kill switches call `/v1/admin/switches`.
+permissions from `/v1/auth/me`. The console **is** the Desk now: FE01
+retired the static `desk.html` that used to serve `/desk`, `/ops`, `/autopsy`
+and `/foresight`. Admin kill switches call `/v1/admin/switches`.
 
 ## 2. Prerequisites
 
 ```bash
 make dev                 # API on :8000
-cd frontend && npm install
-export NEXT_PUBLIC_API_BASE=http://localhost:8000
-npm run dev:console      # http://localhost:3001
+make web-install         # once
+make web-console         # http://localhost:3001
 ```
 
-Optional: open the static Desk at http://localhost:8000/desk as a fallback.
+`NEXT_PUBLIC_API_BASE` defaults to `http://localhost:8000`; export it only if
+the API runs elsewhere. There is no static Desk to fall back to any more.
 
 ## 3. Steps
 
@@ -52,5 +53,7 @@ Optional: open the static Desk at http://localhost:8000/desk as a fallback.
 ## 5. Troubleshooting
 
 - CORS / network: confirm `NEXT_PUBLIC_API_BASE` and that `make dev` is up.
+- The queue and the approval path are covered by `frontend/e2e/staff-desk.spec.ts`,
+  so `make e2e` reproduces steps 1 to 4 without a browser of your own.
 - Empty queue: Create demo cases while signed in as agent or supervisor.
 - Flip refused: enable Step-up MFA, then retry.

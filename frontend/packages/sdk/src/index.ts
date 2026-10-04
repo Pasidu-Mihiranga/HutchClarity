@@ -1,5 +1,6 @@
 export {
   ClarityClient,
+  ClarityApiError,
   createClarityClient,
   type ClarityClientOptions,
   type CasePayload,

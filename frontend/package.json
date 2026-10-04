@@ -9,6 +9,7 @@
     "dev:customer": "npm run dev -w @clarity/customer-web",
     "dev:console": "npm run dev -w @clarity/console",
     "dev:verify": "npm run dev -w @clarity/verify",
+    "dev:all": "npm run dev:customer & npm run dev:console & npm run dev:verify & wait",
     "build": "npm run build -w @clarity/customer-web -w @clarity/console -w @clarity/verify",
     "lint": "npm run lint --workspaces --if-present",
     "sdk:generate": "openapi-typescript ../contracts/openapi.json -o packages/sdk/src/generated/schema.ts",

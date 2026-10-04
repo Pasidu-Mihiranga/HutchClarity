@@ -62,7 +62,7 @@ from clarity.platform.persistence import UnitOfWork, UnitOfWorkFactory
 
 #: Where the public verification page lives. Configured per environment;
 #: the host is a placeholder until HUTCH confirms the domain.
-DEFAULT_VERIFY_BASE = "https://clarity.example/v"
+DEFAULT_VERIFY_BASE = "https://clarity.example/r"
 
 _ACTOR_FOR_CONFIRMATION = {
     ConfirmedBy.CUSTOMER: ActorType.CUSTOMER_CONFIRMED,
@@ -115,7 +115,7 @@ class ReceiptService:
         from clarity.integration.drivers.mock.store import list_receipts, session_scope
 
         with session_scope() as session:
-            for receipt, subscriber_ref in list_receipts(session):
+            for receipt, subscriber_ref in list_receipts(session, verify_base=self._verify_base):
                 self._ledger.append(receipt, subscriber_ref=subscriber_ref)
                 if receipt.payload.supersedes:
                     self._ledger.mark_superseded(

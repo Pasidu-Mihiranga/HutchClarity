@@ -21,7 +21,9 @@ frontend/
 ## Prerequisites
 
 - Node.js 18+
-- Backend API reachable (default `http://localhost:8000`)
+- Backend API reachable (default `http://localhost:8000`): `make dev` from the
+  repository root. These apps are the only UI, so the API serves no pages
+  (FE01 retired the static UI it used to carry).
 
 ## Install & build
 

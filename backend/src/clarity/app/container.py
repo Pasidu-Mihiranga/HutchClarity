@@ -512,7 +512,7 @@ class Clarity:
         thresholds: PolicyThresholds | None = None,
         signing: SigningService | None = None,
         clock: datetime | None = DEMO_NOW,
-        verify_base: str = "http://localhost:8000/v",
+        verify_base: str = "http://localhost:3002/r",
         provider: ModelProvider | None = None,
         daily_refund_limit_lkr: str = "250000.00",
         profile: Profile | str | None = None,

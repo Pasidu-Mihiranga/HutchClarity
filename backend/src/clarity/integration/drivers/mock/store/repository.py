@@ -366,8 +366,14 @@ def save_receipt(session: Session, receipt: Any, *, subscriber_ref: str) -> None
     )
 
 
-def list_receipts(session: Session) -> list[tuple[Any, str]]:
-    """Load Trust Receipts oldest-first as (receipt, subscriber_ref)."""
+def list_receipts(session: Session, *, verify_base: str) -> list[tuple[Any, str]]:
+    """Load Trust Receipts oldest-first as (receipt, subscriber_ref).
+
+    `verify_url` is not part of the signed payload, so it is not stored and has
+    to be rebuilt. It is rebuilt from the caller's configured base: it used to
+    be a hard-coded `http://localhost:8000/v/...`, which pointed at the static
+    page FE01 retired and was wrong in every deployment anyway.
+    """
     from clarity.contracts.receipt import ReceiptPayload, ReceiptSignature, TrustReceipt
 
     rows = session.scalars(select(TrustReceiptRow).order_by(TrustReceiptRow.issued_at.asc())).all()
@@ -377,7 +383,7 @@ def list_receipts(session: Session) -> list[tuple[Any, str]]:
             payload=ReceiptPayload.model_validate(row.payload_json),
             payload_hash=row.payload_hash,
             signature=ReceiptSignature.model_validate(row.signature_json),
-            verify_url=f"http://localhost:8000/v/{row.receipt_id}",
+            verify_url=f"{verify_base.rstrip('/')}/{row.receipt_id}",
         )
         out.append((receipt, row.subscriber_ref))
     return out

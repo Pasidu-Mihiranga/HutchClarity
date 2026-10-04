@@ -130,13 +130,13 @@ Updated as implementation proceeds. Checkbox states are the source of truth for 
 ### Phase 0 - Decide and record (no code)
 
 - [ ] Resolve the Section 3 blocking question (A, B or C) with the team
-- [ ] Write `docs/adr/0031-modular-microservices.md`: context (what changed since ADR-0002), decision, the 8-service split, alternatives, consequences, compliance
-  - **Number corrected 2026-10-04.** This said `0015`, which is now taken by the accepted `0015-detectors-zen-tables-opa.md`. The highest ADR is `0030`, so the next free number is `0031`. Check again before writing: ADRs have been landing steadily.
-- [ ] Set ADR-0002 status to `Superseded by 0031`
-- [ ] Add ADR-0031 to `docs/adr/README.md` index
+- [ ] Write `docs/adr/0032-modular-microservices.md`: context (what changed since ADR-0002), decision, the 8-service split, alternatives, consequences, compliance
+  - **Number corrected twice.** It said `0015`, taken by the accepted `0015-detectors-zen-tables-opa.md`, then `0031`, which FE01 took on 2026-10-04 for `0031-next-js-14-until-16-passes-the-browser-suite.md`. The next free number is `0032`. Check again before writing: ADRs keep landing, and this is the second collision on this line.
+- [ ] Set ADR-0002 status to `Superseded by 0032`
+- [ ] Add ADR-0032 to `docs/adr/README.md` index
 - [ ] Record the plan change in `docs/enterprise-plan/CHANGES.md`
 - [ ] Add a "Deviations" entry in `ARCHITECTURE.md`
-- [ ] Get ADR-0031 to `Accepted`. **No work below starts before this.**
+- [ ] Get ADR-0032 to `Accepted`. **No work below starts before this.**
 
 ### Phase 1 - Close the gaps found in the audit
 
@@ -324,7 +324,7 @@ devlogs.
 
 ### Wave 5 - Production readiness (ship gate)
 
-- [ ] #28 `[FE01]` Frontend: verified build, static UI retired, Next.js 16, accessibility and language review `p1`
+- [ ] #28 `[FE01]` Frontend: verified build, static UI retired, accessibility and language review `p1`
 - [x] #42 `[X01]` Security hardening: threat-model checks, DAST, dependency and licence scanning `p1`
 - [x] #44 `[X03]` Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges `p1`
 - [x] #43 `[X02]` Performance and resilience: load and chaos tests `p2`

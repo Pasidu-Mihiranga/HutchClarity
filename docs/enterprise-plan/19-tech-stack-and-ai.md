@@ -56,7 +56,7 @@ Where a popular tool fails C2 or C3, the table names it and states why it was no
 | Layer | Choice | Why |
 |---|---|---|
 | Language / UI | **TypeScript + React** | Industry default; largest hiring pool |
-| Framework | **Next.js 16** (App Router, `output: "standalone"`) | SSR for the verify page and BFF route handlers. Standalone output runs on any Node host or container, not only Vercel. |
+| Framework | **Next.js 14** (App Router, `output: "standalone"`). Next.js 16 stays the target and is held until it passes the browser suite (ADR-0031) | SSR for the verify page and BFF route handlers. Standalone output runs on any Node host or container, not only Vercel. |
 | Runtime | **Node.js 24 LTS** | LTS support window |
 | Components | **shadcn/ui on Radix primitives + Tailwind CSS** | Accessible primitives (WCAG), code owned in-repo (no vendor runtime) |
 | Data fetching | **TanStack Query** + SDK generated from OpenAPI (`openapi-typescript`) | Typed end to end |
