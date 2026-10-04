@@ -18,6 +18,9 @@ x-frontend: &frontend
   tmpfs: [/tmp]
   mem_limit: 256m
 
+# Health checks probe every 2s while a container starts (start_interval,
+# Docker 25+), then every 10s. Each tier of the start chain used to wait up to
+# 10s to be seen healthy.
 services:
   postgres:
     image: pgvector/pgvector:pg18
@@ -62,6 +65,8 @@ services:
     healthcheck:
       test: [CMD-SHELL, "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 >/dev/null"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 8s
       retries: 30
     mem_limit: 768m
@@ -81,6 +86,8 @@ services:
     healthcheck:
       test: [CMD-SHELL, "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/clarity HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 30
     mem_limit: 512m
@@ -94,6 +101,8 @@ services:
     healthcheck:
       test: [CMD, /opa, eval, "1"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 20
     mem_limit: 128m
@@ -104,6 +113,8 @@ services:
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8103/health', timeout=3)"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 20
 
@@ -123,6 +134,8 @@ services:
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 30
 
@@ -137,6 +150,8 @@ services:
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8099/health', timeout=3)"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 20
 
@@ -151,6 +166,8 @@ services:
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/health', timeout=3)"]
       interval: 10s
+      start_period: 120s
+      start_interval: 2s
       timeout: 5s
       retries: 20
 
