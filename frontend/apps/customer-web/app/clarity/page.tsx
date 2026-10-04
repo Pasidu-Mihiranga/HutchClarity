@@ -366,18 +366,9 @@ export default function ClarityPage() {
         return;
       }
 
-      const can = accountIntents(account);
-      if (!can[clientIntent]) {
-        setCs((s) => {
-          const msgs = s.messages.filter((m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")));
-          return {
-            ...s, ...update1, mode: "miss", intent: clientIntent,
-            messages: [...msgs, { role: "clarity", kind: "miss" as ResultKind }],
-          };
-        });
-        setBusy(false);
-        return;
-      }
+      // No client-side eligibility gate (A2): rules decide (I1). When no rule
+      // matches, `decision/policy.py` answers HANDOFF with `NO_CAUSE_FOUND`,
+      // which `pickResultKind` renders as the handoff card (I2).
 
       // progress steps
       setCs((s) => {
