@@ -944,6 +944,16 @@ class Clarity:
         self.audit.after_append(lambda _record: checkpointer.maybe_checkpoint())
         return checkpointer
 
+    def grant_sweep_interval(self) -> timedelta:
+        """How often a server records ended grants (policy, I10)."""
+        return _DURATION.validate_python(
+            str(
+                self.policies.resolve(
+                    "audit.grant.sweep_interval", as_of=self._clock or datetime.now(tz=UTC)
+                )
+            )
+        )
+
     def _new_audit_grants(self, clock: datetime | None) -> AuditGrants:
         def now() -> datetime:
             return clock or datetime.now(tz=UTC)

@@ -352,7 +352,7 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 - [x] Grants in the authorization layer, time-boxed, with the five separation-of-duties rules (`modules/iam/grants.py`; resolved into `Principal.granted` at token verification; any driver wrapped so they hold under OPA)
 - [x] `GET /v1/audit` paged and filtered by actor, type and case; hashes and masked detail only, never a payload; every read recorded as `audit.read`; the response carries the checkpoint verification
 - [x] Recertification (unreviewed grants lapse after `audit.grant.review_interval`); break-glass for admins, PT4H, recorded as `grant.break_glass`
-- [ ] Record a grant's expiry or lapse as an event at the moment it happens (needs a scheduler; today it is visible from the grant's stored times)
+- [x] Record a grant's expiry or lapse as `grant.expired` / `grant.lapsed`, once, with `occurred_at` the exact end: a per-process sweep (`audit.grant.sweep_interval`, PT1M) and a check on every authenticated request
 
 | # | Given | When | Then |
 |---|---|---|---|

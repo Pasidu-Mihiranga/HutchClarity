@@ -66,8 +66,9 @@ def clock() -> Clock:
 
 
 @pytest.fixture
-def ledger() -> AuditLedger:
-    return AuditLedger()
+def ledger(clock: Clock) -> AuditLedger:
+    """On the same clock as the grants, as the container wires them."""
+    return AuditLedger(clock=clock)
 
 
 @pytest.fixture
@@ -463,3 +464,186 @@ def test_granting_needs_a_stepped_up_session(api: TestClient):
 
     assert refused.status_code == 403
     assert "step-up" in refused.json()["detail"]
+
+
+# --------------------------------------------------------------------------- #
+# Endings: expiry and lapse recorded at the moment they happen
+# --------------------------------------------------------------------------- #
+
+
+def endings(ledger: AuditLedger) -> list[object]:
+    return ledger.of_type(AuditEventType.GRANT_EXPIRED) + ledger.of_type(
+        AuditEventType.GRANT_LAPSED
+    )
+
+
+def test_an_expiry_is_recorded_with_the_moment_it_happened(
+    grants: AuditGrants, ledger: AuditLedger, clock: Clock
+):
+    grant_id = granted_read(grants, days=10)
+    expires_at = grants.get(grant_id).expires_at
+
+    clock.advance(timedelta(days=12))  # noticed two days late
+    grants.record_endings()
+
+    record = ledger.of_type(AuditEventType.GRANT_EXPIRED)[-1]
+    assert record.object_ref == grant_id
+    assert record.occurred_at == expires_at, "the trail states when it ended"
+    assert record.recorded_at == clock.now, "and separately when it was noticed"
+    assert record.detail["end_reason"] == "expired"
+    assert ledger.verify().intact
+
+
+def test_a_missed_recertification_is_recorded_as_a_lapse(
+    grants: AuditGrants, ledger: AuditLedger, clock: Clock
+):
+    grant_id = granted_read(grants, days=60)
+    review_by = grants.get(grant_id).review_by
+
+    clock.advance(timedelta(days=31))
+    grants.record_endings()
+
+    record = ledger.of_type(AuditEventType.GRANT_LAPSED)[-1]
+    assert record.occurred_at == review_by
+    assert grants.get(grant_id).end_reason == "lapsed"
+
+
+def test_an_ending_is_recorded_once(grants: AuditGrants, ledger: AuditLedger, clock: Clock):
+    granted_read(grants, days=10)
+    clock.advance(timedelta(days=11))
+
+    grants.record_endings()
+    grants.record_endings()
+
+    assert len(endings(ledger)) == 1
+
+
+def test_two_processes_on_one_store_record_an_ending_once(clock: Clock, ledger: AuditLedger):
+    """The API and the MCP server both sweep in ``full``: one record, not two."""
+    store = MemoryStore()
+
+    def build() -> AuditGrants:
+        return AuditGrants(
+            lambda: MemoryUnitOfWork(store),
+            audit=ledger,
+            max_duration=lambda: timedelta(days=90),
+            review_interval=lambda: timedelta(days=30),
+            break_glass_duration=lambda: timedelta(hours=4),
+            clock=clock,
+        )
+
+    api, mcp = build(), build()
+    granted_read(api, days=10)
+    clock.advance(timedelta(days=11))
+
+    first = api.record_endings()
+    second = mcp.record_endings()
+
+    assert len(first) == 1 and second == []
+    assert len(endings(ledger)) == 1
+
+
+def test_a_revoked_or_still_live_grant_records_no_ending(
+    grants: AuditGrants, ledger: AuditLedger, clock: Clock
+):
+    revoked = granted_read(grants, days=10)
+    grants.revoke(BOB, revoked, reason="moved team")
+    granted_read(grants, days=60)
+
+    clock.advance(timedelta(days=11))
+    grants.record_endings()
+
+    assert endings(ledger) == []
+
+
+def test_a_failed_record_releases_its_claim_for_the_next_sweep(
+    grants: AuditGrants, ledger: AuditLedger, clock: Clock, monkeypatch: pytest.MonkeyPatch
+):
+    grant_id = granted_read(grants, days=10)
+    clock.advance(timedelta(days=11))
+    real = ledger.append
+
+    def failing(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("trail unavailable")
+
+    monkeypatch.setattr(ledger, "append", failing)
+    with pytest.raises(RuntimeError):
+        grants.record_endings()
+    assert grants.get(grant_id).ended_at is None, "claim released"
+
+    monkeypatch.setattr(ledger, "append", real)
+    assert len(grants.record_endings()) == 1
+
+
+def test_a_break_glass_ending_is_recorded(grants: AuditGrants, ledger: AuditLedger, clock: Clock):
+    grants.break_glass(
+        staff("plat:nuwan", Role.PLATFORM_ADMIN),
+        permission=Permission.AUDIT_EXPORT,
+        reason="INC-42",
+    )
+    clock.advance(timedelta(hours=5))
+
+    grants.record_endings()
+
+    record = ledger.of_type(AuditEventType.GRANT_EXPIRED)[-1]
+    assert record.detail["break_glass"] is True
+
+
+def _expired_grant(clarity: Clarity) -> str:
+    """Put an already-expired active grant in the store: the demo clock is frozen."""
+    from clarity.modules.iam.public import GRANTS, AuditGrant
+
+    now = clarity.audit_grants._clock()
+    grant = AuditGrant(
+        grant_id="GRT-expired",
+        subject_kind=SubjectKind.USER,
+        subject_ref="sup:ruwan",
+        permission=Permission.AUDIT_READ,
+        reason="October",
+        duration_seconds=3600,
+        requested_by="sec:alice",
+        requested_at=now - timedelta(hours=2),
+        state=GrantState.ACTIVE,
+        approved_by="sec:bob",
+        approved_at=now - timedelta(hours=2),
+        expires_at=now - timedelta(hours=1),
+        review_by=now + timedelta(days=1),
+    )
+    with clarity.audit.open_unit() as unit:
+        unit.repository(GRANTS).put(grant.grant_id, grant)
+        unit.commit()
+    return grant.grant_id
+
+
+def test_any_signed_in_request_records_an_ending_first(api: TestClient, clarity: Clarity):
+    grant_id = _expired_grant(clarity)
+    ruwan = session(api, "sup:ruwan", ["supervisor"])
+
+    assert api.get("/v1/audit", headers=ruwan).status_code == 403, "expired, so refused"
+
+    recorded = clarity.audit.of_type(AuditEventType.GRANT_EXPIRED)
+    assert [r.object_ref for r in recorded] == [grant_id]
+
+
+def test_the_server_sweeps_endings_when_nobody_signs_in(
+    clarity: Clarity, monkeypatch: pytest.MonkeyPatch
+):
+    """The background sweep, under a real lifespan, with nobody making requests."""
+    import time
+
+    grant_id = _expired_grant(clarity)
+    monkeypatch.setattr(clarity, "grant_sweep_interval", lambda: timedelta(seconds=0))
+
+    with TestClient(create_app(clarity)):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if clarity.audit.of_type(AuditEventType.GRANT_EXPIRED):
+                break
+            time.sleep(0.1)
+
+    recorded = clarity.audit.of_type(AuditEventType.GRANT_EXPIRED)
+    assert [r.object_ref for r in recorded] == [grant_id]
+
+
+def test_the_sweep_interval_comes_from_policy(clarity: Clarity):
+    assert clarity.grant_sweep_interval() == timedelta(minutes=1)

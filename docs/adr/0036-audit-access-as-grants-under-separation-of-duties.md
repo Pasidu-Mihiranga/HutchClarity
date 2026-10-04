@@ -63,9 +63,15 @@ and an admin who can hand themselves any duty defeats the controls.
 - `iam.grants` collection; grants live beside the trail and survive a reset.
 - A recorded refusal for every broken rule: separation-of-duties refusals are
   403s, so the refusal handler records them as `access.denied` with the rule.
-- An expired or lapsed grant is not recorded at the moment it lapses; it is
-  visible from its stored times. Recording expiry as an event needs a
-  scheduler and is left for later.
+- An expired or lapsed grant is recorded as `grant.expired` or `grant.lapsed`.
+  *Amended 2026-10-04:* this ADR first left it unrecorded for want of a
+  scheduler. The trail now records each ending once, with `occurred_at` set
+  to the moment the grant ended (from its stored times) and `recorded_at` to
+  when it was noticed. Two triggers, no new infrastructure: a sweep in each
+  API process on `audit.grant.sweep_interval` (PT1M), and a check on every
+  authenticated request, so an ending is recorded before the grant could next
+  matter. An ending is claimed in the store first, so two processes record it
+  once.
 
 ## Compliance
 

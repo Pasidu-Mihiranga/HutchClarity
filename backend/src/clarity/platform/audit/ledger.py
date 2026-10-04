@@ -112,6 +112,10 @@ class AuditEventType(StrEnum):
     GRANT_APPROVED = "grant.approved"
     GRANT_REVOKED = "grant.revoked"
     GRANT_RECERTIFIED = "grant.recertified"
+    GRANT_EXPIRED = "grant.expired"
+    """An active grant reached its expiry. ``occurred_at`` is that moment."""
+    GRANT_LAPSED = "grant.lapsed"
+    """An active grant nobody recertified in time. ``occurred_at`` is its review deadline."""
     BREAK_GLASS_USED = "grant.break_glass"
     """An admin self-granted an audit duty for an incident. Always a signal."""
 

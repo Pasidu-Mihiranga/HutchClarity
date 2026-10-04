@@ -39,6 +39,15 @@ keys:
       - value: P30D
         version: 1
 
+  - key: audit.grant.sweep_interval
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: How often a server process records grants that have expired or lapsed.
+    values:
+      - value: PT1M
+        version: 1
+
   - key: audit.grant.break_glass_duration
     kind: duration
     owner_role: compliance

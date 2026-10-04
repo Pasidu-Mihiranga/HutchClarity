@@ -20,12 +20,16 @@ these routes exactly as plan §19 describes.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import asyncio
+import logging
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -131,6 +135,8 @@ _STATUS_FOR_CODE = {
 #: ISO 8601 durations in request bodies, such as ``P30D``.
 _DURATION_ADAPTER: TypeAdapter[timedelta] = TypeAdapter(timedelta)
 
+_log = logging.getLogger("clarity.audit.grants")
+
 _app_state: dict[str, Clarity] = {}
 
 
@@ -221,11 +227,50 @@ async def _audit_requests(request: Request, call_next: Any) -> Response:
     return response
 
 
+async def _sweep_grant_endings(stop: asyncio.Event) -> None:
+    """Record expired and lapsed grants on a schedule (audit assurance Phase 3).
+
+    The trail's own scheduler, with no new infrastructure: one loop per server
+    process, on ``audit.grant.sweep_interval``. Every authenticated request
+    also records endings first, so this loop is what covers the quiet hours
+    when nobody signs in. A failed sweep is logged and retried on the next
+    tick: it must never take the server down, and a claim it could not record
+    is released for the next attempt.
+    """
+    while not stop.is_set():
+        try:
+            interval = get_clarity().grant_sweep_interval().total_seconds()
+        except Exception:  # policy unreadable: fall back, keep sweeping
+            _log.exception("could not resolve audit.grant.sweep_interval; using 60s")
+            interval = 60.0
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(interval, 1.0))
+            return
+        except TimeoutError:
+            pass
+        try:
+            await run_in_threadpool(get_clarity().audit_grants.record_endings)
+        except Exception:
+            _log.exception("recording grant endings failed; retrying next sweep")
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    stop = asyncio.Event()
+    sweeper = asyncio.create_task(_sweep_grant_endings(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        await sweeper
+
+
 def create_app(clarity: Clarity | None = None) -> FastAPI:
     if clarity is not None:
         _app_state["clarity"] = clarity
 
     app = FastAPI(
+        lifespan=_lifespan,
         title="Hutch Clarity API",
         version="0.1.0",
         description=(

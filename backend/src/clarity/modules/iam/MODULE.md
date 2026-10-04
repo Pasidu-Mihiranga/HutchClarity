@@ -34,6 +34,7 @@ Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refre
 - A token never contains the raw MSISDN.
 - A grant carries only an audit permission (`GRANTABLE_PERMISSIONS`): never money, never `audit:assign`.
 - A grant is requested by one holder of `audit:assign` and approved by a different one; nobody grants themselves, by name or through a role they hold. Break-glass is the one exception, admin-only, short, and recorded as `grant.break_glass`.
+- A grant that expires or lapses is recorded once, as `grant.expired` or `grant.lapsed`, with the moment it ended.
 - Whatever authorization driver is configured is wrapped, so grants and the rule that an audit duty removes money permissions hold under OPA too.
 
 ## 7. Migration status (enterprise-plan 21)
@@ -51,5 +52,6 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.iam` with a public surface (R1) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-keycloak-opa-shared-state.md` | Keycloak, OPA, shared OTP and revocable sessions (M-IAM, #7) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P3-grants-and-audited-reads.md` | Audit duties by grant under separation of duties (Phase 3, ADR-0036) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P3-grant-endings-recorded.md` | Grant expiry and lapse recorded once, at the moment they happen |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-opa-parity-made-real.md` | Authorization parity evaluates the real Rego, not a Python stand-in |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-M-IAM-keycloak-verified-real.md` | Verified against real Keycloak; fixed the multi-key JWKS defect |

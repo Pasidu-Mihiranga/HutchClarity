@@ -36,7 +36,7 @@ from clarity.kernel.common import ClarityModel, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.iam.authorization import AuthorizationPolicy
 from clarity.platform.audit.ledger import ActorKind, AuditEventType, AuditLedger
-from clarity.platform.persistence import Repository, UnitOfWorkFactory
+from clarity.platform.persistence import ConcurrentUpdate, Repository, UnitOfWorkFactory
 from clarity.platform.security.principal import (
     GRANTABLE_PERMISSIONS,
     MONEY_PERMISSIONS,
@@ -83,6 +83,18 @@ class AuditGrant(ClarityModel):
     revoked_by: str | None = None
     revoked_at: datetime | None = None
     revoke_reason: str | None = None
+    ended_at: datetime | None = None
+    """When an active grant stopped by expiry or lapse. Set once, when recorded."""
+    end_reason: str | None = None
+    """``expired`` or ``lapsed``."""
+
+    def ending(self) -> tuple[datetime, str] | None:
+        """When and why an active grant stops on its own: the earlier of the two."""
+        if self.state is not GrantState.ACTIVE or self.expires_at is None:
+            return None
+        if self.review_by is not None and self.review_by < self.expires_at:
+            return self.review_by, "lapsed"
+        return self.expires_at, "expired"
 
     def is_active(self, now: datetime) -> bool:
         return (
@@ -157,11 +169,93 @@ class AuditGrants:
         )
 
     def apply(self, principal: Principal) -> Principal:
-        """The principal with its active grants attached, for every check after."""
+        """The principal with its active grants attached, for every check after.
+
+        Records any grant that has ended first, so an ending is in the trail
+        before the grant could next have mattered to anyone.
+        """
         if not principal.roles or principal.is_customer:
             return principal
+        self.record_endings()
         granted = self.active_for(principal)
         return dataclasses.replace(principal, granted=granted) if granted else principal
+
+    # -- endings ------------------------------------------------------------------- #
+
+    def record_endings(self) -> list[AuditGrant]:
+        """Write ``grant.expired`` or ``grant.lapsed`` for every grant that has ended.
+
+        Called by the background sweep and on every authenticated request. Each
+        record's ``occurred_at`` is the moment the grant actually ended, taken
+        from its stored times, so the trail states the true end even when the
+        ending is noticed a little later; ``recorded_at`` shows when it was.
+
+        **Once only, across processes.** An ending is claimed by writing
+        ``ended_at`` in a unit of work that read the grant first, so a second
+        process racing for the same grant loses with ``ConcurrentUpdate`` and
+        records nothing. The claim is committed before the record is appended;
+        if the append fails, the claim is released so the next sweep retries.
+        """
+        now = self._clock()
+        recorded: list[AuditGrant] = []
+        for grant in self.all():
+            if grant.ended_at is not None:
+                continue
+            ending = grant.ending()
+            if ending is None or ending[0] > now:
+                continue
+            ended_at, reason = ending
+            claimed = self._claim_ending(grant.grant_id, ended_at, reason)
+            if claimed is None:
+                continue
+            try:
+                self._audit.append(
+                    AuditEventType.GRANT_EXPIRED
+                    if reason == "expired"
+                    else AuditEventType.GRANT_LAPSED,
+                    actor_ref="clarity-grants",
+                    actor_kind=ActorKind.SYSTEM,
+                    object_ref=claimed.grant_id,
+                    payload=claimed.model_dump(mode="json"),
+                    detail={
+                        "subject": f"{claimed.subject_kind.value}:{claimed.subject_ref}",
+                        "permission": claimed.permission.value,
+                        "end_reason": reason,
+                        "ended_at": ended_at.isoformat(),
+                        "noticed_at": now.isoformat(),
+                        "break_glass": claimed.break_glass,
+                    },
+                    now=ended_at,
+                )
+            except Exception:
+                self._release_ending(claimed.grant_id)
+                raise
+            recorded.append(claimed)
+        return recorded
+
+    def _claim_ending(self, grant_id: str, ended_at: datetime, reason: str) -> AuditGrant | None:
+        try:
+            with self._open_unit() as unit:
+                store: Repository[str, AuditGrant] = unit.repository(GRANTS)
+                current = store.get(grant_id)
+                if current is None or current.ended_at is not None:
+                    return None
+                claimed = current.model_copy(update={"ended_at": ended_at, "end_reason": reason})
+                store.put(grant_id, claimed)
+                unit.commit()
+                return claimed
+        except ConcurrentUpdate:
+            return None
+
+    def _release_ending(self, grant_id: str) -> None:
+        with self._open_unit() as unit:
+            store: Repository[str, AuditGrant] = unit.repository(GRANTS)
+            current = store.get(grant_id)
+            if current is not None:
+                store.put(
+                    grant_id, current.model_copy(update={"ended_at": None, "end_reason": None})
+                )
+                unit.commit()
 
     # -- the lifecycle ----------------------------------------------------------- #
 

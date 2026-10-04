@@ -4,6 +4,17 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (audit assurance Phase 3, grant endings)
+
+- Audit event types `grant.expired` and `grant.lapsed` (a missed
+  recertification), each recorded once with `occurred_at` the exact moment the
+  grant ended. `AuditGrants.record_endings()`; `AuditGrant.ended_at`,
+  `end_reason`, `ending()`.
+- A background sweep in each API process (FastAPI lifespan) on new policy key
+  `audit.grant.sweep_interval` (PT1M); `Clarity.grant_sweep_interval()`.
+  Every authenticated request also records endings first.
+- No `/v1` contract change.
+
 ### Added (audit assurance Phase 3, ADR-0036)
 
 - **New `/v1` routes**, all signed-in: `GET /v1/audit` (paged trail, hashes
