@@ -72,19 +72,41 @@ test still drives the login page itself, because something has to.
 make check                   1994 passed, 544 skipped
 frontend npm run build       3 apps, compiled successfully
 e2e, first ever run          1 passed, 7 failed
-e2e, after the fixes         see below
+e2e, after the fixes         9 passed (16.0s)
 ```
 
-Four of the five axe audits pass with no serious or critical violations, and
-the dispute journey reaches a verified receipt in the browser.
+All five axe audits pass with no serious or critical violations, and the
+dispute journey reaches a verified receipt in the browser.
+
+## Two more defects, found by the last two failing tests
+
+6. **A grounded answer showed no source.** The server returns `citation` on
+   every article in `SOURCE@version` form, and the knowledge card dropped it: a
+   customer read an answer taken from a policy document with no way to tell
+   which document or which version. K03 built the citation machinery and the UI
+   never surfaced it, which means C05 was closed with its "citations" scope
+   incomplete. Now rendered as a labelled `Sources` region.
+7. **White on the brand orange fails WCAG AA.** axe measured `#ffffff` on
+   `#f26226` at **3.2:1** against the 4.5:1 that normal-size text needs, on the
+   customer's own message bubble and two buttons. `--orange` stays as it is for
+   fills, borders and icons, where no text sits on it; a new `--orange-strong`
+   (`#c2410c`, **5.2:1**) carries white text. The token's comment says which is
+   which, so the next person does not reintroduce it.
+
+   This is a brand-adjacent change and worth flagging: the orange a customer
+   sees behind white text is now slightly darker than `#f26226`. The
+   alternative was to leave a serious accessibility violation in the one screen
+   where a customer commits to money moving. **REQUIRES HUTCH CONFIRMATION**
+   that the darker shade is acceptable for text surfaces.
 
 ## Open issues / next step
 
 - **Next.js 14 to 16 is not done.** 16.3.8 is current and accepts React 18.2,
   so it is feasible without forcing React 19, but it has not been attempted.
 - **`interfaces/http/static` is not retired.** The scope says "once parity is
-  shown", and parity is what the browser suite is for. It should not be removed
-  while any journey assertion is still failing.
+  shown". The browser suite now passes, which is the parity evidence, but the
+  static UI is still referenced by WT-13 as a desk fallback and by the demo
+  path. Retiring it is a separate change that has to update those first.
 - **The si/ta native-speaker review has not happened** and cannot be done here.
   It needs a human who speaks Sinhala and Tamil. The leaked-key defect above is
   a reminder that the catalogues are not reviewed: three customer-facing labels

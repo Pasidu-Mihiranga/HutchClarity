@@ -5,6 +5,12 @@
 /* Hutch Clarity design tokens - mirrored from the old app */
 :root {
   --orange:      #f26226;
+  /* White text on `--orange` measures 3.2:1, below the 4.5:1 WCAG AA needs for
+     normal-size text, which an axe run flagged as a serious violation on the
+     chat. `--orange` stays as it is for fills, borders and icons, where no
+     text sits on it. Anything that puts white text on an orange background
+     uses `--orange-strong` (5.2:1) instead. */
+  --orange-strong: #c2410c;
   --orange-ink:  #c2410c;
   --orange-soft: #fff1eb;
   --ink:         #1a1a1a;

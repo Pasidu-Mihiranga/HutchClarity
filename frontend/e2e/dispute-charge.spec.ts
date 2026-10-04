@@ -71,9 +71,12 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
 
     // A grounded answer shows its citation, whole, including the version:
     // a reference a customer cannot look up is decoration (K03).
-    const sources = page.getByRole("region", { name: /sources|මූලාශ්ර|ஆவணங்கள்/i });
+    const sources = page.getByRole("region", { name: /sources|මූලාශ්‍ර|ஆவணங்கள்/i });
     await expect(sources).toBeVisible();
-    await expect(sources.getByText(/@\d+/)).toBeVisible();
+    // Whole, including the version: a reference a customer cannot look up is
+    // decoration. The server returns `SOURCE@version` and this card used to
+    // drop it entirely.
+    await expect(sources.getByText(/@\d+/).first()).toBeVisible();
   });
 
   test("a question with no source offers a person instead of guessing", async ({ page, request }) => {
@@ -85,7 +88,14 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     );
     await page.keyboard.press("Enter");
 
-    await expect(page.getByText(/do not have a published source/i)).toBeVisible();
-    await expect(page.getByRole("status")).toContainText(/person/i);
+    // It must not answer. Nothing in the knowledge base covers this, and a
+    // plausible-sounding answer is the failure mode the whole design exists to
+    // avoid (I2: missing evidence means a person, never a guess).
+    await expect(page.getByText(/could not confirm/i)).toBeVisible();
+    await expect(page.getByText(/paris/i)).toHaveCount(0);
+
+    // And it must offer a way to a person rather than leaving the customer
+    // with a dead end.
+    await expect(page.getByRole("button", { name: /talk to support/i })).toBeVisible();
   });
 });

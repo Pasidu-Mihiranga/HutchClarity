@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  Article,
   ClarityState,
   Decision,
   FollowUp,
@@ -86,9 +87,24 @@ const EN = {
   fuNetwork: "Check network status",
   fuCompare: "Compare packages",
   fuDisable: "Disable this service",
+  sourcesTitle: "Sources",
+  // Suggestion chips reach `FollowUps` too, so their keys belong here or the
+  // fallback humanises "qBalance" into "Q Balance".
+  qBalance: "Why did my balance change?",
+  qSub: "Why am I subscribed?",
+  qTwice: "Why was my reload taken twice?",
+  qSlow: "Why is my data slow?",
+  qMissing: "Why didn't my reload arrive?",
+  qEsim: "How do I convert to eSIM?",
+  qActivate: "How do I activate a pack?",
+  qFup: "Why has my speed reduced?",
+  qPackIssue: "Why isn't my package working?",
+  qPackMissing: "I paid but didn't receive my data",
+  qExpiry: "What happens when my package expires?",
 };
 
 const SI: Partial<typeof EN> = {
+  sourcesTitle: "මූලාශ්‍ර",
   fuPrevent: "නැවත සිදු නොවීමට",
   fuSupport: "සහාය සමඟ කතා කරන්න",
   foundReason: "හේතුව හමු වුණා",
@@ -104,6 +120,7 @@ const SI: Partial<typeof EN> = {
 };
 
 const TA: Partial<typeof EN> = {
+  sourcesTitle: "ஆவணங்கள்",
   fuPrevent: "மீண்டும் நடக்காமல் தடு",
   fuSupport: "ஆதரவிடம் பேசு",
   foundReason: "காரணம் கிடைத்தது",
@@ -339,6 +356,43 @@ function InvestigationCard({
   );
 }
 
+/**
+ * Where a grounded answer came from (K03).
+ *
+ * The server returns `citation` on every article, in `SOURCE@version` form, and
+ * this card used to drop it: a customer read an answer taken from a policy
+ * document with no way to tell which document, or which version of it. A
+ * reference a customer cannot look up is decoration, so the version is shown
+ * whole rather than trimmed to something tidier.
+ *
+ * Rendered as a labelled region so it is announced as one, and so a test can
+ * ask for it by name rather than by styling.
+ */
+function Sources({ articles, lang }: { articles: Article[] | null; lang: string }) {
+  const cited = (articles ?? []).filter((a) => a.citation);
+  if (!cited.length) return null;
+  return (
+    <section
+      aria-label={tl(lang, "sourcesTitle")}
+      style={{ marginTop: 12, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}
+    >
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#64748b" }}>
+        {tl(lang, "sourcesTitle")}
+      </p>
+      <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12, color: "#475569" }}>
+        {cited.map((a) => (
+          <li key={a.citation}>
+            {a.title}
+            {" "}
+            <code style={{ fontSize: 11 }}>{a.citation}</code>
+            {a.owner ? ` (${a.owner})` : ""}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function KnowledgeCard({ state, lang, onFollow, onHandoff }: { state: ClarityState; lang: string; onFollow: (f: FollowUp) => void; onHandoff: () => void }) {
   const top = state.articles?.[0];
   return (
@@ -346,6 +400,7 @@ function KnowledgeCard({ state, lang, onFollow, onHandoff }: { state: ClaritySta
       <span style={{ ...verdict, background: "#eff6ff", color: "#1d4ed8" }}>HOW TO</span>
       <h3 style={cardH3}>{top?.title ?? tl(lang, "unknown")}</h3>
       <p style={{ fontSize: 15, margin: "6px 0 0" }}>{top?.body ?? tl(lang, "intentHint")}</p>
+      <Sources articles={state.articles ?? null} lang={lang} />
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         <button onClick={onHandoff} style={btnSecondary}>{tl(lang, "needMoreHelp")}</button>
       </div>
@@ -539,7 +594,7 @@ const verdict: React.CSSProperties = {
 };
 
 const btnPrimary: React.CSSProperties = {
-  background: "var(--orange)",
+  background: "var(--orange-strong)",
   color: "#fff",
   border: 0,
   borderRadius: 999,

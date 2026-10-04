@@ -101,12 +101,14 @@ test.describe("accessibility", () => {
     const box = page.getByRole("textbox", { name: /ask|message|type/i });
     await box.fill("Why was LKR 49 deducted from my balance?");
     await page.keyboard.press("Enter");
-    // The first turn opens the case; the flow runs from the second.
     await expect(page.getByRole("heading", { name: /found the reason/i })).toBeVisible();
-    await box.fill("Yes, please fix it");
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("navigation", { name: /charge|ගාස්තු|கட்டண/i })).toBeVisible();
 
-    await audit(page, "/clarity mid-journey");
+    // Audit the confirm sheet, not the resting page: it is where a customer
+    // commits to money moving, so it is the state whose labels, focus order
+    // and contrast matter most.
+    await page.getByRole("button", { name: /refund & disable/i }).click();
+    await expect(page.getByRole("heading", { name: /disable this subscription/i })).toBeVisible();
+
+    await audit(page, "/clarity with the confirm sheet open");
   });
 });

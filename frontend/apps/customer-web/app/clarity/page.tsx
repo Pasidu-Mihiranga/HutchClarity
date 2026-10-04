@@ -655,7 +655,7 @@ export default function ClarityPage() {
                   return (
                     <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
                       <div style={{
-                        background: "var(--orange)", color: "#fff", borderRadius: "18px 18px 4px 18px",
+                        background: "var(--orange-strong)", color: "#fff", borderRadius: "18px 18px 4px 18px",
                         padding: "10px 16px", maxWidth: "80%", fontSize: 15, fontWeight: 500,
                       }}>
                         {msg.text}
@@ -748,7 +748,7 @@ export default function ClarityPage() {
               disabled={!input.trim() || busy}
               style={{
                 width: 40, height: 40, borderRadius: 999, border: 0,
-                background: input.trim() && !busy ? "var(--orange)" : "#e4e4e7",
+                background: input.trim() && !busy ? "var(--orange-strong)" : "#e4e4e7",
                 color: input.trim() && !busy ? "#fff" : "#a1a1aa",
                 fontSize: 16, fontWeight: 700,
                 cursor: input.trim() && !busy ? "pointer" : "not-allowed",
@@ -819,7 +819,7 @@ export default function ClarityPage() {
                 padding: "10px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "cancel")}</button>
               <button onClick={doConfirm} style={{
-                flex: 1, border: 0, background: "var(--orange)", color: "#fff", borderRadius: 999,
+                flex: 1, border: 0, background: "var(--orange-strong)", color: "#fff", borderRadius: 999,
                 padding: "10px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "confirm")}</button>
             </div>
