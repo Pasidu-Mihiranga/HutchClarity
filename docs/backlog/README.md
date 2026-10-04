@@ -100,6 +100,9 @@ flowchart LR
 | [X01](issues/X01-security-hardening-threat-model-checks-dast-depe.md) | Security hardening: threat-model checks, DAST, dependency and licence scanning | `security` | P1 | B10 |
 | [X02](issues/X02-performance-and-resilience-load-and-chaos-tests.md) | Performance and resilience: load and chaos tests | `platform` | P2 | B05, B04 |
 | [X03](issues/X03-deployment-artefacts-images-compose-full-helm-op.md) | Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges | `deploy` | P1 | B05, H01 |
+| [DEP01](issues/DEP01-safe-single-vps-demo-deployment.md) | Safe single-VPS demo deployment | `deploy` | P1 | X03, FE01, H01, N02 |
+| [CD01](issues/CD01-ci-gated-vps-deployment.md) | CI-gated deployment to demo VPS | `deploy` | P1 | DEP01, B10 |
+| [WA01](issues/WA01-baileys-whatsapp-transport.md) | Baileys WhatsApp transport adapter | `channel-gateway` | P1 | DEP01, CD01, N02, C01, N01 |
 
 ## Labels
 
