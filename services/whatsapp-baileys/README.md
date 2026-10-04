@@ -18,6 +18,9 @@ HUTCH. Use requires operator approval and compliance with WhatsApp terms.
   volume and must never enter an image, backup log or repository.
 - Pairing has no HTTP route. An operator runs `npm run pair` inside the private
   deployment and supplies `WHATSAPP_PAIRING_PHONE` as country-code digits.
+- Phone pairing waits for Baileys' pairing-ready event before requesting the
+  code. After WhatsApp registers the device, the command reconnects through the
+  required session restart and reports success only when the session opens.
 - If phone-number linking is refused, the operator sets
   `WHATSAPP_PAIRING_MODE=qr` and scans the private terminal QR from WhatsApp
   Linked Devices.

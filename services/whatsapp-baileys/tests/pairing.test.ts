@@ -1,30 +1,16 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { waitForSocketOpen } from "../src/pairing.js"
+import { shouldRequestPairingCode, shouldRestartPairedSession } from "../src/pairing.js"
 
-test("pairing waits until the provider socket is open", async () => {
-  const socket = { isOpen: false }
-  let polls = 0
-  await waitForSocketOpen(socket, {
-    pause: async () => {
-      polls += 1
-      socket.isOpen = true
-    },
-  })
-  assert.equal(polls, 1)
+test("phone pairing waits for the provider QR readiness event", () => {
+  assert.equal(shouldRequestPairingCode({ mode: "phone", qr: undefined, requested: false }), false)
+  assert.equal(shouldRequestPairingCode({ mode: "phone", qr: "ready", requested: false }), true)
+  assert.equal(shouldRequestPairingCode({ mode: "phone", qr: "ready", requested: true }), false)
+  assert.equal(shouldRequestPairingCode({ mode: "qr", qr: "ready", requested: false }), false)
 })
 
-test("pairing fails safely when the provider socket never opens", async () => {
-  let time = 0
-  await assert.rejects(
-    waitForSocketOpen({ isOpen: false }, {
-      timeoutMs: 10,
-      pollMs: 5,
-      now: () => time,
-      pause: async (milliseconds) => {
-        time += milliseconds
-      },
-    }),
-    /did not become ready/,
-  )
+test("post-pair restart is expected only after credentials register", () => {
+  assert.equal(shouldRestartPairedSession(515, true), true)
+  assert.equal(shouldRestartPairedSession(515, false), false)
+  assert.equal(shouldRestartPairedSession(401, true), false)
 })
