@@ -101,8 +101,27 @@ dispute journey reaches a verified receipt in the browser.
 
 ## Open issues / next step
 
-- **Next.js 14 to 16 is not done.** 16.3.8 is current and accepts React 18.2,
-  so it is feasible without forcing React 19, but it has not been attempted.
+- **Next.js 16 was attempted and reverted.** 16.3.8 installs cleanly, accepts
+  React 18.2, type-checks, and builds all three apps with Turbopack. It then
+  fails the browser suite: **7 of 9 tests fail on Next 16 against 9 of 9 on
+  Next 14.** Adding `allowedDevOrigins` for the blocked `/_next/hmr` requests,
+  which is the migration note Next itself prints, made it worse rather than
+  better (7 failed, then 7 failed with different tests passing).
+
+  Reverted to `^14.2.0`. A build that compiles is not an upgrade that works,
+  and the suite is now the thing that says so. The upgrade needs its own
+  change with time to work through the runtime differences; doing it to tick a
+  scope line would have shipped a regression the suite had just been built to
+  catch.
+
+  **Two things to know before anyone retries it.** Next 16 rewrites
+  `tsconfig.json` and `next-env.d.ts` in every app on install, so a revert has
+  to restore those too. It also writes `AGENTS.md` and `CLAUDE.md` into
+  `apps/customer-web/`, which are agent instructions from a dependency landing
+  inside the repository: by the "closest file wins" rule in our own AGENTS.md
+  they would take precedence over project rules for anyone working in that
+  directory. They were deleted. If the upgrade is retried, they need a
+  deliberate decision rather than being committed by accident.
 - **`interfaces/http/static` is not retired.** The scope says "once parity is
   shown". The browser suite now passes, which is the parity evidence, but the
   static UI is still referenced by WT-13 as a desk fallback and by the demo
