@@ -240,18 +240,27 @@ Phases 0 to 2 deliver real value regardless of whether microservices happen: the
 Linked to the GitHub issues in the repo. Check off each item as it is merged. Priority: p0 = critical path, p1 = required, p2 = important, p3 = nice-to-have.
 
 **The checkbox here and the GitHub issue state must agree.** As of 2026-10-04
-they do not: eleven issues are ticked below and still **open** on GitHub,
-because the work landed before closing-on-merge became the habit.
+they do: 30 issues are closed and one is open (#28 FE01).
 
-| Ticked here, open on GitHub |
-|---|
-| #5 B02, #6 B05, #11 B03, #12 B04, #14 B06, #15 B07, #16 B08, #17 B09, #18 B10, #25 M-ACT, #34 M-CASE |
+All eleven issues that were ticked here and still open on GitHub (#5 B02, #6
+B05, #11 B03, #12 B04, #14 B06, #15 B07, #16 B08, #17 B09, #18 B10, #25 M-ACT,
+#34 M-CASE) have since been verified against their own acceptance tests and
+closed. Two needed real fixes first:
 
-Every issue closed from #19 onwards carries a `Closes: #N` footer on its
-commit, which GitHub acts on when the commit reaches `main`. The eleven above
-predate that and need either closing or a second look; they are left open
-rather than closed in bulk, because a tick here is a claim and the issue's own
-acceptance tests are the evidence.
+- **#6 B05:** the `full` profile could not start. `knowledge`, `autopsy`,
+  `deskops` and `insights` had collections no module owned, so `create_schema`
+  refused to build their tables and 30 PostgreSQL tests errored.
+- **#18 B10:** five of the six CI lanes were failing on every push, for four
+  unrelated reasons, while `make check` stayed green.
+
+**#14 B06 was closed on a local run and had to be reopened**: its own
+acceptance tests failed on the two-core CI runner with
+`IllegalTransition: ACTIONED -> EXECUTING`, a real double-tap race on the money
+path. Fixed, then closed again on a green run. For a test whose outcome depends
+on core count and scheduling, the CI result is the authority.
+
+Every issue from #19 onwards carries a `Closes: #N` footer on its commit, which
+GitHub acts on when the commit reaches `main`.
 
 ### Wave 0 - Baseline wiring (do before any other wave)
 
@@ -316,6 +325,6 @@ devlogs.
 ### Wave 5 - Production readiness (ship gate)
 
 - [ ] #28 `[FE01]` Frontend: verified build, static UI retired, Next.js 16, accessibility and language review `p1`
-- [ ] #42 `[X01]` Security hardening: threat-model checks, DAST, dependency and licence scanning `p1`
-- [ ] #44 `[X03]` Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges `p1`
-- [ ] #43 `[X02]` Performance and resilience: load and chaos tests `p2`
+- [x] #42 `[X01]` Security hardening: threat-model checks, DAST, dependency and licence scanning `p1`
+- [x] #44 `[X03]` Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges `p1`
+- [x] #43 `[X02]` Performance and resilience: load and chaos tests `p2`

@@ -29,3 +29,7 @@ backend/.eval/
 # the generated plan are artefacts of a run.
 .zap/report.*
 .zap/zap.yaml
+
+# Playwright run artefacts (traces, videos, screenshots).
+frontend/test-results/
+frontend/playwright-report/

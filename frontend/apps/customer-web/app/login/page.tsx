@@ -16,25 +16,35 @@ export default function LoginPage() {
   const [step, setStep] = useState<"request" | "verify">("request");
   const [status, setStatus] = useState<{ text: string; tone: "ok" | "info" } | null>(null);
   const [busy, setBusy] = useState(false);
+  // The code from the simulated inbox. There is no "any six digits" path: the
+  // backend generates a code per challenge and refuses anything else, so the
+  // panel below has to show the real one or nobody can sign in.
+  const [demoCode, setDemoCode] = useState<string | null>(null);
 
   async function onRequest(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setStatus(null);
     try {
       const result = await client.requestOtp(msisdn);
-      setStatus({
-        text: result.message ?? (result.demo_code ? `OTP sent (demo: ${result.demo_code})` : "OTP sent to your number."),
-        tone: "ok",
-      });
+      setStatus({ text: result.message ?? "OTP sent to your number.", tone: "ok" });
       setStep("verify");
+      // Read the simulated SMS back and prefill it. Synthetic profiles only;
+      // the route 404s in prod, so a failure here is not an error worth
+      // showing, it just means there is no inbox to read.
+      try {
+        const message = await client.demoInbox(msisdn);
+        if (message.code) {
+          setDemoCode(message.code);
+          setCode(message.code);
+        }
+      } catch {
+        setDemoCode(null);
+      }
     } catch (err) {
       setStatus({
-        text: err instanceof Error
-          ? `${err.message} - demo mode: enter any 6-digit code`
-          : "Request failed",
+        text: err instanceof Error ? err.message : "Request failed",
         tone: "info",
       });
-      setStep("verify");
     } finally { setBusy(false); }
   }
 
@@ -227,7 +237,17 @@ export default function LoginPage() {
           Simulated SMS inbox
         </div>
         <p style={{ margin: 0, padding: 12, fontSize: 14, color: "var(--ink)" }}>
-          Any 6-digit code works in demo mode.
+          {demoCode ? (
+            <>
+              Your code is{" "}
+              <strong data-testid="demo-otp-code" style={{ letterSpacing: ".1em" }}>
+                {demoCode}
+              </strong>
+              . It has been filled in for you.
+            </>
+          ) : (
+            "Enter your Hutch number to receive a simulated code here."
+          )}
         </p>
       </div>
     </main>

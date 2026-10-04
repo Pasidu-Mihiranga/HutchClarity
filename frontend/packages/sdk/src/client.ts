@@ -219,6 +219,18 @@ export class ClarityClient {
     });
   }
 
+  /**
+   * The simulated SMS inbox. Synthetic profiles only: the route is gated by
+   * `demo_only` and returns 404 in `prod` (I9).
+   *
+   * The sign-in code is generated per challenge and is **not** "any six
+   * digits", which the login page used to claim. Reading it back is the only
+   * way to complete a sign-in in the prototype.
+   */
+  demoInbox(msisdn: string): Promise<{ code: string; msisdn?: string; text?: string }> {
+    return this.request(`/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`);
+  }
+
   verifyOtp(msisdn: string, code: string): Promise<OtpVerifyResult> {
     return this.request("/v1/auth/otp/verify", {
       method: "POST",

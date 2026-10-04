@@ -21,12 +21,18 @@ const DILANI = "+94771234567";
 
 async function signIn(page: Page): Promise<void> {
   await page.goto("/login");
-  // Any six digits are accepted in the synthetic profiles, and the identity
-  // routes that allow it 404 in prod (I9), which is what makes automating
-  // this journey safe rather than a bypass.
   await page.getByLabel("Hutch number").fill(DILANI);
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("6-digit code").fill("123456");
+
+  // The code is generated per challenge and read back from the simulated
+  // inbox, which the login page now shows and prefills. There is no
+  // "any six digits" path: the backend refuses anything else with 401, and
+  // this helper used to assume otherwise, which is why every browser test
+  // failed the first time the suite was actually executed.
+  const shown = page.getByTestId("demo-otp-code");
+  await expect(shown).toBeVisible();
+  await page.getByLabel("6-digit code").fill((await shown.innerText()).trim());
+
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/(account|clarity|cases)/);
 }
