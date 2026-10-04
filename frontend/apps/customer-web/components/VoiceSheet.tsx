@@ -5,8 +5,9 @@
  *
  * Speech becomes text through the browser's own speech recognition
  * (`SpeechRecognition`). In Chrome and Safari that service sends the audio to
- * the browser vendor (Google, Apple), not to Hutch, so it is opt-in: the sheet
- * says so before anything listens, and listening starts only on a tap. Only
+ * the browser vendor (Google, Apple), not to Hutch. Tapping Speak is the
+ * opt-in: the sheet starts listening at once, inside that tap's user
+ * activation, and says where the audio goes for as long as it listens. Only
  * the resulting text reaches Clarity, as an ordinary question the customer can
  * check or edit first. The orb reads the microphone's loudness locally and
  * sends nothing.
@@ -72,7 +73,7 @@ export function VoiceSheet({
   const [voice, setVoice] = useState(false);
   const recRef = useRef<Recognition | null>(null);
   const textRef = useRef("");
-  const firstRef = useRef<HTMLButtonElement>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
 
   const stopRecognition = useCallback(() => {
     recRef.current?.abort();
@@ -80,7 +81,6 @@ export function VoiceSheet({
   }, []);
 
   useEffect(() => {
-    firstRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -138,6 +138,20 @@ export function VoiceSheet({
 
   const stop = () => recRef.current?.stop();
 
+  // Listen as soon as the sheet opens: the Speak tap that opened it is the
+  // user activation `start()` needs. A browser that still refuses lands in
+  // the error state, whose Try again button is a fresh gesture.
+  const startRef = useRef(start);
+  startRef.current = start;
+  useEffect(() => {
+    startRef.current();
+  }, []);
+
+  // Keyboard focus follows the one action that matters in each phase.
+  useEffect(() => {
+    primaryRef.current?.focus();
+  }, [phase]);
+
   const status =
     phase === "listening" ? (voice ? t(lang, "voice.hearing") : t(lang, "voice.listening"))
     : phase === "heard" ? t(lang, "voice.heard")
@@ -165,20 +179,20 @@ export function VoiceSheet({
         <p className="vo-status" role="status" aria-live="polite" data-error={phase === "error" ? "" : undefined}>{status}</p>
         {text ? <p className="vo-transcript" data-testid="voice-transcript">{text}</p> : null}
 
-        {phase === "idle" ? <p className="vo-notice">{t(lang, "voice.notice")}</p> : null}
+        {phase !== "heard" ? <p className="vo-notice">{t(lang, "voice.notice")}</p> : null}
 
         <div className="vo-actions">
           {phase === "idle" || phase === "error" ? (
-            <button ref={firstRef} type="button" className="vo-btn vo-btn-primary" onClick={start}>
+            <button ref={primaryRef} type="button" className="vo-btn vo-btn-primary" onClick={start}>
               {t(lang, phase === "idle" ? "voice.start" : "voice.retry")}
             </button>
           ) : null}
           {phase === "listening" ? (
-            <button type="button" className="vo-btn vo-btn-primary" onClick={stop}>{t(lang, "voice.stop")}</button>
+            <button ref={primaryRef} type="button" className="vo-btn vo-btn-primary" onClick={stop}>{t(lang, "voice.stop")}</button>
           ) : null}
           {phase === "heard" ? (
             <>
-              <button type="button" className="vo-btn vo-btn-primary" onClick={() => onAsk(text)}>{t(lang, "voice.ask")}</button>
+              <button ref={primaryRef} type="button" className="vo-btn vo-btn-primary" onClick={() => onAsk(text)}>{t(lang, "voice.ask")}</button>
               <button type="button" className="vo-btn" onClick={() => onEdit(text)}>{t(lang, "voice.edit")}</button>
               <button type="button" className="vo-btn vo-btn-ghost" onClick={start}>{t(lang, "voice.retry")}</button>
             </>

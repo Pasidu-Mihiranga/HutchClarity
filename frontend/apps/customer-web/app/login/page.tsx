@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClarityClient } from "@clarity/sdk";
 import { t } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
+import { safeNext } from "@/lib/session";
 
 const client = new ClarityClient();
 
@@ -63,7 +64,8 @@ export default function LoginPage() {
       try { window.sessionStorage.setItem("clarity_token", result.token); } catch {}
       client.setToken(result.token);
       setStatus({ text: "Signed in - redirecting...", tone: "ok" });
-      router.push("/");
+      // Back to where an expired session sent us from (lib/session.ts).
+      router.push(safeNext(new URLSearchParams(window.location.search).get("next")));
     } catch (err) {
       // A failed sign-in used to write `clarity_token = "demo-token"` and say
       // "placeholder login accepted locally". That turned a rejected code into

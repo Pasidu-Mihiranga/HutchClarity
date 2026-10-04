@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     capable: true,
     title: "Clarity",
   },
+  icons: { apple: "/apple-touch-icon.png" },
+  // The standard name for what `appleWebApp.capable` declares for iOS only;
+  // Chrome warns when the Apple tag appears without it.
+  other: { "mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
