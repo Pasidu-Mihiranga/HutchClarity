@@ -42,6 +42,7 @@ from clarity.contracts.events import KnowledgePublishedV1, RiskDetectedV1
 from clarity.contracts.receipt import ReceiptAuditAnchor
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
+from clarity.integration.drivers.sms import SmsOtpDelivery, SmsSettings
 from clarity.integration.ports import DriverMode
 from clarity.integration.registry import AdapterRegistry
 from clarity.kernel.common import Channel, Language
@@ -86,6 +87,7 @@ from clarity.modules.iam.public import (
     OidcLogin,
     OidcSettings,
     OpaAuthorizationPolicy,
+    OtpDelivery,
     OtpService,
     PythonAuthorizationPolicy,
     StaffDirectory,
@@ -350,6 +352,27 @@ def _configured_provider(
             model=settings.model_name,
             api_key=settings.model_api_key,
             timeout_seconds=settings.model_timeout_seconds,
+        )
+    )
+
+
+def _otp_delivery(settings: Settings) -> OtpDelivery | None:
+    """The SMS gateway when one is configured, else the simulated inbox.
+
+    `None` means the service builds its own `SimulatedInbox`, which is what
+    every profile but `prod` wants. Both halves of the credential are required
+    before a gateway is used: a URL with no token would fail on every send, and
+    failing at sign-in is a worse way to discover a missing secret than not
+    being configured at all.
+    """
+    if not settings.sms_url or not settings.sms_token:
+        return None
+    return SmsOtpDelivery(
+        SmsSettings(
+            url=settings.sms_url,
+            token=settings.sms_token,
+            sender=settings.sms_sender,
+            timeout_seconds=settings.auth_timeout_seconds,
         )
     )
 
@@ -701,7 +724,13 @@ class Clarity:
                 self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
             ),
         )
-        self.otp = otp or OtpService(open_unit=self.open_unit)
+        # One-time code delivery (B6). The simulated inbox is the default and
+        # is correct for the synthetic profiles; a gateway is configured where
+        # codes have to reach a real handset. The port is the same either way,
+        # and both drivers pass `tests/contract/test_otp_delivery_parity.py`.
+        self.otp = otp or OtpService(
+            delivery=_otp_delivery(self.settings), open_unit=self.open_unit
+        )
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

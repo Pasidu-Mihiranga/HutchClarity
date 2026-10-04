@@ -21,6 +21,9 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **An SMS driver for one-time codes** (`CLARITY_SMS_URL`, `CLARITY_SMS_TOKEN`). `OtpDelivery` had one implementation, `SimulatedInbox`, so in `prod` a customer's code was generated into an inbox nobody can reach and sign-in could not complete. Both drivers pass `tests/contract/test_otp_delivery_parity.py`, which asserts the code never reaches a log or an exception and that a delivery failure says nothing about whether the number exists. The gateway interface is **REQUIRES HUTCH CONFIRMATION**.
+- Sign-in routes are rate limited by the application (`throttle.auth.per_minute`), not only by nginx. The OTP service bounds challenges per number; this bounds them per caller, which is what stops one script working through a list of numbers, and it exists in `lite` where no reverse proxy does.
+
 - **`GET /v1/auth/sessions`** lists a person's own live sessions (channel, assurance, when it started, when it ends, which one is this request) and **`DELETE /v1/auth/sessions`** ends them, keeping the current device unless `keep_current=false`. The subject comes from the verified token, so there is nothing to enumerate, and the list carries nothing that could resume a session.
 
 ### Changed

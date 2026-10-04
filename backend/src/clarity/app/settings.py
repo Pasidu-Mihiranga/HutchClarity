@@ -159,6 +159,18 @@ class Settings(BaseSettings):
         alias="CLARITY_STAFF_DIRECTORY_FILE",
         description="Path to that JSON document. The inline variable wins when both are set.",
     )
+    sms_url: str | None = Field(
+        default=None,
+        alias="CLARITY_SMS_URL",
+        description=(
+            "The SMS gateway one-time codes are delivered through (B6). "
+            "Without it the simulated inbox is used, which is correct for the "
+            "synthetic profiles and useless in prod. REQUIRES HUTCH "
+            "CONFIRMATION of the real SMSC interface."
+        ),
+    )
+    sms_token: str | None = Field(default=None, alias="CLARITY_SMS_TOKEN")
+    sms_sender: str = Field(default="HutchClarity", alias="CLARITY_SMS_SENDER")
     opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
     # The clarity-mcp deployable (A04, ADR-0018).
     mcp_resource_url: str = Field(
