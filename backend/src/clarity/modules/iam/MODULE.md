@@ -10,7 +10,7 @@
 | Files | `authorization.py`, `directory.py`, `httpsms.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py` |
 
 ## 1. Purpose
-Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization.
+Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization; and staff sign-in through the provider (B1), where the API is the confidential client and the browser holds a cookie rather than a token.
 
 ## 2. Public surface (`public.py`)
 `StaffDirectory` loads simulated staff accounts. `authenticate` returns that account's role. A configured directory is what closes `POST /v1/auth/staff/session`.
@@ -32,7 +32,7 @@ safe delivery failure without exposing the provider response.
 | `clarity.platform.persistence` | `iam.grants` |
 
 ## 5. Data owned
-Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refresh_tokens` and `iam.grants`. Grants are stored beside the audit trail's store so a demo reset carries them with it. Lite uses the shared memory store; full uses the IAM PostgreSQL schema.
+Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refresh_tokens`, `iam.pending_logins` and `iam.grants`. A pending login looks like throwaway protocol state and is not: the browser decides which replica receives the callback, so holding it in a dictionary makes sign-in fail intermittently behind a load balancer. Grants are stored beside the audit trail's store so a demo reset carries them with it. Lite uses the shared memory store; full uses the IAM PostgreSQL schema.
 
 ## 6. Invariants
 - The OTP code travels only through the delivery port; it is never returned by a request.
@@ -41,6 +41,13 @@ Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refre
 - A grant is requested by one holder of `audit:assign` and approved by a different one; nobody grants themselves, by name or through a role they hold. Break-glass is the one exception, admin-only, short, and recorded as `grant.break_glass`.
 - A grant that expires or lapses is recorded once, as `grant.expired` or `grant.lapsed`, with the moment it ended.
 - Whatever authorization driver is configured is wrapped, so grants and the rule that an audit duty removes money permissions hold under OPA too.
+- **`OidcLogin` decides nothing about a person.** It turns an authorization code into verified claims; roles come from the provider's token and are mapped by `KeycloakTokenVerifier` onto the closed `Role` enum, where an unknown role grants nothing. A principal carrying no known role is refused rather than admitted with none.
+- **The browser never holds a provider token.** The API is the confidential client and the console carries an `HttpOnly` cookie holding the same Clarity staff token `TokenIssuer` has always minted, so revocation, the trail and `STEP_UP_WINDOW` work unchanged.
+- **A sign-in state is single use.** It is deleted when claimed, so a replayed callback finds nothing, and the id token's nonce is checked before anything is trusted.
+- **A step-up re-authenticates.** `prompt=login` and `max_age=0` with `acr_values`, against a realm that carries `acr.loa.map`: without the map the provider ignores the level, answers from its own cookie, and the token claims MFA for a password typed an hour ago.
+- **The realm must declare the `basic` and `acr` scopes explicitly.** A realm import replaces Keycloak's built-in client scopes rather than adding to them, so declaring the Clarity MCP scopes removed them. `basic` emits `sub`, which `KeycloakTokenVerifier` requires, and `acr` carries the level of assurance. Both failures are silent: the realm imports and tokens issue. `tests/unit/test_keycloak_realm.py` pins it.
+- **Recency comes from `auth_time`, never from the name of a level.** The ACR says what was proven; `auth_time` says when. Requiring `acr == "mfa-recent"` made `MFA_RECENT` unreachable from any real provider, so a completed step-up granted nothing.
+- **Staff SSO is off unless fully configured.** Issuer, client secret and callback, all three. A confidential client with no secret is a public client nobody decided to make public, and a half-configured SSO silently falling back to the development sign-in is the failure nobody notices.
 
 ## 7. Migration status (enterprise-plan 21)
 M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloak JWKS and delegate permissions to OPA. Refresh tokens rotate, access sessions revoke immediately, and OTP/rate-limit state is shared between replicas. Staff dev sign-in remains synthetic-profile only (D3).
@@ -50,6 +57,7 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 - `tests/unit/test_httpsms.py`
 - `tests/contract/test_authz_parity.py` (real OPA in the `full` lane)
 - `tests/security/test_audit_grants.py`
+- `tests/unit/test_keycloak_realm.py` (the shipped realm's own configuration)
 - `tests/integration/test_keycloak.py` (real Keycloak, `CLARITY_KEYCLOAK_URL`)
 
 ## 9. Change history
@@ -64,4 +72,5 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-M-IAM-keycloak-verified-real.md` | Verified against real Keycloak; fixed the multi-key JWKS defect |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-FE-session-survives-deploy.md` | Optional persisted issuer key, so a redeploy no longer signs every customer out |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-staff-login-vertex.md` | Directory sign-in: the server assigns the role |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-B1-B2-keycloak-staff-sso.md` | Staff SSO through the provider: `oidc.py`, the cookie session, step-up by level of assurance (B1, B2) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-SMS01-httpsms-otp.md` | Customer OTP delivery through httpSMS |

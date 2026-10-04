@@ -56,6 +56,10 @@
             "userinfo.token.claim": "false"
           }
         }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
       ]
     },
     {
@@ -98,10 +102,306 @@
         "clarity.analytics",
         "clarity.customer-assist",
         "clarity.staff-assist"
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
+      ]
+    },
+    {
+      "clientId": "clarity-console",
+      "name": "Clarity staff console (authorization code via the API)",
+      "description": "SIMULATED development identity. The API performs the code exchange and the browser never sees a Keycloak token. Production federates HUTCH SSO and this client is replaced. REQUIRES HUTCH CONFIRMATION.",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "secret": "clarity-console-development-only",
+      "redirectUris": [
+        "http://localhost:8000/v1/auth/staff/oidc/callback",
+        "http://127.0.0.1:8000/v1/auth/staff/oidc/callback",
+        "http://localhost:8100/v1/auth/staff/oidc/callback",
+        "http://127.0.0.1:8100/v1/auth/staff/oidc/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3101/*##http://127.0.0.1:3101/*",
+        "acr.loa.map": "{\"password\": \"1\", \"mfa\": \"2\"}"
+      },
+      "protocolMappers": [
+        {
+          "name": "clarity-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "clarity-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "clarity-realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr"
       ]
     }
   ],
   "users": [
+    {
+      "username": "nadeesha",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Nadeesha",
+      "lastName": "Perera",
+      "email": "nadeesha@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "nadeesha-clarity",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "agent"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "dilani",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dilani",
+      "lastName": "Fernando",
+      "email": "dilani@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dilani-clarity",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "clarity-development-only",
+          "secretData": "{\"value\": \"CLARITYDEVELOPMENTONLYSECRET\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "supervisor"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "sunil",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Sunil",
+      "lastName": "Jayasuriya",
+      "email": "sunil@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sunil-clarity",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "clarity-development-only",
+          "secretData": "{\"value\": \"CLARITYDEVELOPMENTONLYSECRET\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "finance"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "kavitha",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Kavitha",
+      "lastName": "Raj",
+      "email": "kavitha@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "kavitha-clarity",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "vas_ops"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "roshan",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Roshan",
+      "lastName": "Silva",
+      "email": "roshan@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "roshan-clarity",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "cx_engineer"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "ishara",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ishara",
+      "lastName": "Wickrama",
+      "email": "ishara@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ishara-clarity",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "clarity-development-only",
+          "secretData": "{\"value\": \"CLARITYDEVELOPMENTONLYSECRET\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "compliance"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "kamal",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Kamal",
+      "lastName": "Bandara",
+      "email": "kamal@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "kamal-clarity",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "auditor"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "tharindu",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Tharindu",
+      "lastName": "Gunasekara",
+      "email": "tharindu@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "tharindu-clarity",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "clarity-development-only",
+          "secretData": "{\"value\": \"CLARITYDEVELOPMENTONLYSECRET\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "platform_admin"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "username": "nuwan",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Nuwan",
+      "lastName": "Rathnayake",
+      "email": "nuwan@clarity.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "nuwan-clarity",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "clarity-development-only",
+          "secretData": "{\"value\": \"CLARITYDEVELOPMENTONLYSECRET\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "security_admin"
+      ],
+      "attributes": {
+        "simulated": [
+          "yes"
+        ]
+      }
+    },
     {
       "username": "service-account-clarity-mcp",
       "enabled": true,
@@ -140,6 +440,182 @@
       "attributes": {
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "basic",
+      "description": "sub and auth_time. Keycloak ships this; the realm's own clientScopes list replaces the built-in set rather than adding to it, so it has to be restated here.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "auth_time",
+            "jsonType.label": "long"
+          }
+        },
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "acr",
+      "description": "The authentication context class reference. This is what carries the level of assurance a step-up asked for; without it a stepped-up session is indistinguishable from a password one.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "acr loa level",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-acr-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "attributes": {
+    "acr.loa.map": "{\"password\": \"1\", \"mfa\": \"2\"}"
+  },
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "browserFlow": "clarity-browser-stepup",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "authenticationFlows": [
+    {
+      "alias": "clarity-browser-stepup",
+      "description": "Browser flow with a conditional OTP step gated on the requested level of assurance",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "clarity-stepup-forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "clarity-stepup-forms",
+      "description": "Password, then OTP when a higher level was asked for",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "flowAlias": "clarity-loa-1",
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        },
+        {
+          "flowAlias": "clarity-loa-2",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "clarity-loa-1",
+      "description": "Level 1: username and password",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "clarity-loa-1-condition"
+        },
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "clarity-loa-2",
+      "description": "Level 2: a one-time code, asked for only when the client requested it",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "clarity-loa-2-condition"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "clarity-loa-1-condition",
+      "config": {
+        "loa-condition-level": "1",
+        "loa-max-age": "36000"
+      }
+    },
+    {
+      "alias": "clarity-loa-2-condition",
+      "config": {
+        "loa-condition-level": "2",
+        "loa-max-age": "300"
       }
     }
   ]

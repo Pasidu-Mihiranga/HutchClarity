@@ -132,10 +132,21 @@ class KeycloakTokenVerifier:
 
         role_names = _role_names(claims, self._audience)
         roles = frozenset(Role(name) for name in role_names if name in set(Role))
+        # The ACR says *what* was proven. `auth_time` says *when*. Recency is
+        # read from the clock, never from the name of a level.
+        #
+        # This used to require `acr == "mfa-recent"`, which no real Keycloak
+        # ever sends: with a level-of-assurance map configured the provider
+        # returns the level's own name, and a realm that calls its second
+        # factor "mfa" would authenticate somebody properly and still never
+        # reach `MFA_RECENT`. Since `MFA_RECENT` is what an above-cap approval
+        # requires, a step-up would have asked for a one-time code and then
+        # granted nothing for it. Found by running the flow (B2).
         acr = str(claims.get("acr", ""))
-        assurance = Assurance.MFA if acr in {"mfa", "mfa-recent"} else Assurance.NONE
+        stepped_up = acr in {"mfa", "mfa-recent"}
+        assurance = Assurance.MFA if stepped_up else Assurance.NONE
         auth_time = claims.get("auth_time")
-        if acr == "mfa-recent" and isinstance(auth_time, int):
+        if stepped_up and isinstance(auth_time, int):
             authenticated = datetime.fromtimestamp(auth_time, tz=moment.tzinfo)
             if moment - authenticated <= STEP_UP_WINDOW:
                 assurance = Assurance.MFA_RECENT

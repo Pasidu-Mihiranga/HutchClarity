@@ -109,6 +109,24 @@
       "response": "SessionView",
       "status": "200"
     },
+    "GET /v1/auth/staff/oidc/callback": {
+      "parameters": [
+        "query:code?",
+        "query:error?",
+        "query:state?"
+      ],
+      "request": null,
+      "response": null,
+      "status": "200"
+    },
+    "GET /v1/auth/staff/oidc/start": {
+      "parameters": [
+        "query:return_to?"
+      ],
+      "request": null,
+      "response": null,
+      "status": "200"
+    },
     "GET /v1/cases/{case_id}": {
       "parameters": [
         "header:authorization?",
@@ -423,6 +441,16 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/auth/logout": {
+      "parameters": [
+        "cookie:clarity_staff_idt?",
+        "cookie:clarity_staff_session?",
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/auth/otp/request": {
       "parameters": [],
       "request": "OtpRequest",
@@ -451,6 +479,15 @@
       "parameters": [],
       "request": "StaffSignIn",
       "response": "SessionView",
+      "status": "200"
+    },
+    "POST /v1/auth/staff/step-up": {
+      "parameters": [
+        "header:authorization?",
+        "query:return_to?"
+      ],
+      "request": null,
+      "response": "object",
       "status": "200"
     },
     "POST /v1/cases": {

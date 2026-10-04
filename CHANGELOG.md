@@ -19,6 +19,15 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - `FlowToolAdapter` serves all nine tools the flow files name. Five (`get_case_timeline`, `get_cause_assessment`, `explain_rule`, `get_customer_safeguards`, `request_handoff`) raised `ToolUnavailable`; the gap was invisible because they are only reachable through the bounded agent step, which has never run without a configured planner. `tests/unit/test_flow_tool_adapter.py` reads the tool names out of the shipped flow files, so a flow declaring a tool the adapter does not serve now fails the build.
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
 
+### Changed
+
+- `KeycloakTokenVerifier` derives `MFA_RECENT` from `auth_time` against `STEP_UP_WINDOW` rather than requiring `acr == "mfa-recent"`. No real Keycloak sends that value: with a level-of-assurance map configured the provider returns the level's own name, so a correctly completed step-up never reached the assurance an above-cap approval requires.
+- The realm declares the `basic` and `acr` client scopes and assigns them to every client. A realm import replaces Keycloak's built-ins rather than adding to them, so tokens carried no `sub` (which the verifier requires) and no `acr` (which step-up depends on).
+- Staff sign-in requests the `openid` scope alone. `profile` and `email` do not exist in this realm for the same reason, and asking for them is an `invalid_scope` refusal before the login form renders.
+- CORS is pinned to the origins a deployment serves (`CLARITY_ALLOWED_ORIGINS`) and allows credentials. `allow_origins=["*"]` was not merely loose: the CORS specification forbids the wildcard with credentials, so cookie-borne sign-in could not have worked under it.
+- `principal_from` accepts the staff session cookie as well as the `Authorization` header, header first.
+- `get_clarity` and `ClarityDep` moved to `interfaces/http/deps.py` so more than one module can register routes without importing `main`.
+
 ### Fixed
 
 - The audit checkpoint key path is built only when `KEYS_DIR` is set, so mypy no longer rejects `None / "audit-checkpoint-ed25519.pem"` on the full profile.

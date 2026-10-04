@@ -83,6 +83,7 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
         "iam.otp_requests",
         "iam.sessions",
         "iam.refresh_tokens",
+        "iam.pending_logins",
         "reconciliation.expected_actions",
         "reconciliation.mismatches",
     }
