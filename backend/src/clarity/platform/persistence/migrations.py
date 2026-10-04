@@ -207,9 +207,16 @@ def _make_append_only_tables_append_only(
 
     And the operations that *do* legitimately remove audit rows, restoring a
     backup and sealing a segment, get a role of their own. ``CUSTODIAN_ROLE``
-    holds ``DELETE``; the application role is deliberately **not** a member of it,
-    so those operations run under a separate connection or not at all. The plan's
-    wording is precise and worth keeping: revoke from the *writing* role.
+    holds ``DELETE``; the application role is deliberately **not** a member of it.
+    ``as_custodian`` assumes that role with ``SET LOCAL ROLE`` for the span and
+    puts the application role back afterwards. ``SET ROLE`` is checked against
+    the session user, so the database owner can assume it and a connection that
+    logged in as ``clarity_app`` cannot. The custodian also receives the
+    sequences those inserts use, and ``SELECT``, ``INSERT``, ``UPDATE`` and
+    ``DELETE`` on the two pointer tables, because a restore rewrites the head
+    and archival rewrites the floor inside the same span. The pointers hold no
+    history. The plan's wording is precise and worth keeping: revoke from the
+    *writing* role.
     """
     connection.execute(
         text(
@@ -236,6 +243,34 @@ def _make_append_only_tables_append_only(
             text(f"GRANT USAGE ON SCHEMA {schema_of(collection)} TO {CUSTODIAN_ROLE}")
         )
         connection.execute(text(f"GRANT SELECT, INSERT, DELETE ON {table} TO {CUSTODIAN_ROLE}"))
+        _grant_sequence(connection, table)
+
+    # Head and floor are pointers. Restore and archival rewrite them while the
+    # transaction is the custodian, so the application role's grants are not in
+    # force for those statements. They are not append-only and hold no history.
+    present = set(collections)
+    for collection in ("platform.audit_head", "platform.audit_floor"):
+        if collection not in present:
+            continue
+        table = f"{schema_of(collection)}.{table_of(collection)}"
+        connection.execute(
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO {CUSTODIAN_ROLE}")
+        )
+        _grant_sequence(connection, table)
+
+
+def _grant_sequence(connection: Connection, table: str) -> None:
+    """Let the custodian insert into ``table``.
+
+    A ``bigserial`` column draws its default from a sequence owned by the table
+    owner. ``INSERT`` without naming that column calls ``nextval``, which the
+    custodian cannot do until it holds ``USAGE``.
+    """
+    sequence = connection.execute(
+        text("SELECT pg_get_serial_sequence(:table, 'sequence')"),
+        {"table": table},
+    ).scalar_one()
+    connection.execute(text(f"GRANT USAGE, SELECT ON SEQUENCE {sequence} TO {CUSTODIAN_ROLE}"))
 
 
 def append_only_report(engine: Engine) -> dict[str, set[str]]:

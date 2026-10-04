@@ -89,7 +89,10 @@ def test_a_trail_destroyed_in_postgres_comes_back_whole(tmp_path: Path, trail) -
     bundle = vault.back_up(OPERATOR, path)
     before = [record.chain_hash for record in ledger.records]
 
-    with store_unit(ledger) as unit:
+    # The writing role cannot empty these tables. The custodian span is the
+    # same privilege a restore uses, and the only way this drill can simulate
+    # the loss without connecting as the database owner.
+    with store_unit(ledger) as unit, unit.as_custodian():
         for collection in (AUDIT, AUDIT_CHECKPOINTS, AUDIT_HEAD):
             repository = unit.repository(collection)
             for key in list(repository.keys()):

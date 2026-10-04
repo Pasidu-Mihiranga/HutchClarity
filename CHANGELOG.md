@@ -19,7 +19,11 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
   `DELETE` from the module role and grants `DELETE` to the new
   `clarity_audit_custodian` role, which `clarity_app` is not a member of.
 - **`UnitOfWork.as_custodian()`**: the named, bounded exception to append-only,
-  used by restore and archival only.
+  used by restore and archival only. On PostgreSQL the span assumes
+  `clarity_audit_custodian` and returns to `clarity_app`. The custodian is
+  granted the audit sequences and writes on the head and floor pointers, which
+  those two operations rewrite inside the span. `clarity_app` is still not a
+  member of the custodian role.
 
 ### Changed (audit assurance Phases 2, 6 and 7, breaking for stored hashes)
 

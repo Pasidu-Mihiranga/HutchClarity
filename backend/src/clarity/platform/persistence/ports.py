@@ -76,9 +76,15 @@ class UnitOfWork(Protocol):
         call site and bounded by it, and so a reviewer can grep for every place
         that takes it.
 
-        It does **not** grant anything at the database level. In ``full`` the
-        tables are granted ``DELETE`` only to the custodian role, so this relaxes
-        the application's own guard and PostgreSQL still has the final say.
+        On PostgreSQL the span assumes ``clarity_audit_custodian`` and puts the
+        application role back when it ends. ``DELETE`` on an audit table is
+        granted to that role alone, and the application role is not a member of
+        it, so a request cannot inherit the privilege. The switch is authorised
+        against the session user (the database owner), which is the same reason
+        a unit of work can assume the application role in the first place. A
+        login that is already the application role cannot enter the span. The
+        in-memory driver relaxes its own guard for the same span, so both
+        profiles accept a restore and refuse an ordinary rewrite.
         """
         ...
 

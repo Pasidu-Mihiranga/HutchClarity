@@ -104,3 +104,27 @@ around the application entirely; the tamper tests take the custodian span to sta
 exactly that. Grants asserted in `tests/integration/test_append_only_grants.py`
 (`full` lane, not yet executed here); the application guard in
 `tests/security/test_append_only.py`.
+
+## Amendment, 2026-10-04: the span assumes the custodian role
+
+The amendment above granted `DELETE` to `clarity_audit_custodian` and told
+restore and archival to take `as_custodian`. The PostgreSQL driver left that
+span empty. A unit of work runs as `clarity_app`, that role is not a member of
+the custodian, and the database refused the `DELETE`. The destroy-and-restore
+drill failed with `permission denied for table audit` the first time it was run
+against PostgreSQL. Archival would have failed the same way.
+
+`as_custodian` now executes `SET LOCAL ROLE clarity_audit_custodian` for the
+span and `SET LOCAL ROLE clarity_app` when the span ends without having
+committed. `SET ROLE` is authorised against the session user, not the current
+role, so the database owner can assume the custodian while `clarity_app` still
+cannot inherit `DELETE`. A connection that logged in as the application role
+cannot enter the span. No new login and no new infrastructure: the pool already
+connects as the owner so that it can assume `clarity_app`.
+
+The custodian is also granted `USAGE` on the `bigserial` sequences, and
+`SELECT`, `INSERT`, `UPDATE` and `DELETE` on `platform.audit_head` and
+`platform.audit_floor`. Those pointers are rewritten inside the same span, and
+once the transaction has assumed the custodian the application role's grants
+are not in force. The pointers hold no history. The append-only tables still
+do not grant the custodian `UPDATE`.

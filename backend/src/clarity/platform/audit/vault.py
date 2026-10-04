@@ -180,9 +180,9 @@ class AuditVault:
         with self._open_unit() as unit, unit.as_custodian():
             # The named exception to append-only: replacing the trail is the one
             # thing a restore is for, and saying so here is what keeps every
-            # other write path from being able to do it (ADR-0038). In the full
-            # profile the DELETE below also needs the custodian database role,
-            # so this states the intent and PostgreSQL still has the final say.
+            # other write path from being able to do it (ADR-0038). On PostgreSQL
+            # the span assumes clarity_audit_custodian, the only role granted
+            # DELETE on these tables. The application role is not a member of it.
             records: Repository[str, Any] = unit.repository(AUDIT)
             signed: Repository[str, Checkpoint] = unit.repository(AUDIT_CHECKPOINTS)
             heads: Repository[str, dict[str, Any]] = unit.repository(AUDIT_HEAD)

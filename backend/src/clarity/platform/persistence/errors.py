@@ -33,3 +33,14 @@ class ConcurrentUpdate(PersistenceError):
 
 class UnitOfWorkClosed(PersistenceError):
     """A unit of work was used after it committed or rolled back."""
+
+
+class CustodianUnavailable(PersistenceError):
+    """This connection cannot assume the audit custodian role.
+
+    Restore and archival need ``DELETE`` on the append-only tables, and that
+    privilege belongs to ``clarity_audit_custodian`` alone. The application
+    role is not a member of it. Assuming it works only when the session user
+    (the role that logged in) is allowed to ``SET ROLE`` to the custodian,
+    which the database owner is and ``clarity_app`` is not.
+    """

@@ -17,8 +17,16 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import ProgrammingError
 
-from clarity.platform.audit.ledger import AUDIT, AUDIT_HEAD
+from clarity.platform.audit.ledger import (
+    AUDIT,
+    AUDIT_FLOOR,
+    AUDIT_HEAD,
+    AuditEventType,
+    AuditLedger,
+)
+from clarity.platform.audit.lifecycle import SEGMENTS
 from clarity.platform.persistence.migrations import append_only_report
+from clarity.platform.persistence.postgres import PostgresStore
 from clarity.platform.persistence.schemas import (
     APPEND_ONLY,
     CUSTODIAN_ROLE,
@@ -145,3 +153,42 @@ def test_the_application_role_is_not_a_member_of_the_custodian(engine: Engine) -
         ).all()
 
     assert rows == [], "clarity_app must not inherit the custodian's DELETE"
+
+
+def test_the_custodian_span_assumes_the_role_and_puts_it_back(engine: Engine) -> None:
+    """``as_custodian`` is the switch, not a comment beside an ordinary delete.
+
+    A restore deletes audit rows, rewrites the head, and an archival writes a
+    segment and the floor, all inside one span. The next unit of work is the
+    application role again and still cannot delete.
+    """
+    store = PostgresStore(engine)
+    ledger = AuditLedger(store.unit)
+    record = ledger.append(
+        AuditEventType.STAFF_ACTION,
+        actor_ref="sup:ruwan",
+        object_ref="plan:1",
+        payload={"i": 1},
+        detail={"amount_lkr": "900.00"},
+    )
+    key = str(record.seq).zfill(12)
+
+    with pytest.raises(ProgrammingError, match="permission denied"), store.unit() as unit:
+        unit.repository(AUDIT).delete(key)
+
+    with store.unit() as unit, unit.as_custodian():
+        unit.repository(AUDIT).delete(key)
+        unit.repository(AUDIT_HEAD).put("head", {"seq": 0, "chain_hash": "restored"})
+        unit.repository(AUDIT_FLOOR).put("floor", {"seq": 0, "chain_hash": "restored"})
+        unit.repository(SEGMENTS).put(key, {"sealed": True})
+        unit.commit()
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f"INSERT INTO {qualified(AUDIT)} (key, value, document, version) "
+                "VALUES ('after', '\\x00'::bytea, '{}'::jsonb, 1)"
+            )
+        )
+    with pytest.raises(ProgrammingError, match="permission denied"), store.unit() as unit:
+        unit.repository(AUDIT).delete("after")

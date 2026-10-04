@@ -37,10 +37,15 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import DBAPIError
 
-from clarity.platform.persistence.errors import ConcurrentUpdate, UnitOfWorkClosed
+from clarity.platform.persistence.errors import (
+    ConcurrentUpdate,
+    CustodianUnavailable,
+    UnitOfWorkClosed,
+)
 from clarity.platform.persistence.ports import Repository
 from clarity.platform.persistence.schemas import (
     APP_ROLE,
+    CUSTODIAN_ROLE,
     OWNERS,
     is_append_only,
     is_customer_scoped,
@@ -125,6 +130,7 @@ class PostgresUnitOfWork:
         #: silently overwrite the earlier one: those are still version checked.
         self._written: set[tuple[str, Any]] = set()
         self._closed = False
+        self._custodian_depth = 0
         self._connection.execute(text(f"SET LOCAL lock_timeout = '{lock_timeout_ms}ms'"))
         # Requests run as the application role, never as the database owner: an
         # owner or superuser bypasses row-level security, which would make the
@@ -270,18 +276,59 @@ class PostgresUnitOfWork:
 
     @contextmanager
     def as_custodian(self) -> Iterator[None]:
-        """See ``UnitOfWork.as_custodian``.
+        """Assume the audit custodian for this span, then return to the app role.
 
-        A no-op on the write path here, because the plain insert this driver uses
-        for an append-only collection is already correct after a delete: a
-        restore removes the rows and writes fresh ones, and never needs to update
-        one in place. What the operation really needs is ``DELETE``, which this
-        cannot grant: the migration gives that to the custodian role alone, so
-        PostgreSQL refuses it under the ordinary application role whatever this
-        context manager says. That is the intended order: the database has the
-        final say and the application states its intent.
+        ``SET ROLE`` is authorised against the session user, not the current
+        role, so this succeeds for the database owner even though ``clarity_app``
+        is not a member of the custodian and cannot inherit ``DELETE``. A login
+        that is already the application role is refused, which is the property
+        the separation exists for.
+
+        The plain insert this driver uses for an append-only collection is
+        already valid after a delete, so the span does not need ``UPDATE`` on
+        those tables. The pointer tables are not append-only and are rewritten
+        in the same span, which is why the custodian is granted that narrower
+        write on them.
+
+        A failed statement aborts the transaction, and a ``SET ROLE`` in this
+        ``finally`` would then raise and hide the original error. After a
+        commit the role change was transaction-local and has already ended.
         """
-        yield
+        self._guard()
+        if self._custodian_depth == 0:
+            self._assume(CUSTODIAN_ROLE)
+        self._custodian_depth += 1
+        try:
+            yield
+        finally:
+            self._custodian_depth -= 1
+            if self._custodian_depth == 0 and not self._closed:
+                self._resume_application_role()
+
+    def _assume(self, role: str) -> None:
+        try:
+            self._connection.execute(text(f"SET LOCAL ROLE {role}"))
+        except DBAPIError as error:
+            self._transaction.rollback()
+            self._close()
+            raise CustodianUnavailable(
+                f"this connection cannot assume {role}. Restore and archival "
+                "require a database login that is allowed to SET ROLE to the "
+                "audit custodian. The application role is not that login."
+            ) from error
+
+    def _resume_application_role(self) -> None:
+        try:
+            self._connection.execute(text(f"SET LOCAL ROLE {APP_ROLE}"))
+        except DBAPIError as error:
+            # 25P02: the body already aborted the transaction. Raising here would
+            # hide that error. Any other failure would leave the rest of the unit
+            # running as the custodian, so it is rolled back instead.
+            if getattr(error.orig, "sqlstate", None) == "25P02":
+                return
+            self._transaction.rollback()
+            self._close()
+            raise
 
     def all_keys(self, collection: str) -> list[Any]:
         self._guard()
