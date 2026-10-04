@@ -6,6 +6,8 @@ export {
   type CasePayload,
   type OtpRequestResult,
   type OtpVerifyResult,
+  type AutopsyCluster,
+  type AutopsyWorkspace,
   type ReceiptPayload,
   type SessionView,
   type QueueItem,

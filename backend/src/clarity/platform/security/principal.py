@@ -61,6 +61,16 @@ class Permission(StrEnum):
     RECEIPT_READ_ANY = "receipt:read:any"
     DESK_QUEUE_READ = "desk:queue:read"
     RECONCILIATION_READ = "reconciliation:read"
+    AUTOPSY_REVIEW = "autopsy:review"
+    """Confirm or reject a complaint cluster.
+
+    Its own permission rather than `rule:draft`, because the two are different
+    judgements. Reviewing says "these complaints are the same problem", which
+    is a CX call on evidence. Drafting a rule says "this is what the system
+    should do about it", which is a change to how money moves and is governed
+    as one. A reviewer who could do both by holding one permission is a
+    reviewer whose confirmation is already halfway to a published rule.
+    """
     RULE_DRAFT = "rule:draft"
     RULE_PUBLISH = "rule:publish"
     CONFIG_DRAFT = "config:draft"
@@ -163,6 +173,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     ),
     Role.SUPERVISOR: frozenset(
         {
+            Permission.AUTOPSY_REVIEW,
             Permission.CASE_READ,
             Permission.CASE_READ_ANY,
             Permission.CASE_EVALUATE,
@@ -207,6 +218,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.RECEIPT_READ,
             Permission.RECEIPT_READ_ANY,
             Permission.DESK_QUEUE_READ,
+            Permission.AUTOPSY_REVIEW,
             Permission.RULE_DRAFT,
             Permission.CONFIG_DRAFT,
         }

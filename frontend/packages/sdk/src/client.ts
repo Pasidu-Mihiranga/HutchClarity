@@ -67,6 +67,32 @@ export type TranscriptPayload = {
   retention_days: number;
 };
 
+export type AutopsyCluster = {
+  cluster_id: string;
+  label: string;
+  size: number;
+  status: string;
+  status_label: string;
+  mapping_label: string;
+  hypothesis: boolean;
+  suggested_rule_id: string | null;
+  languages: Record<string, number>;
+  representative_masked_complaints: string[];
+  synthetic_demo_trend: Record<string, number>;
+  reviews?: { reviewer: string; accepted: boolean; at: string; note: string }[];
+};
+
+export type AutopsyWorkspace = {
+  clusters: AutopsyCluster[];
+  complaint_count: number;
+  languages: Record<string, number>;
+  clustering_method: string;
+  clustering_disclosure: string;
+  hypothesis: boolean;
+  synthetic: boolean;
+  note: string;
+};
+
 export type ReceiptPayload = {
   receipt_id?: string;
   id?: string;
@@ -543,6 +569,51 @@ export class ClarityClient {
 
   demoAutopsy(): Promise<Record<string, unknown>> {
     return this.request("/v1/demo/autopsy");
+  }
+
+  // --- Complaint Autopsy (D1) ---------------------------------------------
+
+  /** The reviewer workspace. `desk:queue:read`: seeing is not ruling. */
+  autopsyClusters(): Promise<AutopsyWorkspace> {
+    return this.request("/v1/autopsy/clusters");
+  }
+
+  /** Record a first verdict. The reviewer is the caller, never a field. */
+  reviewCluster(
+    clusterId: string,
+    body: { accept: boolean; note?: string },
+  ): Promise<AutopsyCluster> {
+    return this.request(`/v1/autopsy/clusters/${encodeURIComponent(clusterId)}/review`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Change a verdict, keeping the one it replaces. The note is required. */
+  supersedeClusterReview(
+    clusterId: string,
+    body: { accept: boolean; note: string },
+  ): Promise<AutopsyCluster> {
+    return this.request(`/v1/autopsy/clusters/${encodeURIComponent(clusterId)}/supersede`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Propose a policy change from a confirmed cluster.
+   *
+   * Returns a draft change id and nothing more: activation goes through the
+   * governance lifecycle, approved by somebody else (AU02).
+   */
+  proposeRuleCandidate(
+    clusterId: string,
+    body: { key: string; value: string; rationale: string },
+  ): Promise<{ change_id: string; state: string; cluster_id: string; note: string }> {
+    return this.request(
+      `/v1/autopsy/clusters/${encodeURIComponent(clusterId)}/rule-candidate`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
   }
 
   demoForesight(): Promise<Record<string, unknown>> {
