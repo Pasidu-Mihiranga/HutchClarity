@@ -24,8 +24,10 @@ export IMAGE_TAG=$candidate
 "${compose[@]}" config --quiet
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --remove-orphans
-# Pick up the new container addresses now rather than after the next DNS refresh.
-"${compose[@]}" exec -T reverse-proxy nginx -s reload
+# Recreate, not reload: the configs are single-file bind mounts, and the
+# release tarball replaces those files, so a running proxy keeps reading the
+# old ones. Recreating also picks up the new container addresses at once.
+"${compose[@]}" up -d --force-recreate --no-deps --wait reverse-proxy
 if ! "$root/deploy/scripts/healthcheck.sh"; then
   "$root/deploy/scripts/rollback.sh"
   exit 1
