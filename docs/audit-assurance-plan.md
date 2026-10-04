@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phases 1, 2, 3, 4 and 6 landed 2026-10-04, with the Phase 2 and 4 deferrals; Phase 7 (lifecycle) and Phase 5 (dashboard) remain. **Created:** 2026-10-04. **Revision:** 9.
+> **Status:** In progress. Phases 1, 2, 3, 4, 6 and 7 landed 2026-10-04, with the Phase 2 and 4 deferrals; Phase 5 (the console dashboard) remains. **Created:** 2026-10-04. **Revision:** 10.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -304,9 +304,9 @@ Updated as work proceeds. Checkbox states are the source of truth.
 - [x] ADR: one trail through the outbox; state changes fail closed without an audit record ([ADR-0034](adr/0034-one-persisted-audit-trail.md))
 - [x] ADR: signed checkpoints with a dedicated key; anchoring by witness, no WORM storage ([ADR-0035](adr/0035-signed-audit-checkpoints-with-a-separate-key.md))
 - [x] ADR: audit access as time-boxed grants under separation of duties ([ADR-0036](adr/0036-audit-access-as-grants-under-separation-of-duties.md))
-- [ ] ADR: retention, archival, legal hold and erasure for the audit trail
-- [ ] Record RPO, RTO and retention, or mark them **REQUIRES HUTCH CONFIRMATION** with a stated interim value
-- [ ] Add the new module to `docs/modules.md`, `ARCHITECTURE.md` and plan 21 §11.2 once its ADR is accepted
+- [x] ADR-0039
+- [x] Retention: `audit.retention.period`, interim P365D, labelled **ASSUMPTION** pending **REQUIRES HUTCH CONFIRMATION**. RPO and RTO remain open (section 8 decision 1): without an RTO the drill has no elapsed-time pass criterion
+- [x] The assurance module is in `docs/modules.md`, `ARCHITECTURE.md` and plan 21 §11.2. Phases 6 and 7 added no module: recovery and lifecycle are `platform/audit`, which is where the trail already lives
 
 ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md` has reserved 0032, and two collisions on that number have already happened.
 
@@ -399,10 +399,10 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 7: Lifecycle
 
-- [ ] Retention and archival into sealed, checkpointed segments
-- [ ] Legal hold
-- [ ] Erasure by pseudonym mapping and crypto-shredding
-- [ ] Verifiable export bundle with an offline verifier; regulator pack uses it
+- [x] Retention and archival into sealed, checkpointed segments. Records **move**, they do not leave: a contiguous run is sealed as a bundle and the hot table keeps a floor naming the last removed record's seq and hash, so `verify()` resumes at the boundary and the chain is continuous across it. Archival is contiguous or it does not happen, and the whole trail can never be archived (ADR-0039)
+- [x] Legal hold, by subject or by seq range, outranking both retention and erasure. A hold in the middle of the eligible range **pauses** archival behind it rather than skipping past it, because a segment with a hole cannot be verified as a chain
+- [x] Erasure by crypto-shredding the pseudonym link, never by deleting a record: deleting one breaks the chain for everyone after it. The response says what was kept and why. **The limitation is stated, not papered over:** `subscriber_ref` is an HMAC under one shared key, so destroying the registry entry removes Clarity's ability to go from pseudonym to person but not an outsider's ability to confirm a guess (ADR-0039)
+- [x] `GET /v1/audit/export` and `backend/scripts/verify_audit_export.py`, which imports nothing from Clarity: a verifier that imports the code it checks proves only that the code agrees with itself. A scoped export is labelled a selection and the verifier says so. Writing it exposed that the record hash was computed over a form the record is never published in, fixed as hash version 3
 
 ## 8. Decisions needed from the maintainer
 

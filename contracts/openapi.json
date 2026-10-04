@@ -2649,6 +2649,74 @@
         ]
       }
     },
+    "/v1/audit/export": {
+      "get": {
+        "description": "A bundle a regulator can verify without trusting Clarity (Phase 7).\n\nRecords, the signed checkpoints that cover them, the public keys, and the\ninstructions for recomputing both. ``backend/scripts/verify_audit_export.py``\ndoes exactly that with nothing from Clarity imported, which is the point:\na verifier that imports the code it checks proves only that the code\nagrees with itself.\n\nWith ``case_id`` the export is a **selection**, and says so: a chain of\nonly one case's records is not contiguous, and a verifier that read a\nselection as the whole trail would accept a redacted export as complete.\n\nExporting is recorded like any other read of the trail, and needs\n``audit:export``, which costs its holder every money permission.",
+        "operationId": "export_audit_trail_v1_audit_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Audit Trail V1 Audit Export Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Audit Trail",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/v1/audit/grants": {
       "get": {
         "description": "Every audit grant, active or not, for review and recertification.",

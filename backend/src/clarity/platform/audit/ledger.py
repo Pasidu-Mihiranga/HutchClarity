@@ -45,11 +45,26 @@ from clarity.platform.persistence.memory import MemoryStore, MemoryUnitOfWork
 #: Collections the trail lives in. One collection is one table in B05.
 AUDIT = "platform.audit"
 AUDIT_HEAD = "platform.audit_head"
+AUDIT_FLOOR = "platform.audit_floor"
+"""Where the hot trail starts, once older records have been archived.
+
+Empty until something is archived, which is the normal state. A floor says: the
+records below ``seq`` are not in this table any more, they are in a sealed
+segment, and the record at ``seq`` had ``chain_hash``. Verification picks up from
+there instead of demanding that the table start at 1 (Phase 7)."""
 
 #: The rule ``record_hash`` follows. Bumped, never edited (ADR-0033).
-HASH_VERSION = 2
+#:
+#: Version 3 hashes the datetimes as datetimes, so the canonical hasher renders
+#: them in the same form the published JSON carries (``...Z``). Version 2 passed
+#: ``isoformat()`` strings, which bypassed that normalisation and produced
+#: ``...+00:00``: the hash was computed over a form the record was never
+#: published in, so no external verifier could reproduce it. That made the
+#: verifiable export of Phase 7 impossible, which is how it was found.
+HASH_VERSION = 3
 
 _HEAD_KEY = "head"
+_FLOOR_KEY = "floor"
 #: Zero-padded so the store's insertion order and key order agree.
 _KEY_WIDTH = 12
 #: Retries when another writer took the sequence number first.
@@ -162,6 +177,22 @@ class AuditEventType(StrEnum):
     """Reconciliation asked HUTCH about the lost window and sorted what it
     found. It never executes anything; this records what it concluded."""
 
+    # -- lifecycle (audit assurance plan Phase 7) ------------------------- #
+
+    SEGMENT_SEALED = "segment.sealed"
+    """A contiguous run of records left the hot table for a sealed segment, and
+    the floor moved. The chain is continuous across the boundary."""
+
+    HOLD_PLACED = "hold.placed"
+    HOLD_RELEASED = "hold.released"
+    """A legal hold on a subject or a seq range. It outranks both retention and
+    an erasure request, which is the point of it."""
+
+    ERASURE_PERFORMED = "erasure.performed"
+    """An erasure request was answered: the link from a pseudonym to a person
+    destroyed, or refused with the reason. Recorded either way, because a person
+    asking why deserves an answer and a regulator asking needs one."""
+
     REQUEST_PERFORMED = "request.performed"
     """A state-changing request reached its route: who made it, with which
     session, on which route and case, and the status it got. Domain events say
@@ -212,10 +243,16 @@ class AuditRecord(ClarityModel):
 
 
 def record_hash(record: AuditRecord) -> str:
-    """The version 2 hash: every field except the hash itself (ADR-0033).
+    """The version 3 hash: every field except the hash itself (ADR-0033).
 
     ``detail`` is represented by ``detail_hash`` so the hash input stays a
     fixed shape; ``verify`` separately checks that the two agree.
+
+    The datetimes go in **as datetimes**, not as ``isoformat()`` strings, so the
+    canonical hasher normalises them to the same ``...Z`` form that
+    ``model_dump(mode="json")`` publishes. Anything else means hashing a form the
+    record is never published in, which an outside verifier reading the JSON
+    cannot reproduce (see ``HASH_VERSION``).
     """
     return hash_payload(
         {
@@ -231,8 +268,8 @@ def record_hash(record: AuditRecord) -> str:
             "case_id": record.case_id,
             "payload_hash": record.payload_hash,
             "detail_hash": record.detail_hash,
-            "occurred_at": record.occurred_at.isoformat(),
-            "recorded_at": record.recorded_at.isoformat(),
+            "occurred_at": record.occurred_at,
+            "recorded_at": record.recorded_at,
             "prev_hash": record.prev_hash or "genesis",
         }
     )
@@ -411,6 +448,13 @@ class AuditLedger:
     # Reading
     # ------------------------------------------------------------------ #
 
+    @property
+    def floor(self) -> dict[str, Any] | None:
+        """The archival floor, or ``None`` while the whole trail is still here."""
+        with self._open_unit() as unit:
+            marker: Repository[str, dict[str, Any]] = unit.repository(AUDIT_FLOOR)
+            return marker.get(_FLOOR_KEY)
+
     def _all(self) -> list[AuditRecord]:
         with self._open_unit() as unit:
             records: Repository[str, AuditRecord] = unit.repository(AUDIT)
@@ -446,47 +490,68 @@ class AuditLedger:
     # ------------------------------------------------------------------ #
     # Verifying
     # ------------------------------------------------------------------ #
-
     def verify(self, *, since: int = 0, since_hash: str | None = None) -> ChainVerification:
         """Recompute the chain. Any edit, deletion or reordering shows up here.
 
-        With no arguments the whole chain is recomputed, which is the honest
-        default and what a cold start does.
+        Three ways in, all of which reduce to the same forward walk from a known
+        starting point.
 
-        ``since`` and ``since_hash`` give the incremental check: a ``seq`` whose
-        ``chain_hash`` a signed checkpoint vouches for, and the hash it should
-        have. The anchor record is fully recomputed and compared to that hash,
-        and the records above it are verified as usual. The work is then bounded
-        by how much was written since the last checkpoint rather than by the
-        length of the trail, so the liveness heartbeat can run on a minute's
-        cadence however large the trail has grown.
+        **The whole chain**, with no arguments: start at record 1 expecting no
+        predecessor. The honest default, and what a cold start does.
 
-        **Be precise about what this covers**, because the obvious claim for it
-        is false. It covers every record from ``since`` upward exactly as the
-        full check does, the anchor row's own contents, and the shape of the
-        chain below the anchor: the anchor's hash is computed over its
-        predecessor's, transitively down to record 1, so the sequence of hashes
-        the rows below *claim* to have is the sequence the checkpoint signed.
+        **From the last checkpoint** (``since`` and ``since_hash``): a ``seq`` whose
+        ``chain_hash`` a signed checkpoint vouches for. The anchor record is fully
+        recomputed and the walk continues above it, so the work is bounded by what
+        was written since that checkpoint rather than by the length of the trail.
+        That is what lets the liveness heartbeat run on a minute's cadence however
+        large the trail has grown.
 
-        It does **not** confirm the contents of the rows below the anchor. Edit
-        record 3's approver and recompute only record 3's own ``chain_hash``:
-        records 4 upward still carry the ``prev_hash`` they always had, so the
-        hash at the anchor is unchanged and the dangling link between 3 and 4
-        sits below everything this recomputes. Catching that means recomputing
-        record 3, which is the full check.
+        **From the archival floor**, automatically, when older records have been
+        sealed into a segment (Phase 7). The floor says the records below it are
+        not missing, they are elsewhere, and names the hash the last removed one
+        had. The segment's own checkpoint attests to it, so the chain is continuous
+        across the boundary even though this table no longer holds the far side.
+        Verifying the archived part means verifying the segments.
 
-        So an incremental check answers "has the trail been truncated, appended
-        to around the ledger, or tampered with since the last checkpoint", which
-        is the live question a heartbeat asks. It does not replace the full
-        recompute, which is what runs at startup and on the policy interval, nor
-        the restore comparison against an external checkpoint (Phase 6).
+        **Be precise about what the incremental form covers**, because the obvious
+        claim for it is false. It covers every record from the start point upward
+        exactly as a full check does, the anchor row's own contents, and the shape
+        of the chain below: the anchor's hash is computed over its predecessor's,
+        transitively down, so the sequence of hashes the rows below *claim* to have
+        is the sequence the checkpoint signed.
+
+        It does **not** confirm the contents of rows below the start point. Edit
+        record 3 and recompute only record 3's own ``chain_hash``: records 4 upward
+        still carry the ``prev_hash`` they always had, so the hash at the anchor is
+        unchanged and the dangling link between 3 and 4 sits below everything this
+        recomputes. Catching that means recomputing record 3, which is the full
+        check. So an incremental check answers "has the trail been truncated,
+        appended to around the ledger, or tampered with since the last checkpoint",
+        which is the live question a heartbeat asks, and the full recompute stays
+        the tamper check that runs at startup and on the policy interval.
         """
+        if since > 0 and since_hash is None:
+            raise ValueError("an incremental verify needs the hash it starts from")
+
         records = self._all()
-        previous: AuditRecord | None = None
+
+        if since == 0 and (marker := self.floor) is not None:
+            # An archived trail does not start at 1 and must not be read as
+            # truncated. The floor record is the last one *removed*, so the walk
+            # starts at the record after it, expecting the floor's hash as its
+            # predecessor. Nothing below is recomputed here, by construction:
+            # those records are in the segment, and the segment is what verifies
+            # them.
+            floor_seq = int(marker["seq"])
+            return self._walk(
+                [record for record in records if record.seq > floor_seq],
+                first_seq=floor_seq + 1,
+                expects_prev=str(marker["chain_hash"]),
+                scope=floor_seq + 1,
+                below=floor_seq,
+            )
 
         if since > 0:
-            if since_hash is None:
-                raise ValueError("an incremental verify needs the hash it starts from")
             anchor = next((r for r in records if r.seq == since), None)
             if anchor is None:
                 return ChainVerification(
@@ -501,8 +566,8 @@ class AuditLedger:
                     since,
                 )
             # Recompute the anchor itself: one record's work, and without it an
-            # edit to the anchor row that leaves its stored hash alone would
-            # pass, since nothing above the anchor depends on its contents.
+            # edit to the anchor row that leaves its stored hash alone would pass,
+            # since nothing above the anchor depends on its contents.
             if hash_payload(anchor.detail) != anchor.detail_hash:
                 return ChainVerification(
                     False, len(records), since, "detail does not match its hash", since
@@ -511,42 +576,65 @@ class AuditLedger:
                 return ChainVerification(
                     False, len(records), since, "record hash does not match its contents", since
                 )
-            previous = anchor
-            records = [r for r in records if r.seq > since]
-        first = since + 1
-        total = since + len(records)
-        # The anchor is recomputed above, so it is the lowest seq this call
-        # checked; ``first`` is only where the forward loop's numbering starts.
-        scope = since or 1
+            return self._walk(
+                [record for record in records if record.seq > since],
+                first_seq=since + 1,
+                expects_prev=anchor.chain_hash,
+                scope=since,
+                below=since,
+            )
+
+        return self._walk(records, first_seq=1, expects_prev=None, scope=1, below=0)
+
+    def _walk(
+        self,
+        records: list[AuditRecord],
+        *,
+        first_seq: int,
+        expects_prev: str | None,
+        scope: int,
+        below: int,
+    ) -> ChainVerification:
+        """Recompute a contiguous run of records against a known starting point.
+
+        ``below`` is how many records are accounted for elsewhere (archived, or
+        covered by the anchoring checkpoint), so ``length`` stays the length of the
+        whole trail rather than of the part that was walked.
+        """
+        total = below + len(records)
+        previous_hash = expects_prev
+        last_recorded_at: datetime | None = None
+
         for index, record in enumerate(records):
             seq = record.seq
 
             def broken(reason: str, at: int = seq) -> ChainVerification:
                 return ChainVerification(False, total, at, reason, scope)
 
-            if seq != index + first:
-                return broken("sequence numbers are not contiguous", index + 1)
+            if seq != index + first_seq:
+                return broken("sequence numbers are not contiguous", index + first_seq)
             if record.hash_version != HASH_VERSION:
                 return broken(f"unknown record hash version {record.hash_version}")
-            if record.prev_hash != (previous.chain_hash if previous else None):
+            if record.prev_hash != previous_hash:
                 return broken("record does not follow its predecessor")
             if hash_payload(record.detail) != record.detail_hash:
                 return broken("detail does not match its hash")
             if record.chain_hash != record_hash(record):
                 return broken("record hash does not match its contents")
-            if previous is not None and record.recorded_at < previous.recorded_at:
+            if last_recorded_at is not None and record.recorded_at < last_recorded_at:
                 return broken("recorded earlier than its predecessor")
-            previous = record
+            previous_hash = record.chain_hash
+            last_recorded_at = record.recorded_at
 
         head = self.head
-        last = records[-1].chain_hash if records else previous.chain_hash if previous else None
+        last = records[-1].chain_hash if records else expects_prev
         if head != last:
-            # The head pointer and the table disagree: records were removed
-            # from the end, or added around the ledger.
+            # The head pointer and the table disagree: records were removed from
+            # the end, or added around the ledger.
             return ChainVerification(
                 False,
                 total,
-                total + 1 if head else first,
+                total + 1 if head else first_seq,
                 "head does not match the chain",
                 scope,
             )

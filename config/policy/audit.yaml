@@ -329,3 +329,18 @@ keys:
     values:
       - value: "5"
         version: 1
+
+  # -- lifecycle: retention (Phase 7, ADR-0039) --------------------------------
+
+  - key: audit.retention.period
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: >
+      How long a record stays in the hot trail before it may be sealed into a
+      segment. Archived records are not deleted: the chain stays continuous across
+      the boundary. ASSUMPTION, pending the HUTCH retention period
+      (REQUIRES HUTCH CONFIRMATION, plan section 8 decision 2).
+    values:
+      - value: P365D
+        version: 1

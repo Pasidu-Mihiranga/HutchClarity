@@ -22,6 +22,7 @@ import pytest
 from clarity.platform.audit.ledger import (
     AUDIT,
     AUDIT_HEAD,
+    HASH_VERSION,
     AppendOnlyViolation,
     AuditEventType,
     AuditLedger,
@@ -299,7 +300,7 @@ def test_a_record_carries_its_actor_kind_and_session():
 
     assert record.actor_kind == "staff"
     assert record.session_ref == "SES-1"
-    assert record.hash_version == 2
+    assert record.hash_version == HASH_VERSION
 
 
 def test_the_ledger_cannot_be_altered_through_its_public_api():

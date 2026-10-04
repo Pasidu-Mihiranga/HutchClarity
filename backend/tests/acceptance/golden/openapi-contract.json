@@ -68,6 +68,15 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/audit/export": {
+      "parameters": [
+        "header:authorization?",
+        "query:case_id?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/audit/grants": {
       "parameters": [
         "header:authorization?"

@@ -104,7 +104,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
 | Channels | Web, app, WhatsApp, SMS/USSD | Web plus template-only notification routing and a simulated dispatch driver; external channel gateway remains | N02 |
 | Proactive care | Stream detectors open zero-contact cases from system facts | Duplicate reload, FUP threshold and pack-end detectors publish `risk.detected`; duplicate reloads enter the existing resolution flow | Complete (P01); source interfaces require HUTCH confirmation |
-| Assurance | Counted risk rules over the audit trail, alerts, recovery | `modules/assurance`: 8 counted rules plus chain-break, checkpoint-gap and liveness; alert lifecycle with four-eyes closure; the playbook flips the kill switches to safe | Phase 4 of `docs/audit-assurance-plan.md` complete; Phases 6 and 7 (recovery drills, retention) open |
+| Assurance | Counted risk rules over the audit trail, alerts, recovery | `modules/assurance`: 14 counted rules plus chain-break, checkpoint-gap, outbox lag and liveness; alert lifecycle with four-eyes closure; the playbook flips the kill switches to safe. Recovery, retention, legal hold, erasure and verifiable export live in `platform/audit` (ADR-0038, ADR-0039) | Phases 1, 2, 3, 4, 6 and 7 of `docs/audit-assurance-plan.md` complete; Phase 5 (the console Audit section) open. The PostgreSQL restore drill is wired into the `full` CI lane and has not yet executed |
 | Rules | 16 candidates | 10 | Remaining candidates need product/CX confirmation |
 
 ## 7. Known gaps

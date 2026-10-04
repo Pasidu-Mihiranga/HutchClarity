@@ -118,6 +118,7 @@ from clarity.modules.iam.public import (
 )
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
 from clarity.platform.audit.checkpoints import checkpoint_document
+from clarity.platform.audit.export import AuditExport, export_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
@@ -735,6 +736,54 @@ def _register_routes(app: FastAPI) -> None:
                 "lost_to": verification.lost_to,
             },
         }
+
+    @app.get("/v1/audit/export", tags=["audit"])
+    def export_audit_trail(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_EXPORT))],
+        case_id: str | None = None,
+    ) -> dict[str, Any]:
+        """A bundle a regulator can verify without trusting Clarity (Phase 7).
+
+        Records, the signed checkpoints that cover them, the public keys, and the
+        instructions for recomputing both. ``backend/scripts/verify_audit_export.py``
+        does exactly that with nothing from Clarity imported, which is the point:
+        a verifier that imports the code it checks proves only that the code
+        agrees with itself.
+
+        With ``case_id`` the export is a **selection**, and says so: a chain of
+        only one case's records is not contiguous, and a verifier that read a
+        selection as the whole trail would accept a redacted export as complete.
+
+        Exporting is recorded like any other read of the trail, and needs
+        ``audit:export``, which costs its holder every money permission.
+        """
+        records = clarity.audit.for_case(case_id) if case_id else clarity.audit.records
+        export = AuditExport(
+            created_at=clarity.now(),
+            scope=f"case {case_id}" if case_id else "the whole trail",
+            contiguous=case_id is None,
+            records=records,
+            checkpoints=clarity.audit_checkpoints.all(),
+            public_keys=clarity.audit_checkpoints.public_keys(),
+        )
+        trail.record(
+            clarity,
+            AuditEventType.AUDIT_READ,
+            actor_ref=principal.ref,
+            actor_kind=trail.actor_kind_of(principal),
+            session_ref=trail.session_ref_for(trail.bearer_token(request)),
+            object_ref="GET /v1/audit/export",
+            detail={
+                "scope": export.scope,
+                "records": len(records),
+                "contiguous": export.contiguous,
+                "digest": export.digest,
+            },
+            case_id=case_id,
+        )
+        return export_document(export)
 
     def _grant_call(call: Callable[[], AuditGrant]) -> dict[str, Any]:
         """Run one grant operation and map its refusals onto HTTP.

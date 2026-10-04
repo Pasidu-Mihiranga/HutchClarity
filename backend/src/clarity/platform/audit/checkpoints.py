@@ -60,13 +60,18 @@ class Checkpoint(ClarityModel):
 
 
 def statement_hash(seq: int, chain_head: str, recorded_at: datetime) -> str:
-    """What is signed. A purpose label keeps it from being mistaken for a receipt hash."""
+    """What is signed. A purpose label keeps it from being mistaken for a receipt hash.
+
+    ``recorded_at`` goes in as a datetime so the canonical hasher renders it in
+    the same form the published checkpoint document carries, which is what lets an
+    outside verifier recompute this from the JSON alone (ADR-0039).
+    """
     return hash_payload(
         {
             "purpose": "clarity.audit.checkpoint",
             "seq": seq,
             "chain_head": chain_head,
-            "recorded_at": recorded_at.isoformat(),
+            "recorded_at": recorded_at,
         }
     )
 

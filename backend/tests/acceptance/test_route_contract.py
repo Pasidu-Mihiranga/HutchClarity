@@ -57,6 +57,9 @@ SIGNED_IN = {
     # The audit trail and audit duties (audit assurance Phase 3): reading needs
     # audit:read, granting needs audit:assign, break-glass needs admin:manage.
     ("GET", "/v1/audit"),
+    # The verifiable export a regulator checks offline (Phase 7, ADR-0039).
+    # Needs audit:export, which costs its holder every money permission.
+    ("GET", "/v1/audit/export"),
     ("GET", "/v1/audit/grants"),
     ("POST", "/v1/audit/grants"),
     ("POST", "/v1/audit/grants/{grant_id}/approve"),

@@ -127,6 +127,7 @@ from clarity.platform.audit.ledger import (
     AuditEventType,
     AuditLedger,
 )
+from clarity.platform.audit.lifecycle import AuditLifecycle
 from clarity.platform.audit.vault import AuditVault
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard
@@ -721,6 +722,19 @@ class Clarity:
             key=lambda: backup_key_from(self.settings.audit_backup_key),
             clock=(lambda: clock) if clock is not None else None,
         )
+        # Retention, legal hold and erasure (Phase 7). The retention period is a
+        # policy value resolved at the moment it applies, so lengthening it does
+        # not silently re-judge what was already archived.
+        self.audit_lifecycle = AuditLifecycle(
+            self.audit,
+            self.audit_checkpoints,
+            key=lambda: backup_key_from(self.settings.audit_backup_key),
+            directory=lambda: self.settings.audit_backup_dir,
+            retain=lambda as_of: _DURATION.validate_python(
+                str(self.policies.resolve("audit.retention.period", as_of=as_of))
+            ),
+            clock=(lambda: clock) if clock is not None else None,
+        )
         self._open_audit_trail()
         self.switches = SwitchBoard(
             audit_sink=self.audit,
@@ -1003,6 +1017,14 @@ class Clarity:
                 )
             )
         )
+
+    def now(self) -> datetime:
+        """The time this process runs on: the frozen demo clock, or the wall clock.
+
+        Time comes from here rather than from ``datetime.now()`` in a route (I11),
+        so a demo and a replay agree with the trail they are reading.
+        """
+        return self._clock or datetime.now(tz=UTC)
 
     def _new_audit_grants(self, clock: datetime | None) -> AuditGrants:
         def now() -> datetime:

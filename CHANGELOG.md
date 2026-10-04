@@ -4,6 +4,56 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (audit assurance Phases 2, 6 and 7, breaking for stored hashes)
+
+- **Record hash version 3** (ADR-0033 amendment). Version 2 hashed the datetimes
+  as `isoformat()` strings, which bypassed the canonical hasher and produced
+  `...+00:00` while the published JSON carries `...Z`: the hash was computed over
+  a form the record is never published in, so no external verifier could
+  reproduce it. Version 3 passes the datetimes as datetimes. `statement_hash` for
+  checkpoints had the same defect and the same fix. Found by writing the offline
+  export verifier; no version 2 record was ever persisted outside a test.
+- **`AuditLedger.verify` takes `since`/`since_hash`** and resumes automatically
+  from an archival floor; `ChainVerification` and `CheckpointVerification` gained
+  `verified_from`. `Checkpointer.verify` takes `incremental`.
+- **Every audit append is screened** and refuses a raw MSISDN, NIC, card number
+  or email in the payload or the detail (`platform.audit.entropy`). The keyed
+  `payload_hash` the plan proposed is **not** being done, and ADR-0033 says why.
+- **`SwitchBoard` takes a `clock`**, so a flip is stamped from the injected clock
+  (I11) rather than the wall clock.
+
+### Added (audit assurance Phases 6 and 7, ADR-0038 and ADR-0039)
+
+- **New `/v1` route**: `GET /v1/audit/export`, a bundle a regulator verifies with
+  `backend/scripts/verify_audit_export.py`, which imports nothing from Clarity.
+  Needs `audit:export`. OpenAPI snapshot and SDK types regenerated on purpose.
+- **New permission `audit:restore`** (`Permission.AUDIT_RESTORE`): in
+  `AUDIT_DUTIES` and `STEP_UP_PERMISSIONS`, **not** grantable, held by
+  `PLATFORM_ADMIN`. Mirrored into `config/opa/data.json`.
+- **Backup and restore** (`platform.audit.backup`, `platform.audit.vault`):
+  AES-256-GCM bundles, a loss report measured against a checkpoint held outside
+  the bundle, and a restore that refuses a measurable loss unless the operator
+  accepts it in the call.
+- **Retention, legal hold and erasure** (`platform.audit.lifecycle`): archival
+  into sealed segments with the chain continuous across the floor, holds by
+  subject or seq range that outrank both retention and erasure, and erasure by
+  crypto-shredding the pseudonym link rather than deleting records. ADR-0039
+  states the limitation this leaves.
+- **Sealed ports** (`integration.replay`): `SealedCommandPort` refuses every call
+  and counts attempts, so zero adapter calls during a replay is a property of the
+  type; `ReadOnlyCommandPort` allows `status_of` and still refuses `execute`.
+- **Six more risk rules**: snooping, collusion, budget pressure, off hours, grant
+  abuse, agent pressure, plus `trail_lag` for events committed but never
+  published. Fourteen rules in total.
+- Audit event types `data.read`, `backup.created`, `backup.read`,
+  `restore.performed`, `reconciled`, `segment.sealed`, `hold.placed`,
+  `hold.released`, `erasure.performed`.
+- Collections `platform.audit_checkpoints` (which had never been registered, so
+  the `full` profile had no table for it), `platform.audit_floor`,
+  `platform.audit_segments`, `platform.audit_holds`,
+  `platform.audit_pseudonyms`. 16 new policy keys and two settings
+  (`CLARITY_AUDIT_BACKUP_KEY`, `CLARITY_AUDIT_BACKUP_DIR`).
+
 ### Added (audit assurance Phase 4, ADR-0037)
 
 - **New module `clarity.modules.assurance`** (public surface: `AssuranceService`,

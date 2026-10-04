@@ -377,6 +377,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Audit Trail
+         * @description A bundle a regulator can verify without trusting Clarity (Phase 7).
+         *
+         *     Records, the signed checkpoints that cover them, the public keys, and the
+         *     instructions for recomputing both. ``backend/scripts/verify_audit_export.py``
+         *     does exactly that with nothing from Clarity imported, which is the point:
+         *     a verifier that imports the code it checks proves only that the code
+         *     agrees with itself.
+         *
+         *     With ``case_id`` the export is a **selection**, and says so: a chain of
+         *     only one case's records is not contiguous, and a verifier that read a
+         *     selection as the whole trail would accept a redacted export as complete.
+         *
+         *     Exporting is recorded like any other read of the trail, and needs
+         *     ``audit:export``, which costs its holder every money permission.
+         */
+        get: operations["export_audit_trail_v1_audit_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/audit/grants": {
         parameters: {
             query?: never;
@@ -2589,6 +2622,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_audit_trail_v1_audit_export_get: {
+        parameters: {
+            query?: {
+                case_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

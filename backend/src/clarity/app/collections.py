@@ -39,7 +39,8 @@ from clarity.modules.receipts.public import (
 )
 from clarity.modules.reconciliation.public import EXPECTED_ACTIONS, MISMATCHES
 from clarity.platform.audit.checkpoints import AUDIT_CHECKPOINTS
-from clarity.platform.audit.ledger import AUDIT, AUDIT_HEAD
+from clarity.platform.audit.ledger import AUDIT, AUDIT_FLOOR, AUDIT_HEAD
+from clarity.platform.audit.lifecycle import HOLDS, PSEUDONYMS, SEGMENTS
 from clarity.platform.messaging.consumers import ATTEMPTS as CONSUMER_ATTEMPTS
 from clarity.platform.messaging.consumers import DEAD_LETTERS, PROCESSED
 from clarity.platform.messaging.outbox import OUTBOX
@@ -104,6 +105,14 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # live beside the trail for the same reason: a checkpoint in a different
     # store from the records it vouches for can be lost separately from them.
     AUDIT_CHECKPOINTS,
+    # The archival floor, the sealed segment index, the legal holds and the
+    # pseudonym links erasure destroys (Phase 7, ADR-0039). All beside the trail:
+    # a floor in a different store from the records it bounds can be lost
+    # separately from them, which would read as a truncated trail.
+    AUDIT_FLOOR,
+    SEGMENTS,
+    HOLDS,
+    PSEUDONYMS,
 )
 
 __all__ = ["ALL_COLLECTIONS"]
