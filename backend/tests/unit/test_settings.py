@@ -71,3 +71,17 @@ def test_settings_are_passed_in_rather_than_read_from_the_process() -> None:
     clarity = Clarity(settings=settings)
 
     assert clarity.settings.verify_base == "https://verify.example/v"
+    assert clarity._verify_base == "https://verify.example/v"
+
+
+def test_configured_signing_key_survives_a_restart(tmp_path) -> None:
+    """Synthetic VPS receipts must remain verifiable after a container restart."""
+    key_path = tmp_path / "private" / "signing.pem"
+    settings = Settings(SIGNING_KEY_PATH=key_path, _env_file=None)
+
+    first = Clarity(settings=settings)
+    first_public_keys = first.signing.public_keys()
+    second = Clarity(settings=settings)
+
+    assert key_path.stat().st_mode & 0o777 == 0o600
+    assert second.signing.public_keys() == first_public_keys

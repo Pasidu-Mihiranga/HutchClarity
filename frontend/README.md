@@ -33,6 +33,10 @@ npm install
 npm run build
 ```
 
+All three apps emit Next.js standalone output. The generic production image is
+`deploy/docker/Dockerfile.frontend`; it selects a workspace with `APP` and runs
+as a non-root user behind the VPS same-origin reverse proxy.
+
 ## Develop
 
 Set the API base once (or per shell):

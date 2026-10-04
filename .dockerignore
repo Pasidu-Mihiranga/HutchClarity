@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+.keys
+.generated
+**/__pycache__
+**/.mypy_cache
+**/.next
+**/.pytest_cache
+**/node_modules
+frontend/playwright-report
+frontend/test-results
+vps.txt
+*.env
+.env*
+!*.env.example
