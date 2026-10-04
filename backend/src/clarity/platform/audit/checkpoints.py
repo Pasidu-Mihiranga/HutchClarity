@@ -300,6 +300,39 @@ def _fail(result: CheckpointVerification, at: int, reason: str) -> CheckpointVer
     return result
 
 
+def anchor_verifies(anchor: Any, public_keys: dict[str, str]) -> bool:
+    """Check an audit anchor carried inside a Trust Receipt (ADR-0035).
+
+    Takes the anchor structurally rather than by type, because ``ReceiptAuditAnchor``
+    lives in ``contracts`` (L0) and this is ``platform`` (L2): importing it here
+    would be fine by the layer rule but would tie the audit checkpointer to the
+    receipt contract, and the only thing needed is six fields.
+
+    The same two checks the witness path makes: that the statement matches its
+    own fields, so a forged seq or head cannot ride on a genuine signature, and
+    that the signature verifies under a published key.
+    """
+    try:
+        recomputed = statement_hash(
+            int(anchor.checkpoint_seq), str(anchor.chain_head), anchor.recorded_at
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
+    if recomputed != anchor.statement_hash:
+        return False
+    return signature_valid(
+        Checkpoint(
+            seq=int(anchor.checkpoint_seq),
+            chain_head=str(anchor.chain_head),
+            recorded_at=anchor.recorded_at,
+            statement_hash=str(anchor.statement_hash),
+            kid=str(anchor.kid),
+            signature=str(anchor.signature),
+        ),
+        public_keys,
+    )
+
+
 def checkpoint_document(checkpoint: Checkpoint, public_keys: dict[str, str]) -> dict[str, Any]:
     """What the public endpoint serves: enough for anyone to verify and keep."""
     return {
@@ -316,6 +349,7 @@ __all__ = [
     "CheckpointSigner",
     "CheckpointVerification",
     "Checkpointer",
+    "anchor_verifies",
     "checkpoint_document",
     "signature_valid",
     "statement_hash",

@@ -117,7 +117,7 @@ from clarity.modules.iam.public import (
     TokenInvalid,
 )
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
-from clarity.platform.audit.checkpoints import checkpoint_document
+from clarity.platform.audit.checkpoints import anchor_verifies, checkpoint_document
 from clarity.platform.audit.export import AuditExport, export_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType, record_hash
 from clarity.platform.config.artefacts import PolicyValue, Scope
@@ -2338,8 +2338,20 @@ def _verification_view(clarity: Clarity, receipt_id: str) -> VerificationView:
 
     result = clarity.receipts.verify_document(receipt)
     view = clarity.receipts.public_view(receipt)
+    # The anchor is reported separately from the receipt's own validity, and
+    # deliberately does not affect it: a receipt is a statement about one
+    # customer's money, and it stays true whether or not the audit checkpoint it
+    # happened to carry still verifies. Conflating them would let an audit-side
+    # problem tell a customer their refund never happened.
+    anchor = receipt.payload.audit_anchor
     return VerificationView(
         receipt_id=receipt_id,
+        audit_anchor_seq=anchor.checkpoint_seq if anchor else None,
+        audit_anchor_ok=(
+            anchor_verifies(anchor, clarity.audit_checkpoints.public_keys())
+            if anchor is not None
+            else None
+        ),
         status=result.display,
         valid=result.valid,
         reason=result.reason,

@@ -399,7 +399,10 @@ class AuditLifecycle:
             checkpoint_seq=covering,
         )
 
-        with self._open_unit() as unit:
+        with self._open_unit() as unit, unit.as_custodian():
+            # Archival removes records from the hot table, which is the other
+            # legitimate exception to append-only (ADR-0039). The segment file is
+            # already written at this point, so a failure here loses nothing.
             index: Repository[str, Segment] = unit.repository(SEGMENTS)
             index.put(_key(segment.to_seq), segment)
             hot: Repository[str, AuditRecord] = unit.repository(AUDIT)

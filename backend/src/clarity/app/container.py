@@ -38,6 +38,7 @@ from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
 from clarity.contracts.decision import Outcome
 from clarity.contracts.events import KnowledgePublishedV1, RiskDetectedV1
+from clarity.contracts.receipt import ReceiptAuditAnchor
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
 from clarity.integration.ports import DriverMode
@@ -687,6 +688,11 @@ class Clarity:
             verify_base=verify_base,
             persist=persist,
             open_unit=self.open_unit,
+            # Every receipt carries the current signed audit checkpoint, making
+            # a delivered receipt an external witness of the audit head
+            # (ADR-0035). Read lazily: the checkpointer is built below, and a
+            # receipt is only ever issued long after the container is assembled.
+            audit_anchor=self._current_audit_anchor,
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
@@ -1163,6 +1169,25 @@ class Clarity:
                 continue
             plan = next(iter(record.plans.values()))
             self.cases.auto_fix(record.case_id, plan.plan_id)
+
+    def _current_audit_anchor(self) -> ReceiptAuditAnchor | None:
+        """The latest signed audit checkpoint, in the shape a receipt carries.
+
+        The composition root does this translation because ``modules.receipts``
+        must not depend on ``platform.audit``: the receipt contract holds the
+        fields and nothing else (I4, I5).
+        """
+        latest = self.audit_checkpoints.latest()
+        if latest is None:
+            return None
+        return ReceiptAuditAnchor(
+            checkpoint_seq=latest.seq,
+            chain_head=latest.chain_head,
+            recorded_at=latest.recorded_at,
+            statement_hash=latest.statement_hash,
+            kid=latest.kid,
+            signature=latest.signature,
+        )
 
     def pending_event_count(self) -> int:
         """How many events are committed but not yet published.

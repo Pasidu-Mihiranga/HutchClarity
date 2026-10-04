@@ -203,6 +203,20 @@ class VerificationView(ApiModel):
     corrected_lkr: str | None = None
     safeguard: str | None = None
     recurrence_test: str | None = None
+    audit_anchor_seq: int | None = Field(
+        default=None,
+        description=(
+            "The audit checkpoint this receipt witnesses (ADR-0035). None on a "
+            "schema 1.0 receipt, or one issued before any checkpoint was signed."
+        ),
+    )
+    audit_anchor_ok: bool | None = Field(
+        default=None,
+        description=(
+            "Whether that checkpoint's signature verifies. None when the receipt "
+            "carries no anchor, which is not the same as an anchor that failed."
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- #

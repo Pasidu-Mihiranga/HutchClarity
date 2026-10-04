@@ -73,3 +73,34 @@ redelivery is recorded once, the trail survives a reset, MCP calls land in it,
 and a broken chain stops startup. `tests/unit/test_events_and_audit.py`
 checks one chain for two writers on one store and survival across a new ledger
 object.
+
+## Amendment, 2026-10-04: the database enforces append-only
+
+W1 asked for `UPDATE` and `DELETE` to be revoked on the audit tables from the
+writing role, and sat blocked because the generic row store writes with
+`INSERT ... ON CONFLICT DO UPDATE`. A statement carrying that clause needs the
+`UPDATE` privilege whether or not it ever updates anything, so revoking it would
+have broken every append rather than only a rewrite.
+
+Resolved by giving append-only collections a write path that plainly inserts
+(`APPEND_ONLY` in `persistence.schemas`, honoured by both drivers so `lite` and
+`full` behave alike, I20). The conflicting-insert error keeps its existing meaning,
+`ConcurrentUpdate`, because on the audit trail it genuinely is a race for a
+sequence number and `_append_with_retry` is written to handle it. What changes is
+that the loser can no longer overwrite the winner's row.
+
+The migration then revokes `UPDATE` and `DELETE` from the module role and grants
+`DELETE` to `clarity_audit_custodian`, which `clarity_app` is deliberately not a
+member of. The two operations that legitimately remove audit rows, restoring a
+backup (ADR-0038) and sealing a segment (ADR-0039), declare it through a named
+`as_custodian` span, so the privilege is visible at the call site and greppable
+rather than an accident of whether a delete happened to be staged first.
+
+`platform.audit_head` and `platform.audit_floor` are deliberately not append-only:
+they are pointers, they move by design, and they hold no history.
+
+None of this replaces the hash chain, which is what still catches someone who goes
+around the application entirely; the tamper tests take the custodian span to stage
+exactly that. Grants asserted in `tests/integration/test_append_only_grants.py`
+(`full` lane, not yet executed here); the application guard in
+`tests/security/test_append_only.py`.

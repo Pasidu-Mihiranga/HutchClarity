@@ -42,6 +42,7 @@ from clarity.platform.persistence.ports import Repository
 from clarity.platform.persistence.schemas import (
     APP_ROLE,
     OWNERS,
+    is_append_only,
     is_customer_scoped,
     role_of,
     schema_of,
@@ -190,6 +191,40 @@ class PostgresUnitOfWork:
         self._written.add((collection, key))
 
     def _write(self, collection: str, key: Any, value: Any) -> None:
+        """Upsert, except on an append-only collection, which plainly inserts.
+
+        The ``ON CONFLICT DO UPDATE`` is why the audit tables could not be made
+        append-only at the database level before: a statement that *needs*
+        ``UPDATE`` cannot run under a role that has been denied it, so revoking
+        the privilege would have broken every append rather than just a rewrite.
+        An append-only collection therefore takes a path that never updates, and
+        the migration can then take ``UPDATE`` away (``is_append_only``).
+
+        The unique violation that a conflicting insert raises keeps its existing
+        meaning, ``ConcurrentUpdate``, and that is deliberate: on the audit trail
+        it is exactly a race, two writers reaching for the same sequence number,
+        and ``AuditLedger._append_with_retry`` is written to retry on the new
+        head. What changes is that the loser can no longer *overwrite* the
+        winner's row, which the upsert would have done silently.
+        """
+        parameters = {
+            "key": str(key),
+            "value": pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
+            "document": _readable(value),
+            "subscriber_ref": self._subscriber_of(collection, value),
+        }
+        if is_append_only(collection):
+            self._connection.execute(
+                text(
+                    f"""
+                    INSERT INTO {_qualified(collection)}
+                        (key, value, document, version, subscriber_ref)
+                    VALUES (:key, :value, :document, 1, :subscriber_ref)
+                    """
+                ),
+                parameters,
+            )
+            return
         self._connection.execute(
             text(
                 f"""
@@ -202,12 +237,7 @@ class PostgresUnitOfWork:
                        updated_at = now()
                 """
             ),
-            {
-                "key": str(key),
-                "value": pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
-                "document": _readable(value),
-                "subscriber_ref": self._subscriber_of(collection, value),
-            },
+            parameters,
         )
 
     def remove(self, collection: str, key: Any) -> None:
@@ -237,6 +267,21 @@ class PostgresUnitOfWork:
             self._transaction.rollback()
             self._close()
             raise ConcurrentUpdate(collection, key, expected=0, found=0) from error
+
+    @contextmanager
+    def as_custodian(self) -> Iterator[None]:
+        """See ``UnitOfWork.as_custodian``.
+
+        A no-op on the write path here, because the plain insert this driver uses
+        for an append-only collection is already correct after a delete: a
+        restore removes the rows and writes fresh ones, and never needs to update
+        one in place. What the operation really needs is ``DELETE``, which this
+        cannot grant: the migration gives that to the custodian role alone, so
+        PostgreSQL refuses it under the ordinary application role whatever this
+        context manager says. That is the intended order: the database has the
+        final say and the application states its intent.
+        """
+        yield
 
     def all_keys(self, collection: str) -> list[Any]:
         self._guard()

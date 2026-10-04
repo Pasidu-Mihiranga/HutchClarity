@@ -11,6 +11,7 @@ one of these; see ``clarity.modules.case.repository``.
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
 
@@ -63,6 +64,22 @@ class UnitOfWork(Protocol):
 
     def rollback(self) -> None:
         """Discard every staged write."""
+        ...
+
+    def as_custodian(self) -> AbstractContextManager[None]:
+        """A span in which an append-only collection may be rewritten.
+
+        Append-only is the ordinary rule and this is the named exception to it,
+        for the two operations that legitimately replace audit rows: restoring a
+        backup, and sealing records into a segment (ADR-0038, ADR-0039). It is a
+        context manager rather than a flag so the privilege is visible at the
+        call site and bounded by it, and so a reviewer can grep for every place
+        that takes it.
+
+        It does **not** grant anything at the database level. In ``full`` the
+        tables are granted ``DELETE`` only to the custodian role, so this relaxes
+        the application's own guard and PostgreSQL still has the final say.
+        """
         ...
 
     def __enter__(self) -> Self: ...

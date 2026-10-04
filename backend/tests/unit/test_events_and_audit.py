@@ -56,7 +56,15 @@ class Store:
         return AuditLedger(self.unit)
 
     def write(self, collection: str, key: str, value: Any) -> None:
-        with self.unit() as unit:
+        """Write around the application, as an insider with table access would.
+
+        Through ``as_custodian``, because the ordinary write path now refuses to
+        overwrite an audit row at all (W1). That is the point of these tests
+        rather than a problem for them: append-only stops Clarity's own code
+        doing this, and the hash chain is what still catches whoever goes around
+        Clarity to do it anyway. Both layers, and a test for each.
+        """
+        with self.unit() as unit, unit.as_custodian():
             unit.repository(collection).put(key, value)
             unit.commit()
 

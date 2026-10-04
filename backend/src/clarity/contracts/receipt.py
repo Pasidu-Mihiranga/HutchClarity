@@ -33,7 +33,14 @@ from clarity.kernel.common import (
     utc_now,
 )
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
+
+#: Versions whose payload hash predates ``audit_anchor``. A receipt issued under
+#: one of these is hashed without that field, so it keeps verifying exactly as it
+#: did on the day it was signed. Receipts are never edited (see the module
+#: docstring), and that has to include not editing them by changing the rule that
+#: hashes them.
+VERSIONS_WITHOUT_AUDIT_ANCHOR: frozenset[str] = frozenset({"1.0"})
 
 
 class RecurrenceResult(StrEnum):
@@ -128,6 +135,41 @@ class ReceiptActor(ClarityModel):
     system: str
 
 
+class ReceiptAuditAnchor(ClarityModel):
+    """A signed audit checkpoint, carried inside the receipt (ADR-0035).
+
+    **Why a receipt is the right place for this.** Signed checkpoints make the
+    audit trail tamper-evident, but an insider who can rewrite the trail can also
+    delete the stored checkpoints, so the design needs a copy somewhere Clarity
+    cannot reach. The public witness endpoint is one such place and depends on
+    somebody having fetched it. Receipts are another, and a better one: they are
+    *delivered*, to customers, at the moment money moves, and nobody can collect
+    them back. Every receipt issued since a checkpoint is an independent witness
+    that the trail once had that head at that sequence number.
+
+    Everything needed to check it is here, so the holder needs nothing from
+    Clarity but the published public key: recompute ``statement_hash`` from
+    ``(checkpoint_seq, chain_head, recorded_at)`` with the purpose label
+    ``clarity.audit.checkpoint``, then verify the Ed25519 signature over its
+    UTF-8 bytes.
+
+    This is L0, so it holds the fields and no logic: the checkpoint type and the
+    verification live in ``platform.audit``, which is above it.
+    """
+
+    checkpoint_seq: int
+    chain_head: str
+    recorded_at: datetime
+    statement_hash: str
+    kid: str
+    signature: str
+
+    @field_validator("recorded_at")
+    @classmethod
+    def _anchor_as_utc(cls, value: datetime) -> datetime:
+        return ensure_utc(value)
+
+
 class ReceiptPayload(ClarityModel):
     """The signed content of a receipt."""
 
@@ -151,6 +193,14 @@ class ReceiptPayload(ClarityModel):
         default=None,
         description="Hash of the previous receipt in the chain; None only for the first.",
     )
+    audit_anchor: ReceiptAuditAnchor | None = Field(
+        default=None,
+        description=(
+            "The audit checkpoint current when this receipt was issued, making the "
+            "receipt an external witness of the audit head (ADR-0035). None on a "
+            "schema 1.0 receipt, and when no checkpoint had been signed yet."
+        ),
+    )
 
     @field_validator("issued_at")
     @classmethod
@@ -163,8 +213,22 @@ class ReceiptPayload(ClarityModel):
         return sum(amounts[1:], amounts[0]) if amounts else None
 
     def compute_hash(self) -> str:
-        """Canonical hash of this payload. The signature covers exactly this."""
-        return hash_payload(self.model_dump(mode="json"))
+        """Canonical hash of this payload. The signature covers exactly this.
+
+        Version-aware, and deliberately so. Adding ``audit_anchor`` to the model
+        makes every payload dump carry the key, ``null`` included, which would
+        change the hash of every receipt ever issued and break its signature. A
+        receipt that verified yesterday has to verify today: that is the entire
+        product. So a payload at a schema version that predates the field is
+        hashed without it, exactly as it was on the day it was signed.
+
+        A new field in future takes the same shape: bump ``SCHEMA_VERSION``, and
+        exclude the field for the versions that came before.
+        """
+        document = self.model_dump(mode="json")
+        if self.schema_version in VERSIONS_WITHOUT_AUDIT_ANCHOR:
+            document.pop("audit_anchor", None)
+        return hash_payload(document)
 
 
 class ReceiptSignature(ClarityModel):

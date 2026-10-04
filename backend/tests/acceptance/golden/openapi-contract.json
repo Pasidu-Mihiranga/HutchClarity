@@ -1079,6 +1079,8 @@
     },
     "VerificationView": {
       "fields": [
+        "audit_anchor_ok",
+        "audit_anchor_seq",
         "chain_ok",
         "corrected_lkr",
         "issued_at",

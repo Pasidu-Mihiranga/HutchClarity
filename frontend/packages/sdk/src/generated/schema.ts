@@ -1993,6 +1993,16 @@ export interface components {
         /** VerificationView */
         VerificationView: {
             /**
+             * Audit Anchor Ok
+             * @description Whether that checkpoint's signature verifies. None when the receipt carries no anchor, which is not the same as an anchor that failed.
+             */
+            audit_anchor_ok?: boolean | null;
+            /**
+             * Audit Anchor Seq
+             * @description The audit checkpoint this receipt witnesses (ADR-0035). None on a schema 1.0 receipt, or one issued before any checkpoint was signed.
+             */
+            audit_anchor_seq?: number | null;
+            /**
              * Chain Ok
              * @default false
              */

@@ -4,6 +4,23 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (audit assurance W1 and Phase 2 cross-anchor; **money path, two approvals**)
+
+- **Receipt schema 1.1**: `ReceiptPayload.audit_anchor` carries the current signed
+  audit checkpoint inside the signed payload, so a delivered receipt witnesses the
+  audit head (ADR-0035 amendment). `compute_hash` is version-aware and hashes a
+  1.0 payload without the field, so receipts already issued keep verifying.
+- **`GET /v1/receipts/{id}/verify`** gains `audit_anchor_seq` and
+  `audit_anchor_ok`, reported separately from the receipt's own validity. OpenAPI
+  snapshot and SDK regenerated on purpose.
+- **Audit tables are append-only in the database** (ADR-0034 amendment). The write
+  path for `platform.audit`, `platform.audit_checkpoints` and
+  `platform.audit_segments` plainly inserts; the migration revokes `UPDATE` and
+  `DELETE` from the module role and grants `DELETE` to the new
+  `clarity_audit_custodian` role, which `clarity_app` is not a member of.
+- **`UnitOfWork.as_custodian()`**: the named, bounded exception to append-only,
+  used by restore and archival only.
+
 ### Changed (audit assurance Phases 2, 6 and 7, breaking for stored hashes)
 
 - **Record hash version 3** (ADR-0033 amendment). Version 2 hashed the datetimes

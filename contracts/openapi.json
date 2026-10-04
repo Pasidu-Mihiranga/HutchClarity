@@ -1360,6 +1360,30 @@
       "VerificationView": {
         "additionalProperties": false,
         "properties": {
+          "audit_anchor_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether that checkpoint's signature verifies. None when the receipt carries no anchor, which is not the same as an anchor that failed.",
+            "title": "Audit Anchor Ok"
+          },
+          "audit_anchor_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The audit checkpoint this receipt witnesses (ADR-0035). None on a schema 1.0 receipt, or one issued before any checkpoint was signed.",
+            "title": "Audit Anchor Seq"
+          },
           "chain_ok": {
             "default": false,
             "title": "Chain Ok",

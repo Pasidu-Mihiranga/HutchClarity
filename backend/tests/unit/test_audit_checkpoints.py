@@ -63,7 +63,13 @@ class World:
             )
 
     def put(self, collection: str, key: str, value: Any) -> None:
-        with self.unit() as unit:
+        """Write around the application, as the insider these tests stage.
+
+        ``as_custodian`` because the ordinary path refuses to overwrite an audit
+        row (W1). These tests are about what remains detectable when someone has
+        table access regardless.
+        """
+        with self.unit() as unit, unit.as_custodian():
             unit.repository(collection).put(key, value)
             unit.commit()
 

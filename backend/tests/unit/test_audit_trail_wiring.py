@@ -106,9 +106,15 @@ def test_an_mcp_call_lands_in_the_shared_trail(clarity: Clarity):
 
 
 def _break_the_trail(clarity: Clarity) -> None:
-    """Play the insider: edit a stored record behind the ledger's back."""
+    """Play the insider: edit a stored record behind the ledger's back.
+
+    ``as_custodian`` because the ordinary write path refuses to overwrite an
+    audit row now (W1), which is the layer that stops Clarity's own code doing
+    this. These tests are about the layer underneath: what a process does at
+    startup when someone with table access has already done it anyway.
+    """
     first = clarity.audit.records[0]
-    with clarity.open_unit() as unit:
+    with clarity.open_unit() as unit, unit.as_custodian():
         unit.repository(AUDIT).put(
             str(first.seq).zfill(12), first.model_copy(update={"actor_ref": "someone-else"})
         )

@@ -117,3 +117,45 @@ signature is verified first, and a failure there disables the optimisation.
 `tests/unit/test_audit_checkpoints.py` pins all of this, including a test that
 asserts the limitation rather than hiding it, so nobody reads the parameter as
 a free upgrade.
+
+## Amendment, 2026-10-04: the head is cross-anchored into receipts
+
+This ADR deferred carrying the audit head in a Trust Receipt because it changes a
+signed payload. It is done now.
+
+**Why a receipt is the right witness.** Checkpoints make the trail tamper-evident,
+but an insider who can rewrite the trail can also delete the stored checkpoints,
+so the design needs a copy somewhere Clarity cannot reach. The public endpoint is
+one, and depends on somebody having fetched it. Receipts are the other and the
+better one: they are *delivered*, to customers, at the moment money moves, and
+nobody can collect them back. Every receipt issued since a checkpoint independently
+witnesses that the trail once had that head at that sequence number.
+
+`ReceiptAuditAnchor` carries `(checkpoint_seq, chain_head, recorded_at,
+statement_hash, kid, signature)`, which is everything a holder needs to verify it
+against the published key and nothing more. It lives in `contracts` (L0) as fields
+only; `anchor_verifies` in `platform.audit.checkpoints` does the checking, and the
+composition root translates between them so `modules.receipts` keeps no dependency
+on `platform.audit` (I4, I5).
+
+**Compatibility is the hard half.** Adding a field to the payload makes every dump
+carry the key, `null` included, which changes the hash of every receipt ever
+issued and breaks its signature. A receipt that verified yesterday has to verify
+today: that is the entire product. So `SCHEMA_VERSION` is now `1.1` and
+`compute_hash` excludes `audit_anchor` for the versions that predate it
+(`VERSIONS_WITHOUT_AUDIT_ANCHOR`). A future field takes the same shape.
+
+**The anchor does not affect the receipt's own validity.** `GET
+/v1/receipts/{id}/verify` reports `audit_anchor_seq` and `audit_anchor_ok`
+separately. A receipt is a statement about one customer's money and stays true
+whether or not the checkpoint it happened to carry still verifies; conflating them
+would let an audit-side problem tell a customer their refund never happened. A
+missing anchor reports `null` rather than `false`, because "not carried" and
+"carried and failed" are different facts.
+
+Issuing a receipt never fails because the checkpointer is unavailable: the
+customer is owed their proof, and the absence is visible in the payload.
+
+Covered by `tests/security/test_receipt_audit_anchor.py`, including that a forged
+seq or head cannot ride on a genuine signature. **This touches `modules/receipts`,
+so it needs two approvals (AGENTS.md section 10).**

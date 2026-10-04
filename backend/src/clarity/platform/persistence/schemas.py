@@ -29,6 +29,30 @@ OWNERS: dict[str, str] = {
     "platform": "platform",
 }
 
+#: Collections that may only ever be inserted into: no UPDATE, no DELETE.
+#:
+#: The audit trail is the reason this exists. A hash chain detects an edit after
+#: the fact; this stops the edit being possible at all through the ordinary write
+#: path, and the migration backs it with grants so the database refuses rather
+#: than relying on the code remembering (ADR-0034, audit assurance plan W1).
+#:
+#: ``platform.audit_head`` and ``platform.audit_floor`` are deliberately **not**
+#: here: they are pointers, they move by design, and an append-only pointer is a
+#: contradiction. They hold no history, only the current position, and the chain
+#: they point into is what makes a wrong pointer detectable.
+APPEND_ONLY: frozenset[str] = frozenset(
+    {
+        "platform.audit",
+        "platform.audit_checkpoints",
+        "platform.audit_segments",
+    }
+)
+
+
+def is_append_only(collection: str) -> bool:
+    return collection in APPEND_ONLY
+
+
 #: Collections holding rows about one customer. Row-level security binds these
 #: to the subscriber the request is for, so a query that forgets its filter
 #: returns nothing rather than someone else's case (plan 11 section 19).
@@ -81,6 +105,12 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
 #: and nothing more, and it is subject to the policies.
 APP_ROLE = "clarity_app"
 
+#: Holds DELETE on the append-only tables, for the two operations that
+#: legitimately remove audit rows: restoring a backup (ADR-0038) and sealing a
+#: segment (ADR-0039). The application role is deliberately **not** a member, so
+#: ordinary request handling cannot reach it however the code is called.
+CUSTODIAN_ROLE = "clarity_audit_custodian"
+
 
 class UnknownCollection(KeyError):
     """A collection no module claims.
@@ -123,10 +153,13 @@ def is_customer_scoped(collection: str) -> bool:
 
 
 __all__ = [
+    "APPEND_ONLY",
     "APP_ROLE",
+    "CUSTODIAN_ROLE",
     "CUSTOMER_SCOPED",
     "OWNERS",
     "UnknownCollection",
+    "is_append_only",
     "is_customer_scoped",
     "owner_of",
     "role_of",
