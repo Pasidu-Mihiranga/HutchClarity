@@ -38,6 +38,15 @@ THROTTLED: tuple[tuple[str, str], ...] = (
     ("/v1/conversation/suggestions", "throttle.knowledge.per_minute"),
     ("/v1/knowledge/search", "throttle.knowledge.per_minute"),
     ("/v1/clarity/route", "throttle.conversation.per_minute"),
+    # Sign-in (B6). The OTP service already bounds challenges per *number*,
+    # which is the SMS-pumping control; this bounds them per *caller*, which
+    # is what stops one script working through a list of numbers. nginx caps
+    # /v1/auth at 10 a minute in the deployed profile, and nothing does in
+    # `lite`, so the control existed only where the reverse proxy did.
+    ("/v1/auth/otp/request", "throttle.auth.per_minute"),
+    ("/v1/auth/otp/verify", "throttle.auth.per_minute"),
+    ("/v1/auth/staff/login", "throttle.auth.per_minute"),
+    ("/v1/auth/refresh", "throttle.auth.per_minute"),
 )
 
 #: Used when the policy store cannot answer. See the module docstring.

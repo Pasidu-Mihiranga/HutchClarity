@@ -65,7 +65,8 @@ export default function LoginPage() {
     try {
       if (!challengeId) throw new Error("Request a code first.");
       const result = await client.verifyOtp(challengeId, code);
-      try { window.sessionStorage.setItem("clarity_token", result.token); } catch {}
+      // The API set an HttpOnly session cookie on this response (B4); there is
+      // nothing for the page to store, and nothing a script can read.
       client.setToken(result.token);
       setStatus({ text: "Signed in - redirecting...", tone: "ok" });
       // Back to where an expired session sent us from (lib/session.ts).
@@ -77,7 +78,7 @@ export default function LoginPage() {
       // refuses, so the customer saw errors everywhere except at the point
       // where something actually went wrong. Deny by default (I9) applies to
       // the UI too, so a refusal clears the session rather than inventing one.
-      try { window.sessionStorage.removeItem("clarity_token"); } catch {}
+      // Nothing to clear: the session cookie is the API's to remove.
       client.setToken(undefined);
       setStatus({
         text: err instanceof Error ? err.message : "Verify failed",

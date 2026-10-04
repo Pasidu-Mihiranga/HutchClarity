@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
-import { expireSession, readToken } from "@/lib/session";
+import { expireSession, withSession } from "@/lib/session";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
 import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
 import {
@@ -181,11 +181,12 @@ export default function ClarityPage() {
       try {
         // The chat is for a signed-in customer: without a session every turn
         // is refused, so go and get one instead of failing turn by turn.
-        const token = readToken();
-        if (!token) return expireSession();
-        const res = await fetch(`${BASE}/v1/me/app`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        //
+        // The session is an HttpOnly cookie (B4), so there is nothing to check
+        // before asking. The API's answer is the check: a 401 means no usable
+        // session, whether the cookie is missing, expired or revoked, and this
+        // page no longer has to guess which.
+        const res = await fetch(`${BASE}/v1/me/app`, withSession());
         if (res.status === 401) return expireSession();
         if (!res.ok) return;
         const data = (await res.json()) as AppState;

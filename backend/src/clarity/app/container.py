@@ -42,6 +42,7 @@ from clarity.contracts.events import KnowledgePublishedV1, RiskDetectedV1
 from clarity.contracts.receipt import ReceiptAuditAnchor
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
+from clarity.integration.drivers.sms import SmsOtpDelivery, SmsSettings
 from clarity.integration.ports import DriverMode
 from clarity.integration.registry import AdapterRegistry
 from clarity.kernel.common import Channel, Language
@@ -87,6 +88,7 @@ from clarity.modules.iam.public import (
     OidcLogin,
     OidcSettings,
     OpaAuthorizationPolicy,
+    OtpDelivery,
     OtpService,
     PythonAuthorizationPolicy,
     RoutedOtpDelivery,
@@ -353,6 +355,27 @@ def _configured_provider(
             model=settings.model_name,
             api_key=settings.model_api_key,
             timeout_seconds=settings.model_timeout_seconds,
+        )
+    )
+
+
+def _otp_delivery(settings: Settings) -> OtpDelivery | None:
+    """The SMS gateway when one is configured, else the simulated inbox.
+
+    `None` means the service builds its own `SimulatedInbox`, which is what
+    every profile but `prod` wants. Both halves of the credential are required
+    before a gateway is used: a URL with no token would fail on every send, and
+    failing at sign-in is a worse way to discover a missing secret than not
+    being configured at all.
+    """
+    if not settings.sms_url or not settings.sms_token:
+        return None
+    return SmsOtpDelivery(
+        SmsSettings(
+            url=settings.sms_url,
+            token=settings.sms_token,
+            sender=settings.sms_sender,
+            timeout_seconds=settings.auth_timeout_seconds,
         )
     )
 
@@ -704,35 +727,41 @@ class Clarity:
                 self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
             ),
         )
-        sms = (
-            HttpSmsDelivery(
-                api_key=self.settings.httpsms_api_key,
-                sender=self.settings.httpsms_sender,
-                base_url=self.settings.httpsms_base_url,
-                timeout_seconds=self.settings.httpsms_timeout_seconds,
-            )
-            if self.settings.httpsms_api_key and self.settings.httpsms_sender
-            else None
-        )
         # Real phones the operator tied to a synthetic customer. They are the
-        # only numbers that get a real SMS: the synthetic customers' numbers
-        # belong to strangers, so those codes stay on the sign-in page.
+        # only numbers that get a real SMS in the synthetic profiles: the
+        # synthetic customers' numbers belong to strangers, so those codes stay
+        # on the sign-in page.
         linked = self.settings.linked_phone_pairs()
         for phone, synthetic in linked:
             customer = self.world.account_by_msisdn(synthetic)
             if customer is None:
                 raise ValueError(f"CLARITY_LINKED_PHONES names no synthetic customer: {synthetic}")
             self.world.link_phone(phone, customer.ref)
-        world = self.world
-        self.otp = otp or OtpService(
-            RoutedOtpDelivery(
+        # One-time code delivery (B6). A configured SMS gateway delivers every
+        # code, which is what `prod` needs. Without one, codes are routed per
+        # number: the simulated inbox for synthetic customers, httpSMS for
+        # linked phones when it is configured. The port is the same either way,
+        # and the drivers pass `tests/contract/test_otp_delivery_parity.py`.
+        gateway = _otp_delivery(self.settings)
+        if gateway is None:
+            sms = (
+                HttpSmsDelivery(
+                    api_key=self.settings.httpsms_api_key,
+                    sender=self.settings.httpsms_sender,
+                    base_url=self.settings.httpsms_base_url,
+                    timeout_seconds=self.settings.httpsms_timeout_seconds,
+                )
+                if self.settings.httpsms_api_key and self.settings.httpsms_sender
+                else None
+            )
+            world = self.world
+            gateway = RoutedOtpDelivery(
                 inbox=SimulatedInbox(),
                 sms=sms,
                 sms_numbers=frozenset(phone for phone, _ in linked),
                 known=lambda msisdn: world.account_by_msisdn(msisdn) is not None,
-            ),
-            open_unit=self.open_unit,
-        )
+            )
+        self.otp = otp or OtpService(delivery=gateway, open_unit=self.open_unit)
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

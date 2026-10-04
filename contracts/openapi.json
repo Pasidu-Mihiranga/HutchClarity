@@ -3503,6 +3503,118 @@
         ]
       }
     },
+    "/v1/auth/sessions": {
+      "delete": {
+        "description": "Sign out everywhere (B3).\n\n`keep_current` defaults to true, so somebody who has just found a\nsession they do not recognise does not also sign themselves out of the\ndevice they are holding while they deal with it.",
+        "operationId": "end_other_sessions_v1_auth_sessions_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "keep_current",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Keep Current",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response End Other Sessions V1 Auth Sessions Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Other Sessions",
+        "tags": [
+          "auth"
+        ]
+      },
+      "get": {
+        "description": "Every live session this person holds (B3).\n\nSigned in callers only, and it shows **their own** sessions: the\nsubject comes from the verified token, never from a parameter, so there\nis no id to tamper with and nothing to enumerate.\n\nWhat it deliberately does not show: the token, or anything that could\nbe used to resume a session. A list that can be read over somebody's\nshoulder should not also be a way in. Channel and timings are enough to\nrecognise a device you do not know.",
+        "operationId": "list_sessions_v1_auth_sessions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Sessions V1 Auth Sessions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/staff/login": {
       "post": {
         "description": "Sign in against the staff directory. The server assigns the role.\n\n**Simulated** accounts, for the synthetic profiles. Production federates\nHUTCH SSO and this route answers 404 (I9). A wrong password and a wrong\nstep-up code return the same refusal.",

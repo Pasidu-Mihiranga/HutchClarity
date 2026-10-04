@@ -43,7 +43,7 @@ from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
-from clarity.interfaces.http import staff_sso, trail
+from clarity.interfaces.http import csrf, staff_sso, trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -56,6 +56,7 @@ from clarity.interfaces.http.auth import (
     public,
     requires,
 )
+from clarity.interfaces.http.cookies import CUSTOMER_COOKIE
 from clarity.interfaces.http.deps import ClarityDep, get_clarity, set_clarity
 from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
@@ -105,7 +106,7 @@ from clarity.interfaces.http.throttle import (
     rate_limit,
 )
 from clarity.kernel.canonical import hash_payload
-from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
+from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.assurance.public import (
@@ -364,6 +365,10 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
 
     app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
+
+    # CSRF, for requests relying on a cookie (B4). Inside the rate limiter, so
+    # a flood of forged requests is still throttled before it is inspected.
+    app.middleware("http")(csrf.enforce())
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
@@ -1215,7 +1220,7 @@ def _register_routes(app: FastAPI) -> None:
         return message
 
     @app.post("/v1/auth/otp/verify", response_model=SessionView, tags=["auth"])
-    def verify_otp(body: OtpVerify, clarity: ClarityDep) -> SessionView:
+    def verify_otp(body: OtpVerify, clarity: ClarityDep) -> JSONResponse:
         """Exchange a correct code for a short-lived customer token."""
         try:
             msisdn = clarity.otp.verify(body.challenge_id, body.code)
@@ -1250,7 +1255,11 @@ def _register_routes(app: FastAPI) -> None:
                 "channel": body.channel.value,
             },
         )
-        return SessionView(
+        # The session also goes in an `HttpOnly` cookie (B4). The body still
+        # carries the token, because the WhatsApp gateway and the MCP server
+        # are not browsers and have nowhere to put a cookie; what changes is
+        # that a browser no longer has to keep one where scripts can read it.
+        view = SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
@@ -1258,6 +1267,18 @@ def _register_routes(app: FastAPI) -> None:
             roles=["customer"],
             assurance=issued.principal.assurance.value,
         )
+        payload = JSONResponse(content=view.model_dump(mode="json"))
+        payload.set_cookie(
+            CUSTOMER_COOKIE,
+            issued.value,
+            max_age=max(0, int((issued.expires_at - utc_now()).total_seconds())),
+            httponly=True,
+            secure=clarity.settings.cookie_secure,
+            samesite="lax",
+            path="/",
+        )
+        csrf.issue(payload, secure=clarity.settings.cookie_secure)
+        return payload
 
     @app.post(
         "/v1/auth/staff/login",
@@ -1414,7 +1435,10 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/.well-known/jwks.json", tags=["auth"])
     def jwks(clarity: ClarityDep) -> dict[str, Any]:
         """The public key a separate validator would use."""
-        return {"keys": [clarity.tokens.public_key_jwk()]}
+        # The whole ring, not just the active key. A validator that is not
+        # this process must be able to check a token signed by a key that is
+        # rotating out, or every rotation breaks it (B5).
+        return {"keys": clarity.tokens.public_keys()}
 
     @app.get(
         "/v1/demo/subscribers",

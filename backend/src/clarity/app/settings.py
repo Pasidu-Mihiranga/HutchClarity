@@ -159,6 +159,18 @@ class Settings(BaseSettings):
         alias="CLARITY_STAFF_DIRECTORY_FILE",
         description="Path to that JSON document. The inline variable wins when both are set.",
     )
+    sms_url: str | None = Field(
+        default=None,
+        alias="CLARITY_SMS_URL",
+        description=(
+            "The SMS gateway one-time codes are delivered through (B6). "
+            "Without it the simulated inbox is used, which is correct for the "
+            "synthetic profiles and useless in prod. REQUIRES HUTCH "
+            "CONFIRMATION of the real SMSC interface."
+        ),
+    )
+    sms_token: str | None = Field(default=None, alias="CLARITY_SMS_TOKEN")
+    sms_sender: str = Field(default="HutchClarity", alias="CLARITY_SMS_SENDER")
     httpsms_api_key: str | None = Field(default=None, alias="HTTPSMS_API_KEY")
     httpsms_sender: str | None = Field(default=None, alias="HTTPSMS_SENDER")
     httpsms_base_url: str = Field(default="https://api.httpsms.com/v1", alias="HTTPSMS_BASE_URL")

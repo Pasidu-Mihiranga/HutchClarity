@@ -683,6 +683,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description Every live session this person holds (B3).
+         *
+         *     Signed in callers only, and it shows **their own** sessions: the
+         *     subject comes from the verified token, never from a parameter, so there
+         *     is no id to tamper with and nothing to enumerate.
+         *
+         *     What it deliberately does not show: the token, or anything that could
+         *     be used to resume a session. A list that can be read over somebody's
+         *     shoulder should not also be a way in. Channel and timings are enough to
+         *     recognise a device you do not know.
+         */
+        get: operations["list_sessions_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        /**
+         * End Other Sessions
+         * @description Sign out everywhere (B3).
+         *
+         *     `keep_current` defaults to true, so somebody who has just found a
+         *     session they do not recognise does not also sign themselves out of the
+         *     device they are holding while they deal with it.
+         */
+        delete: operations["end_other_sessions_v1_auth_sessions_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/staff/login": {
         parameters: {
             query?: never;
@@ -3413,6 +3450,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_other_sessions_v1_auth_sessions_delete: {
+        parameters: {
+            query?: {
+                keep_current?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
