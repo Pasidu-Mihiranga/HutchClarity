@@ -63,3 +63,4 @@ Section 2.2 asked for orchestration in a thin resolution application service. Do
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-CASE-resolution-service.md` | Split out of `CaseService` (M-CASE, #34) |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-RCPT01-receipt-lost-on-copying-driver.md` | Receipt kept on the case under a copying driver |

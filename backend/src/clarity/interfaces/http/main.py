@@ -1760,13 +1760,25 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/v1/ai/usage", tags=["ops"])
     def ai_usage(clarity: ClarityDep) -> dict[str, Any]:
         """Measured token usage, for the AI disclosure (Guidelines §6.2)."""
+        provider = clarity.ai.provider.name
+        # The note must describe the process that answers, not the default: a
+        # deployment with a model configured said "no language model" while
+        # it was calling one.
+        note = (
+            "No language model is configured in this process. Explanations come "
+            "from CX-approved templates, which is the deck's 'works without the "
+            "LLM' path. Token counts are therefore measured, and zero."
+            if provider == "templates"
+            else (
+                f"Explanations are phrased by {provider} from facts the rules "
+                "decided; the model never sets an amount or an action. Token counts "
+                "are measured in this process since it started, and templates "
+                "answer whenever the model is unavailable."
+            )
+        )
         return {
-            "provider": clarity.ai.provider.name,
-            "note": (
-                "No language model is configured in this prototype. Explanations come "
-                "from CX-approved templates, which is the deck's 'works without the "
-                "LLM' path. Token counts are therefore measured, and zero."
-            ),
+            "provider": provider,
+            "note": note,
             **clarity.ai.usage_summary,
         }
 

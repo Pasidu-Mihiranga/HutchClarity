@@ -205,3 +205,47 @@ def test_ten_concurrent_deliveries_issue_one_receipt(clarity: Clarity) -> None:
     assert errors == []
     assert len(clarity.receipts.issued()) == before
     assert clarity.receipts.verify_chain()
+
+
+# -- a driver that stores a copy ------------------------------------------ #
+
+
+class _CopyOnRead:
+    """A case repository that hands out a fresh copy on every read.
+
+    The PostgreSQL driver unpickles a new object per `get`, so the consumer
+    issuing the receipt and the request that executed the plan hold two
+    different records. The in-memory driver returns the one shared object,
+    which is why this was invisible under `lite`.
+    """
+
+    def __init__(self, inner: object) -> None:
+        self._inner = inner
+
+    def get(self, case_id: str) -> object:
+        import copy
+
+        return copy.deepcopy(self._inner.get(case_id))  # type: ignore[attr-defined]
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+
+def test_a_copying_driver_keeps_the_receipt_on_the_case(clarity: Clarity) -> None:
+    """The executing request must not write its stale copy over the receipt.
+
+    Seen live on the `full` profile: the confirm response carried
+    `receipt_id: null`, the chat then fetched `/v1/receipts/null`, and the case
+    stayed ACTIONED although the receipt had been issued.
+    """
+    aggregate = clarity.cases._aggregate
+    aggregate._cases = _CopyOnRead(aggregate._cases)
+
+    case_id, plan_id = _executed_plan(clarity)
+
+    stored = clarity.cases.get(case_id)
+    issued = clarity.receipts.for_plan(plan_id)
+    assert issued is not None
+    assert stored.receipt is not None
+    assert stored.receipt.receipt_id == issued.receipt_id
+    assert stored.case.state.value == "RECEIPTED"

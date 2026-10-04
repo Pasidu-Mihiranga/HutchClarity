@@ -648,6 +648,12 @@ class ResolutionService:
                 "the relay or the receipts consumer is not running"
             )
         record.receipts_by_plan[plan_id] = receipt
+        # The consumer issued the receipt on its own copy of this case. A
+        # driver that stores a copy (PostgreSQL) gives this request a different
+        # object, so without carrying the outcome over, writing it back would
+        # put ACTIONED and no receipt over the consumer's RECEIPTED record.
+        record.receipt = receipt
+        self._advance(record, CaseState.RECEIPTED)
         self._cache_outcome(record)
         return result, receipt
 
