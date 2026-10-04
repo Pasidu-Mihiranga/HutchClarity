@@ -6,6 +6,7 @@ import {
   deliveryState,
   handleInbound,
   normalizeMessage,
+  skipReason,
   sendApprovedNotification,
   signedHeaders,
   type IncomingMessage,
@@ -36,6 +37,42 @@ test("ignores own, group, status, broadcast, newsletter and system messages", ()
     direct({ key: { id: "6", remoteJid: "94781234567@s.whatsapp.net" }, message: {} }),
   ]
   for (const message of refused) assert.equal(normalizeMessage(message), null)
+})
+
+test("a privacy @lid chat is read through the sender's phone-number jid", () => {
+  // WhatsApp addresses many one-to-one chats by @lid. Dropping those silently
+  // meant the gateway received nothing from real customers.
+  const lid = direct({
+    key: {
+      id: "lid-1",
+      remoteJid: "201543766245123@lid",
+      senderPn: "94771112233@s.whatsapp.net",
+      fromMe: false,
+    },
+  })
+  assert.deepEqual(normalizeMessage(lid), {
+    deliveryId: "lid-1",
+    jid: "201543766245123@lid",
+    msisdn: "+94771112233",
+    text: "Why was I charged?",
+  })
+  const v7 = direct({
+    key: { id: "lid-2", remoteJid: "201543766245123@lid", remoteJidAlt: "94771112233@s.whatsapp.net" },
+  })
+  assert.equal(normalizeMessage(v7)?.msisdn, "+94771112233")
+})
+
+test("an @lid chat without a phone number is skipped with a reason", () => {
+  const lid = direct({ key: { id: "lid-3", remoteJid: "201543766245123@lid" } })
+  assert.equal(normalizeMessage(lid), null)
+  assert.equal(skipReason(lid), "no_phone_number")
+})
+
+test("skip reasons name the rule, never the content or the number", () => {
+  assert.equal(skipReason(direct({ key: { ...direct().key, fromMe: true } })), "from_me")
+  assert.equal(skipReason(direct({ key: { id: "g", remoteJid: "1203630@g.us" } })), "not_one_to_one")
+  assert.equal(skipReason(direct({ message: {} })), "no_text")
+  assert.equal(skipReason(direct()), null)
 })
 
 test("uses the approved voice fallback", () => {

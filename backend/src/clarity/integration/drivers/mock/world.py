@@ -197,6 +197,9 @@ class SyntheticWorld:
     def __init__(self, *, now: datetime = DEMO_NOW, persist: bool = False) -> None:
         self.now = now
         self._accounts: dict[str, Account] = {}
+        #: Real phones that act as a synthetic customer (CLARITY_LINKED_PHONES).
+        #: In memory only: each process applies the server setting at start.
+        self._linked: dict[str, str] = {}
         self._seq = 0
         self._persist = persist
         #: Sources the operator has marked unavailable, to demo degradation.
@@ -230,7 +233,21 @@ class SyntheticWorld:
         return self._accounts.get(ref)
 
     def account_by_msisdn(self, msisdn: str) -> Account | None:
-        return self._accounts.get(ref_for(normalise_msisdn(msisdn)))
+        normalised = normalise_msisdn(msisdn)
+        linked = self._linked.get(normalised)
+        if linked is not None:
+            return self._accounts.get(linked)
+        return self._accounts.get(ref_for(normalised))
+
+    def link_phone(self, phone: str, ref: str) -> None:
+        """Let a real phone sign in, chat and message as the customer `ref`.
+
+        Sign-in, the chat and the channel gateway all resolve a number through
+        `account_by_msisdn`, so one link covers every channel.
+        """
+        if ref not in self._accounts:
+            raise KeyError(f"no synthetic customer {ref}")
+        self._linked[normalise_msisdn(phone)] = ref
 
     def network_for(self, subscriber_ref: str) -> dict[str, object]:
         """Simulated coverage and outage state for one subscriber (`hutch-sim`).

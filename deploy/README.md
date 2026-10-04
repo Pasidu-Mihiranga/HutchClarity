@@ -67,6 +67,22 @@ or HUTCH. The transport is limited to direct customer messages and must be
 operated in accordance with WhatsApp terms. The service ignores own messages,
 groups, status, broadcasts, newsletters and unsupported system messages.
 
+### Linked test phones
+
+The synthetic customers' numbers (078...) belong to real strangers, so they are
+never texted. To test with a real phone, link it to a synthetic customer in
+`.env.production` and recreate the backend services:
+
+```bash
+CLARITY_LINKED_PHONES=+9477XXXXXXX=+94781234567
+```
+
+That phone then gets its sign-in code by SMS and signs in, chats and messages
+on WhatsApp as that customer. Every other synthetic number shows its code on
+the sign-in page; an unknown number gets the same answer and no SMS. A real
+number is personal data: link only phones whose owners agreed, and remove the
+link when testing ends.
+
 ## HTTPS
 
 After the stack answers with the temporary certificate, run

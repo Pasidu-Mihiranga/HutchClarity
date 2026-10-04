@@ -115,6 +115,7 @@ from clarity.modules.iam.public import (
     HttpSmsDeliveryFailed,
     LoginRefused,
     OtpRefused,
+    RoutedOtpDelivery,
     SimulatedInbox,
     SubjectKind,
     TokenInvalid,
@@ -1141,22 +1142,31 @@ def _register_routes(app: FastAPI) -> None:
             raise HTTPException(status_code=429, detail=str(error)) from error
 
         requested("sent" if account is not None else "unknown_number", challenge_id)
-        simulated = isinstance(clarity.otp.delivery, SimulatedInbox)
+        # A linked phone gets a real SMS. Every other number, known or not,
+        # gets the same answer, so the response never says who is a customer.
+        delivery = clarity.otp.delivery
+        by_sms = isinstance(delivery, RoutedOtpDelivery) and delivery.channel_for(msisdn) == "sms"
+        if not isinstance(delivery, (RoutedOtpDelivery, SimulatedInbox)):
+            by_sms = True
         return {
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
-            "simulated": simulated,
+            "simulated": not by_sms,
             "detail": (
-                "A simulated SMS was written to the development inbox."
-                if simulated
-                else "A sign-in code was sent by SMS."
+                "A sign-in code was sent by SMS."
+                if by_sms
+                else (
+                    "SMS delivery is not connected for this number; "
+                    "the code is shown on the sign-in page."
+                )
             ),
         }
 
     @app.get("/v1/demo/inbox", tags=["demo"], dependencies=[Depends(demo_only)])
     def demo_inbox(clarity: ClarityDep, msisdn: str) -> dict[str, Any]:
         """The simulated SMS inbox. Prototype only, and labelled everywhere."""
-        inbox = clarity.otp.delivery
+        delivery = clarity.otp.delivery
+        inbox = delivery.inbox if isinstance(delivery, RoutedOtpDelivery) else delivery
         message = inbox.latest_for(msisdn) if isinstance(inbox, SimulatedInbox) else None
         if message is None:
             raise HTTPException(status_code=404, detail="no simulated message for that number")
