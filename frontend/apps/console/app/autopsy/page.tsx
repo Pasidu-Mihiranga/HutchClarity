@@ -95,11 +95,18 @@ export default function AutopsyPage() {
           <h2 id="autopsy-basis" className="sr-only">
             What this workspace is reading
           </h2>
-          <p className="text-sm">
-            <strong>{data?.complaint_count ?? 0}</strong> masked complaints ·{" "}
-            {data?.clustering_method ?? "loading"}
-          </p>
-          <p className="text-xs text-fg-muted">{data?.clustering_disclosure ?? ""}</p>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs uppercase text-fg-muted">Complaints</dt>
+              <dd className="text-lg font-medium">{data?.complaint_count ?? 0}</dd>
+              <dd className="text-xs text-fg-muted">masked complaints</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase text-fg-muted">Method</dt>
+              <dd className="text-lg font-medium">{data?.clustering_method ?? "loading"}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-fg-muted">{data?.clustering_disclosure ?? ""}</p>
           {!canReview ? (
             <p className="mt-2 text-xs text-warning">
               You can read this workspace. Ruling on a cluster needs{" "}
@@ -201,32 +208,55 @@ function ClusterCard({
         </Badge>
         <span className="text-sm">{cluster.size} complaints</span>
       </div>
-      <p className="text-sm">{cluster.status_label}</p>
-      <p className="text-xs text-warning">{cluster.mapping_label}</p>
-      <p className="text-xs">
-        Languages:{" "}
-        {Object.entries(cluster.languages)
-          .map(([k, v]) => `${k} ${v}`)
-          .join(" · ")}
-      </p>
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs uppercase text-fg-muted">Status</dt>
+          <dd className="text-sm">{cluster.status_label}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase text-fg-muted">Suggested mapping</dt>
+          <dd className="text-sm text-warning">{cluster.mapping_label}</dd>
+        </div>
+      </dl>
+
+      <div>
+        <h4 className="text-xs font-semibold uppercase text-fg-muted">Languages:</h4>
+        <ul className="mt-1 flex flex-wrap gap-1">
+          {Object.entries(cluster.languages).map(([language, count]) => (
+            <li
+              key={language}
+              className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink"
+            >
+              {language} {count}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <div>
         <h4 className="text-xs font-semibold uppercase text-fg-muted">
           Representative masked complaints
         </h4>
-        {cluster.representative_masked_complaints.map((text, i) => (
-          <blockquote key={i} className="mt-1 border-l-2 border-border pl-2 text-sm">
-            {text}
-          </blockquote>
-        ))}
+        <ul className="mt-1 space-y-1">
+          {cluster.representative_masked_complaints.map((text, i) => (
+            <li key={i}>
+              <blockquote className="border-l-2 border-border pl-2 text-sm">{text}</blockquote>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <p className="text-xs text-fg-muted">
-        Synthetic trend:{" "}
-        {Object.entries(cluster.synthetic_demo_trend)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(" · ")}
-      </p>
+      <div>
+        <h4 className="text-xs font-semibold uppercase text-fg-muted">Synthetic trend:</h4>
+        <ul className="mt-1 flex flex-wrap gap-1">
+          {Object.entries(cluster.synthetic_demo_trend).map(([day, count]) => (
+            <li key={day} className="rounded-lg bg-surface-2 px-2 py-1 text-xs">
+              <span className="block text-fg-subtle">{day}</span>
+              <span className="font-medium text-ink">{count}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {cluster.reviews?.length ? (
         <div className="rounded-lg bg-surface-2 p-2">
