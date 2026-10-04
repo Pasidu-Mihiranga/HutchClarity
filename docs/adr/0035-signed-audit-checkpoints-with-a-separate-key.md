@@ -82,3 +82,38 @@ verifies Ed25519 from public material only, as an outside verifier would.
 rewrite, a cut with a rewound head (with the loss range asserted), deleted
 checkpoints caught by a witness, a forged checkpoint, key rotation, separate
 keys, startup refusal and the public endpoint.
+
+## Amendment, 2026-10-04: incremental verification, and what it does not cover
+
+`Checkpointer.verify(incremental=True)` and `AuditLedger.verify(since=, since_hash=)`
+recompute record hashes only from the newest checkpoint that verifies upward, so
+the work is bounded by what was written since that checkpoint rather than by the
+length of the trail. That is what lets the liveness heartbeat run on a minute's
+cadence on a trail of any size.
+
+**The obvious claim for it is false, and was written down before it was tested.**
+The first version of this ADR argued that because a chain hash commits to its
+predecessor's, checking one hash at the anchor covers every record below it. It
+does not. Edit record 3 and recompute only record 3's own `chain_hash`: records 4
+upward still carry the `prev_hash` they always had, so the hash at the anchor is
+unchanged and the dangling link between 3 and 4 sits below everything the
+incremental check recomputes. A test caught this.
+
+What an incremental check therefore covers:
+
+- every record from the anchor upward, exactly as a full check does;
+- the anchor row's own contents, which are recomputed rather than hash-compared,
+  because nothing above the anchor depends on them;
+- the shape of the chain below the anchor, meaning the sequence of hashes those
+  rows *claim* to have is the sequence the checkpoint signed;
+- truncation, including of the anchor itself.
+
+What it does not cover: the contents of a row below the anchor. So the full
+recompute stays the default and the tamper check, runs at startup and on the
+policy interval, and the incremental check is the freshness check between two of
+them. A forged checkpoint is never used as the anchor: every checkpoint's
+signature is verified first, and a failure there disables the optimisation.
+
+`tests/unit/test_audit_checkpoints.py` pins all of this, including a test that
+asserts the limitation rather than hiding it, so nobody reads the parameter as
+a free upgrade.

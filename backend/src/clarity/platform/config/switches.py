@@ -17,6 +17,7 @@ when" is the first question after an incident.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -59,11 +60,21 @@ class SwitchFlip:
 class SwitchBoard:
     """Holds switch state. Everything is on unless someone turned it off."""
 
-    def __init__(self, *, audit_sink: object | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        audit_sink: object | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._off: dict[str, SwitchFlip] = {}
         self._history: list[SwitchFlip] = []
         self._lock = threading.Lock()
         self._audit = audit_sink
+        #: Time comes from the injected clock (I11). Without it a flip stamped
+        #: from the wall clock lands outside a replay's window, and any rule
+        #: that joins a flip to what happened between two of them, such as
+        #: ``switch_then_pay``, silently sees nothing.
+        self._clock = clock or utc_now
 
     def is_on(self, name: str | Switch) -> bool:
         return str(name) not in self._off
@@ -94,7 +105,11 @@ class SwitchBoard:
             raise ValueError("a switch flip must record why")
 
         flip = SwitchFlip(
-            name=name, enabled=enabled, actor_ref=actor_ref, reason=reason, at=now or utc_now()
+            name=name,
+            enabled=enabled,
+            actor_ref=actor_ref,
+            reason=reason,
+            at=now or self._clock(),
         )
         with self._lock:
             if enabled:

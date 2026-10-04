@@ -16,7 +16,7 @@ runs, and a liveness check turns a missing heartbeat into a critical alert.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 
 from clarity.kernel.common import utc_now
@@ -34,6 +34,7 @@ from clarity.modules.assurance.alerts import (
 from clarity.modules.assurance.rules import RULES, Band, Finding, Thresholds
 from clarity.platform.audit.ledger import ActorKind, AuditEventType, AuditLedger
 from clarity.platform.config.switches import Switch, SwitchBoard
+from clarity.platform.messaging.outbox import OutboxRow
 from clarity.platform.persistence import Repository, UnitOfWorkFactory
 from clarity.platform.security.principal import Principal
 
@@ -49,6 +50,7 @@ PLAYBOOK_SWITCHES: tuple[Switch, ...] = (Switch.AUTO_FIX_GLOBAL, Switch.CUSTOMER
 CHAIN_BREAK = "chain_break"
 DETECTOR_SILENT = "detector_silent"
 CHECKPOINT_GAP = "checkpoint_gap"
+TRAIL_LAG = "trail_lag"
 
 
 class AssuranceService:
@@ -63,6 +65,7 @@ class AssuranceService:
         verify: Callable[[], object],
         resolve: Callable[[str, datetime], object],
         clock: Callable[[], datetime] | None = None,
+        pending: Callable[[], Sequence[OutboxRow]] | None = None,
     ) -> None:
         self._open_unit = open_unit
         self._audit = audit
@@ -70,6 +73,10 @@ class AssuranceService:
         self._verify = verify
         self._resolve = resolve
         self._clock = clock or utc_now
+        #: Undelivered outbox rows. Optional, and a callable rather than the
+        #: outbox itself, because this module must not reach into messaging: it
+        #: is handed the one read it needs by the composition root.
+        self._pending = pending
 
     # -- reading -------------------------------------------------------------- #
 
@@ -114,6 +121,7 @@ class AssuranceService:
                     )
                 )
         findings.extend(self._integrity_findings(now))
+        findings.extend(self._lag_findings(now))
         raised = [self._record(finding, now) for finding in findings]
         self._escalate_overdue(now)
         self._beat(now)
@@ -150,6 +158,53 @@ class AssuranceService:
                     )
                 )
         return findings
+
+    def _lag_findings(self, now: datetime) -> list[Finding]:
+        """Events committed but not yet published: the quiet way the trail stops.
+
+        An append to the ledger is synchronous, so there is no writer queue to
+        fall behind. The gap is one step earlier. A state change commits its
+        event to the outbox in the same transaction (I7) and the relay publishes
+        it afterwards; the consumers that turn an event into a ``event.published``
+        record run on the far side of that. So a stalled relay leaves the state
+        changed and the trail quiet, which is precisely the failure the
+        heartbeat was added for: nothing looks wrong, because nothing is
+        arriving to look wrong.
+
+        Counted, like every other rule: the number of rows still pending past
+        the age the policy store allows, with the oldest named, and no attempt to
+        guess why. A relay that is merely busy clears them and the alert closes
+        on the next run; one that is stuck does not.
+        """
+        if self._pending is None:
+            return []
+        tolerated = Thresholds(self._resolve, now).window("assurance.outbox.max_lag")
+        try:
+            stale = [row for row in self._pending() if now - row.appended_at > tolerated]
+        except Exception as error:  # the check must not be the thing that fails
+            return [
+                Finding(
+                    rule_id=f"{TRAIL_LAG}_failed",
+                    band=Band.MEDIUM,
+                    summary=f"outbox lag could not be measured: {error}",
+                    evidence=(),
+                )
+            ]
+        if not stale:
+            return []
+        oldest = min(stale, key=lambda row: row.appended_at)
+        return [
+            Finding(
+                rule_id=TRAIL_LAG,
+                band=Band.HIGH,
+                summary=(
+                    f"{len(stale)} event(s) have been waiting to be published for "
+                    f"longer than {tolerated}, the oldest since "
+                    f"{oldest.appended_at.isoformat()}: the trail is behind the system"
+                ),
+                evidence=(),
+            )
+        ]
 
     def _last_checkpoint_at(self) -> datetime | None:
         issued = self._audit.of_type(AuditEventType.CHECKPOINT_ISSUED)

@@ -196,3 +196,136 @@ keys:
     values:
       - value: "50"
         version: 1
+
+  - key: assurance.outbox.max_lag
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Longest an event may wait to be published before the trail counts as behind.
+    values:
+      - value: PT5M
+        version: 1
+
+  # -- assurance: the scenarios that needed a signal the trail now carries -----
+
+  - key: assurance.snooping.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window for counting customer records one staff account opened.
+    values:
+      - value: PT1H
+        version: 1
+
+  - key: assurance.snooping.min_cases
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Records opened with no work done on any of them before it is a finding.
+    values:
+      - value: "10"
+        version: 1
+
+  - key: assurance.collusion.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window for counting cases that paid the same subscriber.
+    values:
+      - value: P7D
+        version: 1
+
+  - key: assurance.collusion.min_cases
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Cases paying one subscriber in the window before it is a finding.
+    values:
+      - value: "3"
+        version: 1
+
+  - key: assurance.budget.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window over which executed money is totalled.
+    values:
+      - value: P1D
+        version: 1
+
+  - key: assurance.budget.window_alert_lkr
+    kind: money
+    owner_role: compliance
+    tags: [operational, money]
+    description: >
+      Total executed in the window above which compliance is told. Not the refund
+      cap: the decision policy caps one case and the budget caps the day, while
+      this is how much in total may move before somebody is asked about it.
+    values:
+      - value: "150000.00"
+        version: 1
+
+  - key: assurance.off_hours.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window for counting approvals made outside working hours.
+    values:
+      - value: P1D
+        version: 1
+
+  - key: assurance.off_hours.from_hour
+    kind: number
+    owner_role: operations
+    tags: [operational]
+    guardrail: { min: 0, max: 24 }
+    description: First hour of the working day, Colombo time (UTC+5:30).
+    values:
+      - value: "7"
+        version: 1
+
+  - key: assurance.off_hours.to_hour
+    kind: number
+    owner_role: operations
+    tags: [operational]
+    guardrail: { min: 0, max: 24 }
+    description: Hour the working day ends, Colombo time (UTC+5:30).
+    values:
+      - value: "21"
+        version: 1
+
+  - key: assurance.off_hours.min_count
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Out-of-hours approvals by one account in the window before it is a finding.
+    values:
+      - value: "3"
+        version: 1
+
+  - key: assurance.grant_abuse.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: An audit duty approved and revoked within this, having been used, is a finding.
+    values:
+      - value: PT30M
+        version: 1
+
+  - key: assurance.agent_pressure.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window for counting refused assistant proposals.
+    values:
+      - value: PT1H
+        version: 1
+
+  - key: assurance.agent_pressure.min_count
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Refused assistant proposals in the window before it is a finding.
+    values:
+      - value: "5"
+        version: 1

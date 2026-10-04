@@ -131,6 +131,7 @@ from clarity.platform.config.switches import SwitchBoard
 from clarity.platform.messaging.consumers import CollectingAlertHook, ConsumerRegistry
 from clarity.platform.messaging.drivers.in_process import InProcessEventBus
 from clarity.platform.messaging.envelope import Event, EventType
+from clarity.platform.messaging.outbox import OutboxRow, outbox_in
 from clarity.platform.messaging.relay import Relay
 from clarity.platform.observability import configure_logging, configure_tracing
 from clarity.platform.persistence import (
@@ -709,7 +710,10 @@ class Clarity:
         # demo reset carries them with it, as it carries identity.
         self.audit_grants = audit_grants or self._new_audit_grants(clock)
         self._open_audit_trail()
-        self.switches = SwitchBoard(audit_sink=self.audit)
+        self.switches = SwitchBoard(
+            audit_sink=self.audit,
+            clock=(lambda: clock) if clock is not None else None,
+        )
         # Detection, alerts and the chain-break playbook (ADR-0037). It reads
         # the trail and the switches; no module calls it and it calls none.
         self.assurance = assurance or AssuranceService(
@@ -719,6 +723,10 @@ class Clarity:
             verify=self.audit_checkpoints.verify,
             resolve=lambda key, as_of: self.policies.resolve(key, as_of=as_of),
             clock=(lambda: clock) if clock is not None else None,
+            # Undelivered events, so a stalled relay shows as a quiet trail
+            # rather than as nothing at all. Read lazily: the relay below does
+            # not exist yet, but the store it drains does.
+            pending=self._pending_events,
         )
         # Messaging: the bus, the relay that drains the outbox onto it, and the
         # consumer framework that wraps each handler in deduplication, backoff
@@ -1121,6 +1129,15 @@ class Clarity:
                 continue
             plan = next(iter(record.plans.values()))
             self.cases.auto_fix(record.case_id, plan.plan_id)
+
+    def _pending_events(self) -> list[OutboxRow]:
+        """Outbox rows the relay has not published yet, for the lag check.
+
+        The assurance module is a leaf and may not reach into messaging, so the
+        composition root hands it this one read (ADR-0037).
+        """
+        with self.open_unit() as unit:
+            return outbox_in(unit).pending()
 
     def deliver_events(self) -> None:
         """Publish whatever the last unit of work committed, then consume it.

@@ -26,6 +26,7 @@ from clarity.modules.assurance.service import (
     DETECTOR_SILENT,
     HEARTBEATS,
     PLAYBOOK_SWITCHES,
+    TRAIL_LAG,
     AssuranceService,
 )
 
@@ -38,6 +39,7 @@ __all__ = [
     "PLAYBOOK_SWITCHES",
     "RULES",
     "SECOND_PERSON_BANDS",
+    "TRAIL_LAG",
     "Alert",
     "AlertNotFound",
     "AlertRefused",

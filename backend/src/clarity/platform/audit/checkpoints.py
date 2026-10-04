@@ -100,6 +100,9 @@ class CheckpointVerification:
     lost_from: int | None = None
     """First ``seq`` a checkpoint proves existed and the trail no longer holds."""
     lost_to: int | None = None
+    verified_from: int = 1
+    """The lowest ``seq`` whose hash was recomputed. Above ``1`` after an
+    incremental check, where a signed checkpoint covered everything below."""
 
 
 def _key(seq: int) -> str:
@@ -205,19 +208,57 @@ class Checkpointer:
 
     # -- verifying ------------------------------------------------------------ #
 
-    def verify(self, *, witness: Checkpoint | None = None) -> CheckpointVerification:
+    def verify(
+        self, *, witness: Checkpoint | None = None, incremental: bool = False
+    ) -> CheckpointVerification:
         """The chain, every stored checkpoint, and optionally one held elsewhere.
 
         ``witness`` is a checkpoint obtained from outside the database: the
         public endpoint's copy someone saved, or one embedded in a receipt.
         It is what catches an insider who deleted the checkpoints as well.
+
+        ``incremental`` recomputes record hashes only from the newest checkpoint
+        that verifies upward, instead of over the whole trail, so the work is
+        bounded by what was written since that checkpoint. That is what lets the
+        liveness heartbeat run on a minute's cadence however large the trail has
+        grown. It answers a narrower question than the full check does, and
+        ``AuditLedger.verify`` is explicit about which: it will not see an edit
+        to a row below the anchor whose successors were left alone. The full
+        recompute is therefore the default and the tamper check, and this is the
+        freshness check between two of them. Every checkpoint is verified either
+        way, and a checkpoint whose signature does not hold is never used as the
+        anchor.
         """
         records = self._ledger.records
-        chain = self._ledger.verify()
         checkpoints = self.all()
         if witness is not None and all(cp.seq != witness.seq for cp in checkpoints):
             checkpoints = sorted([*checkpoints, witness], key=lambda cp: cp.seq)
         keys = self.public_keys()
+
+        # Every checkpoint must be genuine before any of them is used as proof:
+        # a forged checkpoint with a large seq must not inflate a loss report,
+        # and must not be trusted as the anchor an incremental check starts
+        # from. The verdict is held rather than returned, because a broken chain
+        # is the more specific answer and is reported first.
+        forged: tuple[int, str] | None = None
+        for cp in checkpoints:
+            if cp.statement_hash != statement_hash(cp.seq, cp.chain_head, cp.recorded_at):
+                forged = (cp.seq, "checkpoint statement does not match its fields")
+                break
+            if not signature_valid(cp, keys):
+                forged = (cp.seq, f"checkpoint signature does not verify (kid {cp.kid})")
+                break
+
+        anchor: Checkpoint | None = None
+        if incremental and forged is None:
+            covered = [cp for cp in checkpoints if cp.seq <= len(records)]
+            anchor = covered[-1] if covered else None
+
+        chain = (
+            self._ledger.verify(since=anchor.seq, since_hash=anchor.chain_head)
+            if anchor is not None
+            else self._ledger.verify()
+        )
         result = CheckpointVerification(
             intact=chain.intact,
             length=len(records),
@@ -225,17 +266,13 @@ class Checkpointer:
             last_checkpoint_seq=checkpoints[-1].seq if checkpoints else None,
             broken_at=chain.broken_at,
             reason=chain.reason,
+            verified_from=chain.verified_from,
         )
         if not chain.intact:
             return result
+        if forged is not None:
+            return _fail(result, *forged)
 
-        # Every checkpoint must be genuine before any of them is used as proof:
-        # a forged checkpoint with a large seq must not inflate a loss report.
-        for cp in checkpoints:
-            if cp.statement_hash != statement_hash(cp.seq, cp.chain_head, cp.recorded_at):
-                return _fail(result, cp.seq, "checkpoint statement does not match its fields")
-            if not signature_valid(cp, keys):
-                return _fail(result, cp.seq, f"checkpoint signature does not verify (kid {cp.kid})")
         for cp in checkpoints:
             if cp.seq <= len(records) and records[cp.seq - 1].chain_hash != cp.chain_head:
                 return _fail(result, cp.seq, "trail was rewritten before a signed checkpoint")

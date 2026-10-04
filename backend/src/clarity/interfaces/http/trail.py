@@ -102,12 +102,42 @@ def records_request(method: str, route: str) -> bool:
     return method in STATE_CHANGING and f"{method} {route}" not in NOT_RECORDED_AS_REQUESTS
 
 
+#: Path parameters that name one customer or one of their records. A route with
+#: one of these is about a person; a route without one is a list or a work queue.
+SUBJECT_PARAMS = frozenset({"case_id", "subscriber_ref", "account_ref", "receipt_id"})
+
+
+def records_data_read(method: str, route: str, principal: Principal) -> bool:
+    """Whether this read is recorded as ``data.read``.
+
+    Only staff, and only a route that names one subject. Two deliberate limits.
+
+    **Staff only**, because a customer reading their own case is the product
+    working, and recording it would bury the reads that matter in the ones that
+    do not. A customer reaching another customer's case is a 403, which the
+    refusal handler already records as ``access.denied``.
+
+    **One subject only**, because recording every list request would multiply
+    the trail by the console's polling and answer no question: the queue is
+    public to the desk. Opening one person's record is the act worth having on
+    file, and it is what the snooping rule counts.
+    """
+    return (
+        method == "GET"
+        and not principal.is_customer
+        and bool(principal.roles)
+        and any(f"{{{param}}}" in route for param in SUBJECT_PARAMS)
+    )
+
+
 __all__ = [
     "NOT_RECORDED_AS_REQUESTS",
     "STATE_CHANGING",
+    "SUBJECT_PARAMS",
     "actor_kind_of",
     "bearer_token",
     "record",
+    "records_data_read",
     "records_request",
     "route_of",
     "session_ref_for",

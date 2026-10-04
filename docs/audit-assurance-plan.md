@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phases 1, 3 and 4, and the core of Phase 2, landed 2026-10-04; Phase 5 (dashboard) is next. **Created:** 2026-10-04. **Revision:** 7.
+> **Status:** In progress. Phases 1, 3 and 4, and the core of Phase 2, landed 2026-10-04; the Phase 2 and 4 deferrals closed the same day (revision 8); Phase 5 (dashboard) is next. **Created:** 2026-10-04. **Revision:** 8.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -337,8 +337,8 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 - [x] Signed checkpoints every N records or T minutes (`config/policy/audit.yaml`: 50, PT15M); each recorded as `checkpoint.issued`; startup verifies against them
 - [ ] Cross-anchor the head into the receipt chain. **Deferred** (ADR-0035): it changes the signed receipt payload, a receipt contract change with its own review; the public witness gives an external copy meanwhile
 - [x] Public endpoint for the latest checkpoint: `GET /.well-known/clarity-audit-checkpoint.json`; `verify(witness=...)` uses a saved copy
-- [ ] Incremental verification from the last checkpoint; scheduled full verification. **Deferred**: verification still walks the whole chain (correct, slower at volume). Startup verification is recorded in `ledger.opened`
-- [ ] Keyed payload hashes. **Deferred** pending where the HMAC key lives and how it rotates
+- [x] Incremental verification from the last checkpoint; scheduled full verification. `verify(incremental=True)` recomputes from the newest verified checkpoint upward, with the anchor row itself recomputed. **It is a freshness check, not a tamper check**: it does not see an edit to a row below the anchor whose successors were left alone, so the full recompute stays the default and runs at startup and on the policy interval (ADR-0035 amendment, with a test asserting the limit)
+- [x] ~~Keyed payload hashes~~ **Dropped, and replaced.** A keyed hash would make the trail verifiable by Clarity alone, defeating the verifiable export in 5.10, and would leave `detail` (stored in the clear) untouched. Instead `platform/audit/entropy.py` refuses a raw MSISDN, NIC, card number or email at append time, in payload and detail alike (ADR-0033 amendment)
 - [x] A test that no form of a customer's number reaches the trail (W2, `test_no_raw_phone_number_reaches_the_trail`)
 
 | # | Given | When | Then |
@@ -365,10 +365,10 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 - [x] `modules/assurance`, a leaf module reading the trail ([ADR-0037](adr/0037-assurance-is-a-leaf-module-that-reacts-to-the-trail.md)). It reads the trail rather than subscribing to the bus: the trail already holds every event (W1) **and** the identity and request records the bus never carried, which the rules need to attribute an amount to a person
 - [x] Eight counted rules with thresholds in `config/policy/audit.yaml`: structuring, self-approval, money without proof, switch-then-pay, break-glass used, mass audit read, denial spike, brute force. Each alert cites the `seq` numbers that justify it
-- [ ] The remaining scenarios in 5.7: snooping, collusion, budget pressure, grant abuse, off-pattern, agent pressure. Each needs a signal the trail does not yet carry, or a baseline of normal behaviour to compare against
+- [x] The remaining scenarios in 5.7, all six: `snooping`, `collusion`, `budget_pressure`, `off_hours`, `grant_abuse`, `agent_pressure`. Snooping needed `data.read`, now recorded for a staff `GET` naming one subject (5.5); off-pattern uses **configured** working hours rather than a learned baseline, because a baseline is a model (I1). Fourteen rules in total
 - [x] Alert lifecycle (`open`, `acknowledged`, `investigating`, `disposed` with a reason), repeats folded into the open alert, escalation once on `assurance.alert.ack_sla`, closure by a second person for high and critical, never by the subject
 - [x] Liveness: a heartbeat on every detection run including a quiet one, checked from outside the loop; a checkpoint gap is critical
-- [ ] A liveness heartbeat for the audit *writer* specifically (outbox lag): the writer is in-process today, so a stalled writer shows as a stalled request rather than a quiet queue
+- [x] A liveness heartbeat for the audit *writer* specifically: the append is synchronous, so the gap is one step earlier. `trail_lag` counts events committed to the outbox and never published, which is how a stalled relay leaves state changed and the trail quiet
 - [x] Chain-break playbook: `auto_fix_global` and `customer_actions` to the safe side, only ever towards safe, recorded
 
 | # | Given | When | Then |

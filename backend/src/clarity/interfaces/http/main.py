@@ -190,12 +190,18 @@ async def _trace_requests(request: Request, call_next: Any) -> Response:
 
 
 async def _audit_requests(request: Request, call_next: Any) -> Response:
-    """Record who made every state-changing request (audit assurance plan W2).
+    """Record who made every state-changing request, and which staff read whom.
 
     Runs after the handler, when routing has filled in the route template and
     path parameters, so the record names ``POST /v1/cases/{case_id}/approve``
     and the case rather than a raw URL. 401 and 403 are left to the refusal
     handler, which records them with the reason.
+
+    A staff ``GET`` on a route naming one subject is recorded too, as
+    ``data.read`` (audit assurance plan 5.5): without it nothing distinguishes
+    an agent working their queue from one reading a neighbour's bill, which is
+    what the ``snooping`` rule counts. ``trail.records_data_read`` says which
+    reads qualify and why the rest are left out.
 
     **Not fail closed.** This record is written after the handler committed,
     so a failure here turns the response into an error but cannot undo the
@@ -204,33 +210,38 @@ async def _audit_requests(request: Request, call_next: Any) -> Response:
     """
     response: Response = await call_next(request)
     route = getattr(request.scope.get("route"), "path", None)
-    if (
-        route is not None
-        and trail.records_request(request.method, route)
-        and response.status_code not in {401, 403}
-    ):
-        token = trail.bearer_token(request)
-        principal = ANONYMOUS
-        if token:
-            try:
-                principal = principal_from(request, request.headers.get("authorization"))
-            except StarletteHTTPException:
-                principal = ANONYMOUS
-        trail.record(
-            get_clarity(),
-            AuditEventType.REQUEST_PERFORMED,
-            actor_ref=principal.ref,
-            actor_kind=trail.actor_kind_of(principal),
-            session_ref=trail.session_ref_for(token),
-            object_ref=f"{request.method} {route}",
-            detail={
-                "status": response.status_code,
-                "roles": sorted(role.value for role in principal.roles),
-                "assurance": principal.assurance.value,
-                "path_params": dict(request.path_params),
-            },
-            case_id=request.path_params.get("case_id"),
-        )
+    if route is None or response.status_code in {401, 403}:
+        return response
+
+    writes = trail.records_request(request.method, route)
+    if not writes and request.method != "GET":
+        return response
+
+    token = trail.bearer_token(request)
+    principal = ANONYMOUS
+    if token:
+        try:
+            principal = principal_from(request, request.headers.get("authorization"))
+        except StarletteHTTPException:
+            principal = ANONYMOUS
+    if not writes and not trail.records_data_read(request.method, route, principal):
+        return response
+
+    trail.record(
+        get_clarity(),
+        AuditEventType.REQUEST_PERFORMED if writes else AuditEventType.DATA_READ,
+        actor_ref=principal.ref,
+        actor_kind=trail.actor_kind_of(principal),
+        session_ref=trail.session_ref_for(token),
+        object_ref=f"{request.method} {route}",
+        detail={
+            "status": response.status_code,
+            "roles": sorted(role.value for role in principal.roles),
+            "assurance": principal.assurance.value,
+            "path_params": dict(request.path_params),
+        },
+        case_id=request.path_params.get("case_id"),
+    )
     return response
 
 

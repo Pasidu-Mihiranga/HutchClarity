@@ -66,3 +66,40 @@ time the trail is stored), so version 2 starts at genesis.
 `tests/unit/test_events_and_audit.py::test_rewriting_any_field_of_a_record_is_detected`
 covers every field version 1 left exposed. A new field added to `AuditRecord`
 without adding it to `record_hash` is a review finding against this ADR.
+
+## Amendment, 2026-10-04: no keyed payload hash
+
+The assurance plan proposed making `payload_hash` a keyed hash (HMAC under a key
+held beside the checkpoint key), on the ground that a plain SHA-256 of a phone
+number is reversible by enumerating a mobile prefix. **That is not being done**,
+and the risk is addressed differently.
+
+Two reasons it was the wrong fix.
+
+- **It breaks verifiable export.** `AuditLedger.proves` exists so an auditor
+  holding a document can confirm the ledger recorded *that* document, and the
+  plan promises an export a regulator checks without trusting Clarity. A keyed
+  hash makes both impossible without a key only Clarity holds, which leaves the
+  trail verifiable by Clarity alone: the one property this design exists to
+  avoid.
+- **It protects the wrong field.** `detail` is stored in the clear so a person
+  can read the trail. A phone number there is readable by anyone with audit
+  access, and no hash, keyed or not, changes that.
+
+Instead the identifier does not reach the ledger. `platform.audit.entropy`
+screens every append, payload and detail alike, and **refuses** a raw MSISDN,
+NIC, card number or email address. Masking is never optional (I13), so a caller
+passing one has a defect, and a defect on the audit path fails loudly rather
+than writing personal data into a store that by design cannot be edited.
+
+The screen is deliberately high precision, not high recall: a false positive
+fails a real customer operation (ADR-0034), so each pattern needs a structural
+signal (the `+94`/`07` prefix, the `V` suffix, a Luhn-valid run) and must sit on
+non-alphanumeric boundaries. Opaque cryptographic fields are listed and skipped,
+because a hash has no author who could put a number in it and screening one only
+invites a false positive. Recall stays the masker's job on the text path; this is
+the backstop on the audit path.
+
+Covered by `tests/security/test_audit_entropy.py`, which asserts both halves:
+the identifiers that must be refused, and the forms the codebase actually uses,
+which must keep working.

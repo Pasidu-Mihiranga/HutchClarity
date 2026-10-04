@@ -246,3 +246,165 @@ def test_the_latest_checkpoint_is_public(clarity: Clarity):
     assert body["public_key"]
     published = Checkpoint.model_validate({k: body[k] for k in Checkpoint.model_fields})
     assert clarity.audit_checkpoints.verify(witness=published).intact
+
+
+# --------------------------------------------------------------------------- #
+# Incremental verification (audit assurance plan, Phase 2 deferral)
+# --------------------------------------------------------------------------- #
+
+
+def test_an_incremental_check_starts_above_the_newest_checkpoint():
+    world = World(every=5)
+    world.append(12)
+    latest = world.checkpoints.latest()
+    assert latest is not None
+
+    result = world.checkpoints.verify(incremental=True)
+
+    assert result.intact, result.reason
+    assert result.verified_from == latest.seq, "it anchors on the newest checkpoint"
+    assert result.verified_from > 1, "and does not recompute from record 1"
+
+
+def test_an_incremental_check_catches_a_truncated_trail():
+    """The live question a heartbeat asks, and the one this answers."""
+    world = World(every=100)
+    world.append(20)
+    world.checkpoints.checkpoint()
+    world.rewind_head_to(10)
+
+    result = world.checkpoints.verify(incremental=True)
+
+    assert not result.intact
+    assert result.reason is not None
+
+
+def test_an_incremental_check_catches_an_edit_at_its_own_anchor():
+    """The anchor row is recomputed, not just hash-compared.
+
+    Without that, editing the anchor and leaving its stored hash alone would
+    pass: nothing above the anchor depends on the anchor's contents, only on
+    the hash it claims to have.
+    """
+    world = World(every=100)
+    world.append(20)
+    checkpoint = world.checkpoints.checkpoint()
+    assert checkpoint is not None
+    anchor = next(r for r in world.ledger.records if r.seq == checkpoint.seq)
+    world.put(AUDIT, key(anchor.seq), anchor.model_copy(update={"actor_ref": "agent:nadeesha"}))
+
+    result = world.checkpoints.verify(incremental=True)
+
+    assert not result.intact
+    assert result.broken_at == anchor.seq
+
+
+def test_an_incremental_check_does_not_see_an_edit_below_its_anchor():
+    """The documented boundary of the optimisation, pinned so nobody assumes more.
+
+    Record 3 is rewritten and only its own ``chain_hash`` recomputed. Records 4
+    upward still carry the ``prev_hash`` they always had, so the hash at the
+    anchor is untouched and the dangling link sits below everything an
+    incremental check recomputes. The **full** check is what catches this, and
+    the assertion that it does is the other half of this test.
+    """
+    world = World(every=100)
+    world.append(20)
+    world.checkpoints.checkpoint()
+    victim = world.ledger.records[2]
+    forged = victim.model_copy(update={"actor_ref": "agent:nadeesha"})
+    world.put(AUDIT, key(victim.seq), forged.model_copy(update={"chain_hash": record_hash(forged)}))
+
+    incremental = world.checkpoints.verify(incremental=True)
+    full = world.checkpoints.verify()
+
+    assert incremental.intact, "the documented limitation, not a regression"
+    assert not full.intact, "the full recompute is the tamper check"
+    assert full.broken_at == victim.seq + 1
+
+
+def test_an_incremental_check_does_not_trust_a_forged_checkpoint_as_its_anchor():
+    """A forged checkpoint must not become the point verification starts from.
+
+    Otherwise the attack writes itself: rewrite the trail, forge a checkpoint
+    over the new head, and every later check skips the rewritten records.
+    """
+    world = World(every=100)
+    world.append(10)
+    honest = world.checkpoints.checkpoint()
+    assert honest is not None
+
+    # Rewrite the whole trail consistently, then forge a checkpoint over the
+    # new head without the signing key.
+    records = world.ledger.records
+    victim = records[1]
+    forged_record = victim.model_copy(update={"case_id": "CS-FORGED"})
+    forged_record = forged_record.model_copy(update={"chain_hash": record_hash(forged_record)})
+    world.put(AUDIT, key(victim.seq), forged_record)
+    previous = forged_record
+    for record in records[2:]:
+        relinked = record.model_copy(update={"prev_hash": previous.chain_hash})
+        relinked = relinked.model_copy(update={"chain_hash": record_hash(relinked)})
+        world.put(AUDIT, key(relinked.seq), relinked)
+        previous = relinked
+    world.put(AUDIT_HEAD, "head", {"seq": previous.seq, "chain_hash": previous.chain_hash})
+    world.put(
+        AUDIT_CHECKPOINTS,
+        key(previous.seq),
+        Checkpoint(
+            seq=previous.seq,
+            chain_head=previous.chain_hash,
+            recorded_at=datetime(2026, 10, 4, tzinfo=UTC),
+            statement_hash=statement_hash(
+                previous.seq, previous.chain_hash, datetime(2026, 10, 4, tzinfo=UTC)
+            ),
+            kid="audit-test-1",
+            signature="AA" * 32,
+        ),
+    )
+
+    result = world.checkpoints.verify(incremental=True)
+
+    assert not result.intact, "a forged checkpoint must not vouch for the trail"
+    assert result.verified_from == 1, "and must not become the anchor"
+
+
+def test_an_incremental_check_falls_back_to_the_full_chain_with_no_checkpoint():
+    ledger = AuditLedger()
+    checkpoints = Checkpointer(
+        ledger,
+        DevSigningService(kid="audit-test-1"),
+        ledger.open_unit,
+        every_records=lambda: 1000,
+        max_age=lambda: timedelta(days=1),
+    )
+    ledger.append(
+        AuditEventType.STAFF_ACTION, actor_ref="sup:ruwan", object_ref="plan:1", payload={}
+    )
+
+    result = checkpoints.verify(incremental=True)
+
+    assert result.intact, result.reason
+    assert result.verified_from == 1
+
+
+def test_an_incremental_verify_needs_the_hash_it_starts_from():
+    ledger = AuditLedger()
+    ledger.append(
+        AuditEventType.STAFF_ACTION, actor_ref="sup:ruwan", object_ref="plan:1", payload={}
+    )
+
+    with pytest.raises(ValueError, match="needs the hash"):
+        ledger.verify(since=1)
+
+
+def test_an_incremental_verify_reports_a_missing_anchor():
+    ledger = AuditLedger()
+    ledger.append(
+        AuditEventType.STAFF_ACTION, actor_ref="sup:ruwan", object_ref="plan:1", payload={}
+    )
+
+    result = ledger.verify(since=9, since_hash="whatever")
+
+    assert not result.intact
+    assert result.broken_at == 9

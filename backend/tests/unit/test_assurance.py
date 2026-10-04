@@ -24,6 +24,7 @@ from clarity.modules.assurance.public import (
     Band,
     Disposition,
 )
+from clarity.modules.assurance.rules import RULES, Thresholds
 from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.config.switches import Switch, SwitchBoard
 from clarity.platform.persistence.memory import MemoryStore, MemoryUnitOfWork
@@ -47,6 +48,20 @@ POLICY: dict[str, object] = {
     "assurance.liveness.max_silence": "PT30M",
     "assurance.checkpoint.max_gap": "PT1H",
     "assurance.detection.interval": "PT5M",
+    "assurance.outbox.max_lag": "PT5M",
+    "assurance.snooping.window": "PT1H",
+    "assurance.snooping.min_cases": "10",
+    "assurance.collusion.window": "P7D",
+    "assurance.collusion.min_cases": "3",
+    "assurance.budget.window": "P1D",
+    "assurance.budget.window_alert_lkr": "150000.00",
+    "assurance.off_hours.window": "P1D",
+    "assurance.off_hours.from_hour": "7",
+    "assurance.off_hours.to_hour": "21",
+    "assurance.off_hours.min_count": "3",
+    "assurance.grant_abuse.window": "PT30M",
+    "assurance.agent_pressure.window": "PT1H",
+    "assurance.agent_pressure.min_count": "5",
 }
 
 
@@ -99,8 +114,8 @@ def ledger(clock: Clock) -> AuditLedger:
 
 
 @pytest.fixture
-def switches(ledger: AuditLedger) -> SwitchBoard:
-    return SwitchBoard(audit_sink=ledger)
+def switches(clock: Clock, ledger: AuditLedger) -> SwitchBoard:
+    return SwitchBoard(audit_sink=ledger, clock=clock)
 
 
 @pytest.fixture
@@ -447,11 +462,10 @@ def test_money_without_a_receipt_is_a_finding_after_the_grace(
 def test_a_switch_turned_off_around_a_payment_is_a_finding(
     assurance: AssuranceService, ledger: AuditLedger, switches: SwitchBoard, clock: Clock
 ):
-    # Explicit times: ``SwitchBoard`` stamps a flip with the real clock, not an
-    # injected one, so a frozen-clock test has to say when each flip happened.
-    switches.turn_off(
-        Switch.AUTO_FIX_GLOBAL, actor_ref="sup:ruwan", reason="maintenance", now=clock.now
-    )
+    # No explicit ``now``: the board takes the injected clock (I11), which is
+    # what this asserts. Passing the time by hand hid a real defect, because a
+    # flip stamped from the wall clock falls outside any replay window.
+    switches.turn_off(Switch.AUTO_FIX_GLOBAL, actor_ref="sup:ruwan", reason="maintenance")
     clock.advance(timedelta(minutes=5))
     ledger.append(
         AuditEventType.ACTION_EXECUTED,
@@ -462,7 +476,7 @@ def test_a_switch_turned_off_around_a_payment_is_a_finding(
         detail={"total_amount_lkr": "9000.00"},
     )
     clock.advance(timedelta(minutes=5))
-    switches.turn_on(Switch.AUTO_FIX_GLOBAL, actor_ref="sup:ruwan", reason="done", now=clock.now)
+    switches.turn_on(Switch.AUTO_FIX_GLOBAL, actor_ref="sup:ruwan", reason="done")
 
     assurance.run()
 
@@ -539,3 +553,419 @@ def test_the_structuring_cap_comes_from_the_decision_policy(
     assurance.run()
 
     assert alerts_by_rule(assurance, "structuring")
+
+
+# --------------------------------------------------------------------------- #
+# The rules and the policy store must agree (I10)
+# --------------------------------------------------------------------------- #
+
+
+def test_every_rule_resolves_against_the_real_policy_store():
+    """A rule asking for a key the policy store does not hold is a silent failure.
+
+    ``run`` catches a broken rule so one cannot stop the rest, which is right,
+    and it means a missing policy key degrades to a ``<rule>_failed`` finding
+    rather than an error anybody notices. This is the test that notices: it runs
+    every rule against the real ``config/policy`` directory, so adding a rule
+    without adding its thresholds fails here, and the ``POLICY`` dict above
+    cannot drift away from the file it stands in for.
+    """
+    from clarity.app.container import default_policy_dir
+    from clarity.platform.config.resolver import PolicyResolver
+
+    resolver = PolicyResolver.from_directory(default_policy_dir(None))
+    now = datetime(2026, 10, 4, 9, 0, tzinfo=UTC)
+    thresholds = Thresholds(lambda key, as_of: resolver.resolve(key, as_of=as_of), now)
+
+    missing: list[str] = []
+    for rule_id, rule in RULES.items():
+        try:
+            rule([], thresholds, now)
+        except Exception as error:  # the report below is the point
+            missing.append(f"{rule_id}: {error}")
+
+    assert not missing, "rules asked the policy store for keys it does not hold:\n" + "\n".join(
+        missing
+    )
+
+
+def test_the_stub_policy_covers_every_key_the_real_store_has_for_assurance():
+    """The dict above and the file must name the same assurance keys.
+
+    Without this the stub quietly keeps working while the deployed policy has a
+    key nobody set, or the file grows a key no test exercises.
+    """
+    from clarity.app.container import default_policy_dir
+    from clarity.platform.config.resolver import PolicyResolver
+
+    resolver = PolicyResolver.from_directory(default_policy_dir(None))
+    # ``keys()`` returns PolicyKey models, not dict keys.
+    declared = resolver.keys()
+    real = {entry.key for entry in declared if entry.key.startswith("assurance.")}
+    stubbed = {key for key in POLICY if key.startswith("assurance.")}
+
+    assert real == stubbed, (
+        f"only in config/policy: {sorted(real - stubbed)}; only in the stub: "
+        f"{sorted(stubbed - real)}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# The six scenarios that needed a signal the trail did not carry (plan 5.7)
+# --------------------------------------------------------------------------- #
+
+
+def read_case(ledger: AuditLedger, *, case_id: str, actor: str) -> None:
+    """A staff account opening one customer's record, as the middleware records it."""
+    ledger.append(
+        AuditEventType.DATA_READ,
+        actor_ref=actor,
+        object_ref="GET /v1/cases/{case_id}",
+        payload={},
+        case_id=case_id,
+        detail={"status": 200, "roles": ["agent"]},
+    )
+
+
+def test_snooping_fires_on_records_read_with_no_work_done(assurance, ledger):
+    for index in range(10):
+        read_case(ledger, case_id=f"CS-{index}", actor="agent:nadeesha")
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "snooping"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref == "agent:nadeesha"
+    assert len(found[0].evidence) == 10
+
+
+def test_snooping_does_not_fire_on_an_agent_working_their_queue(assurance, ledger):
+    """Read and then acted on: that is the job, and it must not raise an alert."""
+    for index in range(10):
+        case = f"CS-{index}"
+        read_case(ledger, case_id=case, actor="agent:nadeesha")
+        approve_and_execute(ledger, case_id=case, actor="agent:nadeesha", amount="500.00")
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "snooping"] == []
+
+
+def test_snooping_counts_each_account_separately(assurance, ledger):
+    """Ten agents reading one case each is a desk at work, not ten snoopers."""
+    for index in range(10):
+        read_case(ledger, case_id=f"CS-{index}", actor=f"agent:{index}")
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "snooping"] == []
+
+
+def pay_subject(ledger: AuditLedger, *, case_id: str, subject: str, actor: str) -> None:
+    ledger.append(
+        AuditEventType.REQUEST_PERFORMED,
+        actor_ref=actor,
+        object_ref="POST /v1/cases/{case_id}/approve",
+        payload={},
+        case_id=case_id,
+        detail={"status": 200},
+    )
+    ledger.append(
+        AuditEventType.ACTION_EXECUTED,
+        actor_ref="clarity",
+        object_ref=f"plan:{case_id}",
+        payload={},
+        case_id=case_id,
+        detail={"total_amount_lkr": "900.00", "subject": subject},
+    )
+
+
+def test_collusion_fires_when_one_subscriber_is_paid_across_several_cases(assurance, ledger):
+    for index in range(3):
+        pay_subject(ledger, case_id=f"CS-{index}", subject="sub:9f2a", actor="sup:ruwan")
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "collusion"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref == "sup:ruwan", "one hand, so the finding names it"
+    assert "3 cases" in found[0].summary
+
+
+def test_collusion_names_no_single_subject_when_several_approved(assurance, ledger):
+    """Two approvers for one beneficiary is the shape worth the word collusion.
+
+    The alert deliberately carries no ``subject_ref`` then: naming one of them
+    would be picking a suspect, and the second-person rule would let the other
+    close the alert on themselves.
+    """
+    for index, approver in enumerate(["sup:ruwan", "sup:dilani", "sup:ruwan"]):
+        pay_subject(ledger, case_id=f"CS-{index}", subject="sub:9f2a", actor=approver)
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "collusion"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref is None
+    assert "sup:dilani, sup:ruwan" in found[0].summary
+
+
+def test_collusion_does_not_fire_below_the_threshold(assurance, ledger):
+    for index in range(2):
+        pay_subject(ledger, case_id=f"CS-{index}", subject="sub:9f2a", actor="sup:ruwan")
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "collusion"] == []
+
+
+def test_budget_pressure_fires_on_the_window_total_not_one_payment(assurance, ledger):
+    """No single payment is near the cap; together they are past what is tolerated."""
+    for index in range(4):
+        approve_and_execute(ledger, case_id=f"CS-{index}", actor="sup:ruwan", amount="40000.00")
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "budget_pressure"]
+
+    assert len(found) == 1
+    assert "LKR 160000.00" in found[0].summary
+
+
+def test_budget_pressure_stays_quiet_below_the_ceiling(assurance, ledger):
+    approve_and_execute(ledger, case_id="CS-1", actor="sup:ruwan", amount="40000.00")
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "budget_pressure"] == []
+
+
+def approve_at(ledger: AuditLedger, *, case_id: str, actor: str, when: datetime) -> None:
+    ledger.append(
+        AuditEventType.REQUEST_PERFORMED,
+        actor_ref=actor,
+        object_ref="POST /v1/cases/{case_id}/approve",
+        payload={},
+        case_id=case_id,
+        detail={"status": 200},
+        now=when,
+    )
+
+
+def test_off_hours_fires_on_approvals_outside_the_configured_day(assurance, clock, ledger):
+    # 20:00 UTC is 01:30 the next morning in Colombo, which is outside 07:00-21:00.
+    midnight = clock.now.replace(hour=20, minute=0) - timedelta(days=1)
+    for index in range(3):
+        approve_at(ledger, case_id=f"CS-{index}", actor="sup:ruwan", when=midnight)
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "off_hours"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref == "sup:ruwan"
+    assert "Colombo" in found[0].summary
+
+
+def test_off_hours_treats_the_half_hour_offset_correctly(assurance, clock, ledger):
+    """02:00 UTC is 07:30 in Colombo: inside the working day, and must not fire.
+
+    A rule that rounded the offset to five hours would read this as 07:00 and
+    then read 01:45 UTC as 06:45, getting the boundary wrong in both directions.
+    """
+    inside = clock.now.replace(hour=2, minute=0)
+    for index in range(5):
+        approve_at(ledger, case_id=f"CS-{index}", actor="sup:ruwan", when=inside)
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "off_hours"] == []
+
+
+def test_off_hours_ignores_reads(assurance, clock, ledger):
+    """A late shift reading cases is a late shift. Approving money is the question."""
+    night = clock.now.replace(hour=20, minute=0) - timedelta(days=1)
+    for index in range(10):
+        ledger.append(
+            AuditEventType.DATA_READ,
+            actor_ref="agent:nadeesha",
+            object_ref="GET /v1/cases/{case_id}",
+            payload={},
+            case_id=f"CS-{index}",
+            detail={"status": 200},
+            now=night,
+        )
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "off_hours"] == []
+
+
+def test_grant_abuse_fires_on_a_duty_taken_used_and_handed_straight_back(assurance, clock, ledger):
+    ledger.append(
+        AuditEventType.GRANT_APPROVED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:agent:nadeesha", "permission": "audit:read"},
+    )
+    clock.advance(timedelta(minutes=2))
+    ledger.append(
+        AuditEventType.AUDIT_READ,
+        actor_ref="agent:nadeesha",
+        object_ref="GET /v1/audit/trail",
+        payload={},
+        detail={"filters": {}},
+    )
+    clock.advance(timedelta(minutes=2))
+    ledger.append(
+        AuditEventType.GRANT_REVOKED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:agent:nadeesha", "permission": "audit:read"},
+    )
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "grant_abuse"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref == "agent:nadeesha"
+    assert len(found[0].evidence) == 3
+
+
+def test_grant_abuse_does_not_fire_on_a_duty_that_was_never_used(assurance, clock, ledger):
+    """A grant approved and revoked unused is a correction, not an abuse."""
+    ledger.append(
+        AuditEventType.GRANT_APPROVED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:agent:nadeesha", "permission": "audit:read"},
+    )
+    clock.advance(timedelta(minutes=2))
+    ledger.append(
+        AuditEventType.GRANT_REVOKED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:agent:nadeesha", "permission": "audit:read"},
+    )
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "grant_abuse"] == []
+
+
+def test_grant_abuse_does_not_fire_on_a_duty_held_for_a_real_shift(assurance, clock, ledger):
+    ledger.append(
+        AuditEventType.GRANT_APPROVED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:comp:alice", "permission": "audit:read"},
+    )
+    clock.advance(timedelta(hours=3))
+    ledger.append(
+        AuditEventType.AUDIT_READ,
+        actor_ref="comp:alice",
+        object_ref="GET /v1/audit/trail",
+        payload={},
+        detail={},
+    )
+    clock.advance(timedelta(hours=5))
+    ledger.append(
+        AuditEventType.GRANT_REVOKED,
+        actor_ref="admin:kamal",
+        object_ref="GRANT-1",
+        payload={},
+        detail={"subject": "user:comp:alice", "permission": "audit:read"},
+    )
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "grant_abuse"] == []
+
+
+def test_agent_pressure_fires_on_refused_proposals(assurance, ledger):
+    for index in range(5):
+        ledger.append(
+            AuditEventType.MCP_INVOKED,
+            actor_ref="agent:assistant",
+            object_ref=f"propose_fix:{index}",
+            payload={},
+            detail={"outcome": "denied"},
+        )
+
+    found = [alert for alert in assurance.run() if alert.rule_id == "agent_pressure"]
+
+    assert len(found) == 1
+    assert found[0].subject_ref == "agent:assistant"
+
+
+def test_agent_pressure_ignores_proposals_that_were_accepted(assurance, ledger):
+    for index in range(10):
+        ledger.append(
+            AuditEventType.MCP_INVOKED,
+            actor_ref="agent:assistant",
+            object_ref=f"propose_fix:{index}",
+            payload={},
+            detail={"outcome": "proposed"},
+        )
+
+    assert [alert for alert in assurance.run() if alert.rule_id == "agent_pressure"] == []
+
+
+# --------------------------------------------------------------------------- #
+# The trail falling behind the system (Phase 4 deferral)
+# --------------------------------------------------------------------------- #
+
+
+class StalledOutbox:
+    """Rows the relay never published, as the composition root would read them."""
+
+    def __init__(self, *rows: object) -> None:
+        self.rows = list(rows)
+
+    def __call__(self) -> list[object]:
+        return self.rows
+
+
+class Row:
+    def __init__(self, appended_at: datetime) -> None:
+        self.appended_at = appended_at
+
+
+def service_with(pending, clock, ledger, switches, verification) -> AssuranceService:
+    store = MemoryStore()
+    return AssuranceService(
+        lambda: MemoryUnitOfWork(store),
+        audit=ledger,
+        switches=switches,
+        verify=verification,
+        resolve=lambda key, as_of: POLICY[key],
+        clock=clock,
+        pending=pending,
+    )
+
+
+def test_a_stalled_relay_raises_an_alert(clock, ledger, switches, verification):
+    """Silence from a stalled relay is the failure the heartbeat was added for.
+
+    The state changed and committed; the event never reached the bus, so nothing
+    turned it into a record. Without this rule the dashboard shows a quiet trail
+    and a quiet trail looks like a quiet day.
+    """
+    stale = StalledOutbox(
+        Row(clock.now - timedelta(minutes=30)), Row(clock.now - timedelta(hours=2))
+    )
+    service = service_with(stale, clock, ledger, switches, verification)
+
+    found = [alert for alert in service.run() if alert.rule_id == "trail_lag"]
+
+    assert len(found) == 1
+    assert "2 event(s)" in found[0].summary
+
+
+def test_a_relay_merely_busy_raises_nothing(clock, ledger, switches, verification):
+    fresh = StalledOutbox(Row(clock.now - timedelta(seconds=30)))
+    service = service_with(fresh, clock, ledger, switches, verification)
+
+    assert [alert for alert in service.run() if alert.rule_id == "trail_lag"] == []
+
+
+def test_an_unreadable_outbox_reports_itself_rather_than_failing_detection(
+    clock, ledger, switches, verification
+):
+    """The check must never be the thing that stops the rest of the rules."""
+
+    def broken() -> list[object]:
+        raise RuntimeError("the outbox table is gone")
+
+    service = service_with(broken, clock, ledger, switches, verification)
+
+    found = [alert for alert in service.run() if alert.rule_id == "trail_lag_failed"]
+
+    assert len(found) == 1
+    assert "the outbox table is gone" in found[0].summary
+
+
+def test_no_outbox_reader_means_no_lag_finding(assurance):
+    """The reader is optional, so a unit test that never passed one sees nothing."""
+    assert [alert for alert in assurance.run() if alert.rule_id.startswith("trail_lag")] == []

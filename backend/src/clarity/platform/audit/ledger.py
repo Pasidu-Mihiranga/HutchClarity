@@ -38,6 +38,7 @@ from pydantic import Field
 
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import ClarityModel, utc_now
+from clarity.platform.audit.entropy import refuse_low_entropy
 from clarity.platform.persistence import ConcurrentUpdate, Repository, UnitOfWorkFactory
 from clarity.platform.persistence.memory import MemoryStore, MemoryUnitOfWork
 
@@ -121,6 +122,15 @@ class AuditEventType(StrEnum):
 
     AUDIT_READ = "audit.read"
     """Someone read the trail: who watched the watchers (rule 5)."""
+
+    DATA_READ = "data.read"
+    """A staff account opened one customer's record (plan section 5.5).
+
+    The one *read* the trail records, and only for a named subject: a work queue
+    is a list, but opening one person's case is a look at that person, and
+    without it nothing distinguishes an agent working their queue from one
+    reading a neighbour's bill. Routes are recorded by template, never by URL,
+    so the record names the route and the path parameters, not a query string."""
 
     # -- assurance (audit assurance plan Phase 4) ------------------------- #
 
@@ -216,6 +226,10 @@ class ChainVerification:
     length: int
     broken_at: int | None = None
     reason: str | None = None
+    verified_from: int = 1
+    """The lowest ``seq`` this check recomputed. ``1`` is the whole chain; a
+    higher number means the records below it were covered transitively, by the
+    chain hash the anchoring checkpoint signed (see ``AuditLedger.verify``)."""
 
 
 class AppendOnlyViolation(RuntimeError):
@@ -296,6 +310,8 @@ class AuditLedger:
         Hooks run after the lock is released, so a hook may append (a
         checkpoint records itself) without deadlocking.
         """
+        refuse_low_entropy(payload, path="payload")
+        refuse_low_entropy(detail or {}, path="detail")
         detail = hashable(detail or {})
         payload_hash = hash_payload(hashable(payload))
         detail_hash = hash_payload(detail)
@@ -413,17 +429,84 @@ class AuditLedger:
     # Verifying
     # ------------------------------------------------------------------ #
 
-    def verify(self) -> ChainVerification:
-        """Recompute the whole chain. Any edit, deletion or reordering shows up here."""
+    def verify(self, *, since: int = 0, since_hash: str | None = None) -> ChainVerification:
+        """Recompute the chain. Any edit, deletion or reordering shows up here.
+
+        With no arguments the whole chain is recomputed, which is the honest
+        default and what a cold start does.
+
+        ``since`` and ``since_hash`` give the incremental check: a ``seq`` whose
+        ``chain_hash`` a signed checkpoint vouches for, and the hash it should
+        have. The anchor record is fully recomputed and compared to that hash,
+        and the records above it are verified as usual. The work is then bounded
+        by how much was written since the last checkpoint rather than by the
+        length of the trail, so the liveness heartbeat can run on a minute's
+        cadence however large the trail has grown.
+
+        **Be precise about what this covers**, because the obvious claim for it
+        is false. It covers every record from ``since`` upward exactly as the
+        full check does, the anchor row's own contents, and the shape of the
+        chain below the anchor: the anchor's hash is computed over its
+        predecessor's, transitively down to record 1, so the sequence of hashes
+        the rows below *claim* to have is the sequence the checkpoint signed.
+
+        It does **not** confirm the contents of the rows below the anchor. Edit
+        record 3's approver and recompute only record 3's own ``chain_hash``:
+        records 4 upward still carry the ``prev_hash`` they always had, so the
+        hash at the anchor is unchanged and the dangling link between 3 and 4
+        sits below everything this recomputes. Catching that means recomputing
+        record 3, which is the full check.
+
+        So an incremental check answers "has the trail been truncated, appended
+        to around the ledger, or tampered with since the last checkpoint", which
+        is the live question a heartbeat asks. It does not replace the full
+        recompute, which is what runs at startup and on the policy interval, nor
+        the restore comparison against an external checkpoint (Phase 6).
+        """
         records = self._all()
         previous: AuditRecord | None = None
+
+        if since > 0:
+            if since_hash is None:
+                raise ValueError("an incremental verify needs the hash it starts from")
+            anchor = next((r for r in records if r.seq == since), None)
+            if anchor is None:
+                return ChainVerification(
+                    False, len(records), since, "the anchoring record is missing", since
+                )
+            if anchor.chain_hash != since_hash:
+                return ChainVerification(
+                    False,
+                    len(records),
+                    since,
+                    "the anchoring record does not carry the hash it was signed with",
+                    since,
+                )
+            # Recompute the anchor itself: one record's work, and without it an
+            # edit to the anchor row that leaves its stored hash alone would
+            # pass, since nothing above the anchor depends on its contents.
+            if hash_payload(anchor.detail) != anchor.detail_hash:
+                return ChainVerification(
+                    False, len(records), since, "detail does not match its hash", since
+                )
+            if record_hash(anchor) != anchor.chain_hash:
+                return ChainVerification(
+                    False, len(records), since, "record hash does not match its contents", since
+                )
+            previous = anchor
+            records = [r for r in records if r.seq > since]
+        first = since + 1
+        total = since + len(records)
+        # The anchor is recomputed above, so it is the lowest seq this call
+        # checked; ``first`` is only where the forward loop's numbering starts.
+        scope = since or 1
         for index, record in enumerate(records):
             seq = record.seq
 
             def broken(reason: str, at: int = seq) -> ChainVerification:
-                return ChainVerification(False, len(records), at, reason)
+                return ChainVerification(False, total, at, reason, scope)
 
-            if seq != index + 1:
+            if seq != index + first:
                 return broken("sequence numbers are not contiguous", index + 1)
             if record.hash_version != HASH_VERSION:
                 return broken(f"unknown record hash version {record.hash_version}")
@@ -438,17 +521,18 @@ class AuditLedger:
             previous = record
 
         head = self.head
-        last = records[-1].chain_hash if records else None
+        last = records[-1].chain_hash if records else previous.chain_hash if previous else None
         if head != last:
             # The head pointer and the table disagree: records were removed
             # from the end, or added around the ledger.
             return ChainVerification(
                 False,
-                len(records),
-                len(records) + 1 if head else 1,
+                total,
+                total + 1 if head else first,
                 "head does not match the chain",
+                scope,
             )
-        return ChainVerification(True, len(records))
+        return ChainVerification(True, total, verified_from=scope)
 
     def proves(self, record: AuditRecord, payload: dict[str, Any]) -> bool:
         """Does ``payload`` match what this record attests to?

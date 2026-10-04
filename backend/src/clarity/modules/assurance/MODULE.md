@@ -22,8 +22,8 @@ Nothing here decides anything about a case or moves money (I1).
 
 `AssuranceService`, `Alert`, `AlertState`, `Disposition`, `AlertRefused`,
 `AlertNotFound`, `Band`, `Finding`, `RULES`, `SECOND_PERSON_BANDS`,
-`PLAYBOOK_SWITCHES`, `CHAIN_BREAK`, `CHECKPOINT_GAP`, `DETECTOR_SILENT`, and
-the owned collection names `ALERTS`, `HEARTBEATS`.
+`PLAYBOOK_SWITCHES`, `CHAIN_BREAK`, `CHECKPOINT_GAP`, `DETECTOR_SILENT`,
+`TRAIL_LAG`, and the owned collection names `ALERTS`, `HEARTBEATS`.
 
 ## 3. Used by
 `clarity.app`, `clarity.interfaces.http`
@@ -36,9 +36,15 @@ the owned collection names `ALERTS`, `HEARTBEATS`.
 | `clarity.platform.config` | thresholds from the policy store; kill switches |
 | `clarity.platform.persistence` | `assurance.alerts`, `assurance.heartbeats` |
 | `clarity.platform.security` | `Principal`, `Permission` for the closure rules |
+| `clarity.platform.messaging` | `OutboxRow` as a type only; the rows arrive through a reader the composition root injects |
 
 **No module edges.** It calls no other module and no module calls it: a rule
 that is slow or broken can never block a refund (ADR-0029, ADR-0037).
+
+The messaging dependency is a type import only. Undelivered outbox rows reach
+the lag rule through a `pending` callable that `clarity.app.container` supplies,
+so this module never reaches into the outbox and a deployment without one simply
+has no lag finding.
 
 ## 5. Data owned
 Collections `assurance.alerts` and `assurance.heartbeats`. Lite uses the shared
@@ -57,6 +63,14 @@ memory store; full uses the assurance PostgreSQL schema.
 - The playbook only ever moves switches to the safe side, never back.
 - Detection writes a heartbeat on every run, including a quiet one: a run that
   found nothing and a run that never happened must not look the same.
+- Working hours are **configured**, never learned. `off_hours` reads two numbers
+  owned by whoever owns the roster, because a learned baseline is a model and a
+  model scoring a person's working pattern is a guess wearing a number's
+  clothes (I1).
+- Every rule's thresholds must exist in `config/policy`. `run` catches a broken
+  rule so one cannot stop the rest, which means a missing key would otherwise
+  degrade silently to a `<rule>_failed` finding; a contract test resolves every
+  rule against the real policy directory instead.
 
 ## 7. Migration status (enterprise-plan 21)
 Built in the modular monolith. Detection runs on a schedule in each API
@@ -71,3 +85,4 @@ change, because it already reacts to the trail rather than being called.
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P4-assurance.md` | Detection, alerts, liveness and the chain-break playbook (Phase 4, ADR-0037) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P4-deferred.md` | Six remaining risk scenarios, outbox lag, and the policy-store contract test |
