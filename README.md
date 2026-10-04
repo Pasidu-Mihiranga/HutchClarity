@@ -68,7 +68,7 @@ For the UI, add Node 18+ and run the three Next.js apps next to the API
 See [frontend/README.md](frontend/README.md); the full storyboard is
 [docs/submission/DEMO_SCRIPT.md](docs/submission/DEMO_SCRIPT.md).
 
-`POST /v1/demo/reset` restores the synthetic data so the demo can run again.
+`POST /v1/synthetic/reset` restores the synthetic data so the demo can run again.
 
 The API serves no pages: FE01 retired the static UI it used to carry, so the
 apps above are the only UI (ADR-0031).

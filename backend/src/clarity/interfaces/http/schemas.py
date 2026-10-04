@@ -239,8 +239,8 @@ class QueueItem(ApiModel):
     plan_id: str | None = None
 
 
-class DemoSubscriber(ApiModel):
-    """Prototype only: the synthetic customers the demo ships with."""
+class SyntheticSubscriber(ApiModel):
+    """A synthetic customer in the simulated HUTCH world."""
 
     name: str
     msisdn: str
@@ -357,7 +357,7 @@ class PolicyRollbackRequest(ApiModel):
 
 
 class MerchantSuspendRequest(ApiModel):
-    """Demo merchant block for VAS ops / compliance. Simulated world only."""
+    """Merchant block for VAS ops and compliance. Simulated HUTCH world only."""
 
     merchant_id: str
     reason: str = Field(min_length=1)

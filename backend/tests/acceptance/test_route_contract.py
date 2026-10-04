@@ -107,9 +107,9 @@ SIGNED_IN = {
     ("POST", "/v1/admin/policy/changes/{change_id}/schedule"),
     ("POST", "/v1/admin/policy/changes/{change_id}/activate"),
     ("POST", "/v1/admin/policy/changes/{change_id}/rollback"),
-    ("GET", "/v1/demo/ops"),
-    ("GET", "/v1/demo/autopsy"),
-    ("GET", "/v1/demo/foresight"),
+    ("GET", "/v1/ops/summary"),
+    ("GET", "/v1/autopsy"),
+    ("GET", "/v1/foresight"),
     ("GET", "/v1/me/home"),
     ("GET", "/v1/me/app"),
     ("GET", "/v1/me/cases"),
@@ -123,9 +123,9 @@ SIGNED_IN = {
 }
 
 SYNTHETIC_ONLY = {
-    ("POST", "/v1/demo/reset"),
-    ("GET", "/v1/demo/inbox"),
-    ("GET", "/v1/demo/subscribers"),
+    ("POST", "/v1/synthetic/reset"),
+    ("GET", "/v1/auth/otp/inbox"),
+    ("GET", "/v1/synthetic/subscribers"),
     ("POST", "/v1/auth/staff/session"),
     ("POST", "/v1/auth/staff/login"),
 }
@@ -158,7 +158,7 @@ def _routes(client: TestClient) -> set[tuple[str, str]]:
 
 def _call(client: TestClient, method: str, path: str) -> int:
     concrete = re.sub(r"\{[^}]+\}", "X", path)
-    if path == "/v1/demo/inbox":
+    if path == "/v1/auth/otp/inbox":
         # The inbox holds a code only after one was requested.
         client.post("/v1/auth/otp/request", json={"msisdn": "+94781234567"})
         concrete += "?msisdn=%2B94781234567"
@@ -191,6 +191,6 @@ def test_synthetic_only_routes_do_not_exist_in_production(route: tuple[str, str]
     assert _call(_app(Profile.PROD), *route) == 404
 
 
-@pytest.mark.parametrize("route", sorted(SYNTHETIC_ONLY - {("POST", "/v1/demo/reset")}))
+@pytest.mark.parametrize("route", sorted(SYNTHETIC_ONLY - {("POST", "/v1/synthetic/reset")}))
 def test_synthetic_only_routes_work_in_the_demo_profile(route: tuple[str, str]):
     assert _call(_app(), *route) != 404

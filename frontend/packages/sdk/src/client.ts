@@ -36,6 +36,8 @@ export type OtpRequestResult = {
 
 export type OtpVerifyResult = {
   token: string;
+  /** Rotated by `POST /v1/auth/refresh`; renews the ten-minute access token. */
+  refresh_token?: string | null;
   expires_at: string;
   principal: Record<string, unknown>;
   rls?: Record<string, unknown>;
@@ -142,7 +144,7 @@ export type ApproveResult = {
   [key: string]: unknown;
 };
 
-export type DemoSubscriber = {
+export type SyntheticSubscriber = {
   name: string;
   msisdn: string;
   masked: string;
@@ -389,8 +391,8 @@ export class ClarityClient {
    * digits", which the login page used to claim. Reading it back is the only
    * way to complete a sign-in in the prototype.
    */
-  demoInbox(msisdn: string): Promise<{ code: string; msisdn?: string; text?: string }> {
-    return this.request(`/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`);
+  otpInbox(msisdn: string): Promise<{ code: string; msisdn?: string; text?: string }> {
+    return this.request(`/v1/auth/otp/inbox?msisdn=${encodeURIComponent(msisdn)}`);
   }
 
   /**
@@ -482,29 +484,29 @@ export class ClarityClient {
     });
   }
 
-  demoSubscribers(): Promise<DemoSubscriber[]> {
-    return this.request("/v1/demo/subscribers");
+  syntheticSubscribers(): Promise<SyntheticSubscriber[]> {
+    return this.request("/v1/synthetic/subscribers");
   }
 
-  demoReset(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/reset", { method: "POST" });
+  syntheticReset(): Promise<Record<string, unknown>> {
+    return this.request("/v1/synthetic/reset", { method: "POST" });
   }
 
-  demoOps(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/ops");
+  opsSummary(): Promise<Record<string, unknown>> {
+    return this.request("/v1/ops/summary");
   }
 
-  demoAutopsy(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/autopsy");
+  autopsy(): Promise<Record<string, unknown>> {
+    return this.request("/v1/autopsy");
   }
 
-  demoForesight(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/foresight");
+  foresight(): Promise<Record<string, unknown>> {
+    return this.request("/v1/foresight");
   }
 
   /** Seed one evaluated case per demo subscriber (Desk "Create demo cases"). */
-  async demoSeed(): Promise<number> {
-    const people = await this.demoSubscribers();
+  async syntheticSeed(): Promise<number> {
+    const people = await this.syntheticSubscribers();
     for (const person of people) {
       const opened = await this.createCase({
         msisdn: person.msisdn,

@@ -109,6 +109,22 @@
       "response": "SessionView",
       "status": "200"
     },
+    "GET /v1/auth/otp/inbox": {
+      "parameters": [
+        "query:msisdn"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/autopsy": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/cases/{case_id}": {
       "parameters": [
         "header:authorization?",
@@ -136,44 +152,6 @@
       "response": "object",
       "status": "200"
     },
-    "GET /v1/demo/autopsy": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/foresight": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/inbox": {
-      "parameters": [
-        "query:msisdn"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/ops": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/subscribers": {
-      "parameters": [],
-      "request": null,
-      "response": "array[DemoSubscriber]",
-      "status": "200"
-    },
     "GET /v1/desk/queue": {
       "parameters": [
         "header:authorization?"
@@ -188,6 +166,14 @@
       ],
       "request": null,
       "response": "array[object]",
+      "status": "200"
+    },
+    "GET /v1/foresight": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
       "status": "200"
     },
     "GET /v1/knowledge/search": {
@@ -238,6 +224,14 @@
       "response": "array[object]",
       "status": "200"
     },
+    "GET /v1/ops/summary": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/receipts/{receipt_id}": {
       "parameters": [
         "header:authorization?",
@@ -264,6 +258,12 @@
       ],
       "request": null,
       "response": null,
+      "status": "200"
+    },
+    "GET /v1/synthetic/subscribers": {
+      "parameters": [],
+      "request": null,
+      "response": "array[SyntheticSubscriber]",
       "status": "200"
     },
     "POST /v1/admin/merchants/suspend": {
@@ -527,12 +527,6 @@
       "response": "object",
       "status": "200"
     },
-    "POST /v1/demo/reset": {
-      "parameters": [],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "POST /v1/me/family": {
       "parameters": [
         "header:authorization?"
@@ -589,6 +583,12 @@
       ],
       "request": null,
       "response": "VerificationView",
+      "status": "200"
+    },
+    "POST /v1/synthetic/reset": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
       "status": "200"
     }
   },
@@ -743,24 +743,6 @@
         "policy_version",
         "requires_approval",
         "requires_confirmation"
-      ]
-    },
-    "DemoSubscriber": {
-      "fields": [
-        "balance_lkr",
-        "language",
-        "masked",
-        "msisdn",
-        "name",
-        "scenario"
-      ],
-      "required": [
-        "balance_lkr",
-        "language",
-        "masked",
-        "msisdn",
-        "name",
-        "scenario"
       ]
     },
     "EventSource": {
@@ -1044,6 +1026,24 @@
         "enabled",
         "key",
         "reason"
+      ]
+    },
+    "SyntheticSubscriber": {
+      "fields": [
+        "balance_lkr",
+        "language",
+        "masked",
+        "msisdn",
+        "name",
+        "scenario"
+      ],
+      "required": [
+        "balance_lkr",
+        "language",
+        "masked",
+        "msisdn",
+        "name",
+        "scenario"
       ]
     },
     "TimelineEventView": {

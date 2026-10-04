@@ -67,7 +67,6 @@ from clarity.interfaces.http.schemas import (
     CauseView,
     ConfirmRequest,
     DecisionView,
-    DemoSubscriber,
     ExecutionView,
     FamilyRequest,
     MerchantSuspendRequest,
@@ -92,6 +91,7 @@ from clarity.interfaces.http.schemas import (
     StaffLogin,
     StaffSignIn,
     SwitchFlipRequest,
+    SyntheticSubscriber,
     TimelineEventView,
     TimelineView,
     VerificationView,
@@ -532,7 +532,7 @@ def _decision_view(record: CaseRecord, clarity: Clarity | None = None) -> Decisi
 def demo_only(clarity: ClarityDep) -> None:
     """Refuse a prototype-only route outside synthetic profiles.
 
-    `/v1/demo/inbox` hands out OTP codes, so it must not exist where subscribers
+    `/v1/auth/otp/inbox` hands out OTP codes, so it must not exist where subscribers
     are real. DEMO and FULL both run synthetic Hutch data; only PROD is gated.
     """
     if clarity.profile is Profile.PROD:
@@ -1079,7 +1079,7 @@ def _register_routes(app: FastAPI) -> None:
             )
         )
 
-    @app.post("/v1/demo/reset", tags=["demo"], dependencies=[Depends(demo_only)])
+    @app.post("/v1/synthetic/reset", tags=["synthetic"], dependencies=[Depends(demo_only)])
     def demo_reset() -> dict[str, Any]:
         """Rebuild the synthetic world so the demo can be run again cleanly.
 
@@ -1137,10 +1137,10 @@ def _register_routes(app: FastAPI) -> None:
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
             "simulated": True,
-            "detail": "A simulated SMS was written to the demo inbox.",
+            "detail": "SMS delivery is not connected yet; the code is shown on the sign-in page.",
         }
 
-    @app.get("/v1/demo/inbox", tags=["demo"], dependencies=[Depends(demo_only)])
+    @app.get("/v1/auth/otp/inbox", tags=["synthetic"], dependencies=[Depends(demo_only)])
     def demo_inbox(clarity: ClarityDep, msisdn: str) -> dict[str, Any]:
         """The simulated SMS inbox. Prototype only, and labelled everywhere."""
         inbox = clarity.otp.delivery
@@ -1352,13 +1352,13 @@ def _register_routes(app: FastAPI) -> None:
         return {"keys": [clarity.tokens.public_key_jwk()]}
 
     @app.get(
-        "/v1/demo/subscribers",
-        response_model=list[DemoSubscriber],
-        tags=["demo"],
+        "/v1/synthetic/subscribers",
+        response_model=list[SyntheticSubscriber],
+        tags=["synthetic"],
         dependencies=[Depends(demo_only)],
     )
-    def demo_subscribers(clarity: ClarityDep) -> list[DemoSubscriber]:
-        """Prototype only: the synthetic customers shipped with the demo."""
+    def demo_subscribers(clarity: ClarityDep) -> list[SyntheticSubscriber]:
+        """The synthetic customers in the simulated HUTCH world (synthetic profiles only)."""
         scenarios = {
             "+94781234567": "VAS charged with no consent",
             "+94782223333": "Reload taken twice",
@@ -1366,7 +1366,7 @@ def _register_routes(app: FastAPI) -> None:
             "+94784445555": "Large reload not credited, recent SIM swap",
         }
         return [
-            DemoSubscriber(
+            SyntheticSubscriber(
                 name=scenarios.get(account.msisdn, "synthetic subscriber"),
                 msisdn=account.msisdn,
                 masked=account.masked,
@@ -1390,7 +1390,7 @@ def _register_routes(app: FastAPI) -> None:
 
         account = clarity.world.account_by_msisdn(msisdn)
         if account is None:
-            raise HTTPException(status_code=404, detail="no such subscriber in the demo data")
+            raise HTTPException(status_code=404, detail="no such synthetic subscriber")
 
         # A customer may only open a case about their own number. Staff may
         # open one for any subscriber.
@@ -1892,7 +1892,7 @@ def _register_routes(app: FastAPI) -> None:
         clarity: ClarityDep,
         principal: Annotated[Principal, Depends(requires(Permission.MERCHANT_SUSPEND))],
     ) -> dict[str, Any]:
-        """Block a merchant on a demo subscriber (simulated). Needs step-up."""
+        """Block a merchant for a synthetic subscriber (simulated HUTCH). Needs step-up."""
         msisdn = body.subscriber_msisdn or "0781234567"
         try:
             normalised = normalise_msisdn(msisdn)
@@ -2239,8 +2239,8 @@ def _register_routes(app: FastAPI) -> None:
         return suggest_for_snapshot(snapshot, language=language, limit=min(max(limit, 1), 10))
 
     @app.get(
-        "/v1/demo/ops",
-        tags=["demo"],
+        "/v1/ops/summary",
+        tags=["insights"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
     def demo_ops(clarity: ClarityDep) -> dict[str, Any]:
@@ -2257,7 +2257,7 @@ def _register_routes(app: FastAPI) -> None:
         acts on has to be the figure the ledger holds. The projection keeps
         `Decimal` and serialises as a string.
 
-        Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
+        Still a `tags=["synthetic"]` route behind `DESK_QUEUE_READ`. The console's
         own surface is the gap recorded in the I01 devlog.
         """
         boards = clarity.insights.dashboards()
@@ -2271,8 +2271,8 @@ def _register_routes(app: FastAPI) -> None:
         }
 
     @app.get(
-        "/v1/demo/autopsy",
-        tags=["demo"],
+        "/v1/autopsy",
+        tags=["autopsy"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
     def demo_autopsy(clarity: ClarityDep) -> dict[str, Any]:
@@ -2321,8 +2321,8 @@ def _register_routes(app: FastAPI) -> None:
         }
 
     @app.get(
-        "/v1/demo/foresight",
-        tags=["demo"],
+        "/v1/foresight",
+        tags=["foresight"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
     def demo_foresight() -> dict[str, Any]:

@@ -15,7 +15,7 @@ export {
   type TimelineSource,
   type ProposalPayload,
   type ApproveResult,
-  type DemoSubscriber,
+  type SyntheticSubscriber,
   type SwitchStateView,
   type StaffSessionRequest,
   type StaffLoginRequest,

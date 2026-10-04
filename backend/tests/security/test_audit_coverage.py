@@ -52,7 +52,7 @@ def staff(api: TestClient, user: str, roles: list[str], *, step_up: bool = False
 def customer(api: TestClient, msisdn: str) -> dict[str, str]:
     started = api.post("/v1/auth/otp/request", json={"msisdn": msisdn})
     assert started.status_code == 200, started.text
-    code = api.get("/v1/demo/inbox", params={"msisdn": msisdn}).json()["code"]
+    code = api.get("/v1/auth/otp/inbox", params={"msisdn": msisdn}).json()["code"]
     verified = api.post(
         "/v1/auth/otp/verify",
         json={"challenge_id": started.json()["challenge_id"], "code": code},
@@ -193,7 +193,7 @@ def test_a_customer_sign_in_is_recorded_without_the_number(api: TestClient, clar
 
 def test_a_wrong_code_is_recorded_and_the_code_is_not(api: TestClient, clarity: Clarity):
     started = api.post("/v1/auth/otp/request", json={"msisdn": DILANI}).json()
-    real = api.get("/v1/demo/inbox", params={"msisdn": DILANI}).json()["code"]
+    real = api.get("/v1/auth/otp/inbox", params={"msisdn": DILANI}).json()["code"]
     wrong = "000000" if real != "000000" else "111111"
 
     refused = api.post(

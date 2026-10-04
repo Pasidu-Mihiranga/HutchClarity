@@ -4,6 +4,26 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (`/v1` contract and SDK)
+
+- Routes renamed; nothing else about them changed:
+  `/v1/demo/autopsy` is `/v1/autopsy`, `/v1/demo/foresight` is `/v1/foresight`,
+  `/v1/demo/ops` is `/v1/ops/summary`, `/v1/demo/inbox` is `/v1/auth/otp/inbox`,
+  `/v1/demo/subscribers` and `/v1/demo/reset` are `/v1/synthetic/subscribers`
+  and `/v1/synthetic/reset`. The inbox, subscribers and reset routes remain
+  synthetic-profile only and answer 404 in `prod` (I9).
+- SDK: `autopsy()`, `foresight()`, `opsSummary()`, `otpInbox()`,
+  `syntheticSubscribers()`, `syntheticReset()`, `syntheticSeed()` and the type
+  `SyntheticSubscriber` replace their `demo*` names. `OtpVerifyResult` carries
+  `refresh_token`.
+
+### Fixed (customer web)
+
+- Home, cases, case detail and account show the signed-in customer's own data.
+  They used to render a hard-coded customer, two invented cases, an invented
+  case on error and a fixed masked number. Reload now credits the balance.
+- Sessions renew with the refresh token instead of ending after ten minutes.
+
 ### Added
 
 - `POST /v1/auth/staff/login` checks a staff directory and assigns that account's role. When `CLARITY_STAFF_DIRECTORY` or `CLARITY_STAFF_DIRECTORY_FILE` is set, `POST /v1/auth/staff/session` returns 404. Both routes stay 404 in `prod`. OpenAPI snapshot and SDK regenerated on purpose.

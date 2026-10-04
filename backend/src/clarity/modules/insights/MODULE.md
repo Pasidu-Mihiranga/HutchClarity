@@ -32,7 +32,7 @@ the module and asserts it.
 
 `clarity.app.container`, which constructs the service and registers it as the
 `insights` consumer group; and `clarity.interfaces.http` for
-`GET /v1/demo/ops`.
+`GET /v1/ops/summary`.
 
 ## 4. Depends on
 
@@ -83,7 +83,7 @@ stays the authority and `rebuild_from` is how the cache is made to agree again.
 
 R6. The projections, the consumer and the persistence are in place.
 
-**Not yet:** the console does not render any of it, so `GET /v1/demo/ops` is
+**Not yet:** the console does not render any of it, so `GET /v1/ops/summary` is
 the only surface and it is a demo route. The projection also has no offset of
 its own: the `seen` set grows with the log, which is the honest trade for a
 prototype, and B04's `processed_event` record is where a per-consumer offset
@@ -114,4 +114,4 @@ something else depended on, which is the opposite of what it is for.
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Scaffold: `public.py` and `MODULE.md` stubs to satisfy the architecture tests |
-| 2026-10-04 | `docs/devlog/2026/2026-10-04-I01-insights-projections.md` | Event-fed read models, replay determinism, and `/v1/demo/ops` off live objects |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-I01-insights-projections.md` | Event-fed read models, replay determinism, and `/v1/ops/summary` off live objects |

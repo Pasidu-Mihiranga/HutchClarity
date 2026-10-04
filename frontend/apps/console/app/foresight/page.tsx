@@ -13,7 +13,7 @@ export default function ForesightPage() {
   const allowed = hasPermission("desk:queue:read");
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (allowed) void client.demoForesight().then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : "Foresight failed")); }, [allowed, client, generation]);
+  useEffect(() => { if (allowed) void client.foresight().then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : "Foresight failed")); }, [allowed, client, generation]);
   if (!session || !allowed) return <AccessDenied need="desk:queue:read" />;
   const predictions = (data?.predictions || []) as Prediction[];
   const comparison = (data?.baseline_vs_swarm || []) as Comparison[];

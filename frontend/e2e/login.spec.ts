@@ -22,7 +22,7 @@ test.describe("sign in", () => {
     // The panel used to say "Any 6-digit code works in demo mode", which was
     // false: the backend generates a code per challenge and answers 401 to
     // anything else, so nobody following that instruction could sign in.
-    const shown = page.getByTestId("demo-otp-code");
+    const shown = page.getByTestId("otp-code");
     await expect(shown).toBeVisible();
     const code = (await shown.innerText()).trim();
     expect(code).toMatch(/^\d{6}$/);

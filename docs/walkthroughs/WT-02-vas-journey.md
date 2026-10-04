@@ -71,5 +71,5 @@ Demo subscriber (synthetic): MSISDN `0781234567` (Dilani) / VAS silent renewal.
 ## 6. Troubleshooting
 
 - Empty cards: hard-refresh; suggestions fall back to defaults if the API errors.
-- Empty world: `POST /v1/demo/reset` against the API, or **Reset demo data**
+- Empty world: `POST /v1/synthetic/reset` against the API, or **Reset demo data**
   on the console's Desk.

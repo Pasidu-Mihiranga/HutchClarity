@@ -3,7 +3,7 @@ import Link from "next/link";
 type CaseRowProps = {
   id: string;
   cause: string;
-  amount: string;
+  amount?: string | null;
   currency?: string;
   state: "OPEN" | "RESOLVED" | string;
   date?: string;
@@ -64,9 +64,11 @@ export function CaseRow({
         <p style={{ margin: 0, fontWeight: 650, fontSize: 15, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {cause}
         </p>
-        <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-          {currency} {amount}
-        </p>
+        {amount ? (
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+            {currency} {amount}
+          </p>
+        ) : null}
       </div>
       <span style={{ color: "#a1a1aa", fontSize: 20, flexShrink: 0 }} aria-hidden="true">›</span>
     </Link>
