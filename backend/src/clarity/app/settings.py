@@ -115,6 +115,10 @@ class Settings(BaseSettings):
         alias="CLARITY_STAFF_DIRECTORY_FILE",
         description="Path to that JSON document. The inline variable wins when both are set.",
     )
+    httpsms_api_key: str | None = Field(default=None, alias="HTTPSMS_API_KEY")
+    httpsms_sender: str | None = Field(default=None, alias="HTTPSMS_SENDER")
+    httpsms_base_url: str = Field(default="https://api.httpsms.com/v1", alias="HTTPSMS_BASE_URL")
+    httpsms_timeout_seconds: float = Field(default=10.0, alias="HTTPSMS_TIMEOUT", gt=0)
     opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
     # The clarity-mcp deployable (A04, ADR-0018).
     mcp_resource_url: str = Field(
@@ -266,6 +270,15 @@ class Settings(BaseSettings):
             raise SettingsInvalid(
                 "CLARITY_SIGNER_URL is set but CLARITY_SIGNER_TOKEN is empty; "
                 "OpenBao requires a scoped Transit token"
+            )
+        if bool(self.httpsms_api_key) != bool(self.httpsms_sender):
+            raise SettingsInvalid(
+                "HTTPSMS_API_KEY and HTTPSMS_SENDER must either both be set or both be unset"
+            )
+        if self.httpsms_api_key and self.httpsms_api_key.startswith("pk_"):
+            raise SettingsInvalid(
+                "HTTPSMS_API_KEY is a phone-scoped pk_ key; customer OTP sending "
+                "requires the primary user API key from httpSMS Settings"
             )
         return self
 
