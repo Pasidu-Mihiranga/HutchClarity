@@ -25,7 +25,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -97,6 +97,12 @@ from clarity.interfaces.http.schemas import (
     TimelineView,
     VerificationView,
 )
+from clarity.interfaces.http.throttle import (
+    ANONYMOUS_FALLBACK,
+    ANONYMOUS_KEY,
+    FALLBACK_LIMIT,
+    rate_limit,
+)
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
 from clarity.kernel.ids import new_id
@@ -149,6 +155,7 @@ _STATUS_FOR_CODE = {
 _DURATION_ADAPTER: TypeAdapter[timedelta] = TypeAdapter(timedelta)
 
 _log = logging.getLogger("clarity.audit.grants")
+_throttle_log = logging.getLogger("clarity.http.throttle")
 _stream_log = logging.getLogger("clarity.conversation.stream")
 
 _app_state: dict[str, Clarity] = {}
@@ -347,6 +354,18 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
     # Authentication and authorization are profile-selected drivers. Lite uses
     # local JWT/Python drivers; full may use Keycloak and OPA.
     core = clarity or get_clarity()
+
+    # Rate limiting (A8). Inside the security headers and the trace, so a 429
+    # is still a recorded, header-complete response, and outside the route so
+    # the pipeline is never entered for a refused call.
+    def _limit_for(policy_key: str, at: datetime) -> int:
+        try:
+            return int(core.policies.resolve(policy_key, as_of=at))
+        except Exception:
+            _throttle_log.warning("rate limit %s unresolved; using the default", policy_key)
+            return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
+
+    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
