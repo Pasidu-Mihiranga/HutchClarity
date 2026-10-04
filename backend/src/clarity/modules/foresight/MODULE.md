@@ -47,7 +47,22 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `PersonaSimulator.run(scenario, *, seed) -> tuple[Prediction, ...]` | `propensities(scenario, *, seed) -> PersonaRun` | Drivers return propensities so they are comparable and so banding stays in the module (ADR-0043) |
 
 ## 3. Used by
-`clarity.app.container` (builds the catalogue, engine, backtest and service), `clarity.app.collections` (the seven collection names) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+`clarity.app.container` (builds the catalogue, engine, backtest, service and rehearsal), `clarity.app.collections` (the seven collection names) and `clarity.interfaces.http` (the `/v1/foresight` routes and `GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+
+### `/v1` surface (C4, F06)
+| Route | Permission |
+|---|---|
+| `POST /v1/foresight/scenarios` | `foresight:scenario:draft` |
+| `POST /v1/foresight/scenarios/{scenario_id}/versions` | `foresight:scenario:draft` |
+| `GET /v1/foresight/scenarios`, `GET .../{scenario_id}` | `foresight:read` |
+| `POST /v1/foresight/runs` (202 + `Location`, `Idempotency-Key` required) | `foresight:run` |
+| `GET /v1/foresight/runs`, `GET .../{run_id}` | `foresight:read` |
+| `POST /v1/foresight/launches` | `foresight:outcome:record` |
+| `POST /v1/foresight/launches/{launch_id}/outcomes` | `foresight:outcome:record` |
+| `POST /v1/foresight/backtests` | `foresight:run` |
+| `GET /v1/foresight/launches`, `.../backtests`, `.../calibration`, `.../spikes` | `foresight:read` |
+
+`Role.PRODUCT` holds `foresight:read`, `foresight:scenario:draft` and `foresight:run`. It deliberately does **not** hold `foresight:outcome:record`: the person who wants the calibration gate open must not be the one recording the evidence that opens it. `Role.CX_ENGINEER` holds `foresight:read` and `foresight:outcome:record` and cannot draft.
 
 ## 4. Depends on
 | Package | Through |
@@ -86,6 +101,7 @@ Its **parameters** are owned by the policy store, not by this module: `config/po
 - **A repeated run request returns the original run** (I8), including its original outcome. The risk foresight carries is not a double charge, it is a double finding: two runs of one scenario reported twice is how a rehearsal gets counted as two pieces of evidence.
 - **`record_launch` refuses `Provenance.REAL`** until C6 wires the capability and the required external `evidence_ref`, and it refuses rather than downgrading to `SYNTHETIC`: a caller whose evidence silently did not count would find out at the gate.
 - **A report rests on the latest stored calibration**, attached by the service rather than passed in by a caller. A report that chose its own backtest could be made to look decision-ready by handing it a friendlier one.
+- **Drafting and recording are different duties** (C4). No role holds both `foresight:scenario:draft` and `foresight:outcome:record`, which is the same maker-checker split the money path uses, applied to evidence.
 - **A propensity never sets a reported band** (ADR-0043, C3). The port returns a share of one segment in [0, 1]; banding happens once in the module against the policy thresholds; `PersonaRehearsal` constructs its own baseline and takes no headline argument, so no caller can put a model in charge of a band.
 - **An absent comparison is not a zero one.** A driver that could not answer reports `answered=False` and the column is `None`, because a column of zeros reads as the finding that no segment will complain.
 - **Agreement between methods proves nothing** and every rehearsal says so: both rest on the same segment catalogue and neither has been calibrated against a real launch.
@@ -104,6 +120,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 - `tests/unit/test_autopsy_foresight.py`
 - `tests/unit/test_foresight_personas.py` (C3: the parity suite over all three drivers, the round-based driver's determinism and policy inputs, the LLM driver's parsing and refusals, and the I1 boundary)
 - `tests/unit/test_foresight_catalogue.py` (C1: policy-driven parameters, `as_of` resolution, parse refusals, borrowing, the frozen scenario)
+- `tests/acceptance/test_foresight_api.py` (C4: the `/v1/foresight` contract, deny-by-default on every route, the duty split, 202 and idempotency)
 - `tests/unit/test_foresight_persistence.py` (C2: ownership, append-only, versions, idempotent runs, the run lifecycle, evidence, backtest assembly)
 - `tests/integration/test_append_only_grants.py` and `tests/integration/test_postgres_isolation.py` cover the seven tables generically, against a real PostgreSQL
 
@@ -116,3 +133,4 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C1-foresight-policy-and-typed-scenario.md` | Moved every tunable to `config/policy/foresight.yaml` and the wording to `platform/content/foresight.py`; froze `Scenario` with a real id and a required typed `effective_date`; injected the clock (C1/F03) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C2-foresight-persistence.md` | Seven collections in the `clarity_foresight` schema, six append-only; scenario versions, idempotent runs with a lifecycle, launches, outcomes, calibrations and spikes (C2/F05) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C3-persona-simulator-port.md` | Replaced the hash-based swarm with a `PersonaSimulator` port returning propensities, three drivers, and the structural I1 boundary (C3/F04, F11; ADR-0043) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C4-foresight-api.md` | `/v1/foresight`: scenarios, versions, runs (202 + poll URL + required `Idempotency-Key`), launches, outcomes, backtests, calibration and spikes; four permissions and a new `Role.PRODUCT` (C4/F06) |

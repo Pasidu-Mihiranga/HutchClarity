@@ -563,6 +563,29 @@
         "title": "FamilyRequest",
         "type": "object"
       },
+      "ForesightRunRequest": {
+        "additionalProperties": false,
+        "description": "Ask for a rehearsal of one scenario version.",
+        "properties": {
+          "scenario_version_id": {
+            "minLength": 1,
+            "title": "Scenario Version Id",
+            "type": "string"
+          },
+          "seed": {
+            "default": 42,
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scenario_version_id"
+        ],
+        "title": "ForesightRunRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -585,6 +608,46 @@
         ],
         "title": "Language",
         "type": "string"
+      },
+      "LaunchRecordRequest": {
+        "additionalProperties": false,
+        "description": "Record that a rehearsed change shipped.",
+        "properties": {
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "synthetic",
+            "description": "synthetic or real. Recording a real launch is refused until the capability and evidence checks land (C6).",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "scenario_version_id": {
+            "minLength": 1,
+            "title": "Scenario Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario_version_id"
+        ],
+        "title": "LaunchRecordRequest",
+        "type": "object"
       },
       "MerchantSuspendRequest": {
         "additionalProperties": false,
@@ -706,6 +769,36 @@
         ],
         "title": "Outcome",
         "type": "string"
+      },
+      "OutcomeRecordRequest": {
+        "additionalProperties": false,
+        "description": "One observed theme-segment band for a launch.",
+        "properties": {
+          "band": {
+            "description": "low, medium or high.",
+            "title": "Band",
+            "type": "string"
+          },
+          "segment": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Segment",
+            "type": "string"
+          },
+          "theme": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme",
+          "segment",
+          "band"
+        ],
+        "title": "OutcomeRecordRequest",
+        "type": "object"
       },
       "PlanView": {
         "additionalProperties": false,
@@ -1074,6 +1167,152 @@
           "value"
         ],
         "title": "SafeguardRequest",
+        "type": "object"
+      },
+      "ScenarioDraftRequest": {
+        "additionalProperties": false,
+        "description": "A change to rehearse.\n\n``effective_date`` is required because the whole run resolves policy as of\nit: a rehearsal is about a change that lands on a day, so the parameters it\nuses are the ones in force on that day (C1).",
+        "properties": {
+          "affected_products": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Affected Products",
+            "type": "array"
+          },
+          "affected_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1.0",
+            "title": "Affected Share"
+          },
+          "business_context": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Business Context",
+            "type": "string"
+          },
+          "change_type": {
+            "description": "One of the ChangeType values, e.g. pack_retired.",
+            "title": "Change Type",
+            "type": "string"
+          },
+          "effective_date": {
+            "format": "date",
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 10.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1.0",
+            "title": "Severity"
+          }
+        },
+        "required": [
+          "name",
+          "change_type",
+          "effective_date"
+        ],
+        "title": "ScenarioDraftRequest",
+        "type": "object"
+      },
+      "ScenarioReviseRequest": {
+        "additionalProperties": false,
+        "description": "The next version of an existing scenario family.\n\nThe whole scenario, not a patch: a version is a complete statement of what\nis being rehearsed, and a partial update would leave a reader of version 2\nreconstructing it from version 1.",
+        "properties": {
+          "affected_products": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Affected Products",
+            "type": "array"
+          },
+          "affected_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1.0",
+            "title": "Affected Share"
+          },
+          "business_context": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Business Context",
+            "type": "string"
+          },
+          "change_type": {
+            "description": "One of the ChangeType values, e.g. pack_retired.",
+            "title": "Change Type",
+            "type": "string"
+          },
+          "effective_date": {
+            "format": "date",
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 10.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1.0",
+            "title": "Severity"
+          }
+        },
+        "required": [
+          "name",
+          "change_type",
+          "effective_date"
+        ],
+        "title": "ScenarioReviseRequest",
         "type": "object"
       },
       "SessionView": {
@@ -5173,6 +5412,819 @@
         "summary": "Reconciliation Queue",
         "tags": [
           "finance"
+        ]
+      }
+    },
+    "/v1/foresight/backtests": {
+      "get": {
+        "operationId": "list_backtests_v1_foresight_backtests_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Backtests V1 Foresight Backtests Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Backtests",
+        "tags": [
+          "foresight"
+        ]
+      },
+      "post": {
+        "description": "Replay every stored launch through the baseline and keep the result.",
+        "operationId": "run_backtest_v1_foresight_backtests_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Backtest V1 Foresight Backtests Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Backtest",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/calibration": {
+      "get": {
+        "description": "The calibration a report would rest on today.\n\n404 when no backtest has run, rather than a cheerful \"not calibrated\":\nthe two are different, and only one of them has been measured.",
+        "operationId": "read_calibration_v1_foresight_calibration_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Calibration V1 Foresight Calibration Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Calibration",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/launches": {
+      "get": {
+        "operationId": "list_launches_v1_foresight_launches_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Launches V1 Foresight Launches Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Launches",
+        "tags": [
+          "foresight"
+        ]
+      },
+      "post": {
+        "description": "Record that a rehearsed change shipped.\n\nA real launch is refused with 403 until C6 lands the capability and the\nevidence check. The refusal is deliberate: an ungated way to write the\nevidence is worth more to somebody wanting a green gate than the gate is\nworth to anybody else.",
+        "operationId": "record_launch_v1_foresight_launches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Launch V1 Foresight Launches Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Launch",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/launches/{launch_id}/outcomes": {
+      "post": {
+        "description": "Record one observed theme-segment band. Append-only.",
+        "operationId": "record_outcome_v1_foresight_launches__launch_id__outcomes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "launch_id",
+            "required": true,
+            "schema": {
+              "title": "Launch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutcomeRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Outcome V1 Foresight Launches  Launch Id  Outcomes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Outcome",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/runs": {
+      "get": {
+        "operationId": "list_foresight_runs_v1_foresight_runs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Foresight Runs V1 Foresight Runs Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Foresight Runs",
+        "tags": [
+          "foresight"
+        ]
+      },
+      "post": {
+        "description": "Ask for a rehearsal. Answers 202 with a poll URL.\n\n`Idempotency-Key` is required, not optional (I8). Foresight moves no\nmoney, so the risk is not a double charge; it is a double finding. Two\nruns of one scenario, reported twice, is how a rehearsal gets counted as\ntwo pieces of evidence.",
+        "operationId": "request_foresight_run_v1_foresight_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForesightRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Request Foresight Run V1 Foresight Runs Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Foresight Run",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/runs/{run_id}": {
+      "get": {
+        "description": "The run, and its report once it succeeded. The poll URL.",
+        "operationId": "read_foresight_run_v1_foresight_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Foresight Run V1 Foresight Runs  Run Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Foresight Run",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/scenarios": {
+      "get": {
+        "description": "The latest version of every scenario family, newest first.",
+        "operationId": "list_scenarios_v1_foresight_scenarios_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Scenarios V1 Foresight Scenarios Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Scenarios",
+        "tags": [
+          "foresight"
+        ]
+      },
+      "post": {
+        "description": "Draft a scenario. Drafting predicts nothing on its own.",
+        "operationId": "draft_scenario_v1_foresight_scenarios_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Draft Scenario V1 Foresight Scenarios Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft Scenario",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/scenarios/{scenario_id}": {
+      "get": {
+        "description": "Every version of one family, oldest first.",
+        "operationId": "read_scenario_v1_foresight_scenarios__scenario_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Scenario V1 Foresight Scenarios  Scenario Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Scenario",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/scenarios/{scenario_id}/versions": {
+      "post": {
+        "description": "Add a version. The previous one stays readable, so a stored run\nstill cites what it actually rehearsed.",
+        "operationId": "revise_scenario_v1_foresight_scenarios__scenario_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioReviseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revise Scenario V1 Foresight Scenarios  Scenario Id  Versions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revise Scenario",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/spikes": {
+      "get": {
+        "description": "Early-warning spikes. C5 supplies the detector that fills this.",
+        "operationId": "list_spikes_v1_foresight_spikes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Spikes V1 Foresight Spikes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Spikes",
+        "tags": [
+          "foresight"
         ]
       }
     },

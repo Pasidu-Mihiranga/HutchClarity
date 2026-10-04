@@ -6,6 +6,13 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **`/v1/foresight`: a real API for rehearsing a change** (C4/F06). Draft and version a scenario, ask for a run, record what a launch actually produced, run a backtest, read the latest calibration and the early-warning spikes. Fourteen routes, all staff-only.
+  - `POST /v1/foresight/runs` answers **202 with a `Location` poll URL** and **requires an `Idempotency-Key`**. A repeat returns the original run and its original outcome, marked `replayed`. Foresight moves no money, so the risk is not a double charge; it is a double finding.
+  - Four new permissions and a new **`Role.PRODUCT`**. Product may draft and run; it may **not** record what a launch produced, because the person who wants the calibration gate open must not be the one writing the evidence that opens it. CX records outcomes and cannot draft.
+  - `Role.PRODUCT` also closes a pre-existing gap: `config/policy/proactive.yaml` already wrote `owner_role: product` with no matching `Role` member, so the key was owned by a role that did not exist.
+  - The resource is `/v1/foresight`, not `/v1/simulation`. Plan 10 §250 said the latter and everything else said foresight; the plan is corrected (plan v1.13) and a test asserts no `/v1/simulation` path exists.
+  - OpenAPI snapshot, `contracts/openapi.json` and the SDK types regenerated on purpose.
+
 - **Foresight stores what it rehearsed and what actually happened** (C2/F05). Seven collections in a `clarity_foresight` schema with its own role: scenario versions, runs, reports, launches, recorded outcomes, calibrations and detected spikes. A run was built, returned and discarded before this, so nothing could be cited later and the calibration gate had nowhere to keep the evidence it opens on.
   - **Six of the seven are append-only**, backed by database grants (`INSERT` and `SELECT`, nothing else) rather than by the code remembering. `foresight.runs` is the exception, because a run has a lifecycle a caller polls. The launches and outcomes matter most: they are the evidence the plan 02 section 3.4 gate opens on, so they are the rows somebody would have to rewrite to make an uncalibrated engine look calibrated.
   - **Nothing is customer-scoped**, by construction. Foresight reads segment statistics and never an individual record (deck S8), so there is no subscriber to bind a row to.

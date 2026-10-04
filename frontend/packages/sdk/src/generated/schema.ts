@@ -1369,6 +1369,227 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/foresight/backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backtests */
+        get: operations["list_backtests_v1_foresight_backtests_get"];
+        put?: never;
+        /**
+         * Run Backtest
+         * @description Replay every stored launch through the baseline and keep the result.
+         */
+        post: operations["run_backtest_v1_foresight_backtests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Calibration
+         * @description The calibration a report would rest on today.
+         *
+         *     404 when no backtest has run, rather than a cheerful "not calibrated":
+         *     the two are different, and only one of them has been measured.
+         */
+        get: operations["read_calibration_v1_foresight_calibration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/launches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Launches */
+        get: operations["list_launches_v1_foresight_launches_get"];
+        put?: never;
+        /**
+         * Record Launch
+         * @description Record that a rehearsed change shipped.
+         *
+         *     A real launch is refused with 403 until C6 lands the capability and the
+         *     evidence check. The refusal is deliberate: an ungated way to write the
+         *     evidence is worth more to somebody wanting a green gate than the gate is
+         *     worth to anybody else.
+         */
+        post: operations["record_launch_v1_foresight_launches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/launches/{launch_id}/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Outcome
+         * @description Record one observed theme-segment band. Append-only.
+         */
+        post: operations["record_outcome_v1_foresight_launches__launch_id__outcomes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Foresight Runs */
+        get: operations["list_foresight_runs_v1_foresight_runs_get"];
+        put?: never;
+        /**
+         * Request Foresight Run
+         * @description Ask for a rehearsal. Answers 202 with a poll URL.
+         *
+         *     `Idempotency-Key` is required, not optional (I8). Foresight moves no
+         *     money, so the risk is not a double charge; it is a double finding. Two
+         *     runs of one scenario, reported twice, is how a rehearsal gets counted as
+         *     two pieces of evidence.
+         */
+        post: operations["request_foresight_run_v1_foresight_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Foresight Run
+         * @description The run, and its report once it succeeded. The poll URL.
+         */
+        get: operations["read_foresight_run_v1_foresight_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Scenarios
+         * @description The latest version of every scenario family, newest first.
+         */
+        get: operations["list_scenarios_v1_foresight_scenarios_get"];
+        put?: never;
+        /**
+         * Draft Scenario
+         * @description Draft a scenario. Drafting predicts nothing on its own.
+         */
+        post: operations["draft_scenario_v1_foresight_scenarios_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/scenarios/{scenario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Scenario
+         * @description Every version of one family, oldest first.
+         */
+        get: operations["read_scenario_v1_foresight_scenarios__scenario_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/scenarios/{scenario_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revise Scenario
+         * @description Add a version. The previous one stays readable, so a stored run
+         *     still cites what it actually rehearsed.
+         */
+        post: operations["revise_scenario_v1_foresight_scenarios__scenario_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/spikes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Spikes
+         * @description Early-warning spikes. C5 supplies the detector that fills this.
+         */
+        get: operations["list_spikes_v1_foresight_spikes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/knowledge/search": {
         parameters: {
             query?: never;
@@ -1937,6 +2158,19 @@ export interface components {
             /** Msisdn */
             msisdn: string;
         };
+        /**
+         * ForesightRunRequest
+         * @description Ask for a rehearsal of one scenario version.
+         */
+        ForesightRunRequest: {
+            /** Scenario Version Id */
+            scenario_version_id: string;
+            /**
+             * Seed
+             * @default 42
+             */
+            seed: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1948,6 +2182,27 @@ export interface components {
          * @enum {string}
          */
         Language: "si" | "ta" | "en";
+        /**
+         * LaunchRecordRequest
+         * @description Record that a rehearsed change shipped.
+         */
+        LaunchRecordRequest: {
+            /** Evidence Ref */
+            evidence_ref?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Provenance
+             * @description synthetic or real. Recording a real launch is refused until the capability and evidence checks land (C6).
+             * @default synthetic
+             */
+            provenance: string;
+            /** Scenario Version Id */
+            scenario_version_id: string;
+        };
         /**
          * MerchantSuspendRequest
          * @description Demo merchant block for VAS ops / compliance. Simulated world only.
@@ -2002,6 +2257,21 @@ export interface components {
          * @enum {string}
          */
         Outcome: "AUTO_FIX" | "ONE_TAP_FIX" | "STAFF_APPROVAL" | "EXPLAIN_ONLY" | "HANDOFF";
+        /**
+         * OutcomeRecordRequest
+         * @description One observed theme-segment band for a launch.
+         */
+        OutcomeRecordRequest: {
+            /**
+             * Band
+             * @description low, medium or high.
+             */
+            band: string;
+            /** Segment */
+            segment: string;
+            /** Theme */
+            theme: string;
+        };
         /** PlanView */
         PlanView: {
             /** Actions */
@@ -2138,6 +2408,84 @@ export interface components {
             kind: string;
             /** Value */
             value: string;
+        };
+        /**
+         * ScenarioDraftRequest
+         * @description A change to rehearse.
+         *
+         *     ``effective_date`` is required because the whole run resolves policy as of
+         *     it: a rehearsal is about a change that lands on a day, so the parameters it
+         *     uses are the ones in force on that day (C1).
+         */
+        ScenarioDraftRequest: {
+            /** Affected Products */
+            affected_products?: string[];
+            /**
+             * Affected Share
+             * @default 1.0
+             */
+            affected_share: number | string;
+            /**
+             * Business Context
+             * @default
+             */
+            business_context: string;
+            /**
+             * Change Type
+             * @description One of the ChangeType values, e.g. pack_retired.
+             */
+            change_type: string;
+            /**
+             * Effective Date
+             * Format: date
+             */
+            effective_date: string;
+            /** Name */
+            name: string;
+            /**
+             * Severity
+             * @default 1.0
+             */
+            severity: number | string;
+        };
+        /**
+         * ScenarioReviseRequest
+         * @description The next version of an existing scenario family.
+         *
+         *     The whole scenario, not a patch: a version is a complete statement of what
+         *     is being rehearsed, and a partial update would leave a reader of version 2
+         *     reconstructing it from version 1.
+         */
+        ScenarioReviseRequest: {
+            /** Affected Products */
+            affected_products?: string[];
+            /**
+             * Affected Share
+             * @default 1.0
+             */
+            affected_share: number | string;
+            /**
+             * Business Context
+             * @default
+             */
+            business_context: string;
+            /**
+             * Change Type
+             * @description One of the ChangeType values, e.g. pack_retired.
+             */
+            change_type: string;
+            /**
+             * Effective Date
+             * Format: date
+             */
+            effective_date: string;
+            /** Name */
+            name: string;
+            /**
+             * Severity
+             * @default 1.0
+             */
+            severity: number | string;
         };
         /** SessionView */
         SessionView: {
@@ -4507,6 +4855,497 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backtests_v1_foresight_backtests_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_backtest_v1_foresight_backtests_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_calibration_v1_foresight_calibration_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_launches_v1_foresight_launches_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_launch_v1_foresight_launches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LaunchRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_outcome_v1_foresight_launches__launch_id__outcomes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                launch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutcomeRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_foresight_runs_v1_foresight_runs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_foresight_run_v1_foresight_runs_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForesightRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_foresight_run_v1_foresight_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scenarios_v1_foresight_scenarios_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_scenario_v1_foresight_scenarios_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_scenario_v1_foresight_scenarios__scenario_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                scenario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_scenario_v1_foresight_scenarios__scenario_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                scenario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioReviseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_spikes_v1_foresight_spikes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
