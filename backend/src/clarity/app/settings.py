@@ -119,6 +119,15 @@ class Settings(BaseSettings):
     httpsms_sender: str | None = Field(default=None, alias="HTTPSMS_SENDER")
     httpsms_base_url: str = Field(default="https://api.httpsms.com/v1", alias="HTTPSMS_BASE_URL")
     httpsms_timeout_seconds: float = Field(default=10.0, alias="HTTPSMS_TIMEOUT", gt=0)
+    linked_phones: str | None = Field(
+        default=None,
+        alias="CLARITY_LINKED_PHONES",
+        description=(
+            "Real phones that sign in as a synthetic customer, as "
+            "'real=synthetic' pairs separated by commas. Only these numbers "
+            "receive a real SMS; set on the server, never committed."
+        ),
+    )
     opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
     # The clarity-mcp deployable (A04, ADR-0018).
     mcp_resource_url: str = Field(
@@ -275,12 +284,30 @@ class Settings(BaseSettings):
             raise SettingsInvalid(
                 "HTTPSMS_API_KEY and HTTPSMS_SENDER must either both be set or both be unset"
             )
+        try:
+            self.linked_phone_pairs()
+        except ValueError as error:
+            raise SettingsInvalid(f"CLARITY_LINKED_PHONES: {error}") from error
         if self.httpsms_api_key and self.httpsms_api_key.startswith("pk_"):
             raise SettingsInvalid(
                 "HTTPSMS_API_KEY is a phone-scoped pk_ key; customer OTP sending "
                 "requires the primary user API key from httpSMS Settings"
             )
         return self
+
+    def linked_phone_pairs(self) -> list[tuple[str, str]]:
+        """`CLARITY_LINKED_PHONES` as (real phone, synthetic number) pairs."""
+        from clarity.kernel.common import normalise_msisdn
+
+        pairs: list[tuple[str, str]] = []
+        for item in (self.linked_phones or "").split(","):
+            if not item.strip():
+                continue
+            real, sep, synthetic = item.partition("=")
+            if not sep:
+                raise ValueError("each entry is real=synthetic")
+            pairs.append((normalise_msisdn(real.strip()), normalise_msisdn(synthetic.strip())))
+        return pairs
 
     @property
     def is_full(self) -> bool:

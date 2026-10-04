@@ -37,6 +37,7 @@ from clarity.modules.iam.otp import (
     OTP_REQUESTS,
     OtpRefused,
     OtpService,
+    RoutedOtpDelivery,
     SimulatedInbox,
 )
 from clarity.modules.iam.tokens import (
@@ -71,6 +72,7 @@ __all__ = [
     "OtpRefused",
     "OtpService",
     "PythonAuthorizationPolicy",
+    "RoutedOtpDelivery",
     "SimulatedInbox",
     "StaffDirectory",
     "StaffDirectoryInvalid",

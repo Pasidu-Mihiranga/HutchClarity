@@ -87,6 +87,8 @@ from clarity.modules.iam.public import (
     OpaAuthorizationPolicy,
     OtpService,
     PythonAuthorizationPolicy,
+    RoutedOtpDelivery,
+    SimulatedInbox,
     StaffDirectory,
     StaffDirectoryInvalid,
     TokenIssuer,
@@ -699,7 +701,7 @@ class Clarity:
                 self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
             ),
         )
-        otp_delivery = (
+        sms = (
             HttpSmsDelivery(
                 api_key=self.settings.httpsms_api_key,
                 sender=self.settings.httpsms_sender,
@@ -709,7 +711,25 @@ class Clarity:
             if self.settings.httpsms_api_key and self.settings.httpsms_sender
             else None
         )
-        self.otp = otp or OtpService(otp_delivery, open_unit=self.open_unit)
+        # Real phones the operator tied to a synthetic customer. They are the
+        # only numbers that get a real SMS: the synthetic customers' numbers
+        # belong to strangers, so those codes stay on the sign-in page.
+        linked = self.settings.linked_phone_pairs()
+        for phone, synthetic in linked:
+            customer = self.world.account_by_msisdn(synthetic)
+            if customer is None:
+                raise ValueError(f"CLARITY_LINKED_PHONES names no synthetic customer: {synthetic}")
+            self.world.link_phone(phone, customer.ref)
+        world = self.world
+        self.otp = otp or OtpService(
+            RoutedOtpDelivery(
+                inbox=SimulatedInbox(),
+                sms=sms,
+                sms_numbers=frozenset(phone for phone, _ in linked),
+                known=lambda msisdn: world.account_by_msisdn(msisdn) is not None,
+            ),
+            open_unit=self.open_unit,
+        )
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

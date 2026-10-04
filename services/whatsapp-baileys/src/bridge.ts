@@ -7,6 +7,10 @@ export type IncomingKey = {
   id?: string | null
   remoteJid?: string | null
   fromMe?: boolean | null
+  /** Phone-number JID when `remoteJid` is a privacy `@lid` (Baileys 6.7). */
+  senderPn?: string | null
+  /** The same, under its Baileys 7 name. */
+  remoteJidAlt?: string | null
 }
 
 export type IncomingContent = {
@@ -51,28 +55,59 @@ export type DeliveryUpdate = {
 
 const refusedJids = new Set(["status@broadcast"])
 
-export function normalizeMessage(input: IncomingMessage): NormalizedMessage | null {
+const PHONE_JID = "@s.whatsapp.net"
+
+export type SkipReason =
+  | "from_me"
+  | "no_id"
+  | "not_one_to_one"
+  | "no_phone_number"
+  | "bad_number"
+  | "no_text"
+
+/** The phone-number JID of a one-to-one sender, from either addressing form. */
+function phoneJidOf(key: IncomingKey): string | null {
+  const jid = key.remoteJid ?? ""
+  if (jid.endsWith(PHONE_JID)) return jid
+  // WhatsApp now addresses many one-to-one chats by a privacy id (`@lid`).
+  // Those carry the phone-number JID separately; without it there is no
+  // number to identify the customer by, so the message is not used.
+  if (jid.endsWith("@lid")) {
+    const alt = key.senderPn ?? key.remoteJidAlt ?? ""
+    return alt.endsWith(PHONE_JID) ? alt : null
+  }
+  return null
+}
+
+/** Why a message is not forwarded, or null when it is. Never logs content. */
+export function skipReason(input: IncomingMessage): SkipReason | null {
   const jid = input.key.remoteJid ?? ""
-  const deliveryId = input.key.id ?? ""
+  if (input.key.fromMe) return "from_me"
+  if (!input.key.id) return "no_id"
   if (
-    input.key.fromMe ||
-    !deliveryId ||
-    !jid.endsWith("@s.whatsapp.net") ||
     jid.endsWith("@g.us") ||
     jid.endsWith("@broadcast") ||
     jid.endsWith("@newsletter") ||
-    refusedJids.has(jid)
+    refusedJids.has(jid) ||
+    !(jid.endsWith(PHONE_JID) || jid.endsWith("@lid"))
   ) {
-    return null
+    return "not_one_to_one"
   }
+  const phoneJid = phoneJidOf(input.key)
+  if (!phoneJid) return "no_phone_number"
+  const user = phoneJid.slice(0, -PHONE_JID.length).split(":", 1)[0] ?? ""
+  if (!/^\d{8,15}$/.test(user)) return "bad_number"
+  if (!extractText(unwrap(input.message))) return "no_text"
+  return null
+}
 
-  const user = jid.slice(0, -"@s.whatsapp.net".length).split(":", 1)[0] ?? ""
-  if (!/^\d{8,15}$/.test(user)) return null
-
-  const content = unwrap(input.message)
-  const text = extractText(content)
-  if (!text) return null
-  return { deliveryId, jid, msisdn: `+${user}`, text }
+export function normalizeMessage(input: IncomingMessage): NormalizedMessage | null {
+  if (skipReason(input) !== null) return null
+  const phoneJid = phoneJidOf(input.key) ?? ""
+  const user = phoneJid.slice(0, -PHONE_JID.length).split(":", 1)[0] ?? ""
+  const text = extractText(unwrap(input.message)) ?? ""
+  // Reply to the chat the message came from, in whichever form it used.
+  return { deliveryId: input.key.id ?? "", jid: input.key.remoteJid ?? "", msisdn: `+${user}`, text }
 }
 
 function unwrap(content: IncomingContent | null | undefined): IncomingContent | null {

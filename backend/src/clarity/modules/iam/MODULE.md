@@ -57,6 +57,7 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.iam` with a public surface (R1) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-keycloak-opa-shared-state.md` | Keycloak, OPA, shared OTP and revocable sessions (M-IAM, #7) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-SMS02-WA02-linked-phones-lid.md` | OTP routed per number: SMS only to linked phones; `RoutedOtpDelivery` |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P3-grants-and-audited-reads.md` | Audit duties by grant under separation of duties (Phase 3, ADR-0036) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P3-grant-endings-recorded.md` | Grant expiry and lapse recorded once, at the moment they happen |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-opa-parity-made-real.md` | Authorization parity evaluates the real Rego, not a Python stand-in |

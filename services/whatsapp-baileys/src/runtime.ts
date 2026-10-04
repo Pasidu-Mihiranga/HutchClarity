@@ -9,7 +9,7 @@ import makeWASocket, {
   type WAMessage,
 } from "@whiskeysockets/baileys"
 import pino from "pino"
-import { deliveryState, handleInbound } from "./bridge.js"
+import { deliveryState, handleInbound, skipReason } from "./bridge.js"
 import type { WhatsAppConfig } from "./config.js"
 
 const logger = pino({
@@ -97,7 +97,13 @@ export class WhatsAppRuntime extends EventEmitter {
         this.config.webhookSecret,
         async (jid, text) => this.socket?.sendMessage(jid, { text }),
       )
-      if (outcome !== "ignored") {
+      if (outcome === "ignored") {
+        // The reason only: never the text or the sender.
+        logger.info(
+          { deliveryId: message.key.id, reason: skipReason(message) },
+          "WhatsApp message ignored",
+        )
+      } else {
         logger.info({ deliveryId: message.key.id, outcome }, "WhatsApp message handled")
       }
     } catch (error) {
