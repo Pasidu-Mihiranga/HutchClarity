@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sys
+from difflib import unified_diff
 from pathlib import Path
 
 from clarity.app.container import Clarity
@@ -46,9 +47,16 @@ def check(target: Path = DEFAULT_TARGET) -> int:
     app = create_app(Clarity(world=build_demo_world()))
     current = json.dumps(app.openapi(), indent=2, sort_keys=True) + "\n"
     if committed != current:
+        difference = unified_diff(
+            committed.splitlines(),
+            current.splitlines(),
+            fromfile="committed/openapi.json",
+            tofile="served/openapi.json",
+            lineterm="",
+        )
         print(
             f"{target.name} is stale: the app serves a different schema.\n"
-            "Run `make contracts` and commit the result.",
+            "Run `make contracts` and commit the result.\n" + "\n".join(list(difference)[:200]),
             file=sys.stderr,
         )
         return 1

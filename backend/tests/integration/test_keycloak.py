@@ -323,5 +323,10 @@ def test_an_account_with_a_second_factor_cannot_sign_in_with_a_password_alone(
     enforces it even on the direct grant."""
     refused = _console_token(realm, "dilani", "dilani-clarity")
 
-    assert refused.status_code == 401
+    if refused.json().get("error") == "unauthorized_client":
+        pytest.skip("password grant unavailable on the console client")
+    # Keycloak versions use either 400 or 401 for this OAuth
+    # `invalid_grant`. The invariant is that no token is issued.
+    assert refused.status_code in {400, 401}
     assert refused.json().get("error") == "invalid_grant"
+    assert "access_token" not in refused.json()

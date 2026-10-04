@@ -41,8 +41,10 @@ test.describe("thinking orb", () => {
     const orb = page.locator(".mo-wait");
     await expect(orb).toBeVisible();
     await expect(orb.locator("canvas")).toBeVisible();
-    // The status is announced politely, and starts at the first label.
-    await expect(orb.getByRole("status")).toHaveText("Thinking");
+    // The status is announced politely. Streaming can advance from the local
+    // initial label before Playwright observes it, so either valid first
+    // provider stage proves that the live region is working.
+    await expect(orb.getByRole("status")).toHaveText(/^(Thinking|Checking subscriptions)$/);
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

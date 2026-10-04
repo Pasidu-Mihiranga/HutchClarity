@@ -3,6 +3,10 @@
 Last verified: 2026-10-04, branch `feat/wa01-baileys-whatsapp` (mocked
 transport). Live pairing and the synthetic subscriber journey remain pending.
 
+Live verification on 2026-10-04 found and corrected provider timestamp
+freshness using the frozen domain clock. Repeat the linked-phone journey after
+the correction deploys before marking this walkthrough complete.
+
 ## Preconditions
 
 - Hosted `clarity-channel-gateway` is healthy and has a webhook HMAC secret.

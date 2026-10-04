@@ -3241,6 +3241,90 @@
         ]
       }
     },
+    "/v1/auth/logout": {
+      "post": {
+        "description": "End the session here, and at the provider.\n\nRevoking locally and leaving the provider's cookie alone is not a\nsign-out: the next visit returns instantly with no credentials asked\nfor, which on a shared desk is the whole problem.\n\nIdempotent on purpose. Signing out twice, or signing out with no\nsession, is not an error worth reporting to someone who is leaving.",
+        "operationId": "logout_v1_auth_logout_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "clarity_staff_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Clarity Staff Session"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "clarity_staff_idt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Clarity Staff Idt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Logout V1 Auth Logout Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "description": "Who the current token says you are, and what it lets you do.",
@@ -3461,6 +3545,128 @@
         ]
       }
     },
+    "/v1/auth/staff/oidc/callback": {
+      "get": {
+        "description": "Take the authorization code back and mint a Clarity staff session.",
+        "operationId": "callback_v1_auth_staff_oidc_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Callback",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/staff/oidc/start": {
+      "get": {
+        "description": "Begin a staff sign-in. Public by necessity: nobody is signed in yet.",
+        "operationId": "start_v1_auth_staff_oidc_start_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "return_to",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "title": "Return To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/staff/session": {
       "post": {
         "description": "Development staff sign-in.\n\n**Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra).\nWhen a staff directory is configured this route is gone: the browser\ncannot choose a role.",
@@ -3498,6 +3704,68 @@
           }
         },
         "summary": "Staff Session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/staff/step-up": {
+      "post": {
+        "description": "Ask the provider to re-authenticate this person at a higher level.\n\nReturns the URL rather than redirecting, because the caller is the\nconsole's own fetch and a 303 on an XHR is not a thing a browser\nfollows usefully. The console sends the person there.\n\n`prompt=login` and `max_age=0` are what make this a re-authentication.\nWithout them the provider answers from the session cookie it already\nhas, the token comes back claiming MFA, and the approval rests on the\npassword typed an hour ago.",
+        "operationId": "step_up_v1_auth_staff_step_up_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "return_to",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "title": "Return To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Step Up V1 Auth Staff Step Up Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Step Up",
         "tags": [
           "auth"
         ]

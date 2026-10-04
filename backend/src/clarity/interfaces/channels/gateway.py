@@ -24,6 +24,7 @@ service window may only be a template.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -82,7 +83,12 @@ class InboundMessage(BaseModel):
         return self.thread_id or self.msisdn
 
 
-def create_channel_gateway_app(clarity: Any, *, verifier: WebhookVerifier | None = None) -> FastAPI:
+def create_channel_gateway_app(
+    clarity: Any,
+    *,
+    verifier: WebhookVerifier | None = None,
+    webhook_clock: Callable[[], datetime] = utc_now,
+) -> FastAPI:
     """Build the gateway, bound to an assembled core.
 
     `clarity` is the composition root, typed loosely so this interface does not
@@ -92,7 +98,7 @@ def create_channel_gateway_app(clarity: Any, *, verifier: WebhookVerifier | None
     windows = ServiceWindows(clock=lambda: _now(clarity))
     checks = verifier or WebhookVerifier(
         getattr(clarity.settings, "channel_webhook_secret", None),
-        clock=lambda: _now(clarity),
+        clock=webhook_clock,
     )
 
     app = FastAPI(
