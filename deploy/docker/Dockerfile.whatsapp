@@ -5,7 +5,10 @@ COPY services/whatsapp-baileys/package.json services/whatsapp-baileys/package-lo
 RUN npm ci
 COPY services/whatsapp-baileys/tsconfig.json ./
 COPY services/whatsapp-baileys/src ./src
-RUN npm run build && npm prune --omit=dev
+RUN npm run build \
+ && test -f dist/src/main.js \
+ && test -f dist/src/pair.js \
+ && npm prune --omit=dev
 
 FROM node:20-bookworm-slim AS runtime
 

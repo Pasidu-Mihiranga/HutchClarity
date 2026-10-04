@@ -8,8 +8,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js",
-    "pair": "node dist/pair.js",
+    "start": "node dist/src/main.js",
+    "pair": "node dist/src/pair.js",
     "test": "npm run build && node --test dist/tests/*.test.js"
   },
   "dependencies": {
