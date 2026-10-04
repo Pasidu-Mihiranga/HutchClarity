@@ -21,6 +21,8 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **The issuer key can be rotated** (`TokenIssuer.rotate()`). A retired key keeps verifying for `KEY_OVERLAP_WINDOW`, so rotation is not an outage: without an overlap, changing the key signs out everyone holding a token. Key ids are derived from the key itself rather than the fixed `clarity-iam-dev`, so a token says which key signed it. `/.well-known/clarity-keys.json` publishes the whole ring, and the ring is written to the shared key volume so a rotation performed by one replica is honoured by the others.
+
 - **An SMS driver for one-time codes** (`CLARITY_SMS_URL`, `CLARITY_SMS_TOKEN`). `OtpDelivery` had one implementation, `SimulatedInbox`, so in `prod` a customer's code was generated into an inbox nobody can reach and sign-in could not complete. Both drivers pass `tests/contract/test_otp_delivery_parity.py`, which asserts the code never reaches a log or an exception and that a delivery failure says nothing about whether the number exists. The gateway interface is **REQUIRES HUTCH CONFIRMATION**.
 - Sign-in routes are rate limited by the application (`throttle.auth.per_minute`), not only by nginx. The OTP service bounds challenges per number; this bounds them per caller, which is what stops one script working through a list of numbers, and it exists in `lite` where no reverse proxy does.
 

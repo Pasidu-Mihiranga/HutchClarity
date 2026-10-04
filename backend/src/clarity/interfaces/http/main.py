@@ -1395,7 +1395,10 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/.well-known/jwks.json", tags=["auth"])
     def jwks(clarity: ClarityDep) -> dict[str, Any]:
         """The public key a separate validator would use."""
-        return {"keys": [clarity.tokens.public_key_jwk()]}
+        # The whole ring, not just the active key. A validator that is not
+        # this process must be able to check a token signed by a key that is
+        # rotating out, or every rotation breaks it (B5).
+        return {"keys": clarity.tokens.public_keys()}
 
     @app.get(
         "/v1/demo/subscribers",

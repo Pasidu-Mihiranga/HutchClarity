@@ -25,13 +25,16 @@ import secrets
 import tempfile
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import jwt
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 
 from clarity.kernel.common import utc_now
 from clarity.platform.persistence import (
@@ -64,6 +67,17 @@ REFRESH_TOKEN_TTL = timedelta(days=30)
 #: refresh window that was already here, so a session that is used regularly
 #: now ends where an idle one always did.
 ABSOLUTE_SESSION_TTL = timedelta(days=30)
+
+#: How long a retired signing key still verifies the tokens it signed.
+#:
+#: Rotation without an overlap is not rotation, it is an outage: the moment the
+#: key changes, every token in circulation fails to verify and every signed-in
+#: person is signed out. The window has to cover the longest-lived thing the
+#: old key signed, which is a staff session at `STAFF_TOKEN_TTL`, with room for
+#: a rotation that does not complete instantly across replicas.
+#:
+#: **ASSUMPTION - REQUIRES HUTCH CONFIRMATION.**
+KEY_OVERLAP_WINDOW = timedelta(hours=12)
 
 #: How recently MFA must have happened to count as step-up.
 STEP_UP_WINDOW = timedelta(minutes=5)
@@ -132,6 +146,103 @@ class SessionRecord:
         return self.started_at or self.refresh_expires_at - REFRESH_TOKEN_TTL
 
 
+def _kid_for(public: Ed25519PublicKey) -> str:
+    """A key's name, derived from the key itself.
+
+    Content-addressed rather than configured, so two processes that load the
+    same key agree on its name without being told, and a rotated key cannot
+    accidentally reuse the name of the one it replaced. The fixed
+    `clarity-iam-dev` it replaces made every key in the system's history
+    indistinguishable in a token header.
+    """
+    raw = public.public_bytes(
+        encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+    )
+    return "iam-" + hashlib.sha256(raw).hexdigest()[:16]
+
+
+@dataclass(frozen=True)
+class SigningKey:
+    """One key in the ring, and when it stops being usable for signing."""
+
+    kid: str
+    private: Ed25519PrivateKey
+    retired_at: datetime | None = None
+
+    @property
+    def public(self) -> Ed25519PublicKey:
+        return self.private.public_key()
+
+    def verifies_at(self, now: datetime) -> bool:
+        """Retired keys keep verifying for the overlap window, never longer."""
+        return self.retired_at is None or now < self.retired_at + KEY_OVERLAP_WINDOW
+
+    def jwk(self) -> dict[str, str]:
+        raw = self.public.public_bytes(
+            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+        )
+        return {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "kid": self.kid,
+            "alg": _ALGORITHM,
+            "use": "sig",
+            "x": base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii"),
+        }
+
+
+#: A retired key on disk, named so the file describes itself:
+#: ``iam-issuer-retired-<kid>-<epoch seconds>.pem``. No sidecar, because a
+#: sidecar can go missing separately from the key it describes.
+_RETIRED_PREFIX = "iam-issuer-retired-"
+
+
+def _write_key_file(path: Path, private: Ed25519PrivateKey) -> None:
+    """Write a key the same way `_load_or_create_key` does: whole, or not at all."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".iam-key-")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(
+                private.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+            )
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def _read_retired(directory: Path | None) -> list[SigningKey]:
+    """Keys this deployment has rotated out, from the shared key volume.
+
+    Read from disk rather than held only in memory, because a rotation on one
+    replica has to be visible to the others. Without this, replica A rotates,
+    replica B keeps signing with the key A retired, and neither can verify the
+    other's tokens: rotation would look like intermittent sign-outs.
+    """
+    if directory is None or not directory.is_dir():
+        return []
+    found: list[SigningKey] = []
+    for path in directory.glob(f"{_RETIRED_PREFIX}*.pem"):
+        stem = path.stem.removeprefix(_RETIRED_PREFIX)
+        kid, _, retired = stem.rpartition("-")
+        try:
+            private = serialization.load_pem_private_key(path.read_bytes(), password=None)
+            moment = datetime.fromtimestamp(int(retired), tz=UTC)
+        except (ValueError, TypeError, OSError):
+            # An unreadable key file is not a reason to refuse every token the
+            # active key signed. It simply does not join the ring.
+            continue
+        if isinstance(private, Ed25519PrivateKey):
+            found.append(SigningKey(kid=kid, private=private, retired_at=moment))
+    return found
+
+
 def _load_or_create_key(key_path: Path | None) -> Ed25519PrivateKey:
     """The issuer key: in memory, or loaded from ``key_path``, created once.
 
@@ -187,10 +298,22 @@ class TokenIssuer:
         open_unit: UnitOfWorkFactory | None = None,
         key_path: Path | None = None,
     ) -> None:
-        self._private = _load_or_create_key(key_path)
-        self._public = self._private.public_key()
+        # A ring, not a key. `key_path` is still the active key and still
+        # loads the same file, so an existing deployment keeps its sessions;
+        # rotation adds keys beside it rather than replacing it (B5).
+        active = SigningKey(kid="", private=_load_or_create_key(key_path))
+        self._active = SigningKey(kid=_kid_for(active.public), private=active.private)
+        self._key_path = key_path
+        # Loaded from the shared key volume, so a rotation performed by one
+        # process is honoured by every other (B5).
+        self._retired: list[SigningKey] = _read_retired(
+            key_path.parent if key_path is not None else None
+        )
         self._audience = audience
-        self._kid = kid
+        # Kept only so an explicitly configured name still appears, for a
+        # deployment that pinned one. Derived names are the default because a
+        # key should be identifiable by what it is.
+        self._configured_kid = kid if kid != "clarity-iam-dev" else None
         if open_unit is None:
             store = MemoryStore()
 
@@ -294,9 +417,9 @@ class TokenIssuer:
     def _encode(self, claims: dict[str, object]) -> str:
         return jwt.encode(
             claims,
-            self._private,
+            self._active.private,
             algorithm=_ALGORITHM,
-            headers={"kid": self._kid},
+            headers={"kid": self._signing_kid},
         )
 
     # -- validating ------------------------------------------------------- #
@@ -306,10 +429,19 @@ class TokenIssuer:
         if not token:
             raise TokenInvalid
 
+        moment = now or utc_now()
         try:
+            # Which key signed this. A token naming a key this issuer has
+            # never held, or one whose overlap window has closed, is refused
+            # before any signature check: that is what makes a retired key
+            # actually retire rather than merely stop being advertised.
+            named = jwt.get_unverified_header(token).get("kid")
+            public = self._key_for(named if isinstance(named, str) else None, now=moment)
+            if public is None:
+                raise TokenInvalid
             claims = jwt.decode(
                 token,
-                self._public,
+                public,
                 # Only EdDSA is accepted, so a token claiming `alg: none` or a
                 # symmetric algorithm is rejected rather than trusted.
                 algorithms=[_ALGORITHM],
@@ -474,19 +606,68 @@ class TokenIssuer:
 
     # -- publication ------------------------------------------------------ #
 
+    @property
+    def _signing_kid(self) -> str:
+        return self._configured_kid or self._active.kid
+
+    def _key_for(self, kid: str | None, *, now: datetime) -> Ed25519PublicKey | None:
+        """The public key a token names, if this issuer still honours it."""
+        if kid is None or kid == self._signing_kid:
+            return self._active.public
+        for key in self._retired:
+            if key.kid == kid and key.verifies_at(now):
+                return key.public
+        return None
+
+    def rotate(self, *, now: datetime | None = None) -> str:
+        """Begin signing with a new key, keeping the old one verifying.
+
+        Returns the new key's id. The retired key keeps verifying for
+        `KEY_OVERLAP_WINDOW`, which is what makes this a rotation rather than
+        an outage: every token already in circulation was signed by it.
+
+        Keys older than the window are dropped here rather than by a sweeper,
+        for the same reason conversation state expires on read: a cleanup job
+        that has not run is not a reason to keep honouring a retired key.
+        """
+        moment = now or utc_now()
+        with self._lock:
+            retiring = SigningKey(
+                kid=self._active.kid, private=self._active.private, retired_at=moment
+            )
+            fresh = Ed25519PrivateKey.generate()
+            if self._key_path is not None:
+                # The retiring key first. If the process dies between the two
+                # writes, the ring has a key too many rather than one too few,
+                # and a key too many only costs a window of extra verification.
+                _write_key_file(
+                    self._key_path.parent
+                    / f"{_RETIRED_PREFIX}{retiring.kid}-{int(moment.timestamp())}.pem",
+                    retiring.private,
+                )
+                _write_key_file(self._key_path, fresh)
+            self._active = SigningKey(kid=_kid_for(fresh.public_key()), private=fresh)
+            self._retired = [key for key in [retiring, *self._retired] if key.verifies_at(moment)]
+            # A rotation that signed with a name the configured one overrides
+            # would be invisible in a token header.
+            self._configured_kid = None
+        return self._active.kid
+
+    def public_keys(self, *, now: datetime | None = None) -> list[dict[str, str]]:
+        """Every key a validator needs: the active one and any still in overlap.
+
+        Publishing only the active key would make rotation break every
+        validator that is not this process, which is the same outage by another
+        route.
+        """
+        moment = now or utc_now()
+        keys = [{**self._active.jwk(), "kid": self._signing_kid}]
+        keys.extend(key.jwk() for key in self._retired if key.verifies_at(moment))
+        return keys
+
     def public_key_jwk(self) -> dict[str, str]:
-        """The public key, for a validator that is not this process."""
-        raw = self._public.public_bytes(
-            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
-        )
-        return {
-            "kty": "OKP",
-            "crv": "Ed25519",
-            "kid": self._kid,
-            "alg": _ALGORITHM,
-            "use": "sig",
-            "x": base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii"),
-        }
+        """The active public key. `public_keys` is what a validator should read."""
+        return {**self._active.jwk(), "kid": self._signing_kid}
 
 
 def step_up(

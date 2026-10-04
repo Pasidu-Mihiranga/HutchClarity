@@ -32,6 +32,7 @@ from clarity.modules.iam.otp import (
 from clarity.modules.iam.tokens import (
     ABSOLUTE_SESSION_TTL,
     CUSTOMER_TOKEN_TTL,
+    KEY_OVERLAP_WINDOW,
     STEP_UP_WINDOW,
     TokenInvalid,
     TokenIssuer,
@@ -897,3 +898,117 @@ def test_signing_out_everywhere_does_not_touch_anyone_else(issuer: TokenIssuer):
 def test_an_unverifiable_token_names_no_session(issuer: TokenIssuer):
     assert issuer.session_id("not-a-token") is None
     assert issuer.session_id("") is None
+
+
+# --------------------------------------------------------------------------- #
+# Rotating the issuer key (B5)
+# --------------------------------------------------------------------------- #
+
+
+def test_a_key_is_named_after_itself(issuer: TokenIssuer):
+    """Two processes loading the same key agree on its name without being told.
+
+    The fixed `clarity-iam-dev` this replaces made every key in the system's
+    history indistinguishable in a token header, so a token could not say which
+    key signed it and rotation had nothing to key on.
+    """
+    named = jwt.get_unverified_header(issuer.for_staff("s", roles={Role.SUPERVISOR}).value)
+
+    assert named["kid"].startswith("iam-")
+    assert named["kid"] == issuer.public_key_jwk()["kid"]
+
+
+def test_rotation_does_not_sign_everybody_out(issuer: TokenIssuer):
+    """The whole point. Without an overlap, rotating is an outage."""
+    before = issuer.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    issuer.rotate()
+
+    assert issuer.verify(before.value).ref == "sup-1"
+
+
+def test_tokens_minted_after_a_rotation_use_the_new_key(issuer: TokenIssuer):
+    old_kid = issuer.public_key_jwk()["kid"]
+
+    new_kid = issuer.rotate()
+    after = issuer.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    assert new_kid != old_kid
+    assert jwt.get_unverified_header(after.value)["kid"] == new_kid
+    assert issuer.verify(after.value).ref == "sup-1"
+
+
+def test_a_retired_key_stops_verifying_when_its_window_closes(issuer: TokenIssuer):
+    """A key that verifies forever has not been retired, only hidden."""
+    start = utc_now()
+    before = issuer.for_staff("sup-1", roles={Role.SUPERVISOR}, now=start)
+    issuer.rotate(now=start)
+
+    with pytest.raises(TokenInvalid):
+        issuer.verify(before.value, now=start + KEY_OVERLAP_WINDOW + timedelta(minutes=1))
+
+
+def test_the_published_ring_carries_every_key_a_validator_needs(issuer: TokenIssuer):
+    """Publishing only the active key breaks every external validator on
+    rotation, which is the same outage by another route."""
+    old_kid = issuer.public_key_jwk()["kid"]
+    new_kid = issuer.rotate()
+
+    published = {key["kid"] for key in issuer.public_keys()}
+
+    assert published == {old_kid, new_kid}
+
+
+def test_a_key_past_its_window_leaves_the_published_ring(issuer: TokenIssuer):
+    start = utc_now()
+    old_kid = issuer.public_key_jwk()["kid"]
+    new_kid = issuer.rotate(now=start)
+
+    later = issuer.public_keys(now=start + KEY_OVERLAP_WINDOW + timedelta(minutes=1))
+
+    assert {key["kid"] for key in later} == {new_kid}
+    assert old_kid not in {key["kid"] for key in later}
+
+
+def test_a_token_naming_a_key_this_issuer_never_held_is_refused(issuer: TokenIssuer):
+    """Refused on the name, before any signature check."""
+    other = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(MemoryStore()))
+    forged = other.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    with pytest.raises(TokenInvalid):
+        issuer.verify(forged.value)
+
+
+def test_a_rotation_survives_a_restart(tmp_path):
+    """And is seen by every process sharing the key volume.
+
+    Held only in memory, a rotation on one replica is invisible to the others:
+    they keep signing with the key it retired and cannot verify its new tokens,
+    which looks like intermittent sign-outs rather than a configuration fault.
+    """
+    store = MemoryStore()
+    key_path = tmp_path / "keys" / "iam-issuer.pem"
+    before = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+    issued = before.for_staff("sup-1", roles={Role.SUPERVISOR})
+    new_kid = before.rotate()
+
+    after = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+
+    # The new key is the one it signs with, and the retired one still verifies.
+    assert after.public_key_jwk()["kid"] == new_kid
+    assert after.verify(issued.value).ref == "sup-1"
+    assert {key["kid"] for key in after.public_keys()} >= {new_kid}
+
+
+def test_a_second_process_honours_a_rotation_it_did_not_perform(tmp_path):
+    store = MemoryStore()
+    key_path = tmp_path / "keys" / "iam-issuer.pem"
+    one = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+    old_token = one.for_staff("sup-1", roles={Role.SUPERVISOR})
+    one.rotate()
+    fresh_token = one.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    two = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+
+    assert two.verify(fresh_token.value).ref == "sup-1"
+    assert two.verify(old_token.value).ref == "sup-1"
