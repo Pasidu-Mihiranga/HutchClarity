@@ -7,7 +7,7 @@
 | Audience | developers / demo presenters / judges |
 | Journey | Customer asks (chip or free-form) about an unexpected VAS charge; Clarity Investigation Card → confirm modal → refund → Trust Receipt |
 | Status | verified, API path and browser steps |
-| Last verified | 2026-10-04 (browser, `frontend/e2e/dispute-charge.spec.ts`) |
+| Last verified | 2026-10-04 (browser suite and live VPS release `01d1762`: trusted HTTPS, synthetic OTP, evidence, LKR 49 action and persisted verified receipt) |
 
 > **FE01 (#28), 2026-10-04.** Both halves are now verified. The acceptance
 > suite drives this flow over `/v1` and ends at a receipt the backend verifies
@@ -43,7 +43,7 @@ Open the customer app at <http://localhost:3000>. FE01 retired the static UI
 the API used to serve, so `make dev` on its own gives you the API and no
 pages.
 
-Demo subscriber (synthetic): MSISDN `0771234567` (Dilani) / VAS silent renewal.
+Demo subscriber (synthetic): MSISDN `0781234567` (Dilani) / VAS silent renewal.
 
 ## 3. Steps
 

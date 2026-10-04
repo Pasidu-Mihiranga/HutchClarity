@@ -39,10 +39,10 @@ const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8000';
  * first run of this scenario did exactly that and reported 92% failures.
  */
 const SUBSCRIBERS = [
-  { msisdn: '+94771234567', outcome: 'ONE_TAP_FIX', pays: true },
-  { msisdn: '+94772223333', outcome: 'AUTO_FIX', pays: false },
-  { msisdn: '+94773334444', outcome: 'EXPLAIN_ONLY', pays: false },
-  { msisdn: '+94774445555', outcome: 'STAFF_APPROVAL', pays: false },
+  { msisdn: '+94781234567', outcome: 'ONE_TAP_FIX', pays: true },
+  { msisdn: '+94782223333', outcome: 'AUTO_FIX', pays: false },
+  { msisdn: '+94783334444', outcome: 'EXPLAIN_ONLY', pays: false },
+  { msisdn: '+94784445555', outcome: 'STAFF_APPROVAL', pays: false },
 ];
 
 const whyDuration = new Trend('clarity_why_duration', true);

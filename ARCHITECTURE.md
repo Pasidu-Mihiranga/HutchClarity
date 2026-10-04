@@ -2,7 +2,7 @@
 
 > The [enterprise plan](docs/enterprise-plan/README.md) is the **intended** design, and [chapter 21](docs/enterprise-plan/21-migration-and-deployment-plan.md) is the plan for getting there. This file is the **as-built** state: what exists, how it is layered, what differs from the plan, and how far the migration has gone. It is updated in the same change as anything that affects it.
 >
-> **Last updated:** 2026-10-02 (branch `main`) · **Migration:** R1 complete; R2 and R3 in progress; R4 started with H01; R6 includes N01 and P01 · **Tests:** 1,222 passed, 512 infrastructure-dependent skipped · `ruff`, `mypy --strict` (193 files), 3 import contracts and the module-boundary tests all clean
+> **Last updated:** 2026-10-04 · **Migration:** R1 complete; R2 and R3 in progress; R4 started with H01; R6 includes N01 and P01; R7 has a verified single-VPS demo deployment · **Tests:** 1,998 passed, 544 infrastructure-dependent skipped · `ruff`, `mypy --strict` (218 files) and 3 import contracts clean
 
 ---
 
@@ -83,7 +83,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | R3 Core migration | **In progress.** Wave 1 core work M-ACT, M-CASE, M-DET, M-GOV, M-DEC, M-RCPT and M-REC is implemented. |
 | R4 Satellites | **In progress.** H01 is complete: `hutch-sim` runs as a separate HTTP service and the `full` profile selects parity-tested HTTP read and command drivers. Other satellites remain in the backlog. |
 | R6 Capabilities | **In progress.** N01 notifications is built with template-only dispatch, preferences, consent, quiet hours, idempotency and fallback. P01 consumes payment, usage and pack facts, publishes deduplicated risks and starts the existing zero-contact resolution flow for duplicate reloads. Other capabilities remain in the backlog. |
-| R7 | Not started. Work items with acceptance tests: [docs/backlog](docs/backlog/README.md). |
+| R7 | **In progress.** DEP01 runs the `full` profile on the Hetzner demo VPS with private Compose networking, persistent data, three standalone Next.js images, trusted short-lived IP HTTPS, backups and rollback. CD01 is implemented and awaits a verified `main` deployment. |
 | R5 Frontend | **Started early by the team:** Next.js 14 `customer-web`, `console`, `verify` and shared packages call the `/v1` API. Build not yet verified on `dev`; the static UI stays until it is. |
 
 ## 6. Where this differs from the target
@@ -101,6 +101,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | MCP | `clarity-mcp`: MCP SDK, Streamable HTTP, OAuth 2.1, token exchange | `clarity.entrypoints.mcp_asgi` serves MCP at `/mcp` (stateless), OAuth 2.1 resource server, scope to profile, MCP Apps cards | A04 done. Token exchange is implemented and refuses rather than forwarding when unconfigured; `clarity-mcp` still reads through the in-process narrow view instead of calling `/v1` over HTTP. |
 | Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js apps + shared packages (plan 19) | Next.js 14 apps in `frontend/` are the only UI; the FastAPI static UI is retired (FE01) | Next.js 16 once it passes the browser suite (ADR-0031) |
+| Demo deployment | Containers for the core, private infrastructure, HTTPS edges | One-VPS Compose deployment of the `full` profile: public customer, Desk and verifier origins; API, MCP, channel gateway, hutch-sim, PostgreSQL, Kafka, Keycloak and OPA remain internal | Hackathon topology only; HUTCH production platform remains unconfirmed |
 | Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
 | Channels | Web, app, WhatsApp, SMS/USSD | Web plus template-only notification routing and a simulated dispatch driver; external channel gateway remains | N02 |
 | Proactive care | Stream detectors open zero-contact cases from system facts | Duplicate reload, FUP threshold and pack-end detectors publish `risk.detected`; duplicate reloads enter the existing resolution flow | Complete (P01); source interfaces require HUTCH confirmation |
@@ -113,7 +114,9 @@ Full list in [docs/submission/KNOWN_LIMITATIONS.md](docs/submission/KNOWN_LIMITA
 
 1. **Single process only.** Correctness under concurrency holds inside one process (1,500 of 1,500 concurrent double confirms give one refund and one receipt); a second replica would not share that state until R3.
 2. **Identity is ours, not HUTCH's.** Permission checks are real; the issuer key is generated at startup, so a restart signs everyone out; no refresh, revocation or session store. Development sign-in routes return 404 in the `prod` profile.
-3. **No persistence.** A restart loses every case and receipt.
+3. **Profile-dependent persistence.** `lite` intentionally loses state on
+   restart. The verified `full` VPS profile persists cases, receipts, synthetic
+   HUTCH data, PostgreSQL, Kafka, Keycloak state and the synthetic signing key.
 4. **`clarity-mcp` reads in-process, not over `/v1`.** The network transport landed (A04), but the deployable reads through the narrow MCP view rather than calling `clarity-api` over HTTP as plan 07 §10.6 wants. The authorization boundary is real either way and the RFC 8693 token exchange is implemented and tested; the HTTP adapter is not, because no generated Python client exists yet.
 5. **Sinhala and Tamil wording is not native-speaker reviewed.** The `language_review` gate in `config/ai/gates.yaml` exists and blocks for exactly this reason: the harness cannot score fluency, so the ratings have to come from people (A05).
 6. **Three of five evaluation datasets have no subject built.** `flow` needs C02 (C01 landed the pipeline), `rag` needs K01-K03, `language_review` needs native speakers. Their gates are declared and **block**, rather than being absent and therefore silently satisfied. The intake set holds 20 utterances per language against the 300 plan 22 §10 requires, so that gate blocks too while still reporting its score (si 0.559, ta 0.520, en 0.688, si-en 0.305 against a 0.90 gate).

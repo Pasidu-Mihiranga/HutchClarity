@@ -42,8 +42,8 @@ from clarity.platform.security.principal import (
     permissions_for,
 )
 
-DILANI = "+94771234567"
-PRIYA = "+94774445555"
+DILANI = "+94781234567"
+PRIYA = "+94784445555"
 
 
 @pytest.fixture
@@ -180,7 +180,7 @@ def test_a_customer_token_carries_the_pseudonym_not_the_number(issuer: TokenIssu
     """A token is copied into logs and proxies; a phone number there is a leak."""
     issued = issuer.for_customer("sub_abc123", assurance=Assurance.OTP, channel="web")
 
-    assert "771234567" not in issued.value
+    assert "781234567" not in issued.value
     assert issuer.verify(issued.value).subscriber_ref == "sub_abc123"
 
 

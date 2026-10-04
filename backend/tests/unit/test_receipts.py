@@ -31,7 +31,7 @@ from clarity.modules.timeline.builder import TimelineRequest
 
 from ..support.repositories import receipt_repository, tool_layer
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 SUBSCRIBER = ref_for(DILANI)
 
 
@@ -148,7 +148,7 @@ def test_a_receipt_never_contains_the_raw_number(receipts, case, executed):
     receipt = issue(receipts, case, executed)
 
     serialized = receipt.model_dump_json()
-    assert "771234567" not in serialized
+    assert "781234567" not in serialized
     assert receipt.payload.subject.msisdn_masked == "07X XXX 4567"
 
 
@@ -379,7 +379,7 @@ def test_the_public_view_proves_validity_without_exposing_the_account(receipts, 
     assert view["status"] == "VERIFIED"
     assert view["corrected_lkr"] == "49.00"
     assert view["recurrence_test"] == "PASSED"
-    assert "771234567" not in str(view)
+    assert "781234567" not in str(view)
     assert "evidence" not in view, "full evidence needs authentication"
 
 

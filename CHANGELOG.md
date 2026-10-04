@@ -228,6 +228,20 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
   by a demo reset**, and decisions, executions, receipts and MCP calls were
   never recorded in it.
 
+### Added (DEP01, CD01, #57, #58)
+
+- Added a private-network, single-VPS Compose deployment with persistent demo
+  data, three non-root Next.js images, hardened IP HTTPS proxying, health checks,
+  backups, rollback and short-lived certificate renewal.
+- Added CI-gated GHCR deployment after successful `main` builds, immutable SHA
+  releases, pinned SSH host verification and manual no-rebuild rollback.
+
+### Fixed (DEP01, #57)
+
+- `VERIFY_BASE` and `SIGNING_KEY_PATH` are now applied by the composition root.
+  Synthetic Trust Receipts therefore retain their deployed verification URL and
+  remain verifiable after a container restart.
+
 ### Removed (FE01, #28)
 
 - **The static UI is retired.** `clarity.interfaces.http` no longer serves

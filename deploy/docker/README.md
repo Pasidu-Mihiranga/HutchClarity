@@ -20,5 +20,14 @@ docker build -f deploy/docker/Dockerfile -t clarity:dev .
 Every one of them answers `GET /health`, which is what the Helm chart's
 liveness and readiness probes use (ADR-0016).
 
+`Dockerfile.frontend` is the matching generic production image for
+`customer-web`, `console` and `verify`. Pass `APP=<workspace>` and build the API
+base as an empty string for the VPS same-origin reverse-proxy layout. It emits
+Next.js standalone output and runs as uid 10001.
+
 `CLARITY_PROFILE` defaults to `full` in the image, because an image is built to
 be deployed. A local run against no infrastructure sets `CLARITY_PROFILE=lite`.
+
+The Internet-facing Compose topology and operations are documented in
+[`deploy/README.md`](../README.md). The development `full.yml` is not deployed
+to a public host.

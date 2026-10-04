@@ -11,6 +11,8 @@ import type {
 } from "@/lib/clarityChat";
 import { PROGRESS_STEPS, INTENT_EMPTY } from "@/lib/clarityChat";
 import type { Lang } from "@/lib/clarityChat";
+import { t } from "@clarity/i18n";
+import { ThinkingOrb } from "@/components/ui/thinking-orb";
 
 // ─── inline translations (mirrors customer.js I18N, English-only for card text) ─
 type TranslationKey = keyof typeof EN;
@@ -223,52 +225,35 @@ function EvidenceList({ decision, timeline, lang }: { decision: Decision | null;
 
 // ─── individual card types ─────────────────────────────────────────────────────
 
-function ThinkingCard({ label }: { label: string }) {
+/**
+ * The waiting state for both "thinking" (before the turn is classified) and
+ * "progress" (the account checks). One component for both, so when the
+ * thinking message is replaced by the progress message in the same slot React
+ * keeps the orb mounted and it does not assemble twice.
+ *
+ * While thinking, the orb cycles its labels. During the checks the label is
+ * the real current step and the checklist below shows what is done, so the
+ * animation never claims more than the client knows.
+ */
+function WaitingCard({ lang, step }: { lang: Lang; step: number | null }) {
+  if (step === null) {
+    const labels = ["wait.thinking", "wait.searching", "wait.analyzing", "wait.composing"].map((k) => t(lang, k));
+    return <ThinkingOrb labels={labels} cycle />;
+  }
+  const labels = PROGRESS_STEPS.map((s) => EN[s.key as TranslationKey] ?? s.key);
+  const current = Math.max(0, Math.min(step, PROGRESS_STEPS.length - 1));
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px" }}>
-      <span style={{ display: "flex", gap: 4 }} aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--orange)",
-              display: "inline-block",
-              animation: `ccBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }}
-          />
-        ))}
-      </span>
-      <span style={{ fontSize: 14, color: "var(--muted)" }}>{label || "Checking your account..."}</span>
-    </div>
-  );
-}
-
-function ProgressCard({ step }: { step: number }) {
-  return (
-    <div style={{ padding: "12px 16px" }}>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
+    <div>
+      <ThinkingOrb labels={labels} index={current} />
+      <ul className="mo-steps">
         {PROGRESS_STEPS.map((s, i) => {
-          const done = i < step;
-          const active = i === step;
+          const state = i < step ? "done" : i === step ? "active" : "todo";
           return (
-            <li
-              key={s.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                fontSize: 13,
-                color: done ? "#22c55e" : active ? "var(--ink)" : "var(--muted)",
-                fontWeight: active ? 600 : 400,
-              }}
-            >
-              <span style={{ width: 18, textAlign: "center", fontWeight: 700 }}>
-                {done ? "✓" : active ? "…" : "○"}
+            <li key={s.id} data-state={state}>
+              <span className="mo-step-mark" aria-hidden="true">
+                {state === "done" ? "✓" : state === "active" ? "…" : "○"}
               </span>
-              {EN[s.key as TranslationKey] ?? s.key}
+              {labels[i]}
             </li>
           );
         })}
@@ -657,8 +642,8 @@ export function ClarityMessageCard({
 }) {
   const { lang, app } = actions;
 
-  if (kind === "thinking") return <ThinkingCard label={state.thinkingLabel || "Checking your account..."} />;
-  if (kind === "progress") return <ProgressCard step={state.progressStep} />;
+  if (kind === "thinking") return <WaitingCard lang={lang} step={null} />;
+  if (kind === "progress") return <WaitingCard lang={lang} step={state.progressStep} />;
   if (kind === "investigation") return (
     <InvestigationCard
       state={state}

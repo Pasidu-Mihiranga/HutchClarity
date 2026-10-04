@@ -15,10 +15,10 @@ from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
 
-DILANI = "+94771234567"  # VAS without consent -> ONE_TAP_FIX, LKR 49
-NIMAL = "+94772223333"  # duplicate reload -> AUTO_FIX
-KUMAR = "+94773334444"  # disclosed fair-use cap -> EXPLAIN_ONLY
-PRIYA = "+94774445555"  # LKR 12,000 reload, SIM swap -> STAFF_APPROVAL
+DILANI = "+94781234567"  # VAS without consent -> ONE_TAP_FIX, LKR 49
+NIMAL = "+94782223333"  # duplicate reload -> AUTO_FIX
+KUMAR = "+94783334444"  # disclosed fair-use cap -> EXPLAIN_ONLY
+PRIYA = "+94784445555"  # LKR 12,000 reload, SIM swap -> STAFF_APPROVAL
 
 
 @pytest.fixture

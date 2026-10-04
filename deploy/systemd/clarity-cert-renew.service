@@ -1,0 +1,7 @@
+[Unit]
+Description=Renew Hutch Clarity short-lived IP certificate
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/hutch-clarity/deploy/scripts/https-renew.sh

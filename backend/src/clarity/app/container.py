@@ -600,7 +600,10 @@ class Clarity:
         self._rules_dir = rules_dir
         self._policy_dir = policy_dir
         self._clock = clock
-        self._verify_base = verify_base
+        configured_verify_base = (
+            self.settings.verify_base if verify_base == "http://localhost:3002/r" else verify_base
+        )
+        self._verify_base = configured_verify_base
         self._daily_refund_limit_lkr = daily_refund_limit_lkr
         self._provider = provider
         self.world, persist = _world_for_profile(self.profile, world, clock, self.settings)
@@ -673,7 +676,7 @@ class Clarity:
                 timeout_seconds=self.settings.signer_timeout_seconds,
             )
             if self.settings.signer_url
-            else DevSigningService()
+            else DevSigningService(key_path=self.settings.signing_key_path)
         )
         self.receipts = ReceiptService(
             self.signing,
@@ -685,7 +688,7 @@ class Clarity:
                 self._repository(BY_PLAN),
             ),
             probe=MockRecurrenceProbe(self.world),
-            verify_base=verify_base,
+            verify_base=configured_verify_base,
             persist=persist,
             open_unit=self.open_unit,
             # Every receipt carries the current signed audit checkpoint, making

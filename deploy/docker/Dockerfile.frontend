@@ -1,0 +1,29 @@
+# One production image recipe for all three Next.js applications.
+FROM node:20-bookworm-slim AS dependencies
+WORKDIR /workspace/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/apps ./apps
+COPY frontend/packages ./packages
+RUN npm ci
+
+FROM dependencies AS build
+ARG APP
+ARG NEXT_PUBLIC_API_BASE=""
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE} NEXT_TELEMETRY_DISABLED=1
+RUN case "$APP" in customer-web|console|verify) ;; *) exit 64 ;; esac \
+ && npm run build -w "@clarity/$APP"
+
+FROM node:20-bookworm-slim AS runtime
+ARG APP
+ENV APP=${APP} HOSTNAME=0.0.0.0 PORT=3000 NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+RUN groupadd --system --gid 10001 clarity \
+ && useradd --system --uid 10001 --gid clarity --create-home clarity
+WORKDIR /app
+COPY --from=build --chown=clarity:clarity /workspace/frontend/apps/${APP}/.next/standalone ./
+COPY --from=build --chown=clarity:clarity /workspace/frontend/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build --chown=clarity:clarity /workspace/frontend/apps/${APP}/public ./apps/${APP}/public
+USER clarity
+EXPOSE 3000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["sh", "-c", "exec node apps/${APP}/server.js"]

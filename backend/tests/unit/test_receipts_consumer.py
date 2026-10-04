@@ -18,7 +18,7 @@ from clarity.integration.drivers.mock.world import build_demo_world, ref_for
 from clarity.kernel.common import Channel
 from clarity.platform.messaging.envelope import Event, EventType
 
-DILANI = "+94771234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
+DILANI = "+94781234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
 
 
 @pytest.fixture
@@ -133,7 +133,7 @@ def test_the_event_carries_no_raw_number_anywhere(clarity: Clarity) -> None:
 
     serialised = event.model_dump_json()
     assert DILANI not in serialised
-    assert "771234567" not in serialised
+    assert "781234567" not in serialised
     assert event.subject == ref_for(DILANI)
 
 

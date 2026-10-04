@@ -165,7 +165,7 @@ export default function DeskPage() {
       const result = await client.suspendMerchant({
         merchant_id: "merchant-gamezone",
         reason: "Console VAS ops suspend (simulated)",
-        subscriber_msisdn: "0771234567",
+        subscriber_msisdn: "0781234567",
       });
       setNote(
         `Merchant ${result.merchant_id} blocked on Dilani (simulated). Newly blocked: ${String(result.newly_blocked)}`,

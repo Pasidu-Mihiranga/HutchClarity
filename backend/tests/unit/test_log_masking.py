@@ -23,7 +23,7 @@ from clarity.platform.observability.logs import (
     redact_value,
 )
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_a_log_line_with_an_msisdn_is_masked(captured: list[logging.LogRecord]) 
     assert len(captured) == 1
     rendered = captured[0].getMessage()
     assert DILANI not in rendered
-    assert "771234567" not in rendered
+    assert "781234567" not in rendered
     assert "[msisdn]" in rendered
     assert "CASE-1" in rendered, "the case id is an identifier and must survive"
 
@@ -79,10 +79,10 @@ def test_an_msisdn_in_a_structured_field_is_masked(captured: list[logging.LogRec
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("+94771234567", "[msisdn]"),
-        ("0771234567", "[msisdn]"),
-        ("077 123 4567", "[msisdn]"),
-        ("+94 77 123 4567", "[msisdn]"),
+        ("+94781234567", "[msisdn]"),
+        ("0781234567", "[msisdn]"),
+        ("078 123 4567", "[msisdn]"),
+        ("+94 78 123 4567", "[msisdn]"),
         ("199012345678", "[nic]"),
         ("912345678V", "[nic]"),
         ("dilani@example.lk", "[email]"),
@@ -97,7 +97,7 @@ def test_every_shape_of_personal_data_is_redacted(raw: str, expected: str) -> No
 
 def test_a_field_named_for_its_content_is_replaced_wholesale() -> None:
     """A bare value has no shape to recognise, so the field name decides."""
-    assert redact_value("msisdn", "0771234567") == "[redacted]"
+    assert redact_value("msisdn", "0781234567") == "[redacted]"
     assert redact_value("password", "anything at all") == "[redacted]"
     assert redact_value("case_id", "CASE-3") == "CASE-3"
 
@@ -180,6 +180,6 @@ def test_the_redaction_patterns_agree_with_the_ai_masker() -> None:
     """
     from clarity.ai.pii import find_pii
 
-    for raw in ("+94771234567", "0771234567", "912345678V", "dilani@example.lk"):
+    for raw in ("+94781234567", "0781234567", "912345678V", "dilani@example.lk"):
         assert find_pii(raw), f"the AI masker does not recognise {raw}"
         assert raw not in redact(raw), f"log redaction does not recognise {raw}"

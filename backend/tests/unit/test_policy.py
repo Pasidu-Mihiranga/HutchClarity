@@ -575,7 +575,7 @@ def test_a_decision_records_the_policy_it_used(clarity_container):
     from clarity.integration.drivers.mock.world import ref_for
 
     clarity = clarity_container
-    account = clarity.world.account(ref_for("+94772223333"))
+    account = clarity.world.account(ref_for("+94782223333"))
     case = clarity.cases.open_case(
         subscriber_ref=account.ref, msisdn_masked=account.masked, channel=Channel.APP
     )
@@ -592,7 +592,7 @@ def test_the_rule_scoped_cap_is_what_makes_the_deck_example_work(clarity_contain
     from clarity.integration.drivers.mock.world import ref_for
 
     clarity = clarity_container
-    account = clarity.world.account(ref_for("+94772223333"))
+    account = clarity.world.account(ref_for("+94782223333"))
     case = clarity.cases.open_case(
         subscriber_ref=account.ref, msisdn_masked=account.masked, channel=Channel.APP
     )
@@ -613,7 +613,7 @@ def test_pulling_the_rule_switch_stops_that_auto_fix_end_to_end(clarity_containe
     clarity.switches.turn_off(
         auto_fix_switch("DUPLICATE_RELOAD"), actor_ref="sup-1", reason="refund anomaly"
     )
-    account = clarity.world.account(ref_for("+94772223333"))
+    account = clarity.world.account(ref_for("+94782223333"))
     case = clarity.cases.open_case(
         subscriber_ref=account.ref, msisdn_masked=account.masked, channel=Channel.APP
     )

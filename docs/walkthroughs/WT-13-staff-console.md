@@ -7,7 +7,7 @@
 | Audience | developers / demo presenters / judges |
 | Journey | Switch demo staff roles; Desk approve; Autopsy and Foresight; kill switches |
 | Status | verified |
-| Last verified | 2026-10-04 (browser, `frontend/e2e/staff-desk.spec.ts`) |
+| Last verified | 2026-10-04 (browser suite and live VPS release `01d1762`) |
 
 ## 1. What you will see
 
@@ -19,6 +19,10 @@ retired the static `desk.html` that used to serve `/desk`, `/ops`, `/autopsy`
 and `/foresight`. Admin kill switches call `/v1/admin/switches`.
 
 ## 2. Prerequisites
+
+The hosted synthetic demo is available at
+`https://116.203.101.73:8443/`. Its `/v1` calls are same-origin through the
+reverse proxy. For local development:
 
 ```bash
 make dev                 # API on :8000

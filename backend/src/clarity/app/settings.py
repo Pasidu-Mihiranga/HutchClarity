@@ -81,10 +81,13 @@ class Settings(BaseSettings):
         alias="SUBSCRIBER_HMAC_KEY",
         description="Keys the subscriber_ref pseudonym. A real deployment sets its own.",
     )
-    signing_key_path: Path = Field(
-        default=Path(".keys/signing.pem"),
+    signing_key_path: Path | None = Field(
+        default=None,
         alias="SIGNING_KEY_PATH",
-        description="Ed25519 key the signer uses for Trust Receipts.",
+        description=(
+            "Ed25519 key the development signer persists for Trust Receipts. "
+            "Unset keeps the key in memory, so a read-only container still starts."
+        ),
     )
     keys_dir: Path = Field(default=Path(".keys"), alias="KEYS_DIR")
     keycloak_issuer: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_ISSUER")
