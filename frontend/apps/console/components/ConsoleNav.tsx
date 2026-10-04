@@ -39,12 +39,14 @@ export function ConsoleNav() {
   const { hasPermission, session } = useStaffSession();
 
   return (
-    <nav className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-4 py-3">
-      <Link
-        href="/"
-        className="mr-4 text-sm font-semibold text-sky-800 hover:text-sky-950"
-      >
-        Clarity Console
+    <nav className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-1 px-4 py-3 sm:px-6">
+      <Link href="/" className="mr-3 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-xs font-semibold text-white">
+          C
+        </span>
+        <span className="font-display text-sm font-semibold tracking-tight text-ink">
+          Clarity Desk
+        </span>
       </Link>
       {links.map((link) => {
         const allowed = !session || hasPermission(...link.anyOf);
@@ -54,7 +56,7 @@ export function ConsoleNav() {
             <span
               key={link.href}
               title="Your current role cannot access this"
-              className="cursor-not-allowed rounded px-3 py-1.5 text-sm text-slate-300"
+              className="cursor-not-allowed rounded-full px-3 py-1.5 text-sm text-[#c7ced5]"
             >
               {link.label}
             </span>
@@ -64,18 +66,18 @@ export function ConsoleNav() {
           <Link
             key={link.href}
             href={link.href}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded-full px-3 py-1.5 text-sm ${
               active
-                ? "bg-sky-700 text-white"
-                : "text-slate-700 hover:bg-slate-100"
+                ? "bg-ink text-white"
+                : "text-[#555d68] hover:bg-paper"
             }`}
           >
             {link.label}
           </Link>
         );
       })}
-      <span className="ml-auto text-xs text-amber-800">
-        Simulated IDP · permissions are real
+      <span className="ml-auto hidden text-[11px] font-medium uppercase tracking-[0.14em] text-[#818995] sm:inline">
+        Synthetic records
       </span>
     </nav>
   );

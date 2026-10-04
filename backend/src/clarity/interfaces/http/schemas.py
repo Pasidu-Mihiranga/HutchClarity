@@ -266,13 +266,29 @@ class OtpVerify(ApiModel):
 
 
 class StaffSignIn(ApiModel):
-    """Development staff sign-in. **Simulated**: production federates HUTCH SSO."""
+    """Development staff sign-in. **Simulated**: production federates HUTCH SSO.
+
+    Closed with 404 once ``CLARITY_STAFF_DIRECTORY`` is set. The browser must
+    not choose a role.
+    """
 
     user_ref: str
     roles: list[str]
     step_up: bool = Field(
         default=False,
         description="Simulates recent MFA, which approvals above the cap require.",
+    )
+
+
+class StaffLogin(ApiModel):
+    """Username and password. The directory assigns the role. **Simulated** staff."""
+
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=200)
+    step_up_code: str = Field(
+        default="",
+        max_length=64,
+        description="Empty signs in at ordinary MFA. A code raises assurance to recent MFA.",
     )
 
 

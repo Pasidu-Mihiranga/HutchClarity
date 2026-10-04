@@ -12,6 +12,13 @@ from clarity.modules.iam.authorization import (
     OpaAuthorizationPolicy,
     PythonAuthorizationPolicy,
 )
+from clarity.modules.iam.directory import (
+    LoginRefused,
+    StaffDirectory,
+    StaffDirectoryInvalid,
+    StaffIdentity,
+    hash_secret,
+)
 from clarity.modules.iam.grants import (
     GRANTS,
     AuditGrant,
@@ -56,14 +63,19 @@ __all__ = [
     "GrantState",
     "IssuedToken",
     "KeycloakTokenVerifier",
+    "LoginRefused",
     "OpaAuthorizationPolicy",
     "OtpRefused",
     "OtpService",
     "PythonAuthorizationPolicy",
     "SimulatedInbox",
+    "StaffDirectory",
+    "StaffDirectoryInvalid",
+    "StaffIdentity",
     "SubjectKind",
     "TokenInvalid",
     "TokenIssuer",
     "TokenVerifier",
+    "hash_secret",
     "is_subject",
 ]

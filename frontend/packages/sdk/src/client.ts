@@ -282,6 +282,12 @@ export type StaffSessionRequest = {
   step_up?: boolean;
 };
 
+export type StaffLoginRequest = {
+  username: string;
+  password: string;
+  step_up_code?: string;
+};
+
 function resolveBase(baseUrl?: string): string {
   const fromEnv =
     typeof process !== "undefined"
@@ -404,6 +410,14 @@ export class ClarityClient {
 
   staffSession(body: StaffSessionRequest): Promise<SessionView> {
     return this.request("/v1/auth/staff/session", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Directory sign-in. The server assigns the role. Synthetic profiles only. */
+  staffLogin(body: StaffLoginRequest): Promise<SessionView> {
+    return this.request("/v1/auth/staff/login", {
       method: "POST",
       body: JSON.stringify(body),
     });

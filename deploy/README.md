@@ -34,6 +34,10 @@ Run `deploy/scripts/vps-bootstrap.sh` once as root after copying `deploy/` and
 Application secrets remain in `/opt/hutch-clarity/.env.production` and CD never
 replaces that file. `SIGNING_KEY_PATH` points at a persistent volume. This is a
 development Ed25519 signer for synthetic receipts, not a KMS or HSM.
+Vertex credentials and the staff directory are files under
+`/opt/hutch-clarity/private/` (mode 0600), mounted read-only. CD does not
+upload them. `GOOGLE_APPLICATION_CREDENTIALS` inside the container is
+`/run/clarity-private/google-service-account.json`.
 
 ## HTTPS
 

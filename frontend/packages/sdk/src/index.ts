@@ -18,6 +18,7 @@ export {
   type DemoSubscriber,
   type SwitchStateView,
   type StaffSessionRequest,
+  type StaffLoginRequest,
   type RuledOutItem,
   // Audit assurance (plan 5.8, ADR-0037 to ADR-0039).
   type AuditRecordView,

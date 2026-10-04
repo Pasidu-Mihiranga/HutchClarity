@@ -1170,9 +1170,40 @@
         "title": "SourceStatusView",
         "type": "object"
       },
+      "StaffLogin": {
+        "additionalProperties": false,
+        "description": "Username and password. The directory assigns the role. **Simulated** staff.",
+        "properties": {
+          "password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "step_up_code": {
+            "default": "",
+            "description": "Empty signs in at ordinary MFA. A code raises assurance to recent MFA.",
+            "maxLength": 64,
+            "title": "Step Up Code",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "StaffLogin",
+        "type": "object"
+      },
       "StaffSignIn": {
         "additionalProperties": false,
-        "description": "Development staff sign-in. **Simulated**: production federates HUTCH SSO.",
+        "description": "Development staff sign-in. **Simulated**: production federates HUTCH SSO.\n\nClosed with 404 once ``CLARITY_STAFF_DIRECTORY`` is set. The browser must\nnot choose a role.",
         "properties": {
           "roles": {
             "items": {
@@ -3388,9 +3419,51 @@
         ]
       }
     },
+    "/v1/auth/staff/login": {
+      "post": {
+        "description": "Sign in against the staff directory. The server assigns the role.\n\n**Simulated** accounts, for the synthetic profiles. Production federates\nHUTCH SSO and this route answers 404 (I9). A wrong password and a wrong\nstep-up code return the same refusal.",
+        "operationId": "staff_login_v1_auth_staff_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Staff Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/staff/session": {
       "post": {
-        "description": "Development staff sign-in.\n\n**Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra)\nbehind this same interface; there is no password here, which is why\nthe Desk labels the role picker as a demo control.",
+        "description": "Development staff sign-in.\n\n**Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra).\nWhen a staff directory is configured this route is gone: the browser\ncannot choose a role.",
         "operationId": "staff_session_v1_auth_staff_session_post",
         "requestBody": {
           "content": {

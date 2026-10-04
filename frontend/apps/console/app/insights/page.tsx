@@ -53,10 +53,13 @@ export default function InsightsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Insights</h1>
-        <p className="text-sm text-slate-600">
-          Live demo counts from cases in this process. Autopsy / foresight are
-          labelled hypotheses.
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+          Anticipate
+        </p>
+        <h1 className="font-display text-4xl font-semibold tracking-tight">Insights</h1>
+        <p className="text-sm text-mute">
+          Counts from synthetic cases in this process. Autopsy and foresight
+          stay labelled as hypotheses.
         </p>
       </div>
 
@@ -75,7 +78,7 @@ export default function InsightsPage() {
           <p className="text-lg font-medium">
             LKR {String(ops?.money_at_stake_lkr ?? "0.00")}
           </p>
-          <Badge tone="warning">In-memory demo</Badge>
+          <Badge tone="warning">Synthetic records</Badge>
         </Card>
         <Card className="space-y-2">
           <p className="text-xs uppercase text-slate-500">Top autopsy cluster</p>
@@ -96,7 +99,7 @@ export default function InsightsPage() {
                 </li>
               ))
             : (
-              <li className="text-slate-500">None yet - create demo cases on Desk.</li>
+              <li className="text-slate-500">None yet. Cases show up here after they are opened.</li>
             )}
         </ul>
       </Card>

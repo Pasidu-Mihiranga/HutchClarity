@@ -432,6 +432,12 @@
       "response": "SessionView",
       "status": "200"
     },
+    "POST /v1/auth/staff/login": {
+      "parameters": [],
+      "request": "StaffLogin",
+      "response": "SessionView",
+      "status": "200"
+    },
     "POST /v1/auth/staff/session": {
       "parameters": [],
       "request": "StaffSignIn",
@@ -1004,6 +1010,17 @@
         "completeness",
         "event_count",
         "source"
+      ]
+    },
+    "StaffLogin": {
+      "fields": [
+        "password",
+        "step_up_code",
+        "username"
+      ],
+      "required": [
+        "password",
+        "username"
       ]
     },
     "StaffSignIn": {

@@ -28,6 +28,7 @@ from clarity.ai.gateway import (
 )
 from clarity.ai.guard import Guard
 from clarity.ai.local import LOCAL_IMPLEMENTATIONS
+from clarity.ai.providers import ProviderConfig, VertexAIProvider, provider_for
 from clarity.ai.roles import LOCAL_PROVIDERS, ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
 from clarity.app.desk import ServiceCaseFixer, ServiceDeskCases
@@ -85,6 +86,8 @@ from clarity.modules.iam.public import (
     OpaAuthorizationPolicy,
     OtpService,
     PythonAuthorizationPolicy,
+    StaffDirectory,
+    StaffDirectoryInvalid,
     TokenIssuer,
     TokenVerifier,
 )
@@ -305,18 +308,63 @@ def _ai_providers(configured: ModelProvider | None, settings: Settings) -> dict[
     if configured is None:
         return providers
 
-    library = CassetteLibrary(settings.cassette_dir, recording=settings.record_cassettes)
-    # One configured provider stands behind every remote name: the prototype
-    # has a single endpoint, and the catalogue decides which role reaches it.
-    for remote in ("groq", "gemini"):
-        providers[remote] = RecordedProvider(
-            configured,
-            library=library,
-            role="shared",
-            provider=remote,
-            model=settings.model_name,
-        )
+    # Templates still preferred, and nobody injected a provider: the caller
+    # passes None so the chain ends on its local step. A deployment that turns
+    # templates off calls the model directly. Recording wraps the call (A02).
+    remote_names = ("vertex",) if isinstance(configured, VertexAIProvider) else ("groq", "gemini")
+    if settings.record_cassettes or settings.prefer_templates:
+        library = CassetteLibrary(settings.cassette_dir, recording=settings.record_cassettes)
+        for remote in remote_names:
+            providers[remote] = RecordedProvider(
+                configured,
+                library=library,
+                role="shared",
+                provider=remote,
+                model=settings.model_name,
+            )
+        return providers
+    for remote in remote_names:
+        providers[remote] = configured
     return providers
+
+
+def _configured_provider(
+    explicit: ModelProvider | None, settings: Settings
+) -> ModelProvider | None:
+    """The model this process will call, or None when nothing is configured."""
+    if explicit is not None:
+        return explicit
+    if settings.vertex_project:
+        return VertexAIProvider(
+            project=settings.vertex_project,
+            location=settings.vertex_location,
+            model=settings.model_name,
+            timeout_seconds=settings.model_timeout_seconds,
+        )
+    return provider_for(
+        ProviderConfig.of(
+            base_url=settings.model_base_url,
+            model=settings.model_name,
+            api_key=settings.model_api_key,
+            timeout_seconds=settings.model_timeout_seconds,
+        )
+    )
+
+
+def _staff_directory(settings: Settings) -> StaffDirectory | None:
+    """The configured accounts, or None when sign-in is still the dev route."""
+    raw = settings.staff_directory
+    if raw is None and settings.staff_directory_file is not None:
+        path = settings.staff_directory_file
+        if not path.is_file():
+            raise SettingsInvalid(f"CLARITY_STAFF_DIRECTORY_FILE does not exist: {path}")
+        raw = path.read_text(encoding="utf-8")
+    if raw is None:
+        return None
+    try:
+        return StaffDirectory.load(raw)
+    except StaffDirectoryInvalid as error:
+        raise SettingsInvalid(str(error)) from error
 
 
 def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | None:
@@ -605,7 +653,8 @@ class Clarity:
         )
         self._verify_base = configured_verify_base
         self._daily_refund_limit_lkr = daily_refund_limit_lkr
-        self._provider = provider
+        self._provider = _configured_provider(provider, self.settings)
+        self.staff_directory = _staff_directory(self.settings)
         self.world, persist = _world_for_profile(self.profile, world, clock, self.settings)
         # Every module's state lives behind this seam (B02). The profile chooses
         # the driver; nothing in a module knows which one it got.
@@ -704,14 +753,32 @@ class Clarity:
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
-        self.ai = AIGateway(provider=provider, prefer_templates=provider is None)
+        # An injected provider is used as given. Otherwise the setting decides,
+        # and an absent provider still cannot leave the template tier.
+        self.ai = AIGateway(
+            provider=self._provider,
+            prefer_templates=(
+                False
+                if provider is not None
+                else self.settings.prefer_templates or self._provider is None
+            ),
+        )
         # Roles, not models (A01, I12). The catalogue is the only place a model
         # ID appears; code asks for a role and this walks the chain it declares.
+        # While templates are preferred, remote names stay unbound so a missing
+        # cassette cannot take down an explanation. An injected provider keeps
+        # the cassette wrap the tests rely on.
+        templates_only = (
+            provider is None
+            and self.settings.prefer_templates
+            and not self.settings.record_cassettes
+        )
+        router_provider = None if templates_only else self._provider
         self.models = ModelCatalogue.from_file(default_models_file(self.settings.models_file))
         self.ai_quotas = TokenBuckets()
         self.roles = RoleRouter(
             self.models,
-            providers=_ai_providers(provider, self.settings),
+            providers=_ai_providers(router_provider, self.settings),
             buckets=self.ai_quotas,
         )
         # Heuristics always; the guard role assists when a provider is set. It
@@ -995,9 +1062,10 @@ class Clarity:
                 namespace=self.settings.signer_namespace,
                 timeout_seconds=self.settings.signer_timeout_seconds,
             )
+        keys_dir = self.settings.keys_dir
         key_path = (
-            self.settings.keys_dir / "audit-checkpoint-ed25519.pem"
-            if self.profile is Profile.FULL
+            keys_dir / "audit-checkpoint-ed25519.pem"
+            if self.profile is Profile.FULL and keys_dir is not None
             else None
         )
         return DevSigningService(kid="clarity-audit-dev-2027-01", key_path=key_path)

@@ -41,7 +41,7 @@ export default function StudioPage() {
     const next = { ...draft, savedAt: new Date().toISOString() };
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(next));
     setDraft(next);
-    setStatus("Draft saved locally (simulated - no publish API yet).");
+    setStatus("Draft saved in this browser. Publish is not connected yet.");
   }
 
   function exportPack() {
@@ -49,7 +49,7 @@ export default function StudioPage() {
       simulated: true,
       exported_at: new Date().toISOString(),
       subject: session?.subject,
-      note: "Regulator pack stub for demo. Production exports signed artefacts.",
+      note: "Synthetic regulator pack. Not a signed production export.",
       draft,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -58,7 +58,7 @@ export default function StudioPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "clarity-regulator-pack-demo.json";
+    a.download = "clarity-regulator-pack.json";
     a.click();
     URL.revokeObjectURL(url);
     setStatus("Downloaded simulated regulator pack JSON.");
@@ -155,14 +155,14 @@ export default function StudioPage() {
             disabled={!canPublish || !stepUp}
             onClick={() =>
               setStatus(
-                "Publish refused in demo: no rule:publish endpoint yet. Step-up is on.",
+                "Publish is not connected yet. Step-up is on.",
               )
             }
           >
             Request publish
           </Button>
           {!stepUp && canPublish ? (
-            <p className="text-xs text-amber-800">Enable Step-up MFA in the bar.</p>
+            <p className="text-xs text-amber-800">Sign in again with your step-up code.</p>
           ) : null}
           {canExport ? (
             <Button variant="ghost" onClick={exportPack}>

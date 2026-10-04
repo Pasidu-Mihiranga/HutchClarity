@@ -7,12 +7,13 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `authorization.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py` |
+| Files | `authorization.py`, `directory.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py` |
 
 ## 1. Purpose
 Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization.
 
 ## 2. Public surface (`public.py`)
+`StaffDirectory` loads simulated staff accounts. `authenticate` returns that account's role. A configured directory is what closes `POST /v1/auth/staff/session`.
 Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers, and the audit grant service: `AuditGrants`, `AuditGrant`, `GrantState`, `SubjectKind`, `GrantRefused`, `GrantNotFound`, `GrantAwareAuthorizationPolicy`, `is_subject`, `GRANTS` (audit assurance Phase 3, ADR-0036).
 Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers. `TokenIssuer(key_path=...)` keeps the customer token key in a file, created once and shared safely by processes that start together; the composition root passes `KEYS_DIR/iam-issuer.pem` when `KEYS_DIR` is set, and without it the key stays in memory.
 
@@ -57,3 +58,4 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-opa-parity-made-real.md` | Authorization parity evaluates the real Rego, not a Python stand-in |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-M-IAM-keycloak-verified-real.md` | Verified against real Keycloak; fixed the multi-key JWKS defect |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-FE-session-survives-deploy.md` | Optional persisted issuer key, so a redeploy no longer signs every customer out |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-staff-login-vertex.md` | Directory sign-in: the server assigns the role |
