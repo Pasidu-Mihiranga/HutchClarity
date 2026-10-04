@@ -13,7 +13,7 @@
 Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization.
 
 ## 2. Public surface (`public.py`)
-Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers.
+Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers. `TokenIssuer(key_path=...)` keeps the customer token key in a file, created once and shared safely by processes that start together; the composition root passes `KEYS_DIR/iam-issuer.pem` when `KEYS_DIR` is set, and without it the key stays in memory.
 
 ## 3. Used by
 `clarity.app`, `clarity.interfaces.http`
@@ -46,3 +46,4 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-keycloak-opa-shared-state.md` | Keycloak, OPA, shared OTP and revocable sessions (M-IAM, #7) |
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-IAM-opa-parity-made-real.md` | Authorization parity evaluates the real Rego, not a Python stand-in |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-M-IAM-keycloak-verified-real.md` | Verified against real Keycloak; fixed the multi-key JWKS defect |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-FE-session-survives-deploy.md` | Optional persisted issuer key, so a redeploy no longer signs every customer out |

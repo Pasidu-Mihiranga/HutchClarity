@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
 from fastapi.testclient import TestClient
 
 from clarity.app.container import Clarity
+from clarity.app.settings import Settings
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
 from clarity.kernel.common import utc_now
@@ -715,3 +716,38 @@ def test_self_service_permissions_belong_to_customers_only():
     for role, permissions in ROLE_PERMISSIONS.items():
         if role is not Role.CUSTOMER:
             assert not (self_service & permissions), role
+
+
+def test_a_persisted_issuer_key_keeps_sessions_across_a_restart(tmp_path):
+    """Every CD deploy restarts the API. With an in-memory key that signed
+    every customer out, and the chat answered each turn with a 401. The store
+    is shared, as PostgreSQL is between the old and the new process."""
+    store = MemoryStore()
+    key_path = tmp_path / "keys" / "iam-issuer.pem"
+    before = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+    issued = before.for_customer("sub_a", assurance=Assurance.OTP, channel="web")
+
+    after = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
+
+    assert after.verify(issued.value).subscriber_ref == "sub_a"
+    assert key_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_processes_starting_together_share_one_issuer_key(tmp_path):
+    """API, MCP and channel gateway share the key directory on the VPS."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    key_path = tmp_path / "iam-issuer.pem"
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        issuers = list(pool.map(lambda _: TokenIssuer(key_path=key_path), range(8)))
+
+    assert len({str(issuer.public_key_jwk()) for issuer in issuers}) == 1
+
+
+def test_without_keys_dir_the_issuer_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    clarity = Clarity(settings=Settings(_env_file=None))
+
+    assert clarity.settings.keys_dir is None
+    assert clarity.tokens.public_key_jwk()
+    assert list(tmp_path.iterdir()) == []

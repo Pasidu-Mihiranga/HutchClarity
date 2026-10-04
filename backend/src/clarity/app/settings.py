@@ -89,7 +89,15 @@ class Settings(BaseSettings):
             "Unset keeps the key in memory, so a read-only container still starts."
         ),
     )
-    keys_dir: Path = Field(default=Path(".keys"), alias="KEYS_DIR")
+    keys_dir: Path | None = Field(
+        default=None,
+        alias="KEYS_DIR",
+        description=(
+            "Directory for the development keys this process persists: the "
+            "customer token issuer key. Unset keeps it in memory, so every "
+            "restart signs everyone out."
+        ),
+    )
     keycloak_issuer: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_ISSUER")
     keycloak_audience: str = Field(default="clarity-api", alias="CLARITY_KEYCLOAK_AUDIENCE")
     keycloak_jwks_url: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_JWKS_URL")

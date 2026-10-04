@@ -1,6 +1,8 @@
 // Clarity chat state machine and API calls.
 // All API calls target the hutch-sim backend at NEXT_PUBLIC_API_BASE (default :8000).
 
+import { expireSession, readToken } from "@/lib/session";
+
 export type Lang = "en" | "si" | "ta";
 
 export type ResultKind =
@@ -278,12 +280,10 @@ export function makeInitialState(): ClarityState {
 async function apiFetch<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const token =
-    typeof window !== "undefined"
-      ? (window.sessionStorage.getItem("clarity_token") ?? "")
-      : "";
+  const token = typeof window !== "undefined" ? (readToken() ?? "") : "";
   if (token) (opts.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, opts);
+  if (res.status === 401 && typeof window !== "undefined") expireSession();
   if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}`);
   return res.json() as Promise<T>;
 }

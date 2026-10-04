@@ -4,6 +4,16 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Fixed (customer sessions, #57)
+
+- `TokenIssuer` accepts `key_path` (public surface, `clarity.modules.iam`).
+  With `KEYS_DIR` set, the customer token key persists as
+  `KEYS_DIR/iam-issuer.pem`, so a redeploy or restart no longer signs every
+  customer out. `KEYS_DIR` is now optional and unset by default.
+- The customer web app sends a refused or missing session to `/login` and back,
+  instead of failing every chat turn with a 401; the chat waits for the
+  account to load before answering.
+
 ### Added (DEP01, CD01, #57, #58)
 
 - Added a private-network, single-VPS Compose deployment with persistent demo
