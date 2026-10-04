@@ -31,6 +31,7 @@ PUBLIC = {
     # starts, and the callback arrives from the provider's redirect, not from
     # an authenticated caller. What protects them is the single-use `state`,
     # PKCE, and the nonce check on the id token.
+    ("GET", "/v1/auth/sign-in-methods"),
     ("GET", "/v1/auth/staff/oidc/start"),
     ("GET", "/v1/auth/staff/oidc/callback"),
     ("POST", "/v1/auth/logout"),

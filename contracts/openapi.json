@@ -3615,6 +3615,30 @@
         ]
       }
     },
+    "/v1/auth/sign-in-methods": {
+      "get": {
+        "description": "How staff may sign in to this deployment.\n\nThe console has to know, because the two paths look nothing alike: one\nis a redirect to the provider, the other a form. Asking is better than\nguessing, and better than the console carrying its own build-time\nsetting that can disagree with what the API is actually configured for.\n\nPublic: it names mechanisms, not people, and a caller who cannot sign\nin learns only what they would see on the sign-in screen anyway.",
+        "operationId": "sign_in_methods_v1_auth_sign_in_methods_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sign In Methods V1 Auth Sign In Methods Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sign In Methods",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/staff/login": {
       "post": {
         "description": "Sign in against the staff directory. The server assigns the role.\n\n**Simulated** accounts, for the synthetic profiles. Production federates\nHUTCH SSO and this route answers 404 (I9). A wrong password and a wrong\nstep-up code return the same refusal.",

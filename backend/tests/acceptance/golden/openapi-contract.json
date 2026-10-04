@@ -126,6 +126,12 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/auth/sign-in-methods": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/auth/staff/oidc/callback": {
       "parameters": [
         "query:code?",
