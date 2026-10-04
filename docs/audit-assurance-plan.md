@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phases 1 and 3, and the core of Phase 2, landed 2026-10-04; Phase 4 is next. **Created:** 2026-10-04. **Revision:** 6.
+> **Status:** In progress. Phases 1, 3 and 4, and the core of Phase 2, landed 2026-10-04; Phase 5 (dashboard) is next. **Created:** 2026-10-04. **Revision:** 7.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -363,11 +363,13 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 4: Detection and response
 
-- [ ] `modules/assurance` consuming outbox events
-- [ ] Risk rule packs for the scenarios in section 5.7, thresholds in the policy store
-- [ ] Alert lifecycle, deduplication, SLA escalation, four-eyes closure
-- [ ] Liveness heartbeat for the writer, checkpointing and detection
-- [ ] Chain-break playbook flipping the kill switches
+- [x] `modules/assurance`, a leaf module reading the trail ([ADR-0037](adr/0037-assurance-is-a-leaf-module-that-reacts-to-the-trail.md)). It reads the trail rather than subscribing to the bus: the trail already holds every event (W1) **and** the identity and request records the bus never carried, which the rules need to attribute an amount to a person
+- [x] Eight counted rules with thresholds in `config/policy/audit.yaml`: structuring, self-approval, money without proof, switch-then-pay, break-glass used, mass audit read, denial spike, brute force. Each alert cites the `seq` numbers that justify it
+- [ ] The remaining scenarios in 5.7: snooping, collusion, budget pressure, grant abuse, off-pattern, agent pressure. Each needs a signal the trail does not yet carry, or a baseline of normal behaviour to compare against
+- [x] Alert lifecycle (`open`, `acknowledged`, `investigating`, `disposed` with a reason), repeats folded into the open alert, escalation once on `assurance.alert.ack_sla`, closure by a second person for high and critical, never by the subject
+- [x] Liveness: a heartbeat on every detection run including a quiet one, checked from outside the loop; a checkpoint gap is critical
+- [ ] A liveness heartbeat for the audit *writer* specifically (outbox lag): the writer is in-process today, so a stalled writer shows as a stalled request rather than a quiet queue
+- [x] Chain-break playbook: `auto_fix_global` and `customer_actions` to the safe side, only ever towards safe, recorded
 
 | # | Given | When | Then |
 |---|---|---|---|

@@ -64,6 +64,27 @@
         "title": "ActionView",
         "type": "object"
       },
+      "AlertDisposal": {
+        "additionalProperties": false,
+        "description": "Close an alert. A reason is always required.",
+        "properties": {
+          "disposition": {
+            "description": "confirmed | false_positive | accepted_risk",
+            "title": "Disposition",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "disposition",
+          "reason"
+        ],
+        "title": "AlertDisposal",
+        "type": "object"
+      },
       "ApproveRequest": {
         "additionalProperties": false,
         "description": "Who approves and whether they stepped up come from the token.\n\nNeither is accepted here: a caller that could name its own approver could\nsatisfy four-eyes alone, and one that could assert its own step-up would\nmake the approval audit worthless.",
@@ -2190,6 +2211,259 @@
         "summary": "Ai Usage",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/assurance/alerts": {
+      "get": {
+        "description": "The alert queue. Each alert cites the trail records that justify it.",
+        "operationId": "list_alerts_v1_assurance_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Alerts V1 Assurance Alerts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Alerts",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/acknowledge": {
+      "post": {
+        "operationId": "acknowledge_alert_v1_assurance_alerts__alert_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Acknowledge Alert V1 Assurance Alerts  Alert Id  Acknowledge Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge Alert",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/dispose": {
+      "post": {
+        "description": "Close an alert with a disposition and a reason.\n\nNever by its own subject, and a high or critical alert is closed by\nsomeone other than whoever acknowledged it.",
+        "operationId": "dispose_alert_v1_assurance_alerts__alert_id__dispose_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertDisposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dispose Alert V1 Assurance Alerts  Alert Id  Dispose Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dispose Alert",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/investigate": {
+      "post": {
+        "operationId": "investigate_alert_v1_assurance_alerts__alert_id__investigate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Investigate Alert V1 Assurance Alerts  Alert Id  Investigate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Investigate Alert",
+        "tags": [
+          "assurance"
         ]
       }
     },

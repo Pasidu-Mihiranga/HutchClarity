@@ -58,6 +58,7 @@ from clarity.interfaces.http.auth import (
 from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
     ActionView,
+    AlertDisposal,
     ApproveRequest,
     AuditGrantRequest,
     AuditGrantRevoke,
@@ -98,6 +99,12 @@ from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
+from clarity.modules.assurance.public import (
+    Alert,
+    AlertNotFound,
+    AlertRefused,
+    Disposition,
+)
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
 from clarity.modules.iam.public import (
@@ -254,15 +261,46 @@ async def _sweep_grant_endings(stop: asyncio.Event) -> None:
             _log.exception("recording grant endings failed; retrying next sweep")
 
 
+async def _run_detection(stop: asyncio.Event) -> None:
+    """Run risk detection over the trail on a schedule (Phase 4, ADR-0037).
+
+    Liveness is checked *before* each run, not inside it: a loop that has
+    stopped cannot report that it stopped, so the check has to see the
+    heartbeat from the outside. One failed run is logged and retried on the
+    next tick; a run that keeps failing stops the heartbeat, and the liveness
+    check turns that silence into a critical alert.
+    """
+    while not stop.is_set():
+        try:
+            interval = get_clarity().assurance.sweep_interval().total_seconds()
+        except Exception:
+            _log.exception("could not resolve assurance.detection.interval; using 300s")
+            interval = 300.0
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(interval, 1.0))
+            return
+        except TimeoutError:
+            pass
+        try:
+            await run_in_threadpool(get_clarity().assurance.check_liveness)
+            await run_in_threadpool(get_clarity().assurance.run)
+        except Exception:
+            _log.exception("risk detection failed; retrying next interval")
+
+
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     stop = asyncio.Event()
-    sweeper = asyncio.create_task(_sweep_grant_endings(stop))
+    background = [
+        asyncio.create_task(_sweep_grant_endings(stop)),
+        asyncio.create_task(_run_detection(stop)),
+    ]
     try:
         yield
     finally:
         stop.set()
-        await sweeper
+        for task in background:
+            await task
 
 
 def create_app(clarity: Clarity | None = None) -> FastAPI:
@@ -785,6 +823,82 @@ def _register_routes(app: FastAPI) -> None:
         return _grant_call(
             lambda: clarity.audit_grants.break_glass(
                 principal, permission=permission, reason=body.reason
+            )
+        )
+
+    # ------------------------------------------------------------------ #
+    # Assurance: alerts raised from the trail (audit assurance plan Phase 4)
+    # ------------------------------------------------------------------ #
+
+    def _alert_call(call: Callable[[], Alert]) -> dict[str, Any]:
+        """Run one lifecycle move and map its refusals onto HTTP.
+
+        Rule refusals are 403s, so the refusal handler records each one in the
+        trail with the rule that refused it.
+        """
+        try:
+            return call().model_dump(mode="json")
+        except AlertNotFound as error:
+            raise HTTPException(status_code=404, detail="no such alert") from error
+        except AlertRefused as error:
+            status = {
+                "NOT_PERMITTED": 403,
+                "SELF_DISPOSAL": 403,
+                "SECOND_PERSON": 403,
+            }.get(error.code, 409)
+            raise HTTPException(status_code=status, detail=f"{error.code}: {error}") from error
+
+    @app.get("/v1/assurance/alerts", tags=["assurance"])
+    def list_alerts(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+        open_only: bool = False,
+    ) -> dict[str, Any]:
+        """The alert queue. Each alert cites the trail records that justify it."""
+        alerts = clarity.assurance.alerts(open_only=open_only)
+        last = clarity.assurance.last_run()
+        return {
+            "alerts": [alert.model_dump(mode="json") for alert in alerts],
+            "detection_last_ran_at": last.isoformat() if last else None,
+        }
+
+    @app.post("/v1/assurance/alerts/{alert_id}/acknowledge", tags=["assurance"])
+    def acknowledge_alert(
+        alert_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        return _alert_call(lambda: clarity.assurance.acknowledge(principal, alert_id))
+
+    @app.post("/v1/assurance/alerts/{alert_id}/investigate", tags=["assurance"])
+    def investigate_alert(
+        alert_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        return _alert_call(lambda: clarity.assurance.investigate(principal, alert_id))
+
+    @app.post("/v1/assurance/alerts/{alert_id}/dispose", tags=["assurance"])
+    def dispose_alert(
+        alert_id: str,
+        body: AlertDisposal,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        """Close an alert with a disposition and a reason.
+
+        Never by its own subject, and a high or critical alert is closed by
+        someone other than whoever acknowledged it.
+        """
+        try:
+            disposition = Disposition(body.disposition)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=422, detail=f"unknown disposition {body.disposition!r}"
+            ) from error
+        return _alert_call(
+            lambda: clarity.assurance.dispose(
+                principal, alert_id, disposition=disposition, reason=body.reason
             )
         )
 

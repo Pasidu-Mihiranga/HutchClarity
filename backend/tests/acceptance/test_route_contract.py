@@ -63,6 +63,12 @@ SIGNED_IN = {
     ("POST", "/v1/audit/grants/{grant_id}/revoke"),
     ("POST", "/v1/audit/grants/{grant_id}/recertify"),
     ("POST", "/v1/audit/break-glass"),
+    # Assurance alerts (Phase 4): reading needs audit:read, the lifecycle
+    # needs alert:dispose.
+    ("GET", "/v1/assurance/alerts"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/acknowledge"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/investigate"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/dispose"),
     ("GET", "/v1/auth/me"),
     ("POST", "/v1/cases"),
     ("GET", "/v1/cases/{case_id}"),

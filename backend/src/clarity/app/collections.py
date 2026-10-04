@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from clarity.modules.actions.capability import ATTEMPTS as ACTION_ATTEMPTS
 from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
+from clarity.modules.assurance.public import ALERTS, HEARTBEATS
 from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
@@ -86,6 +87,9 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     BATCHES,
     # insights
     PROJECTIONS,
+    # assurance
+    ALERTS,
+    HEARTBEATS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,

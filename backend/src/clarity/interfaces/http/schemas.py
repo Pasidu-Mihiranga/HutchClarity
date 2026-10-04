@@ -358,3 +358,10 @@ class BreakGlassRequest(ApiModel):
 
     permission: str
     reason: str
+
+
+class AlertDisposal(ApiModel):
+    """Close an alert. A reason is always required."""
+
+    disposition: str = Field(description="confirmed | false_positive | accepted_risk")
+    reason: str

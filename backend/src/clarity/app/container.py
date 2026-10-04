@@ -49,6 +49,7 @@ from clarity.modules.actions.capability import (
     StoredPlanRepository,
     ToolLayer,
 )
+from clarity.modules.assurance.public import AssuranceService
 from clarity.modules.autopsy.public import AutopsyService, ComplaintSource
 from clarity.modules.case.public import (
     CASE_SEQUENCE,
@@ -532,6 +533,24 @@ AUDIT_TYPE_FOR_EVENT: dict[EventType, AuditEventType] = {
 #: ISO 8601 durations from the policy store, such as ``PT15M``.
 _DURATION: TypeAdapter[timedelta] = TypeAdapter(timedelta)
 
+#: Event fields carried into the audit detail, where present. Amounts, outcomes
+#: and identifiers: what a counted risk rule reads and an investigator needs.
+_AUDITED_FACTS = (
+    "amount_lkr",
+    "total_amount_lkr",
+    "money_at_stake_lkr",
+    "outcome",
+    "confirmed_by",
+    "approver_roles",
+    "case_id",
+    "plan_id",
+    "decision_id",
+    "receipt_id",
+    "rule_id",
+    "risk_type",
+    "band",
+)
+
 #: Keys in an event's data that name the object it is about, most specific first.
 _OBJECT_KEYS = ("receipt_id", "plan_id", "decision_id", "action_id", "case_id", "rule_id")
 
@@ -558,6 +577,7 @@ class Clarity:
         audit: AuditLedger | None = None,
         audit_checkpoints: Checkpointer | None = None,
         audit_grants: AuditGrants | None = None,
+        assurance: AssuranceService | None = None,
     ) -> None:
         # The only place this process reads its environment (B07, I20). Tests
         # pass a Settings instance instead of setting variables.
@@ -690,6 +710,16 @@ class Clarity:
         self.audit_grants = audit_grants or self._new_audit_grants(clock)
         self._open_audit_trail()
         self.switches = SwitchBoard(audit_sink=self.audit)
+        # Detection, alerts and the chain-break playbook (ADR-0037). It reads
+        # the trail and the switches; no module calls it and it calls none.
+        self.assurance = assurance or AssuranceService(
+            self.audit.open_unit,
+            audit=self.audit,
+            switches=self.switches,
+            verify=self.audit_checkpoints.verify,
+            resolve=lambda key, as_of: self.policies.resolve(key, as_of=as_of),
+            clock=(lambda: clock) if clock is not None else None,
+        )
         # Messaging: the bus, the relay that drains the outbox onto it, and the
         # consumer framework that wraps each handler in deduplication, backoff
         # and dead-lettering (B03, B04).
@@ -1031,6 +1061,12 @@ class Clarity:
                 "subject": event.subject,
                 "correlation_id": event.correlation_id,
                 "object": object_ref,
+                # The facts an investigation counts on: an amount, an outcome,
+                # the ids that join one case's records together. No PII: money
+                # and identifiers only (I13). Without these the trail records
+                # that a refund happened but not how much, and a rule counting
+                # refunds near the cap would have nothing to count.
+                **{key: data[key] for key in _AUDITED_FACTS if key in data},
             },
             now=event.time,
         )
@@ -1169,6 +1205,7 @@ class Clarity:
                 audit=self.audit,
                 audit_checkpoints=self.audit_checkpoints,
                 audit_grants=self.audit_grants,
+                assurance=self.assurance,
             )
         return Clarity(
             rules_dir=self._rules_dir,
@@ -1185,4 +1222,5 @@ class Clarity:
             audit=self.audit,
             audit_checkpoints=self.audit_checkpoints,
             audit_grants=self.audit_grants,
+            assurance=self.assurance,
         )

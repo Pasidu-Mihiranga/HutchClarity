@@ -56,3 +56,143 @@ keys:
     values:
       - value: PT4H
         version: 1
+
+  # -- assurance: detection and alerts (Phase 4, ADR-0037) --------------------
+  # ASSUMPTION - REQUIRES HUTCH VALIDATION. Each threshold decides how loud a
+  # rule is; a false-positive rate feeds a change here through governance,
+  # never a live edit.
+
+  - key: assurance.detection.interval
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: How often risk detection runs over the audit trail.
+    values:
+      - value: PT5M
+        version: 1
+
+  - key: assurance.liveness.max_silence
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Longest detection may be silent before that silence is itself critical.
+    values:
+      - value: PT30M
+        version: 1
+
+  - key: assurance.checkpoint.max_gap
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Longest the trail may go unsigned before a critical alert.
+    values:
+      - value: PT1H
+        version: 1
+
+  - key: assurance.alert.ack_sla
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: An open alert nobody acknowledges within this is escalated.
+    values:
+      - value: PT4H
+        version: 1
+
+  - key: assurance.structuring.window
+    kind: duration
+    owner_role: risk
+    tags: [operational]
+    description: Window for counting approvals just under the four-eyes cap.
+    values:
+      - value: PT1H
+        version: 1
+
+  - key: assurance.structuring.min_count
+    kind: number
+    owner_role: risk
+    tags: [operational]
+    description: Approvals just under the cap by one person before it is a finding.
+    values:
+      - value: "5"
+        version: 1
+
+  - key: assurance.structuring.near_cap_fraction
+    kind: number
+    owner_role: risk
+    tags: [operational]
+    description: Fraction of the four-eyes cap above which an amount counts as "just under".
+    values:
+      - value: "0.9"
+        version: 1
+
+  - key: assurance.receipt.grace
+    kind: duration
+    owner_role: risk
+    tags: [operational]
+    description: How long an execution may go without a receipt before it is a finding.
+    values:
+      - value: PT15M
+        version: 1
+
+  - key: assurance.switch_then_pay.window
+    kind: duration
+    owner_role: risk
+    tags: [operational]
+    description: Window in which a switch off, money moving and the switch on again is one pattern.
+    values:
+      - value: PT6H
+        version: 1
+
+  - key: assurance.otp_failures.window
+    kind: duration
+    owner_role: risk
+    tags: [operational]
+    description: Window for counting failed sign-in codes.
+    values:
+      - value: PT15M
+        version: 1
+
+  - key: assurance.otp_failures.min_count
+    kind: number
+    owner_role: risk
+    tags: [operational]
+    description: Failed codes in the window before it is a finding.
+    values:
+      - value: "10"
+        version: 1
+
+  - key: assurance.denials.window
+    kind: duration
+    owner_role: risk
+    tags: [operational]
+    description: Window for counting refusals for one account.
+    values:
+      - value: PT15M
+        version: 1
+
+  - key: assurance.denials.min_count
+    kind: number
+    owner_role: risk
+    tags: [operational]
+    description: Refusals for one account in the window before it is a finding.
+    values:
+      - value: "10"
+        version: 1
+
+  - key: assurance.audit_reads.window
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Window for counting reads of the audit trail by one account.
+    values:
+      - value: PT1H
+        version: 1
+
+  - key: assurance.audit_reads.min_count
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Audit reads by one account in the window before it is a finding.
+    values:
+      - value: "50"
+        version: 1

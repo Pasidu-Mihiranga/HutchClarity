@@ -12,6 +12,7 @@ from __future__ import annotations
 #: Collection name prefix -> owning module. The prefix is the part before the
 #: first dot, which is how every collection in B02 and B04 is already named.
 OWNERS: dict[str, str] = {
+    "assurance": "assurance",
     "case": "case",
     "actions": "actions",
     "receipts": "receipts",

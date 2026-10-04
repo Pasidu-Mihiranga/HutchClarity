@@ -122,6 +122,15 @@ class AuditEventType(StrEnum):
     AUDIT_READ = "audit.read"
     """Someone read the trail: who watched the watchers (rule 5)."""
 
+    # -- assurance (audit assurance plan Phase 4) ------------------------- #
+
+    ALERT_RAISED = "alert.raised"
+    ALERT_ACKNOWLEDGED = "alert.acknowledged"
+    ALERT_INVESTIGATING = "alert.investigating"
+    ALERT_DISPOSED = "alert.disposed"
+    ALERT_ESCALATED = "alert.escalated"
+    """Nobody acknowledged it within the SLA."""
+
     CHECKPOINT_ISSUED = "checkpoint.issued"
     """The head was signed with the checkpoint key (Phase 2, ADR-0035)."""
 

@@ -46,6 +46,15 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/assurance/alerts": {
+      "parameters": [
+        "header:authorization?",
+        "query:open_only?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/audit": {
       "parameters": [
         "header:authorization?",
@@ -301,6 +310,33 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/assurance/alerts/{alert_id}/acknowledge": {
+      "parameters": [
+        "header:authorization?",
+        "path:alert_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/assurance/alerts/{alert_id}/dispose": {
+      "parameters": [
+        "header:authorization?",
+        "path:alert_id"
+      ],
+      "request": "AlertDisposal",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/assurance/alerts/{alert_id}/investigate": {
+      "parameters": [
+        "header:authorization?",
+        "path:alert_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/audit/break-glass": {
       "parameters": [
         "header:authorization?"
@@ -534,6 +570,16 @@
         "action_id",
         "status",
         "type"
+      ]
+    },
+    "AlertDisposal": {
+      "fields": [
+        "disposition",
+        "reason"
+      ],
+      "required": [
+        "disposition",
+        "reason"
       ]
     },
     "ApproveRequest": {

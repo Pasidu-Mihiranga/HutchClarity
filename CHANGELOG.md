@@ -4,6 +4,35 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (audit assurance Phase 4, ADR-0037)
+
+- **New module `clarity.modules.assurance`** (public surface: `AssuranceService`,
+  `Alert`, `AlertState`, `Disposition`, `AlertRefused`, `AlertNotFound`,
+  `Band`, `Finding`, `RULES`, `ALERTS`, `HEARTBEATS`, `PLAYBOOK_SWITCHES`,
+  `SECOND_PERSON_BANDS`, `CHAIN_BREAK`, `CHECKPOINT_GAP`, `DETECTOR_SILENT`).
+  A leaf: it calls no module and no module calls it.
+- **Eight counted risk rules** over the audit trail, thresholds in
+  `config/policy/audit.yaml`: structuring, self-approval, money without proof,
+  switch-then-pay, break-glass used, mass audit read, denial spike, brute
+  force. Plus chain break, checkpoint gap and detector silence.
+- **New `/v1` routes**, all signed-in: `GET /v1/assurance/alerts` and
+  `POST /v1/assurance/alerts/{alert_id}/acknowledge|investigate|dispose`.
+  OpenAPI snapshot regenerated on purpose (four routes added); SDK types
+  regenerated.
+- Audit event types `alert.raised`, `alert.acknowledged`,
+  `alert.investigating`, `alert.disposed`, `alert.escalated`.
+- Collections `assurance.alerts` and `assurance.heartbeats`; 15 new policy keys
+  under `assurance.*`.
+- Detection and liveness run on a schedule in each API process
+  (`assurance.detection.interval`, PT5M).
+
+### Changed (audit assurance Phase 4)
+
+- **Audit records for domain events now carry money facts** in their detail:
+  `amount_lkr`, `total_amount_lkr`, `outcome`, `confirmed_by`,
+  `approver_roles` and the related identifiers, where the event has them. A
+  counted rule has nothing to count without them. No PII (I13).
+
 ### Added (audit assurance Phase 3, grant endings)
 
 - Audit event types `grant.expired` and `grant.lapsed` (a missed
