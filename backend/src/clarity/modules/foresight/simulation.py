@@ -15,41 +15,51 @@ separates a planning aid from a liability:
 3. **Advisory only.** Nothing here can trigger a customer action. It returns a
    report; a product manager decides what to do with it.
 
-**Prototype note.** Plan §3.4 uses MiroFish/OASIS swarm simulation. This is the
-statistical baseline that plan §12.9 requires *alongside* it - historic
-complaint rates per segment, scaled by how much the change affects each one.
-The baseline is what a simulation would be calibrated against, and it carries
-no licensing or maturity risk. Until it is backtested on ≥3 real launches
-(plan §3.4 gate), neither should be used to make a launch decision.
+**Prototype note.** Plan section 3.4 uses MiroFish/OASIS swarm simulation. This
+is the statistical baseline that plan section 12.9 requires *alongside* it:
+historic complaint rates per segment, scaled by how much the change affects each
+one. The baseline is what a simulation would be calibrated against, and it
+carries no licensing or maturity risk. Until it is backtested on at least three
+real launches (plan section 3.4 gate), neither should be used to make a launch
+decision.
+
+**What C1 changed and why.** Every tunable here used to be a Python constant and
+every sentence a literal. Both now come from outside the engine: numbers from
+the policy store (I10) and wording from ``platform/content/foresight.py``. Two
+consequences are deliberate and load-bearing:
+
+- :class:`Scenario` carries a required ``effective_date``, and the whole run
+  resolves policy ``as_of`` that date. A rehearsal is about a change that lands
+  on a day, so the parameters it uses are the ones in force on that day. Before
+  C1 the field was an optional free-text string that nothing read.
+- :class:`Scenario` is frozen and its ``scenario_id`` is a real field. It used
+  to be a ``@property`` calling ``new_id``, so every read returned a different
+  id: a scenario could not be stored, compared or cited, which is also why
+  nothing stored one.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from clarity.kernel.common import money
 from clarity.kernel.ids import new_id
+from clarity.modules.foresight.catalogue import (
+    Bands,
+    ChangeType,
+    ForesightCatalogue,
+    Segment,
+    ThemeCatalogue,
+)
+from clarity.platform.content import foresight as wording
 
 if TYPE_CHECKING:  # the backtest imports this module, so only for typing
     from clarity.modules.foresight.backtest import CalibrationReport
-
-
-class ChangeType(StrEnum):
-    PACK_RETIRED = "pack_retired"
-    PRICE_INCREASE = "price_increase"
-    FUP_TIGHTENED = "fup_tightened"
-    POLICY_CHANGE = "policy_change"
-    OUTAGE = "outage"
-    PACK_MIGRATION = "pack_migration"
-    FUP_DISCLOSURE_CHANGE = "fup_disclosure_change"
-    VAS_CONSENT_CHANGE = "vas_consent_change"
-    SOCIAL_PACK_SCOPE_CHANGE = "social_pack_scope_change"
-    PAYG_PRICE_CHANGE = "payg_price_change"
-    NEW_PACK = "new_pack"
-    PROMOTION_END = "promotion_end"
 
 
 class VolumeBand(StrEnum):
@@ -60,91 +70,44 @@ class VolumeBand(StrEnum):
     HIGH = "high"
 
 
+def as_of_for(effective_date: date) -> datetime:
+    """The moment a scenario's policy is resolved at.
+
+    Midnight UTC on the day the change takes effect. A change is announced for a
+    date rather than an instant, and resolving at the start of that day is the
+    reading that includes a value whose window opens on it.
+    """
+    return datetime.combine(effective_date, time.min, tzinfo=UTC)
+
+
 @dataclass(frozen=True)
-class Segment:
-    """An aggregated persona. No individual data (deck S8)."""
-
-    name: str
-    share_of_base: Decimal
-    """Fraction of the subscriber base, 0-1."""
-    monthly_complaint_rate: Decimal
-    """Historic complaints per subscriber per month, from aggregates."""
-    price_sensitivity: Decimal = Decimal("1.0")
-    data_intensity: Decimal = Decimal("1.0")
-
-    def __post_init__(self) -> None:
-        if not Decimal("0") <= self.share_of_base <= Decimal("1"):
-            raise ValueError("share_of_base must be a fraction between 0 and 1")
-
-
-#: Illustrative segments from the deck (S11: students, dual-SIM, tourists,
-#: parents). Shares and rates are **ASSUMPTIONS** for the demo and must be
-#: replaced with real aggregates before any launch decision.
-DEMO_SEGMENTS: tuple[Segment, ...] = (
-    Segment("students", Decimal("0.28"), Decimal("0.09"), Decimal("1.6"), Decimal("1.8")),
-    Segment("dual-SIM users", Decimal("0.22"), Decimal("0.06"), Decimal("1.3"), Decimal("0.9")),
-    Segment("parents", Decimal("0.19"), Decimal("0.07"), Decimal("1.1"), Decimal("1.0")),
-    Segment("tourists", Decimal("0.06"), Decimal("0.12"), Decimal("0.7"), Decimal("1.4")),
-    Segment("low-usage prepaid", Decimal("0.25"), Decimal("0.04"), Decimal("1.4"), Decimal("0.5")),
-)
-
-#: Which complaint themes a change type tends to produce, and how strongly.
-#: Derived from the deck's known causes (S11), not from a model.
-_THEMES: dict[ChangeType, tuple[tuple[str, Decimal, str], ...]] = {
-    ChangeType.PACK_RETIRED: (
-        ("pack sunset confusion", Decimal("1.8"), "data_intensity"),
-        ("wrong pack after migration", Decimal("1.2"), "data_intensity"),
-        ("balance burn after pack ends", Decimal("1.0"), "data_intensity"),
-    ),
-    ChangeType.PRICE_INCREASE: (
-        ("unexpected charge amount", Decimal("1.6"), "price_sensitivity"),
-        ("balance disappeared faster", Decimal("1.1"), "price_sensitivity"),
-    ),
-    ChangeType.FUP_TIGHTENED: (
-        ("data stopped at cap", Decimal("2.0"), "data_intensity"),
-        ("unlimited not unlimited", Decimal("1.4"), "data_intensity"),
-    ),
-    ChangeType.POLICY_CHANGE: (
-        ("consent and subscription confusion", Decimal("1.3"), "price_sensitivity"),
-    ),
-    ChangeType.OUTAGE: (
-        ("service unavailable", Decimal("2.4"), "data_intensity"),
-        ("pack validity lost during outage", Decimal("1.5"), "data_intensity"),
-    ),
-}
-
-_THEME_ALIASES: dict[ChangeType, ChangeType] = {
-    ChangeType.PACK_MIGRATION: ChangeType.PACK_RETIRED,
-    ChangeType.FUP_DISCLOSURE_CHANGE: ChangeType.FUP_TIGHTENED,
-    ChangeType.VAS_CONSENT_CHANGE: ChangeType.POLICY_CHANGE,
-    ChangeType.SOCIAL_PACK_SCOPE_CHANGE: ChangeType.PACK_RETIRED,
-    ChangeType.PAYG_PRICE_CHANGE: ChangeType.PRICE_INCREASE,
-    ChangeType.NEW_PACK: ChangeType.PACK_RETIRED,
-    ChangeType.PROMOTION_END: ChangeType.PRICE_INCREASE,
-}
-
-
-@dataclass
 class Scenario:
-    """A change to rehearse."""
+    """A change to rehearse.
+
+    Frozen, because a run cites the scenario it rehearsed and a scenario that
+    could change afterwards would make the citation meaningless.
+    """
 
     name: str
     change_type: ChangeType
+    effective_date: date
+    """When the change takes effect. Drives policy resolution for the whole run."""
     affected_share: Decimal = Decimal("1.0")
     """Fraction of the base the change touches."""
     severity: Decimal = Decimal("1.0")
     """How big the change is, relative to a typical one of its type."""
-    segments: tuple[Segment, ...] = DEMO_SEGMENTS
+    segments: tuple[Segment, ...] | None = None
+    """Explicit segments, or ``None`` for the policy catalogue at ``effective_date``."""
     affected_products: tuple[str, ...] = ()
-    effective_date: str | None = None
     business_context: str = ""
+    scenario_id: str = field(default_factory=lambda: new_id("SIM"))
 
     @property
-    def scenario_id(self) -> str:
-        return new_id("SIM")
+    def as_of(self) -> datetime:
+        return as_of_for(self.effective_date)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Prediction:
     """One predicted theme for one segment."""
 
@@ -164,10 +127,14 @@ class ForesightReport:
     scenario: str
     predictions: list[Prediction]
     basis: str
+    scenario_id: str = ""
+    effective_date: date | None = None
+    generated_at: datetime | None = None
+    """When the run happened, from the injected clock (I11)."""
     caveats: list[str] = field(default_factory=list)
     backtested: bool = False
     calibration: CalibrationReport | None = None
-    """The backtest this report rests on, if any (plan 02 §3.4)."""
+    """The backtest this report rests on, if any (plan 02 section 3.4)."""
 
     @property
     def top_themes(self) -> list[str]:
@@ -179,96 +146,126 @@ class ForesightReport:
 
     @property
     def is_decision_ready(self) -> bool:
-        """False until backtested against real launches (plan §3.4 gate)."""
+        """False until backtested against real launches (plan section 3.4 gate)."""
         return self.backtested
 
 
-_MITIGATIONS: dict[str, str] = {
-    "pack sunset confusion": "Publish a migration card and a self-service flow before the change.",
-    "wrong pack after migration": "Add a provisioning check and a one-tap correction.",
-    "balance burn after pack ends": "Offer data-stop and a spend cap at pack end.",
-    "unexpected charge amount": "Show the new price in the pack truth label before purchase.",
-    "balance disappeared faster": "Send a proactive balance alert for affected segments.",
-    "data stopped at cap": "State the cap and after-cap speed at purchase; alert at 80% and 95%.",
-    "unlimited not unlimited": "Rename the offer and disclose the cap prominently.",
-    "consent and subscription confusion": "Re-confirm consent and brief agents on the new policy.",
-    "service unavailable": "Prepare an outage notice with an honest ETA.",
-    "pack validity lost during outage": "Pre-approve a validity extension rule.",
-}
-
-
 class Foresight:
-    """Statistical rehearsal of a change. Deterministic and explainable."""
+    """Statistical rehearsal of a change. Deterministic and explainable.
 
-    #: Score thresholds for the bands. Relative within one run.
-    _HIGH = Decimal("0.045")
-    _MEDIUM = Decimal("0.015")
+    Deterministic given the same scenario *and the same policy values*: two runs
+    of one scenario agree because they resolve the same keys at the same
+    ``as_of``, not because the numbers are compiled in.
+    """
+
+    def __init__(
+        self,
+        catalogue: ForesightCatalogue,
+        *,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._catalogue = catalogue
+        self._clock = clock or (lambda: datetime.now(tz=UTC))
 
     def run(
         self, scenario: Scenario, *, calibration: CalibrationReport | None = None
     ) -> ForesightReport:
-        predictions: list[Prediction] = []
+        as_of = scenario.as_of
+        bands = self._catalogue.bands(as_of)
+        catalogue = self._catalogue.themes(scenario.change_type, as_of)
+        segments = scenario.segments
+        if segments is None:
+            segments = self._catalogue.segments(as_of)
 
-        theme_type = _THEME_ALIASES.get(scenario.change_type, scenario.change_type)
-        for theme, weight, driver in _THEMES.get(theme_type, ()):
-            for segment in scenario.segments:
-                sensitivity = getattr(segment, driver, Decimal("1.0"))
-                score = (
-                    segment.share_of_base
-                    * segment.monthly_complaint_rate
-                    * weight
-                    * sensitivity
-                    * scenario.severity
-                    * scenario.affected_share
-                )
-                predictions.append(
-                    Prediction(
-                        theme=theme,
-                        segment=segment.name,
-                        band=self._band(score),
-                        relative_score=money(score * 1000) / 1000,
-                        suggested_mitigation=_MITIGATIONS.get(
-                            theme, "Review with CX before launch."
-                        ),
-                    )
-                )
-
+        predictions = [
+            Prediction(
+                theme=theme.theme,
+                segment=segment.name,
+                band=self._band(score, bands),
+                relative_score=money(score * 1000) / 1000,
+                suggested_mitigation=wording.mitigation_for(theme.theme),
+            )
+            for theme in catalogue.themes
+            for segment in segments
+            for score in (
+                self._score(theme.weight, theme.sensitivity_of(segment), segment, scenario),
+            )
+        ]
         predictions.sort(key=lambda p: p.relative_score, reverse=True)
+
         return ForesightReport(
             run_id=new_id("FOR"),
             scenario=scenario.name,
+            scenario_id=scenario.scenario_id,
+            effective_date=scenario.effective_date,
+            generated_at=self._clock(),
             predictions=predictions,
-            basis=(
-                "Statistical baseline over aggregated segments. No individual "
-                "customer data was read."
-            ),
-            caveats=self._caveats(calibration),
+            basis=wording.BASIS,
+            caveats=self._caveats(scenario, catalogue, bands, calibration),
             backtested=calibration is not None and calibration.is_calibrated,
             calibration=calibration,
         )
 
-    def _caveats(self, calibration: CalibrationReport | None) -> list[str]:
+    # ----------------------------------------------------------------- #
+
+    def _score(
+        self, weight: Decimal, sensitivity: Decimal, segment: Segment, scenario: Scenario
+    ) -> Decimal:
+        return (
+            segment.share_of_base
+            * segment.monthly_complaint_rate
+            * weight
+            * sensitivity
+            * scenario.severity
+            * scenario.affected_share
+        )
+
+    def _caveats(
+        self,
+        scenario: Scenario,
+        catalogue: ThemeCatalogue,
+        bands: Bands,
+        calibration: CalibrationReport | None,
+    ) -> list[str]:
         caveats = [
-            "Scenarios, not certainties (deck S11).",
-            "Volume bands are relative within this run and are not complaint counts.",
-            "Segment shares and complaint rates are ASSUMPTIONS for the demo.",
+            wording.CAVEATS["scenarios_not_certainties"],
+            wording.CAVEATS["bands_are_relative"],
+            wording.CAVEATS["segments_are_assumptions"],
         ]
-        if calibration is None:
+        if catalogue.borrowed_from is not None:
             caveats.append(
-                "Not backtested against real launches, so not usable for a launch decision."
+                wording.borrowed_themes_caveat(
+                    scenario.change_type.value, catalogue.borrowed_from.value
+                )
             )
+        if not catalogue.themes:
+            caveats.append(wording.no_themes_caveat(scenario.change_type.value))
+        if not bands.is_ordered:
+            caveats.append(wording.band_thresholds_caveat())
+
+        if calibration is None:
+            caveats.append(wording.CAVEATS["not_backtested"])
             return caveats
         caveats.append(f"Backtest: {calibration.summary()}")
         if not calibration.is_calibrated:
-            caveats.append(
-                "The backtest did not reach the plan §3.4 gate, so this report is "
-                "still not usable for a launch decision."
-            )
+            caveats.append(wording.CAVEATS["gate_not_reached"])
         return caveats
 
-    def _band(self, score: Decimal) -> VolumeBand:
-        if score >= self._HIGH:
+    def _band(self, score: Decimal, bands: Bands) -> VolumeBand:
+        if score >= bands.high:
             return VolumeBand.HIGH
-        if score >= self._MEDIUM:
+        if score >= bands.medium:
             return VolumeBand.MEDIUM
         return VolumeBand.LOW
+
+
+__all__ = [
+    "ChangeType",
+    "Foresight",
+    "ForesightReport",
+    "Prediction",
+    "Scenario",
+    "Segment",
+    "VolumeBand",
+    "as_of_for",
+]

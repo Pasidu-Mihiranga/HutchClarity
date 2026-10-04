@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Protocol
 
+from clarity.modules.foresight.catalogue import ForesightCatalogue
 from clarity.modules.foresight.simulation import Foresight, Prediction, Scenario, VolumeBand
 
 
@@ -36,8 +37,11 @@ class SeededPersonaSimulator:
 
     version = "seeded-persona-v1"
 
+    def __init__(self, catalogue: ForesightCatalogue) -> None:
+        self._catalogue = catalogue
+
     def run(self, scenario: Scenario, *, seed: int) -> tuple[Prediction, ...]:
-        baseline = Foresight().run(scenario).predictions
+        baseline = Foresight(self._catalogue).run(scenario).predictions
         adjusted: list[Prediction] = []
         for item in baseline:
             material = f"{seed}:{scenario.name}:{item.theme}:{item.segment}".encode()
@@ -56,11 +60,14 @@ class SeededPersonaSimulator:
 
 
 class ScenarioRehearsal:
-    def __init__(self, simulator: PersonaSimulator | None = None) -> None:
-        self._simulator = simulator or SeededPersonaSimulator()
+    def __init__(
+        self, catalogue: ForesightCatalogue, simulator: PersonaSimulator | None = None
+    ) -> None:
+        self._catalogue = catalogue
+        self._simulator = simulator or SeededPersonaSimulator(catalogue)
 
     def run(self, scenario: Scenario, *, seed: int = 42) -> SwarmReport:
-        baseline = Foresight().run(scenario).predictions
+        baseline = Foresight(self._catalogue).run(scenario).predictions
         swarm = self._simulator.run(scenario, seed=seed)
         by_key = {(item.theme, item.segment): item for item in swarm}
         comparison = tuple(
