@@ -92,6 +92,20 @@ test.describe("accessibility", () => {
     await audit(page, "/cases");
   });
 
+  test("the packages page has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+    await page.goto("/packages");
+    await expect(page.getByRole("heading", { name: "Packages" })).toBeVisible();
+    await audit(page, "/packages");
+  });
+
+  test("the usage page has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+    await page.goto("/usage");
+    await expect(page.getByRole("heading", { name: "Usage" })).toBeVisible();
+    await audit(page, "/usage");
+  });
+
   test("a chat in mid-journey has no serious violations", async ({ page, request }) => {
     await signedIn(page, await customerToken(request));
     // The confirm card, the citation and the journey nav only exist once a

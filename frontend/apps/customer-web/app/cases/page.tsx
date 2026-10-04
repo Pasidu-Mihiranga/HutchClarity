@@ -1,120 +1,84 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ClarityClient } from "@clarity/sdk";
+import Link from "next/link";
+import { EmptyState, ErrorState, Skeleton } from "@clarity/ui";
 import { CaseRow } from "@/components/CaseRow";
+import { useMe } from "@/lib/useMe";
 
-const client = new ClarityClient();
-
-type CaseItem = {
-  case_id: string;
-  cause?: string;
-  primary_cause?: string;
-  amount?: string;
-  currency?: string;
-  state?: string;
-  created_at?: string;
-};
-
-const DEMO_CASES: CaseItem[] = [
-  {
-    case_id: "demo-case-1",
-    cause: "VAS silent renewal",
-    amount: "99.00",
-    currency: "LKR",
-    state: "OPEN",
-    created_at: "2 Oct 2026",
-  },
-  {
-    case_id: "demo-case-2",
-    cause: "Duplicate data charge",
-    amount: "45.00",
-    currency: "LKR",
-    state: "RESOLVED",
-    created_at: "28 Sep 2026",
-  },
-];
-
+/**
+ * The customer's cases (E4).
+ *
+ * This page called `client.getCases()`, a method the SDK does not have. The
+ * call threw on every render, the `catch` swallowed it, and the page rendered
+ * two cases written into the source: "VAS silent renewal, LKR 99.00, OPEN" and
+ * "Duplicate data charge, LKR 45.00, RESOLVED". A customer with no cases saw
+ * two; a customer with three saw the same two. E5's typed client is what makes
+ * that impossible to write again, and this is the page it was hiding in.
+ *
+ * It now reads the cases out of `/v1/me/app`. An empty list is an empty state,
+ * and a failed load is an error state with a retry; neither is filled in.
+ */
 export default function CasesPage() {
-  const [cases, setCases] = useState<CaseItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // No token to set: the session is an HttpOnly cookie the SDK
-        // sends with credentials (B4).
-        // Typed through a narrow shape rather than `Record<string, unknown>`,
-        // whose values are `unknown` and so not callable. Pre-existing error,
-        // invisible because `npm run typecheck` only covers packages/sdk and
-        // never the apps (C05 devlog).
-        const withCases = client as unknown as { getCases?: () => Promise<unknown> };
-        const data = await withCases.getCases?.();
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setCases(data as CaseItem[]);
-        } else {
-          if (!cancelled) setCases(DEMO_CASES);
-        }
-      } catch {
-        if (!cancelled) setCases(DEMO_CASES);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { app, loading, error, refresh } = useMe();
 
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
-      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--muted)", marginBottom: 14 }}>
+      <h1
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+          color: "var(--muted)",
+          marginBottom: 14,
+        }}
+      >
         Cases
-      </p>
+      </h1>
 
       {loading ? (
         <div style={{ display: "grid", gap: 10 }}>
+          <p role="status" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+            Loading your cases
+          </p>
           {[1, 2].map((i) => (
-            <div
-              key={i}
-              style={{
-                height: 80,
-                borderRadius: "var(--radius-card-sm)",
-                border: "1px solid var(--line)",
-                background: "rgb(var(--c-surface-2))",
-                animation: "pulse 1.5s infinite",
-              }}
-            />
+            <Skeleton key={i} style={{ height: 80, borderRadius: "var(--radius-card-sm)" }} />
           ))}
         </div>
-      ) : cases.length === 0 ? (
-        <div
-          style={{
-            border: "1px dashed var(--line)",
-            borderRadius: "var(--radius)",
-            background: "rgb(var(--c-surface))",
-            padding: "32px 20px",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: 650, color: "var(--ink)" }}>No cases yet</p>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--muted)" }}>
-            If a charge looks wrong, tap &ldquo;Fix this&rdquo; on the home screen.
-          </p>
+      ) : !app ? (
+        <ErrorState
+          title="We could not load your cases"
+          message={error ?? "Please try again in a moment."}
+          onRetry={refresh}
+        />
+      ) : app.cases.length === 0 ? (
+        <div className="h-card" style={{ borderStyle: "dashed" }}>
+          <EmptyState
+            title="No cases yet"
+            description="If a charge looks wrong, ask Clarity about it and it will open one for you."
+            action={
+              <Link href="/clarity" className="h-btn h-btn-primary" style={{ textDecoration: "none" }}>
+                Ask Clarity
+              </Link>
+            }
+          />
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {cases.map((c) => (
-            <CaseRow
-              key={c.case_id}
-              id={c.case_id}
-              cause={(c.cause ?? c.primary_cause) || "Unknown charge"}
-              amount={c.amount ?? "0.00"}
-              currency={c.currency}
-              state={c.state ?? "OPEN"}
-              date={c.created_at}
-            />
+        <ul style={{ display: "grid", gap: 10, listStyle: "none", margin: 0, padding: 0 }}>
+          {app.cases.map((row) => (
+            <li key={row.case_id}>
+              <CaseRow
+                id={row.case_id}
+                caseNo={row.case_no}
+                state={row.state}
+                open={row.open}
+                headline={row.headline}
+                outcome={row.outcome}
+                openedAt={row.opened_at}
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </main>
   );

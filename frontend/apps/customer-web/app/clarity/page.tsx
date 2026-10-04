@@ -50,7 +50,7 @@ import type { ResultKind } from "@/lib/clarityChat";
 const CHAT_I18N: Record<Lang, Record<string, string>> = {
   en: {
     clarityBrand: "Clarity", claritySubtitle: "Hutch AI Assistant",
-    chatHi: "Hi {name}", howHelpToday: "How can I help you today?",
+    chatHi: "Hi {name}", chatHiAnon: "Hi there", howHelpToday: "How can I help you today?",
     chatSubtitle: "Ask me anything about your Hutch account.",
     askClarityAnything: "Ask Clarity anything...", speak: "Speak",
     stageMasked: "Protecting your details...", stageUnderstood: "Understanding your question...",
@@ -84,7 +84,7 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
   },
   si: {
     clarityBrand: "Clarity", claritySubtitle: "Hutch AI සහායක",
-    chatHi: "ආයුබෝවන් {name}", howHelpToday: "අද මම උදව් කරන්නේ කෙසේද?",
+    chatHi: "ආයුබෝවන් {name}", chatHiAnon: "ආයුබෝවන්", howHelpToday: "අද මම උදව් කරන්නේ කෙසේද?",
     chatSubtitle: "ඔබේ Hutch ගිණුම ගැන ඕනෑම දෙයක් අසන්න.",
     askClarityAnything: "Clarity ගෙන් ඕනෑම දෙයක් අසන්න...", speak: "කතා කරන්න",
     stageMasked: "ඔබේ විස්තර ආරක්ෂා කරමින්...", stageUnderstood: "ඔබේ ප්‍රශ්නය තේරුම් ගනිමින්...",
@@ -111,7 +111,7 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
   },
   ta: {
     clarityBrand: "Clarity", claritySubtitle: "Hutch AI உதவியாளர்",
-    chatHi: "வணக்கம் {name}", howHelpToday: "இன்று நான் எப்படி உதவட்டும்?",
+    chatHi: "வணக்கம் {name}", chatHiAnon: "வணக்கம்", howHelpToday: "இன்று நான் எப்படி உதவட்டும்?",
     chatSubtitle: "உங்கள் Hutch கணக்கு பற்றி எதையும் கேளுங்கள்.",
     askClarityAnything: "Clarity இடம் எதையும் கேளுங்கள்...", speak: "பேசு",
     stageMasked: "உங்கள் விவரங்களைப் பாதுகாக்கிறேன்...", stageUnderstood: "உங்கள் கேள்வியைப் புரிந்துகொள்கிறேன்...",
@@ -143,7 +143,6 @@ function tl(lang: Lang, key: string): string {
 }
 
 const LANG_LABELS: Record<Lang, string> = { en: "EN", si: "සිං", ta: "த" };
-const DEMO_NAME = "Dilani Perera";
 
 /** Server stage code -> the i18n key the waiting card shows (A5). */
 const STAGE_LABELS: Record<TurnStage, string> = {
@@ -655,7 +654,9 @@ export default function ClarityPage() {
                   </svg>
                 </div>
                 <h1 style={{ fontSize: "clamp(24px,6vw,30px)", fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px", color: "var(--ink)" }}>
-                  {tl(lang, "chatHi").replace("{name}", app.name ?? DEMO_NAME)}
+                  {app.name
+                    ? tl(lang, "chatHi").replace("{name}", app.name)
+                    : tl(lang, "chatHiAnon")}
                 </h1>
                 <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "rgb(var(--c-fg-muted))" }}>{tl(lang, "howHelpToday")}</p>
                 <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 24px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
