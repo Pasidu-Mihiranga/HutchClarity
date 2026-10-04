@@ -1,0 +1,116 @@
+# Decision policy parameters.
+#
+# These were hard-coded in PolicyThresholds. They are now artefacts: versioned,
+# scoped, effective-dated and bounded by guardrails, so Finance can change a cap
+# without a code release and every decision records which values it used.
+#
+# All values are ASSUMPTION / PROPOSED TARGET - REQUIRES HUTCH VALIDATION.
+
+keys:
+  # --------------------------------------------------------------------- #
+  # Caps
+  # --------------------------------------------------------------------- #
+  - key: decision.auto_fix.cap_lkr
+    kind: money
+    owner_role: finance
+    tags: [money]
+    description: >
+      Most a single case may refund with no human involved at all.
+      Deliberately low globally, raised only for rules whose evidence is
+      strong enough to justify it.
+    guardrail: { min: 0, max: 5000 }
+    values:
+      - value: "1000.00"
+        version: 1
+      # The deck's zero-contact example is a LKR 3,500 reload taken twice
+      # (S2, S5). Two independent captures with one credit is about as
+      # unambiguous as evidence gets, so this rule - and only this rule -
+      # carries a higher ceiling. Raising the global cap instead would have
+      # loosened every other whitelisted rule at the same time.
+      - value: "3500.00"
+        scope: { rule: DUPLICATE_RELOAD }
+        version: 1
+        note: "Deck S2/S5 zero-contact example; evidence is two captures, one credit"
+
+  - key: decision.one_tap.cap_lkr
+    kind: money
+    owner_role: finance
+    tags: [money]
+    description: Most a customer may put right with a single confirmation.
+    guardrail: { min: 0, max: 25000 }
+    values:
+      - value: "5000.00"
+        version: 1
+
+  - key: decision.four_eyes.threshold_lkr
+    kind: money
+    owner_role: finance
+    tags: [money]
+    description: Above this, one approver is not enough.
+    guardrail: { min: 0, max: 1000000 }
+    values:
+      - value: "25000.00"
+        version: 1
+
+  # --------------------------------------------------------------------- #
+  # Confidence and conflict
+  # --------------------------------------------------------------------- #
+  - key: decision.auto_fix.min_confidence
+    kind: number
+    owner_role: cx_engineer
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values:
+      - value: "0.95"
+        version: 1
+
+  - key: decision.one_tap.min_confidence
+    kind: number
+    owner_role: cx_engineer
+    tags: [outcome]
+    guardrail: { min: "0.5", max: "1.0" }
+    values:
+      - value: "0.90"
+        version: 1
+
+  - key: decision.staff.min_confidence
+    kind: number
+    owner_role: cx_engineer
+    tags: [outcome]
+    description: Below this nothing is proposed to staff; the case is handed off.
+    guardrail: { min: "0.0", max: "1.0" }
+    values:
+      - value: "0.70"
+        version: 1
+
+  - key: decision.conflict_margin
+    kind: number
+    owner_role: cx_engineer
+    tags: [outcome]
+    description: Two causes closer than this are treated as conflicting.
+    guardrail: { min: "0.0", max: "1.0" }
+    values:
+      - value: "0.20"
+        version: 1
+
+  # --------------------------------------------------------------------- #
+  # Risk
+  # --------------------------------------------------------------------- #
+  - key: decision.risk.sim_swap_window_days
+    kind: number
+    owner_role: compliance
+    tags: [outcome, regulatory]
+    description: A SIM swap this recent routes the case to a person.
+    guardrail: { min: 0, max: 90 }
+    values:
+      - value: 7
+        version: 1
+
+  - key: decision.risk.repeat_refund_limit_30d
+    kind: number
+    owner_role: finance
+    tags: [money]
+    guardrail: { min: 0, max: 50 }
+    values:
+      - value: 3
+        version: 1

@@ -34,7 +34,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from clarity.ai.pii import ForbiddenContent
-from clarity.contracts.events import ComplaintCreatedV1
+from clarity.contracts.events import ClusterUpdatedV1, ComplaintCreatedV1
 from clarity.kernel.common import utc_now
 from clarity.modules.autopsy.pipeline import (
     AutopsyReport,
@@ -54,6 +54,7 @@ from clarity.modules.autopsy.review import (
     staff_view,
 )
 from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.persistence import (
     MemoryStore,
     MemoryUnitOfWork,
@@ -283,6 +284,22 @@ class AutopsyService:
                 else self._reviews.record(held, reviewer=reviewer, accept=accept, note=note)
             )
             repository.save_cluster(updated)
+            # The verdict and the event in one transaction (I7). Foresight
+            # consumes this to notice that a shipped change produced something,
+            # and it carries codes and counts only: the cluster's label is
+            # derived from what customers wrote, so it stays here (C7).
+            outbox_in(unit).append(
+                Event.of(
+                    ClusterUpdatedV1(
+                        cluster_id=updated.cluster.cluster_id,
+                        status=updated.cluster.status.value,
+                        size=updated.cluster.size,
+                        suggested_rule_id=updated.cluster.suggested_rule_id,
+                        reviewed_by=reviewer,
+                    ),
+                    subject="autopsy",
+                )
+            )
             unit.commit()
         return updated
 

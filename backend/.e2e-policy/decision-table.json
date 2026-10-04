@@ -1,0 +1,38 @@
+{
+  "contentType": "application/vnd.gorules.decision",
+  "version": "2027.09.1",
+  "nodes": [
+    {
+      "id": "clarity-outcome",
+      "name": "Clarity outcome matrix",
+      "type": "decisionTableNode",
+      "position": {"x": 0, "y": 0},
+      "content": {
+        "hitPolicy": "first",
+        "inputs": [{"id": "predicate", "name": "Ordered predicate", "field": "predicate"}],
+        "outputs": [{"id": "outcome", "name": "Outcome", "field": "outcome"}],
+        "rules": [
+          {"_id": "customer_requested_human", "predicate": "customer_requested_human", "outcome": "HANDOFF"},
+          {"_id": "evidence_incomplete", "predicate": "evidence_incomplete", "outcome": "HANDOFF"},
+          {"_id": "no_cause", "predicate": "no_cause", "outcome": "HANDOFF"},
+          {"_id": "fraud_flag", "predicate": "fraud_flag", "outcome": "STAFF_APPROVAL"},
+          {"_id": "recent_sim_swap", "predicate": "recent_sim_swap", "outcome": "STAFF_APPROVAL"},
+          {"_id": "refund_velocity", "predicate": "refund_velocity", "outcome": "STAFF_APPROVAL"},
+          {"_id": "cause_conflict", "predicate": "cause_conflict", "outcome": "STAFF_APPROVAL"},
+          {"_id": "disclosed_term", "predicate": "disclosed_term", "outcome": "EXPLAIN_ONLY"},
+          {"_id": "low_confidence", "predicate": "low_confidence", "outcome": "HANDOFF"},
+          {"_id": "staff_confidence", "predicate": "staff_confidence", "outcome": "STAFF_APPROVAL"},
+          {"_id": "above_one_tap_cap", "predicate": "above_one_tap_cap", "outcome": "STAFF_APPROVAL"},
+          {"_id": "budget_exhausted", "predicate": "budget_exhausted", "outcome": "STAFF_APPROVAL"},
+          {"_id": "auto_fix_disabled", "predicate": "auto_fix_disabled", "outcome": "STAFF_APPROVAL"},
+          {"_id": "auto_fix", "predicate": "auto_fix", "outcome": "AUTO_FIX"},
+          {"_id": "auto_candidate_needs_tap", "predicate": "auto_candidate_needs_tap", "outcome": "ONE_TAP_FIX"},
+          {"_id": "customer_actions_disabled", "predicate": "customer_actions_disabled", "outcome": "STAFF_APPROVAL"},
+          {"_id": "channel_cannot_confirm", "predicate": "channel_cannot_confirm", "outcome": "STAFF_APPROVAL"},
+          {"_id": "default_one_tap", "predicate": "true", "outcome": "ONE_TAP_FIX"}
+        ]
+      }
+    }
+  ],
+  "edges": []
+}

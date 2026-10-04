@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from fractions import Fraction
 
 from clarity.kernel.ids import new_id
 from clarity.modules.foresight.catalogue import ChangeType, ForesightCatalogue
@@ -136,6 +137,25 @@ class CalibrationReport:
     """Share of compared pairs where the band was exactly right."""
     top_theme_hit_rate: Decimal | None
     """Share of launches whose worst observed theme the model ranked first."""
+    theme_recall: Decimal | None = None
+    """Share of observed themes the model predicted at all (plan 08 section 12.9).
+
+    The metric that catches the dangerous direction. A model can have a small
+    band error and still be useless if it never predicts the themes that
+    actually happen: those land in :attr:`unpredicted` and are excluded from the
+    error, so without recall the error improves as the model predicts less.
+    ``None`` when nothing was observed.
+    """
+    segment_rank_correlation: Decimal | None = None
+    """How well the model ordered the segments, averaged over launches.
+
+    Plan 08 section 12.9. In [-1, 1]. A model that knows *which* segments
+    complain most is useful for CX capacity planning even when its bands are
+    wrong, and one that gets the order backwards is worse than useless.
+    ``None`` when no launch had two segments to rank, or when an observed
+    ranking was entirely tied: with no ordering there is no correlation, and
+    reporting 0 or 1 would read as a finding.
+    """
     misses: tuple[BandMiss, ...] = ()
     unpredicted: tuple[ObservedOutcome, ...] = ()
     """Observed themes the model never predicted. The dangerous direction."""
@@ -237,6 +257,8 @@ class Backtest:
             signed_band_error=self._mean(m.step_error for m in misses),
             exact_band_rate=self._rate(sum(1 for m in misses if m.is_exact), len(misses)),
             top_theme_hit_rate=self._rate(top_hits, top_scored),
+            theme_recall=self._theme_recall(launches, engine),
+            segment_rank_correlation=self._segment_rank_correlation(launches, engine),
             misses=tuple(misses),
             unpredicted=tuple(unpredicted),
             unobserved=tuple(unobserved),
@@ -264,6 +286,66 @@ class Backtest:
         if total == 0:
             return None
         return (Decimal(hits) / Decimal(total)).quantize(_RATIO)
+
+    def _theme_recall(
+        self, launches: tuple[HistoricLaunch, ...], engine: Foresight
+    ) -> Decimal | None:
+        """Of the themes actually observed, how many did the model predict?
+
+        Pooled across launches and deduplicated within one: a theme observed in
+        four segments of one launch is one theme the model did or did not
+        anticipate, not four.
+        """
+        observed = 0
+        anticipated = 0
+        for launch in launches:
+            predicted = {p.theme for p in engine.run(launch.scenario).predictions}
+            themes = {outcome.theme for outcome in launch.observed}
+            observed += len(themes)
+            anticipated += len(themes & predicted)
+        return self._rate(anticipated, observed)
+
+    def _segment_rank_correlation(
+        self, launches: tuple[HistoricLaunch, ...], engine: Foresight
+    ) -> Decimal | None:
+        """Spearman over segment rankings, averaged over the launches that have one.
+
+        Exact: ranks are integers or halves, so every step is a rational number
+        and the whole thing runs on :class:`~fractions.Fraction`. No float, and
+        no scipy (plan 08 section 12.9 asks for the metric, not for a
+        dependency).
+
+        A launch contributes only if both rankings exist and neither is entirely
+        tied. One observed band for every segment is not a ranking, and scoring
+        it as agreement or disagreement would invent an ordering nobody
+        observed.
+        """
+        correlations: list[Fraction] = []
+        for launch in launches:
+            predicted = engine.run(launch.scenario)
+            predicted_by_segment: dict[str, Decimal] = {}
+            for item in predicted.predictions:
+                predicted_by_segment[item.segment] = (
+                    predicted_by_segment.get(item.segment, Decimal(0)) + item.relative_score
+                )
+            observed_by_segment: dict[str, int] = {}
+            for outcome in launch.observed:
+                observed_by_segment[outcome.segment] = (
+                    observed_by_segment.get(outcome.segment, 0) + _BAND_STEP[outcome.band]
+                )
+
+            shared = sorted(set(predicted_by_segment) & set(observed_by_segment))
+            correlation = _spearman(
+                [predicted_by_segment[name] for name in shared],
+                [Decimal(observed_by_segment[name]) for name in shared],
+            )
+            if correlation is not None:
+                correlations.append(correlation)
+
+        if not correlations:
+            return None
+        mean = sum(correlations, Fraction(0)) / Fraction(len(correlations))
+        return (Decimal(mean.numerator) / Decimal(mean.denominator)).quantize(_RATIO)
 
     def _worst_observed_themes(self, launch: HistoricLaunch) -> set[str]:
         if not launch.observed:
@@ -300,6 +382,49 @@ class Backtest:
         if unobserved:
             caveats.append(wording.unobserved_caveat(len(unobserved)))
         return caveats
+
+
+def _ranks(values: list[Decimal]) -> list[Fraction] | None:
+    """Descending ranks with ties averaged, or ``None`` when all values tie.
+
+    Average ranks are halves at worst, so everything downstream stays rational.
+    An all-tied list is not a ranking: returning ranks for it would let a
+    correlation be computed against an order nobody observed.
+    """
+    if len(set(values)) < 2:
+        return None
+    order = sorted(range(len(values)), key=lambda index: values[index], reverse=True)
+    ranks: list[Fraction] = [Fraction(0)] * len(values)
+    position = 0
+    while position < len(order):
+        tied = position
+        while tied + 1 < len(order) and values[order[tied + 1]] == values[order[position]]:
+            tied += 1
+        shared = Fraction(sum(range(position + 1, tied + 2)), tied - position + 1)
+        for index in range(position, tied + 1):
+            ranks[order[index]] = shared
+        position = tied + 1
+    return ranks
+
+
+def _spearman(predicted: list[Decimal], observed: list[Decimal]) -> Fraction | None:
+    """Rank correlation in [-1, 1], exactly, or ``None`` when undefined.
+
+    Uses the sum-of-squared-rank-differences form. With tied ranks that form is
+    the usual approximation rather than Pearson over ranks; it is the definition
+    plan 08 section 12.9's "rank correlation" is normally read as, it needs no
+    square root, and so it stays exact. The approximation is in the statistic,
+    never in the arithmetic.
+    """
+    if len(predicted) < 2:
+        return None
+    first = _ranks(predicted)
+    second = _ranks(observed)
+    if first is None or second is None:
+        return None
+    n = Fraction(len(predicted))
+    squared = sum((a - b) * (a - b) for a, b in zip(first, second, strict=True))
+    return Fraction(1) - (Fraction(6) * squared) / (n * (n * n - Fraction(1)))
 
 
 #: SIMULATED historic launches so the backtest can be run and read today.

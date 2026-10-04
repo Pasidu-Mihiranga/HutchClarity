@@ -18,6 +18,17 @@ from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES, CONVERSATION_TRANSCRIPTS
 from clarity.modules.deskops.public import BATCHES
+from clarity.modules.foresight.public import (
+    FORESIGHT_CALIBRATIONS,
+    FORESIGHT_CANDIDATES,
+    FORESIGHT_LAUNCHES,
+    FORESIGHT_OBSERVATIONS,
+    FORESIGHT_OUTCOMES,
+    FORESIGHT_REPORTS,
+    FORESIGHT_RUNS,
+    FORESIGHT_SCENARIOS,
+    FORESIGHT_SPIKES,
+)
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import (
     GRANTS,
@@ -88,6 +99,16 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # autopsy
     COMPLAINTS,
     CLUSTERS,
+    # foresight
+    FORESIGHT_SCENARIOS,
+    FORESIGHT_RUNS,
+    FORESIGHT_REPORTS,
+    FORESIGHT_LAUNCHES,
+    FORESIGHT_OUTCOMES,
+    FORESIGHT_CALIBRATIONS,
+    FORESIGHT_SPIKES,
+    FORESIGHT_CANDIDATES,
+    FORESIGHT_OBSERVATIONS,
     # deskops
     BATCHES,
     # insights
