@@ -59,7 +59,7 @@ def test_complete_posts_the_masked_prompt_and_reads_usage() -> None:
         )
     )
     provider = VertexAIProvider(
-        project="agentrix-500015",
+        project="example-vertex-project",
         location="global",
         model="gemini-2.5-flash",
         credentials=_Creds(),  # type: ignore[arg-type]
@@ -70,7 +70,7 @@ def test_complete_posts_the_masked_prompt_and_reads_usage() -> None:
     assert usage.input_tokens == 4
     assert usage.output_tokens == 6
     assert client.url.endswith(
-        "/projects/agentrix-500015/locations/global/publishers/google/models/"
+        "/projects/example-vertex-project/locations/global/publishers/google/models/"
         "gemini-2.5-flash:generateContent"
     )
     assert client.headers["Authorization"] == "Bearer ya29-test"

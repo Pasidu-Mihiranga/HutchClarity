@@ -162,6 +162,10 @@ export async function signInOnDesk(
     await page.getByLabel("Step-up code").fill("");
   }
   await page.getByRole("button", { name: "Sign in" }).click();
+  // Wait until the desk shows the signed-in staff member. Without this the
+  // next call could look for "Sign out" before the sign-in had landed, skip
+  // signing out, and then wait for a login form that is no longer there.
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 }
 
 type OpenedCase = { caseId: string; outcome: string };
