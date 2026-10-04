@@ -21,6 +21,9 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Changed
 
+- The OPA driver sends `granted`, which the Rego has always read. Without it the branch that stops a holder of a granted audit duty from moving money could not fire: measured against the real Rego, a supervisor holding `audit:read` by grant was allowed `action:approve`. Nothing was reachable through the gap, because `GrantAwareAuthorizationPolicy` enforces the same rule in Python first; what was wrong is that the two drivers were only in parity because one of them was wrapped.
+- A missing token verifier or a missing authorization policy answers **503** instead of falling back. The verifier fallback made an authenticated caller anonymous; the policy fallback improvised a fresh `PythonAuthorizationPolicy()` per request, so a deployment that configures OPA would have had every decision silently revert to the local driver with nothing in the logs.
+
 - `KeycloakTokenVerifier` derives `MFA_RECENT` from `auth_time` against `STEP_UP_WINDOW` rather than requiring `acr == "mfa-recent"`. No real Keycloak sends that value: with a level-of-assurance map configured the provider returns the level's own name, so a correctly completed step-up never reached the assurance an above-cap approval requires.
 - The realm declares the `basic` and `acr` client scopes and assigns them to every client. A realm import replaces Keycloak's built-ins rather than adding to them, so tokens carried no `sub` (which the verifier requires) and no `acr` (which step-up depends on).
 - Staff sign-in requests the `openid` scope alone. `profile` and `email` do not exist in this realm for the same reason, and asking for them is an `invalid_scope` refusal before the login form renders.

@@ -16,6 +16,7 @@ we do and you may not. Neither says which case exists.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -24,7 +25,6 @@ from fastapi import Depends, Header, HTTPException, Request
 from clarity.interfaces.http.cookies import STAFF_COOKIE
 from clarity.modules.iam.public import (
     AuthorizationPolicy,
-    PythonAuthorizationPolicy,
     TokenInvalid,
     TokenVerifier,
 )
@@ -48,8 +48,22 @@ def _unauthenticated() -> HTTPException:
     )
 
 
+_log = logging.getLogger("clarity.http.auth")
+
+
 def _forbidden(detail: str) -> HTTPException:
     return HTTPException(status_code=403, detail=detail)
+
+
+def _unavailable() -> HTTPException:
+    """The server cannot decide this request.
+
+    503, not 401 or 403. Both of those say something about the caller, and the
+    caller has done nothing wrong: a missing verifier or a missing policy is a
+    wiring fault, and reporting it as a refusal sends somebody to look at
+    credentials that are fine.
+    """
+    return HTTPException(status_code=503, detail="authorization is unavailable")
 
 
 def principal_from(request: Request, authorization: str | None) -> Principal:
@@ -80,8 +94,15 @@ def principal_from(request: Request, authorization: str | None) -> Principal:
         return ANONYMOUS
 
     verifier: TokenVerifier | None = getattr(request.app.state, "token_verifier", None)
-    if verifier is None:  # pragma: no cover - the app always wires one
-        return ANONYMOUS
+    if verifier is None:
+        # A token arrived and nothing can check it. Treating that as anonymous
+        # is the wrong way round: the caller presented a credential, so the
+        # honest answer is that this request cannot be authenticated, not that
+        # it was made by nobody. Silently downgrading would turn a wiring fault
+        # into an authorization decision, and the route would then refuse with
+        # a 401 that blames the caller for a server defect.
+        _log.error("a token was presented but no verifier is wired")
+        raise _unavailable()
 
     try:
         principal = verifier.verify(token)
@@ -116,9 +137,18 @@ def requires(permission: Permission) -> Callable[..., Awaitable[Principal]]:
     async def dependency(request: Request, principal: CurrentPrincipal) -> Principal:
         if principal is ANONYMOUS or not principal.roles:
             raise _unauthenticated()
-        policy: AuthorizationPolicy = getattr(
-            request.app.state, "authorization_policy", PythonAuthorizationPolicy()
+        policy: AuthorizationPolicy | None = getattr(
+            request.app.state, "authorization_policy", None
         )
+        if policy is None:
+            # This used to fall back to a fresh `PythonAuthorizationPolicy()`.
+            # In a deployment that configures OPA, a missing app state would
+            # have meant every decision silently reverted to the local driver:
+            # the same answers today, and a different authority than the one
+            # operations believes is deciding, with nothing in the logs. An
+            # authorization driver is not something to improvise per request.
+            _log.error("no authorization policy is wired; refusing the request")
+            raise _unavailable()
         if policy.allows(principal, permission):
             return principal
         if (

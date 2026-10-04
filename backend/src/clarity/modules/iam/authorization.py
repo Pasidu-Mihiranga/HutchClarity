@@ -54,6 +54,16 @@ class OpaAuthorizationPolicy:
                         "roles": sorted(role.value for role in principal.roles),
                         "permission": permission.value,
                         "assurance": principal.assurance.value,
+                        # The Rego reads `input.granted` and the driver did not
+                        # send it, so the branch that stops a holder of a
+                        # granted audit duty from moving money could never
+                        # fire. `GrantAwareAuthorizationPolicy` enforces the
+                        # same rule in Python first, so nothing was reachable
+                        # through it; what was wrong is that the two drivers
+                        # were only in parity because one of them was wrapped.
+                        # Remove the wrapper and the Rego would quietly stop
+                        # enforcing rule 1. Now it stands on its own.
+                        "granted": sorted(granted.value for granted in principal.granted),
                     }
                 },
             )
