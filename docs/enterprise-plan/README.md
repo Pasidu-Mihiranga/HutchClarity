@@ -7,7 +7,7 @@ This folder turns the 17-slide *Hutch Clarity* deck into an enterprise-grade tec
 | Item | Value |
 |---|---|
 | Document | Enterprise Project Plan - Hackathon Prototype → HUTCH Production |
-| Version / date | **v1.10** · 2026-10-02 (see [CHANGES.md](CHANGES.md)) |
+| Version / date | **v1.12** · 2026-10-04 (see [CHANGES.md](CHANGES.md)) |
 | Sources | (1) *Hutch Clarity* 17-slide deck - authoritative concept; (2) *HUTCH Hackathon Final Submission Guidelines* |
 | Not available | SRS, architecture, API, DB, UML, infra, MCP, test, project, risk, RACI and cost documents. **All of these are created in this plan.** |
 | Planning start | **2027-01-04 - Assumed project start date for planning purposes.** |
@@ -84,6 +84,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.9 | 2026-10-02 | R6 started: N01 added event-driven, template-only notification routing and delivery tracking. |
 | v1.10 | 2026-10-02 | R6 continued: P01 added policy-backed stream detectors and zero-contact duplicate-reload resolution. |
 | v1.11 | 2026-10-04 | R5: the static UI is retired and the Next.js apps are the only UI; Next.js 14 is the current framework (FE01, ADR-0031). |
+| v1.12 | 2026-10-04 | Chapter 22 section 9 restated: no conversation content steers a later turn, and a bounded transcript is kept as a record (ADR-0040). |
 
 ### v1.1 audit: gaps found and added
 

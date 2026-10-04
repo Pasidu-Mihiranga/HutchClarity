@@ -6,6 +6,7 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **`GET /v1/cases/{case_id}/transcript`** returns what was said on a case, oldest first, masked, with `case:read` and the same subject binding as every other case route. Backed by the new append-only `conversation.transcripts` collection, 90-day retention (ASSUMPTION), written by the orchestrator after the reply is composed and verified. Nothing in the turn pipeline reads it back, which is what makes it a record rather than memory (ADR-0040, amending plan 22 section 9). OpenAPI snapshot regenerated on purpose.
 - `POST /v1/auth/staff/login` checks a staff directory and assigns that account's role. When `CLARITY_STAFF_DIRECTORY` or `CLARITY_STAFF_DIRECTORY_FILE` is set, `POST /v1/auth/staff/session` returns 404. Both routes stay 404 in `prod`. OpenAPI snapshot and SDK regenerated on purpose.
 - Vertex AI is a text-role provider (`config/ai/models.yaml`). It runs when `CLARITY_VERTEX_PROJECT` is set and `AI_PREFER_TEMPLATES=false`. The model id is `CLARITY_MODEL_NAME`. Credentials are Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`), not a key in the repo. Speech roles stay on Groq, then a local refusal.
 

@@ -127,6 +127,15 @@
       "response": "TimelineView",
       "status": "200"
     },
+    "GET /v1/cases/{case_id}/transcript": {
+      "parameters": [
+        "header:authorization?",
+        "path:case_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/conversation/suggestions": {
       "parameters": [
         "query:language?",

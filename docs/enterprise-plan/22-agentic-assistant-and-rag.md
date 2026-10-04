@@ -151,7 +151,8 @@ stateDiagram-v2
 ## 9. Conversation state and memory
 
 - Short-term state per conversation: flow, state, slots, case ID, language, last proposal ID; stored by the conversation module (in memory in `lite`, PostgreSQL in `full`), TTL 24 h (ASSUMPTION).
-- No long-term memory of conversation content. Durable preferences (language, answer length) live in the customer's profile.
+- **No long-term memory of conversation content**, in the sense that decides a turn: nothing the customer said in an earlier conversation is read back into intake, composition, retrieval or a prompt. Durable preferences (language, answer length) live in the customer's profile.
+- A **transcript** is kept as a record, which is a different thing and is bounded as one (ADR-0040): masked text only, append-only, 90-day retention (ASSUMPTION - REQUIRES HUTCH CONFIRMATION), readable only through a subject-bound route. It exists so a handoff carries what was already explained, a customer can look back from any device, and a dispute about what Clarity said has an answer. An architecture test enforces that no part of the turn pipeline reads it.
 - Cross-channel continuity: a conversation is attached to a case, so WhatsApp → app → shop resumes the same case.
 
 ## 10. Evaluation

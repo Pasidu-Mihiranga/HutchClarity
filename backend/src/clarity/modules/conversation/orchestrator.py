@@ -64,6 +64,7 @@ from clarity.modules.conversation.service import (
     fallback_intake as _fallback_intake,
 )
 from clarity.modules.conversation.state import ConversationState, ConversationStore
+from clarity.modules.conversation.transcript import CLARITY, CUSTOMER, TranscriptStore
 from clarity.modules.conversation.verify import VerifierResult, verify_reply
 from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.messaging.envelope import Event
@@ -235,8 +236,14 @@ class ConversationOrchestrator:
         intake_assist: IntakeAssist | None = None,
         audit: AuditLedger | None = None,
         open_unit: UnitOfWorkFactory | None = None,
+        transcript: TranscriptStore | None = None,
     ) -> None:
         self._store = store or ConversationStore(open_unit=open_unit)
+        # What was said, as a record and never as memory (A4, ADR-0040). It is
+        # written after the turn is decided and read back by nothing in this
+        # pipeline, which is what keeps plan 22 section 9's actual concern
+        # intact: no accumulated content steers a later answer.
+        self._transcript = transcript or TranscriptStore(open_unit=open_unit)
         self._masker = masker or Masker()
         self._guard = guard
         # The `extract` role, asked only when the keyword rules are unsure
@@ -249,6 +256,10 @@ class ConversationOrchestrator:
     @property
     def store(self) -> ConversationStore:
         return self._store
+
+    @property
+    def transcript(self) -> TranscriptStore:
+        return self._transcript
 
     def handle(
         self,
@@ -434,6 +445,20 @@ class ConversationOrchestrator:
         # -- 8. Record ----------------------------------------------------- #
         self._record(record, subscriber_ref=subscriber_ref, now=moment)
 
+        # The transcript, written last and deliberately so: by here the reply
+        # has been composed, verified and substituted if it failed, so what is
+        # kept is what the customer was actually told. `masked.text`, never the
+        # raw message (I13). Nothing in this method reads it back (A4).
+        self._remember(
+            case_id,
+            turn_no=state.turn_no,
+            said=masked.text,
+            replied=reply,
+            language=language,
+            channel=channel,
+            now=moment,
+        )
+
         return Turn(
             reply=reply,
             state=state,
@@ -462,6 +487,49 @@ class ConversationOrchestrator:
         it is the surface an anonymous caller reaches.
         """
         return refusal_for(text)
+
+    def _remember(
+        self,
+        case_id: str,
+        *,
+        turn_no: int,
+        said: str,
+        replied: str,
+        language: str,
+        channel: Channel,
+        now: datetime,
+    ) -> None:
+        """Append both sides of one turn to the transcript (A4).
+
+        Failures here are swallowed on purpose. The transcript is a record of a
+        turn that has already happened: the state is saved, the audit is
+        written and the customer is about to be answered. Losing a line is a
+        gap in a convenience; raising would turn it into a failed turn and lose
+        the answer as well.
+        """
+        try:
+            if said.strip():
+                self._transcript.append(
+                    case_id,
+                    role=CUSTOMER,
+                    text=said,
+                    turn_no=turn_no,
+                    language=language,
+                    channel=channel.value,
+                    now=now,
+                )
+            if replied.strip():
+                self._transcript.append(
+                    case_id,
+                    role=CLARITY,
+                    text=replied,
+                    turn_no=turn_no,
+                    language=language,
+                    channel=channel.value,
+                    now=now,
+                )
+        except Exception:
+            pass
 
     def _inspect(self, text: str) -> GuardVerdict:
         """The guard, with the model tier when one is configured.

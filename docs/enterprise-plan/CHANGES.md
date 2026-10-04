@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.12 - 2026-10-04
+
+| Area | Change | Chapters |
+|---|---|---|
+| Conversation memory | Section 9's "no long-term memory of conversation content" said more than it meant and the code could not hold a handoff together because of it. It now states the rule it was protecting (nothing a customer said steers a later turn) and records the bounded transcript that sits beside it: masked, append-only, 90-day retention, subject-bound read, enforced by an architecture test (ADR-0040) | 22 §9 |
+
 ## v1.11 - 2026-10-04
 
 | Area | Change | Chapters |

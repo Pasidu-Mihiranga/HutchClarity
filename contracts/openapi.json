@@ -4082,6 +4082,67 @@
         ]
       }
     },
+    "/v1/cases/{case_id}/transcript": {
+      "get": {
+        "description": "What was said on this case, oldest first (A4, ADR-0040).\n\nSubject bound like every other case route (I9): the transcript is the\nmost personal thing the conversation holds, so the case id alone must\nnot open it. Staff with `case:read:any` see it because that is what\nmakes a handoff workable: the agent picking the case up can read what\nthe customer already explained instead of asking them again.\n\nThe text is masked, as it was when it was stored. Retention is applied\non read, so a line past its window is gone here even if the table has\nnot been swept.",
+        "operationId": "get_transcript_v1_cases__case_id__transcript_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Transcript V1 Cases  Case Id  Transcript Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Transcript",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
     "/v1/clarity/route": {
       "post": {
         "description": "Server intent: account vs knowledge vs both (legacy) + chat taxonomy.",
