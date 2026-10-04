@@ -77,6 +77,11 @@ the current clusters.
 In-memory structures in the `lite` profile. Target: one PostgreSQL schema `autopsy` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
 ## 6. Invariants
+- **Seeing a cluster and ruling on one are different permissions** (D1). Reading the workspace is `desk:queue:read`; recording a verdict is `autopsy:review`; proposing a policy change from a confirmed cluster is `rule:draft` on top. A reviewer who could do all three by holding one permission would have a confirmation already halfway to a published rule.
+- **The reviewer is the authenticated caller**, never a field in a request body. An anonymous verdict is not an audit record, and one attributed to whatever the caller typed is worse than none.
+- **A hypothesis cannot seed a policy change.** Only a confirmed cluster may be proposed, and the proposal is a `PolicyChange` in the draft state: this module cannot write a rule pack, activate anything, or shortcut the approval lifecycle (AU02).
+- **A proposal names an existing policy artefact.** The artefact's tags decide the change class, so inventing a key would route around the thing that decides how many approvals the change needs.
+
 - No complaint text reaches a model unmasked; refused content is not stored.
 
 ## 7. Migration status (enterprise-plan 21)

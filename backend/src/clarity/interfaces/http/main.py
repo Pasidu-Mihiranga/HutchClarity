@@ -43,7 +43,7 @@ from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
-from clarity.interfaces.http import csrf, staff_sso, trail
+from clarity.interfaces.http import autopsy_api, csrf, staff_sso, trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -1142,6 +1142,11 @@ def _register_routes(app: FastAPI) -> None:
     # flow is four routes and a cookie, and it has nothing to do with the rest
     # of this file.
     staff_sso.register(app)
+
+    # The Complaint Autopsy reviewer workspace (D1). Its own module for the
+    # same reason as the sign-in flow: it is a coherent surface with its own
+    # permissions, and it has nothing to do with the rest of this file.
+    autopsy_api.register(app)
 
     @app.post("/v1/auth/otp/request", tags=["auth"])
     def request_otp(body: OtpRequest, clarity: ClarityDep) -> dict[str, Any]:

@@ -1032,6 +1032,51 @@
         "title": "ReloadRequest",
         "type": "object"
       },
+      "ReviewRequest": {
+        "additionalProperties": false,
+        "description": "A verdict on a cluster.\n\n`accept` rather than a status string: the vocabulary of verdicts belongs to\nthe domain, and a route that took `\"confirmed\"` would be a second place\nthose names are written down.",
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accept"
+        ],
+        "title": "ReviewRequest",
+        "type": "object"
+      },
+      "RuleCandidateRequest": {
+        "additionalProperties": false,
+        "description": "A proposal that a confirmed cluster should change a detection parameter.\n\nIt names an **existing** policy key. Governance drafts changes to artefacts\nthat already exist, with a change class derived from that artefact's tags,\nand inventing a key here would route around the thing that decides how\nrisky the change is. Authoring a brand-new rule pack is a different act\nwith a different lifecycle, and this route does not pretend to do it.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "rationale"
+        ],
+        "title": "RuleCandidateRequest",
+        "type": "object"
+      },
       "RuledOutView": {
         "additionalProperties": false,
         "properties": {
@@ -1228,6 +1273,26 @@
           "roles"
         ],
         "title": "StaffSignIn",
+        "type": "object"
+      },
+      "SupersedeRequest": {
+        "additionalProperties": false,
+        "description": "A deliberate change to somebody else's verdict.\n\nThe note is required here and optional on a first review. Changing a\nprofessional judgement is the case where the reason matters most, and an\nunexplained reversal is the thing an auditor asks about.",
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accept",
+          "note"
+        ],
+        "title": "SupersedeRequest",
         "type": "object"
       },
       "SwitchFlipRequest": {
@@ -3904,6 +3969,271 @@
         "summary": "Step Up",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/v1/autopsy/clusters": {
+      "get": {
+        "description": "The reviewer workspace: clusters, and what is known about each.\n\nReading is `desk:queue:read`, not `autopsy:review`: the desk should be\nable to see what the pattern engine thinks without being able to rule\non it. Every cluster goes through `staff_view`, so one nobody has\nchecked cannot reach a screen without saying so.",
+        "operationId": "list_clusters_v1_autopsy_clusters_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Clusters V1 Autopsy Clusters Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Clusters",
+        "tags": [
+          "autopsy"
+        ]
+      }
+    },
+    "/v1/autopsy/clusters/{cluster_id}/review": {
+      "post": {
+        "description": "Record a first verdict.\n\nRefuses a cluster that already has one. A second `review` would\noverwrite a judgement with no trace of the first, which is what\n`supersede` is for.\n\nThe reviewer is the authenticated principal, never a field in the body:\nan anonymous verdict is not an audit record, and a verdict attributed\nto whoever the caller typed is worse than none.",
+        "operationId": "review_cluster_v1_autopsy_clusters__cluster_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Review Cluster V1 Autopsy Clusters  Cluster Id  Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Cluster",
+        "tags": [
+          "autopsy"
+        ]
+      }
+    },
+    "/v1/autopsy/clusters/{cluster_id}/rule-candidate": {
+      "post": {
+        "description": "Propose a policy change from a confirmed cluster (AU02).\n\n**This publishes nothing.** It creates a policy change in the draft\nstate and returns its id; approval, scheduling and activation all\nhappen through the governance routes, by somebody else. A pattern\nengine that could activate its own rule would be deciding causes from\ncomplaint text, which is exactly what I2 forbids.\n\nRefuses a cluster nobody has confirmed. A hypothesis is not grounds for\na rule, and letting an unreviewed cluster seed one would make the\nreview step decorative.",
+        "operationId": "propose_rule_v1_autopsy_clusters__cluster_id__rule_candidate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleCandidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Propose Rule V1 Autopsy Clusters  Cluster Id  Rule Candidate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Rule",
+        "tags": [
+          "autopsy"
+        ]
+      }
+    },
+    "/v1/autopsy/clusters/{cluster_id}/supersede": {
+      "post": {
+        "description": "Change a verdict, keeping the one it replaces.\n\nBoth survive. A reversal that erased what it reversed would leave the\ntrail saying the cluster was always judged this way.",
+        "operationId": "supersede_review_v1_autopsy_clusters__cluster_id__supersede_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupersedeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Supersede Review V1 Autopsy Clusters  Cluster Id  Supersede Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Supersede Review",
+        "tags": [
+          "autopsy"
         ]
       }
     },

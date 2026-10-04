@@ -865,6 +865,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/autopsy/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Clusters
+         * @description The reviewer workspace: clusters, and what is known about each.
+         *
+         *     Reading is `desk:queue:read`, not `autopsy:review`: the desk should be
+         *     able to see what the pattern engine thinks without being able to rule
+         *     on it. Every cluster goes through `staff_view`, so one nobody has
+         *     checked cannot reach a screen without saying so.
+         */
+        get: operations["list_clusters_v1_autopsy_clusters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Cluster
+         * @description Record a first verdict.
+         *
+         *     Refuses a cluster that already has one. A second `review` would
+         *     overwrite a judgement with no trace of the first, which is what
+         *     `supersede` is for.
+         *
+         *     The reviewer is the authenticated principal, never a field in the body:
+         *     an anonymous verdict is not an audit record, and a verdict attributed
+         *     to whoever the caller typed is worse than none.
+         */
+        post: operations["review_cluster_v1_autopsy_clusters__cluster_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/rule-candidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Rule
+         * @description Propose a policy change from a confirmed cluster (AU02).
+         *
+         *     **This publishes nothing.** It creates a policy change in the draft
+         *     state and returns its id; approval, scheduling and activation all
+         *     happen through the governance routes, by somebody else. A pattern
+         *     engine that could activate its own rule would be deciding causes from
+         *     complaint text, which is exactly what I2 forbids.
+         *
+         *     Refuses a cluster nobody has confirmed. A hypothesis is not grounds for
+         *     a rule, and letting an unreviewed cluster seed one would make the
+         *     review step decorative.
+         */
+        post: operations["propose_rule_v1_autopsy_clusters__cluster_id__rule_candidate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy/clusters/{cluster_id}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Supersede Review
+         * @description Change a verdict, keeping the one it replaces.
+         *
+         *     Both survive. A reversal that erased what it reversed would leave the
+         *     trail saying the cluster was always judged this way.
+         */
+        post: operations["supersede_review_v1_autopsy_clusters__cluster_id__supersede_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cases": {
         parameters: {
             query?: never;
@@ -2125,6 +2231,41 @@ export interface components {
             /** Amount Lkr */
             amount_lkr: string;
         };
+        /**
+         * ReviewRequest
+         * @description A verdict on a cluster.
+         *
+         *     `accept` rather than a status string: the vocabulary of verdicts belongs to
+         *     the domain, and a route that took `"confirmed"` would be a second place
+         *     those names are written down.
+         */
+        ReviewRequest: {
+            /** Accept */
+            accept: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * RuleCandidateRequest
+         * @description A proposal that a confirmed cluster should change a detection parameter.
+         *
+         *     It names an **existing** policy key. Governance drafts changes to artefacts
+         *     that already exist, with a change class derived from that artefact's tags,
+         *     and inventing a key here would route around the thing that decides how
+         *     risky the change is. Authoring a brand-new rule pack is a different act
+         *     with a different lifecycle, and this route does not pretend to do it.
+         */
+        RuleCandidateRequest: {
+            /** Key */
+            key: string;
+            /** Rationale */
+            rationale: string;
+            /** Value */
+            value: string;
+        };
         /** RuledOutView */
         RuledOutView: {
             /** Reason */
@@ -2199,6 +2340,20 @@ export interface components {
             step_up: boolean;
             /** User Ref */
             user_ref: string;
+        };
+        /**
+         * SupersedeRequest
+         * @description A deliberate change to somebody else's verdict.
+         *
+         *     The note is required here and optional on a first review. Changing a
+         *     professional judgement is the case where the reason matters most, and an
+         *     unexplained reversal is the thing an auditor asks about.
+         */
+        SupersedeRequest: {
+            /** Accept */
+            accept: boolean;
+            /** Note */
+            note: string;
         };
         /**
          * SwitchFlipRequest
@@ -3723,6 +3878,156 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_clusters_v1_autopsy_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_cluster_v1_autopsy_clusters__cluster_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_rule_v1_autopsy_clusters__cluster_id__rule_candidate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleCandidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supersede_review_v1_autopsy_clusters__cluster_id__supersede_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupersedeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

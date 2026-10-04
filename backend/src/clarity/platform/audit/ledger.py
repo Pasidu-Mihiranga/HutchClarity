@@ -111,6 +111,13 @@ class AuditEventType(StrEnum):
     OTP_FAILED = "otp.failed"
     """A wrong, expired or reused code. The raw material of brute force."""
 
+    AUTOPSY_CLUSTER_REVIEWED = "autopsy.cluster_reviewed"
+    """A person ruled on a complaint cluster (D1). Recorded whether they
+    confirmed, rejected or superseded, because a reversal is the thing an
+    auditor asks about and it has to be findable."""
+    AUTOPSY_RULE_PROPOSED = "autopsy.rule_proposed"
+    """A confirmed cluster was proposed as a policy change. The proposal, not
+    the change: activation is governance's to record."""
     STAFF_SESSION_STARTED = "staff.session_started"
     STAFF_SESSION_ENDED = "staff.session_ended"
     """A staff member signed out, or their session was revoked (B3)."""
