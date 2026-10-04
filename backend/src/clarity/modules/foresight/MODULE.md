@@ -8,6 +8,7 @@
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
 | Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `personas.py`, `rehearsal.py`, `records.py`, `repository.py`, `service.py` |
+| Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `swarm.py`, `records.py`, `repository.py`, `service.py`, `radar.py` |
 
 ## 1. Purpose
 Foresight: scenario simulation over aggregates only, reported as relative bands, not counts, plus the backtest that measures how wrong the baseline was and refuses to call that a calibration.
@@ -63,6 +64,16 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `GET /v1/foresight/launches`, `.../backtests`, `.../calibration`, `.../spikes` | `foresight:read` |
 
 `Role.PRODUCT` holds `foresight:read`, `foresight:scenario:draft` and `foresight:run`. It deliberately does **not** hold `foresight:outcome:record`: the person who wants the calibration gate open must not be the one recording the evidence that opens it. `Role.CX_ENGINEER` holds `foresight:read` and `foresight:outcome:record` and cannot draft.
+`clarity.app.container` (builds the catalogue, engine, backtest, service and radar, and registers the radar as a `complaint.created` consumer), `clarity.app.collections` (the eight collection names) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+
+### Events
+| Event | Direction | Notes |
+|---|---|---|
+| `complaint.created` | consumed | The radar counts per channel. It reads no complaint text; `autopsy` is what does. |
+| `forecast.ready` | produced | A run finished. Codes and counts only. |
+| `spike.detected` | produced | A window reached the threshold. A channel code, never a channel name. |
+
+Both produced events go through the outbox in the same transaction as the state change (I7). Plan 21 section 11.3 carries all three rows.
 
 ## 4. Depends on
 | Package | Through |
@@ -73,7 +84,7 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `clarity.platform.persistence` | `Repository`, `UnitOfWork`, for the seven collections |
 
 ## 5. Data owned
-Seven collections in the `clarity_foresight` schema, with their own role (I6, ADR-0013). **Nothing is customer-scoped**, by construction: foresight reads segment statistics and never an individual record (deck S8), so there is no `subscriber_ref` to bind a row to.
+Eight collections in the `clarity_foresight` schema, with their own role (I6, ADR-0013). **Nothing is customer-scoped**, by construction: foresight reads segment statistics and never an individual record (deck S8), so there is no `subscriber_ref` to bind a row to.
 
 | Collection | Holds | Append-only |
 |---|---|---|
@@ -83,7 +94,8 @@ Seven collections in the `clarity_foresight` schema, with their own role (I6, AD
 | `foresight.launches` | `StoredLaunch`: a rehearsed change that shipped | yes |
 | `foresight.outcomes` | `RecordedOutcome`, one observed theme-segment band | yes |
 | `foresight.calibrations` | `StoredCalibration`, one backtest | yes |
-| `foresight.spikes` | `DetectedSpike` from the radar (C5 supplies the detector) | yes |
+| `foresight.spikes` | `DetectedSpike` raised by the radar | yes |
+| `foresight.observations` | `ComplaintObservation`: one complaint, counted, keyed by event id (C5) | yes |
 
 `foresight.runs` is the one mutable collection, and the exception is the point: a run has a lifecycle a caller polls, so its row moves by design. Everything else is a claim about the past that a later reader relies on. The launches and outcomes matter most, because they are the evidence the plan 02 section 3.4 gate opens on, so they are exactly the rows somebody would have to rewrite to make an uncalibrated engine look calibrated. Append-only is backed by database grants (`INSERT`, `SELECT` and nothing else), read back from `information_schema` by `tests/integration/test_append_only_grants.py`.
 
@@ -121,6 +133,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 - `tests/unit/test_foresight_personas.py` (C3: the parity suite over all three drivers, the round-based driver's determinism and policy inputs, the LLM driver's parsing and refusals, and the I1 boundary)
 - `tests/unit/test_foresight_catalogue.py` (C1: policy-driven parameters, `as_of` resolution, parse refusals, borrowing, the frozen scenario)
 - `tests/acceptance/test_foresight_api.py` (C4: the `/v1/foresight` contract, deny-by-default on every route, the duty split, 202 and idempotency)
+- `tests/unit/test_foresight_radar.py` (C5: what a spike is and is not, idempotency, scope, the policy inputs, and both events)
 - `tests/unit/test_foresight_persistence.py` (C2: ownership, append-only, versions, idempotent runs, the run lifecycle, evidence, backtest assembly)
 - `tests/integration/test_append_only_grants.py` and `tests/integration/test_postgres_isolation.py` cover the seven tables generically, against a real PostgreSQL
 
@@ -134,3 +147,4 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C2-foresight-persistence.md` | Seven collections in the `clarity_foresight` schema, six append-only; scenario versions, idempotent runs with a lifecycle, launches, outcomes, calibrations and spikes (C2/F05) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C3-persona-simulator-port.md` | Replaced the hash-based swarm with a `PersonaSimulator` port returning propensities, three drivers, and the structural I1 boundary (C3/F04, F11; ADR-0043) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C4-foresight-api.md` | `/v1/foresight`: scenarios, versions, runs (202 + poll URL + required `Idempotency-Key`), launches, outcomes, backtests, calibration and spikes; four permissions and a new `Role.PRODUCT` (C4/F06) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C2-foresight-persistence.md` | Eight collections in the `clarity_foresight` schema, six append-only; scenario versions, idempotent runs with a lifecycle, launches, outcomes, calibrations and spikes (C2/F05) |

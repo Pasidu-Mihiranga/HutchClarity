@@ -21,6 +21,7 @@ from clarity.modules.deskops.public import BATCHES
 from clarity.modules.foresight.public import (
     FORESIGHT_CALIBRATIONS,
     FORESIGHT_LAUNCHES,
+    FORESIGHT_OBSERVATIONS,
     FORESIGHT_OUTCOMES,
     FORESIGHT_REPORTS,
     FORESIGHT_RUNS,
@@ -105,6 +106,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     FORESIGHT_OUTCOMES,
     FORESIGHT_CALIBRATIONS,
     FORESIGHT_SPIKES,
+    FORESIGHT_OBSERVATIONS,
     # deskops
     BATCHES,
     # insights

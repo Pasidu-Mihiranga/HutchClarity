@@ -230,6 +230,61 @@ keys:
       - value: "4"
         version: 1
 
+  # -- the early-warning radar (C5/F08) ----------------------------------- #
+  #
+  # The radar counts complaints per channel in a window and compares that
+  # against the trailing average. All four are ASSUMPTION and have never been
+  # tuned against real traffic: a threshold that fires on ordinary Monday
+  # volume is an alert nobody reads, and one that never fires is not a radar.
+
+  - key: foresight.radar.window_minutes
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Length of the window complaints are counted in, and of each window the
+      baseline averages over.
+    guardrail: { min: "5", max: "1440" }
+    values:
+      - value: "60"
+        version: 1
+
+  - key: foresight.radar.baseline_windows
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      How many preceding windows the baseline averages. More windows is steadier
+      and slower to notice a change in the underlying rate.
+    guardrail: { min: "1", max: "168" }
+    values:
+      - value: "6"
+        version: 1
+
+  - key: foresight.radar.threshold_multiple
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      How many times the baseline a window must reach to count as a spike.
+    guardrail: { min: "1", max: "100" }
+    values:
+      - value: "3"
+        version: 1
+
+  - key: foresight.radar.min_observations
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Complaints a window needs before it can be a spike at all. Without a floor
+      a quiet channel going from one complaint to three is a tripling, which is
+      true and useless.
+    guardrail: { min: "1", max: "10000" }
+    values:
+      - value: "5"
+        version: 1
+
   # -- the calibration gate ----------------------------------------------- #
   #
   # Plan 02 section 3.4's gate, as a key rather than a Python constant. It is

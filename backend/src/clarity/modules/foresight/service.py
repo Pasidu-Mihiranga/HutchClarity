@@ -29,6 +29,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from clarity.contracts.events import ForecastReadyV1
 from clarity.kernel.ids import new_id
 from clarity.modules.foresight.backtest import (
     Backtest,
@@ -50,6 +51,8 @@ from clarity.modules.foresight.records import (
 )
 from clarity.modules.foresight.repository import StoredForesightRepository
 from clarity.modules.foresight.simulation import Foresight, Scenario, VolumeBand
+from clarity.platform.messaging.envelope import Event
+from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.persistence import UnitOfWork, UnitOfWorkFactory
 
 
@@ -223,8 +226,38 @@ class ForesightService:
             if succeeded is not None:
                 succeeded.succeeded(report_id=stored.report_id, at=self._clock())
                 repository.save_run(succeeded)
+            # The state change and the event in one transaction (I7). A
+            # `forecast.ready` published outside it could announce a report that
+            # a rolled-back unit never stored.
+            outbox_in(unit).append(Event.of(self._ready(stored, version), subject="foresight"))
             unit.commit()
         return stored
+
+    def _ready(self, stored: StoredReport, version: ScenarioVersion) -> ForecastReadyV1:
+        """What a consumer needs to decide whether to go and look.
+
+        Codes and counts only. `contracts/events.py` rejects any field whose
+        name contains a `name` or `card` segment, so the scenario's name cannot
+        travel here even if somebody wanted it to; a consumer reads it from
+        `/v1/foresight`, where the permission check is.
+        """
+        report = stored.report
+        return ForecastReadyV1(
+            run_id=stored.run_id,
+            report_id=stored.report_id,
+            scenario_id=version.scenario_id,
+            scenario_version_id=version.version_id,
+            change_type=version.scenario.change_type.value,
+            effective_date=version.scenario.effective_date,
+            predicted_pairs=len(report.predictions),
+            high_band_pairs=sum(1 for item in report.predictions if item.band is VolumeBand.HIGH),
+            backtested=report.backtested,
+            calibration_status=(
+                report.calibration.status.value
+                if report.calibration is not None
+                else "not_calibrated"
+            ),
+        )
 
     def run(self, run_id: str) -> ScenarioRun | None:
         with self._open_unit() as unit:

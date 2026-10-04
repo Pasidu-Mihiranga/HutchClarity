@@ -75,6 +75,7 @@ from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
 from clarity.modules.foresight.public import (
     Backtest,
+    ComplaintRadar,
     Foresight,
     ForesightCatalogue,
     ForesightService,
@@ -1147,6 +1148,19 @@ class Clarity:
             self.foresight_catalogue,
             comparison=_persona_comparison(self.roles, self.models, self.foresight_catalogue),
             clock=self.now,
+        )
+        # The early-warning radar (C5/F08). It consumes the same
+        # `complaint.created` autopsy does and shares nothing with it: autopsy
+        # reads what people said, the radar only counts.
+        self.foresight_radar = ComplaintRadar(
+            open_unit=self.open_unit,
+            catalogue=self.foresight_catalogue,
+            clock=self.now,
+        )
+        self.consumers.register(
+            EventType.COMPLAINT_CREATED,
+            group="foresight-radar",
+            handler=self.foresight_radar.on_complaint_created,
         )
 
         # Insights read models, folded from the event log (I01, #30). The
