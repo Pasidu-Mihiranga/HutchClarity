@@ -490,3 +490,99 @@ def test_the_transcript_holds_masked_text_not_what_was_typed(api, me):
     said = next(e for e in entries if e["role"] == "customer")
 
     assert "0781234567" not in said["text"]
+
+
+# --------------------------------------------------------------------------- #
+# Streaming (A5)
+#
+# The chat used to animate a `setTimeout` with a hardcoded English label while
+# one request ran to completion, so a hung turn looked exactly like a slow one.
+# These assert the two things that make the stream worth having and the one
+# thing that would make it dangerous.
+# --------------------------------------------------------------------------- #
+
+
+def _events(raw: str) -> list[tuple[str, dict]]:
+    """Parse an SSE body into (event, data) pairs."""
+    import json as _json
+
+    out: list[tuple[str, dict]] = []
+    for block in raw.strip().split("\n\n"):
+        name = payload = None
+        for line in block.splitlines():
+            if line.startswith("event: "):
+                name = line.removeprefix("event: ").strip()
+            elif line.startswith("data: "):
+                payload = _json.loads(line.removeprefix("data: "))
+        if name is not None and payload is not None:
+            out.append((name, payload))
+    return out
+
+
+def test_a_streamed_turn_reports_real_stages_then_the_same_answer(api, me):
+    case_id = _open(api, me, DILANI, channel="app", language="en")
+
+    sent = api.post(
+        "/v1/conversation/turn/stream",
+        json={
+            "text": "Why was LKR 49 deducted from my balance?",
+            "case_id": case_id,
+            "channel": "app",
+            "language": "en",
+        },
+        headers=me,
+    )
+
+    assert sent.status_code == 200, sent.text
+    assert sent.headers["content-type"].startswith("text/event-stream")
+    events = _events(sent.text)
+
+    stages = [data["stage"] for name, data in events if name == "stage"]
+    # Real steps, in pipeline order, not a timer.
+    assert stages == ["masked", "understood", "checked", "composed", "verified"]
+
+    # And exactly one answer, last, identical in shape to the JSON route.
+    answers = [data for name, data in events if name == "turn"]
+    assert len(answers) == 1
+    assert events[-1][0] == "turn"
+    assert answers[0]["turn"]["reply"]
+
+
+def test_a_stage_event_never_carries_what_the_customer_said(api, me):
+    """The stream is a progress bar, not a second answer channel.
+
+    A stage event that could carry text would be customer-visible output that
+    no verifier ever saw, which is the one thing the pipeline exists to stop.
+    """
+    case_id = _open(api, me, DILANI, channel="app", language="en")
+    secret = "Why was LKR 49 deducted from my balance?"
+
+    sent = api.post(
+        "/v1/conversation/turn/stream",
+        json={"text": secret, "case_id": case_id, "channel": "app", "language": "en"},
+        headers=me,
+    )
+
+    for name, data in _events(sent.text):
+        if name != "stage":
+            continue
+        assert set(data) == {"stage"}, f"a stage event carried more than a code: {data}"
+        assert "49" not in data["stage"]
+
+
+def test_a_streamed_turn_is_subject_bound_like_the_json_one(api):
+    """A 200 has already been sent, so refusal arrives as an error event."""
+    mine = {"Authorization": f"Bearer {customer_token(api, DILANI)}"}
+    case_id = _open(api, mine, DILANI, channel="app", language="en")
+
+    theirs = {"Authorization": f"Bearer {customer_token(api, KUMAR)}"}
+    sent = api.post(
+        "/v1/conversation/turn/stream",
+        json={"text": "what happened", "case_id": case_id, "channel": "app"},
+        headers=theirs,
+    )
+
+    events = _events(sent.text)
+    assert [name for name, _ in events] == ["error"]
+    assert events[0][1] == {"status": 403}
+    assert not [name for name, _ in events if name == "turn"]

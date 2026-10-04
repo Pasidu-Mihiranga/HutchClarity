@@ -43,9 +43,11 @@ from clarity.modules.conversation.intake import (
 )
 from clarity.modules.conversation.intents import Intent, Route
 from clarity.modules.conversation.orchestrator import (
+    STAGES,
     ConversationOrchestrator,
     FlowEngine,
     FlowOutcome,
+    StageReporter,
     Turn,
     TurnRecord,
 )
@@ -86,6 +88,7 @@ __all__ = [
     "MAX_MESSAGE_CHARS",
     "MAX_TOOL_CALLS_PER_TURN",
     "REFUSALS",
+    "STAGES",
     "AgentLimits",
     "AgentPlan",
     "AgentTrace",
@@ -112,6 +115,7 @@ __all__ = [
     "RejectionCode",
     "Route",
     "Rule",
+    "StageReporter",
     "ToolCaller",
     "ToolNotAllowed",
     "TranscriptEntry",

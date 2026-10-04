@@ -975,6 +975,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/conversation/turn/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Conversation Turn Stream
+         * @description The same turn, as Server-Sent Events (A5).
+         *
+         *     The chat used to animate a `setTimeout` with a hardcoded English label
+         *     while one request ran to completion, so the progress it showed
+         *     reflected nothing: a fast turn still waited, and a hung one looked
+         *     exactly like a slow one.
+         *
+         *     Two event types, and only two:
+         *
+         *     - `stage`, one per completed pipeline step, carrying a code from the
+         *       closed `STAGES` vocabulary. **No customer content travels on a stage
+         *       event**, which is why the orchestrator is handed a code rather than a
+         *       message: a progress channel that can carry text is a second answer
+         *       channel that nothing verifies.
+         *     - `turn`, the identical payload the JSON route returns, once, at the
+         *       end. Composed, verified and recorded before it is sent. Streaming
+         *       reports progress; it does not stream a reply into the customer's view
+         *       before the verifier has seen it.
+         *
+         *     An error ends the stream with an `error` event carrying a status and no
+         *     detail, because the response has already begun with a 200 and cannot
+         *     become a 4xx.
+         */
+        post: operations["conversation_turn_stream_v1_conversation_turn_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/demo/autopsy": {
         parameters: {
             query?: never;
@@ -3805,6 +3846,43 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    conversation_turn_stream_v1_conversation_turn_stream_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
