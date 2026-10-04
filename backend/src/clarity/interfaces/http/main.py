@@ -102,7 +102,7 @@ from clarity.interfaces.http.throttle import (
     ANONYMOUS_FALLBACK,
     ANONYMOUS_KEY,
     FALLBACK_LIMIT,
-    rate_limit,
+    RateLimitMiddleware,
 )
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
@@ -363,7 +363,12 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             _throttle_log.warning("rate limit %s unresolved; using the default", policy_key)
             return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
 
-    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
+    app.add_middleware(
+        RateLimitMiddleware,
+        limiter=core.rate_limiter,
+        resolve=_limit_for,
+        clock=core.case_aggregate._now,
+    )
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization

@@ -37,16 +37,20 @@ export default function LoginPage() {
         tone: "ok",
       });
       setStep("verify");
-      // Read the simulated SMS back and prefill it. Synthetic profiles only;
-      // the route 404s in prod, so a failure here is not an error worth
-      // showing, it just means there is no inbox to read.
-      try {
-        const message = await client.demoInbox(msisdn);
-        if (message.code) {
-          setDemoCode(message.code);
-          setCode(message.code);
+      // Read the synthetic inbox only when this request actually used it.
+      // A live request must not probe a development-only route and produce a
+      // misleading 404 in the browser console.
+      if (result.simulated === true) {
+        try {
+          const message = await client.demoInbox(msisdn);
+          if (message.code) {
+            setDemoCode(message.code);
+            setCode(message.code);
+          }
+        } catch {
+          setDemoCode(null);
         }
-      } catch {
+      } else {
         setDemoCode(null);
       }
     } catch (err) {
@@ -80,7 +84,9 @@ export default function LoginPage() {
       try { window.sessionStorage.removeItem("clarity_token"); } catch {}
       client.setToken(undefined);
       setStatus({
-        text: err instanceof Error ? err.message : "Verify failed",
+        text: err instanceof TypeError
+          ? "The network changed before your code was submitted. Reconnect and press Sign in again."
+          : err instanceof Error ? err.message : "Verify failed",
         tone: "info",
       });
     } finally {

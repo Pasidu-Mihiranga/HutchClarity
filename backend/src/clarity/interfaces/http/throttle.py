@@ -20,13 +20,17 @@ fails closed turns a configuration problem into an outage.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import logging
+from collections.abc import Callable
 from datetime import datetime
 
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from clarity.platform.throttle import RateLimiter
+
+_log = logging.getLogger("clarity.http.throttle")
 
 #: Path prefix -> the policy key holding its per-minute limit.
 #:
@@ -89,35 +93,69 @@ def _caller(request: Request) -> tuple[str, bool]:
     return f"ip:{client}", False
 
 
-def rate_limit(
-    limiter: RateLimiter,
-    resolve: Callable[[str, datetime], int],
-    clock: Callable[[], datetime],
-) -> Callable[[Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]]:
-    """Build the middleware. The container supplies the driver and the clock."""
+class RateLimitMiddleware:
+    """Pure ASGI rate limiting, with request-local response headers.
 
-    async def middleware(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        matched = _route_for(request.url.path)
+    FastAPI's function-style HTTP middleware is implemented through
+    ``BaseHTTPMiddleware``. Under the browser suite's concurrent CORS traffic,
+    its response boundary leaked one request's rate-limit headers and refusal
+    onto unrelated authentication requests. Keeping this wrapper at the ASGI
+    message layer gives every invocation its own scope and send closure.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        limiter: RateLimiter,
+        resolve: Callable[[str, datetime], int],
+        clock: Callable[[], datetime],
+    ) -> None:
+        self.app = app
+        self.limiter = limiter
+        self.resolve = resolve
+        self.clock = clock
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive=receive)
+        # Classify from the immutable ASGI scope. `request.url` is a derived,
+        # cached object; under the browser suite's concurrent CORS traffic it
+        # was observed carrying a throttled request's classification into an
+        # authentication response. That made unrelated login and OTP routes
+        # spend the anonymous assistant budget.
+        path = str(scope.get("path", ""))
+        matched = _route_for(path)
         if matched is None or request.method == "OPTIONS":
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         prefix, policy_key = matched
-        now = clock()
+        now = self.clock()
         key, signed_in = _caller(request)
 
-        checks = [(f"{key}|{prefix}", resolve(policy_key, now))]
+        checks = [(f"{key}|{prefix}", self.resolve(policy_key, now))]
         if not signed_in:
             # One budget across every throttled route, on top of the per-route
             # one. An anonymous caller is the case where this is the only thing
             # between a script and the pipeline.
-            checks.append((f"{key}|anon", resolve(ANONYMOUS_KEY, now)))
+            checks.append((f"{key}|anon", self.resolve(ANONYMOUS_KEY, now)))
 
         for check_key, limit in checks:
-            verdict = limiter.check(check_key, limit=limit, now=now)
+            verdict = self.limiter.check(check_key, limit=limit, now=now)
             if not verdict.allowed:
-                return JSONResponse(
+                _log.warning(
+                    "rate limit refused path=%s prefix=%s key=%s limit=%s remaining=%s",
+                    path,
+                    prefix,
+                    check_key,
+                    limit,
+                    verdict.remaining,
+                )
+                response = JSONResponse(
                     status_code=429,
                     content={
                         "type": "about:blank",
@@ -129,14 +167,21 @@ def rate_limit(
                     media_type="application/problem+json",
                     headers=verdict.headers,
                 )
+                await response(scope, receive, send)
+                return
 
-        response = await call_next(request)
-        # Report the per-route budget, which is the one a client can act on.
-        for header, value in verdict.headers.items():
-            response.headers.setdefault(header, value)
-        return response
+        async def send_with_budget(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                existing = {name.lower() for name, _ in headers}
+                for header, value in verdict.headers.items():
+                    encoded = header.lower().encode("latin-1")
+                    if encoded not in existing:
+                        headers.append((encoded, value.encode("latin-1")))
+                message = {**message, "headers": headers}
+            await send(message)
 
-    return middleware
+        await self.app(scope, receive, send_with_budget)
 
 
 __all__ = [
@@ -144,5 +189,5 @@ __all__ = [
     "ANONYMOUS_KEY",
     "FALLBACK_LIMIT",
     "THROTTLED",
-    "rate_limit",
+    "RateLimitMiddleware",
 ]

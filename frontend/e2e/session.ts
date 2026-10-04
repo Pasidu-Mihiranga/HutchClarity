@@ -43,7 +43,9 @@ export async function customerTokenFor(
   const started = await request.post(`${API}/v1/auth/otp/request`, {
     data: { msisdn },
   });
-  expect(started.ok(), `otp request failed: ${started.status()}`).toBeTruthy();
+  if (!started.ok()) {
+    throw new Error(`otp request failed: ${started.status()} ${await started.text()}`);
+  }
   const { challenge_id } = (await started.json()) as { challenge_id: string };
 
   // The code is generated per challenge. There is no "any six digits" path:
@@ -134,7 +136,9 @@ export async function staffToken(
       step_up_code: stepUp ? "step-up" : "",
     },
   });
-  expect(session.ok(), `staff login failed: ${session.status()}`).toBeTruthy();
+  if (!session.ok()) {
+    throw new Error(`staff login failed: ${session.status()} ${await session.text()}`);
+  }
   const body = (await session.json()) as { token: string; roles: string[] };
   expect(body.roles).toEqual(expect.arrayContaining(roles));
   return body.token;

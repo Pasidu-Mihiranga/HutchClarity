@@ -179,7 +179,7 @@ export function VoiceSheet({
         <p className="vo-status" role="status" aria-live="polite" data-error={phase === "error" ? "" : undefined}>{status}</p>
         {text ? <p className="vo-transcript" data-testid="voice-transcript">{text}</p> : null}
 
-        {phase !== "heard" ? <p className="vo-notice">{t(lang, "voice.notice")}</p> : null}
+        <p className="vo-notice">{t(lang, "voice.notice")}</p>
 
         <div className="vo-actions">
           {phase === "idle" || phase === "error" ? (
