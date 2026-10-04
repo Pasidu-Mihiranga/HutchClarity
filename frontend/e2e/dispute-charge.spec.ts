@@ -30,27 +30,23 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await box.fill("Why was LKR 49 deducted from my balance?");
     await page.keyboard.press("Enter");
 
-    // The first turn is answered statelessly and opens the case: there is no
-    // case to attach state to until it exists, so `case_id` is null and the
-    // server keeps nothing. The flow runs from the next turn, which is why
-    // this drives a second message rather than asserting on the first.
+    // 1. The cause, with its evidence. The rules decided this, not a model
+    //    (I1), and the amount comes from the decision.
     await expect(page.getByRole("heading", { name: /found the reason/i })).toBeVisible();
-    await box.fill("Yes, please fix it");
-    await page.keyboard.press("Enter");
+    await expect(page.getByText("LKR 49.00").first()).toBeVisible();
 
-    // 1. The journey is visible. This is the assertion that would have failed
-    //    before C05: with the flow never running there was no state to show.
-    const journey = page.getByRole("navigation", { name: /charge|ගාස්තු|கட்டண/i });
-    await expect(journey).toBeVisible();
+    // 2. The remedy is offered, and taking it opens a confirmation rather than
+    //    acting. This is the assertion that matters for ADR-0007: the button a
+    //    customer taps proposes, and a second, explicit confirm executes.
+    await page.getByRole("button", { name: /refund & disable/i }).click();
 
-    // 2. A plan is proposed and nothing has happened yet. The wording matters:
-    //    a customer must know the fix has not run (I1, ADR-0007).
-    const confirm = page.getByRole("button", { name: /^confirm$/i });
-    await expect(confirm).toBeVisible();
-    await expect(page.getByText(/nothing has changed yet/i)).toBeVisible();
+    const sheet = page.getByRole("heading", { name: /disable this subscription/i });
+    await expect(sheet).toBeVisible();
+    // What the fix will do, before it does it.
+    await expect(page.getByText(/refunds the disputed amount/i)).toBeVisible();
 
     // 3. Confirming is what executes it.
-    await confirm.click();
+    await page.getByRole("button", { name: /^confirm$/i }).click();
 
     // 4. The receipt, and the backend's own verdict on it. `verified` comes
     //    from `POST /v1/receipts/{id}/verify`, which recomputes the hash chain
