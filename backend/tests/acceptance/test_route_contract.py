@@ -107,6 +107,25 @@ SIGNED_IN = {
     ("POST", "/v1/cases/{case_id}/receipt"),
     ("GET", "/v1/receipts/{receipt_id}"),
     ("GET", "/v1/receipts/{receipt_id}/render"),
+    # Foresight (C4, F06). Four permissions, all staff: `foresight:read` to
+    # look, `foresight:scenario:draft` and `foresight:run` for product, and
+    # `foresight:outcome:record` for whoever observes a launch, deliberately not
+    # product. Nothing here is customer-facing and nothing is public: a
+    # rehearsal names changes HUTCH has not announced.
+    ("POST", "/v1/foresight/scenarios"),
+    ("GET", "/v1/foresight/scenarios"),
+    ("GET", "/v1/foresight/scenarios/{scenario_id}"),
+    ("POST", "/v1/foresight/scenarios/{scenario_id}/versions"),
+    ("POST", "/v1/foresight/runs"),
+    ("GET", "/v1/foresight/runs"),
+    ("GET", "/v1/foresight/runs/{run_id}"),
+    ("POST", "/v1/foresight/launches"),
+    ("GET", "/v1/foresight/launches"),
+    ("POST", "/v1/foresight/launches/{launch_id}/outcomes"),
+    ("POST", "/v1/foresight/backtests"),
+    ("GET", "/v1/foresight/backtests"),
+    ("GET", "/v1/foresight/calibration"),
+    ("GET", "/v1/foresight/spikes"),
     ("GET", "/v1/desk/queue"),
     ("GET", "/v1/admin/switches"),
     ("POST", "/v1/admin/switches"),

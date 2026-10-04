@@ -247,7 +247,7 @@ erDiagram
 | `POST /v1/bulk-fixes` | Fix-all-like-this (L4) | Supervisor maker | Requires dry-run ID + checker approval |
 | `POST /v1/regulator-packs` | Generate TRCSL pack (L4) | Compliance | Async; WORM export; audited |
 | `GET /v1/autopsy/clusters` | Cluster list/trends | CX analyst | |
-| `POST /v1/simulation/scenarios` · `POST …/{id}/runs` | Foresight scenario + run | Product manager | Async; aggregates only |
+| `POST /v1/foresight/scenarios` · `POST …/{id}/versions` · `POST /v1/foresight/runs` | Foresight scenario, version and run | Product manager | 202 with a poll URL; `Idempotency-Key` required; aggregates only |
 | `POST /v1/channels/whatsapp/webhook` | Meta webhook | Meta | Signature (`X-Hub-Signature-256`) verified |
 | `POST /v1/channels/ussd/session` | USSD session callback | HUTCH USSD GW | mTLS; **interface REQUIRES CONFIRMATION** |
 

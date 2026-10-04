@@ -79,6 +79,11 @@ from clarity.modules.foresight.public import (
     Foresight,
     ForesightCatalogue,
     ForesightService,
+    LlmPersonaSimulator,
+    PersonaRehearsal,
+    PersonaSimulator,
+    RoleRouterPersonas,
+    RoundBasedPersonaSimulator,
 )
 from clarity.modules.governance.public import (
     CHANGES,
@@ -542,6 +547,48 @@ class _RolePlanner:
             model_role=ModelRole.REASON.value,
             model=answer.model,
         )
+
+
+def _persona_comparison(
+    router: RoleRouter, catalogue: ModelCatalogue, foresight: ForesightCatalogue
+) -> PersonaSimulator:
+    """Which second method sits beside the baseline (C3/F11).
+
+    The LLM driver when a remote `reason` model is configured, the round-based
+    one otherwise. Mirrors `_planner`'s test deliberately: a template cannot
+    estimate a propensity, so wiring one would mean a wasted call and an empty
+    column on every rehearsal.
+
+    Either way this is the **comparison** argument. `PersonaRehearsal` builds the
+    statistical baseline itself, so nothing here can put a model in charge of a
+    reported band (I1).
+    """
+    chain = catalogue.routing(ModelRole.REASON).chain
+    for step in chain:
+        if not step.is_local and step.provider in router.configured:
+            return LlmPersonaSimulator(foresight, router=RoleRouterPersonas(_PersonaInvoke(router)))
+    return RoundBasedPersonaSimulator(foresight)
+
+
+class _PersonaInvoke:
+    """Asks the `reason` role and hands back text, or nothing.
+
+    A refusal or a template answer becomes `None` rather than text: a template
+    has no view on how a segment reacts, and parsing its wording for numbers
+    would be inventing a second opinion out of a first one's absence.
+    """
+
+    def __init__(self, router: RoleRouter) -> None:
+        self._router = router
+
+    def __call__(self, system: str, facts: dict[str, object], user: str) -> str | None:
+        answer = self._router.invoke(
+            ModelRole.REASON,
+            Prompt(system=system, facts=facts, user_masked=user, language=Language.EN),
+        )
+        if answer.is_refusal or answer.provider in LOCAL_PROVIDERS:
+            return None
+        return answer.text
 
 
 class _RoleProvider:
@@ -1092,6 +1139,14 @@ class Clarity:
         self.foresight_service = ForesightService(
             open_unit=self.open_unit,
             catalogue=self.foresight_catalogue,
+            clock=self.now,
+        )
+        # The baseline is the headline and a second method sits beside it
+        # (C3/F11). `PersonaRehearsal` constructs the baseline itself, so the
+        # only thing wired here is the comparison column.
+        self.foresight_rehearsal = PersonaRehearsal(
+            self.foresight_catalogue,
+            comparison=_persona_comparison(self.roles, self.models, self.foresight_catalogue),
             clock=self.now,
         )
         # The early-warning radar (C5/F08). It consumes the same

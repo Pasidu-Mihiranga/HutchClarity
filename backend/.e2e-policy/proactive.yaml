@@ -1,0 +1,11 @@
+# Proactive stream parameters. ASSUMPTION - REQUIRES HUTCH VALIDATION.
+
+keys:
+  - key: proactive.fup.warning_thresholds
+    kind: string
+    owner_role: product
+    tags: [customer_visible, operational]
+    description: Usage percentages that publish proactive FUP risks.
+    values:
+      - value: "80,95"
+        version: 1
