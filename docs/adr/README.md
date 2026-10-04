@@ -47,6 +47,7 @@ reversed.
 | [0040](0040-conversation-transcripts-are-records-not-memory.md) | Conversation transcripts are records, not memory | Accepted |
 | [0041](0041-a-session-has-an-absolute-deadline.md) | A session has an absolute deadline | Accepted |
 | [0042](0042-the-issuer-signs-from-a-key-ring.md) | The issuer signs from a key ring | Accepted |
+| [0043](0043-a-persona-propensity-never-sets-a-reported-band.md) | A persona propensity never sets a reported band | Accepted |
 ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 
 ## Writing one

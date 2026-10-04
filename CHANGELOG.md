@@ -6,6 +6,13 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **`/v1/foresight`: a real API for rehearsing a change** (C4/F06). Draft and version a scenario, ask for a run, record what a launch actually produced, run a backtest, read the latest calibration and the early-warning spikes. Fourteen routes, all staff-only.
+  - `POST /v1/foresight/runs` answers **202 with a `Location` poll URL** and **requires an `Idempotency-Key`**. A repeat returns the original run and its original outcome, marked `replayed`. Foresight moves no money, so the risk is not a double charge; it is a double finding.
+  - Four new permissions and a new **`Role.PRODUCT`**. Product may draft and run; it may **not** record what a launch produced, because the person who wants the calibration gate open must not be the one writing the evidence that opens it. CX records outcomes and cannot draft.
+  - `Role.PRODUCT` also closes a pre-existing gap: `config/policy/proactive.yaml` already wrote `owner_role: product` with no matching `Role` member, so the key was owned by a role that did not exist.
+  - The resource is `/v1/foresight`, not `/v1/simulation`. Plan 10 §250 said the latter and everything else said foresight; the plan is corrected (plan v1.13) and a test asserts no `/v1/simulation` path exists.
+  - OpenAPI snapshot, `contracts/openapi.json` and the SDK types regenerated on purpose.
+
 - **Foresight stores what it rehearsed and what actually happened** (C2/F05). Seven collections in a `clarity_foresight` schema with its own role: scenario versions, runs, reports, launches, recorded outcomes, calibrations and detected spikes. A run was built, returned and discarded before this, so nothing could be cited later and the calibration gate had nowhere to keep the evidence it opens on.
   - **Six of the seven are append-only**, backed by database grants (`INSERT` and `SELECT`, nothing else) rather than by the code remembering. `foresight.runs` is the exception, because a run has a lifecycle a caller polls. The launches and outcomes matter most: they are the evidence the plan 02 section 3.4 gate opens on, so they are the rows somebody would have to rewrite to make an uncalibrated engine look calibrated.
   - **Nothing is customer-scoped**, by construction. Foresight reads segment statistics and never an individual record (deck S8), so there is no subscriber to bind a row to.
@@ -14,6 +21,13 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
   - Public surface: `ForesightService`, `ForesightRepository`, `StoredForesightRepository`, the record types, and the seven collection names.
 
 ### Changed
+
+- **Foresight rehearses a change with real persona methods, not a hash** (C3/F04, F11). The previous "swarm" took the statistical baseline, hashed `seed:scenario:theme:segment`, took two hex digits modulo three minus one, shifted the band by that, and compared the result against a second run of the same baseline. It measured a hash. Its tests passed because a hash is reproducible.
+  - A `PersonaSimulator` port now returns **propensities in [0, 1]**, the share of one segment expected to complain about one theme, never a band and never a count. Three drivers implement it: the statistical baseline, a seeded round-based cohort simulation (standard library only, no new dependency) and an LLM-driven one over the existing `reason` role.
+  - **A propensity never sets a reported band** (ADR-0043). `PersonaRehearsal` constructs its own baseline and takes no headline argument, so no caller can put a model in charge of a band a product manager acts on. A driver answering 1.0 for every pair leaves the reported bands unchanged, and a test asserts it.
+  - Agreement between the two methods is reported and declared meaningless in the same breath: both rest on the same segment catalogue and neither has been calibrated against a real launch. A driver that could not answer gives an absent column, not a column of zeros.
+  - Public surface, breaking: `swarm.py` and its `ScenarioRehearsal`, `SeededPersonaSimulator`, `SwarmReport` and `Comparison` are removed.
+  - `GET /v1/demo/foresight` keeps its shape; `simulation` gains `comparison_version` and `agreement_rate`, and `baseline_vs_swarm[].swarm` may be `null` when the second method had no view on a pair.
 
 - **Foresight reads its parameters from the policy store** (C1/F03). The segment mix, the per-change-type theme catalogues, which change types borrow another's themes, the band thresholds and the calibration gate were Python constants, so a product manager could not change one without a release (I10, D2). They are now `config/policy/foresight.yaml`, resolved **as of the scenario's effective date** rather than "now", so a rehearsal of an October change uses October's parameters. Mitigation and caveat wording moved to `platform/content/foresight.py`.
   - Public surface, breaking: `Foresight(catalogue, clock=None)`, `Backtest(catalogue, clock=None)` and `ScenarioRehearsal(catalogue)` replace the no-argument constructors; `MIN_REAL_LAUNCHES` and `DEMO_SEGMENTS` are removed rather than kept as fallbacks.

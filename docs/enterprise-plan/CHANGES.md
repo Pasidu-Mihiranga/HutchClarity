@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.13 - 2026-10-04
+
+| Area | Change | Chapters |
+|---|---|---|
+| Foresight API | Section 250 named `POST /v1/simulation/scenarios`. Every other document, and the module itself, says foresight; chapter 10 is a chapter 01-17 document and therefore lowest precedence, so the chapter is what changes. The row now records the shipped surface: `/v1/foresight/scenarios`, `.../{id}/versions` and `/v1/foresight/runs`, answering 202 with a poll URL and requiring an `Idempotency-Key` (C4, F06) | 10 §250 |
+
 ## v1.12 - 2026-10-04
 
 | Area | Change | Chapters |
