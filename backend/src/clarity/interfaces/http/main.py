@@ -1330,9 +1330,10 @@ def _register_routes(app: FastAPI) -> None:
             identity = directory.authenticate(body.username, body.password, body.step_up_code)
         except LoginRefused as error:
             raise HTTPException(status_code=401, detail="sign-in failed") from error
+        role_names = sorted(role.value for role in identity.roles)
         issued = clarity.tokens.for_staff(
             identity.user_ref,
-            roles={identity.role},
+            roles=set(identity.roles),
             assurance=identity.assurance,
         )
         trail.record(
@@ -1343,7 +1344,7 @@ def _register_routes(app: FastAPI) -> None:
             session_ref=trail.session_ref_for(issued.value),
             object_ref=identity.user_ref,
             detail={
-                "roles": [identity.role.value],
+                "roles": role_names,
                 "step_up": identity.assurance is Assurance.MFA_RECENT,
                 "assurance": issued.principal.assurance.value,
                 "simulated": True,
@@ -1354,7 +1355,7 @@ def _register_routes(app: FastAPI) -> None:
             refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
             subject=identity.user_ref,
-            roles=[identity.role.value],
+            roles=role_names,
             assurance=issued.principal.assurance.value,
             permissions=sorted(p.value for p in issued.principal.permissions),
         )

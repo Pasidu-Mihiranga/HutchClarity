@@ -153,6 +153,24 @@ def test_an_unknown_username_is_refused_like_a_wrong_password() -> None:
         directory.authenticate("nobody", "supervisor-clarity", "")
 
 
+def test_an_account_may_hold_several_existing_roles() -> None:
+    raw = json.dumps(
+        {
+            "accounts": [
+                {
+                    "username": "owner",
+                    "user_ref": "owner-1",
+                    "roles": ["product", "platform_admin"],
+                    "password_hash": hash_secret("owner123456"),
+                    "step_up_hash": hash_secret("step-up"),
+                }
+            ]
+        }
+    )
+    identity = StaffDirectory.load(raw).authenticate("owner", "owner123456", "step-up")
+    assert identity.roles == frozenset({Role.PRODUCT, Role.PLATFORM_ADMIN})
+
+
 def test_the_committed_synthetic_directory_holds_no_plaintext_secret() -> None:
     path = Path(__file__).resolve().parents[3] / "config" / "staff" / "synthetic-directory.json"
     raw = path.read_text()

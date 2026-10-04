@@ -38,18 +38,23 @@ class LoginRefused(Exception):
 
 @dataclass(frozen=True)
 class StaffIdentity:
-    """The person the directory says just signed in. The role is not a choice."""
+    """The person the directory says just signed in. The roles are not a choice."""
 
     user_ref: str
-    role: Role
+    roles: frozenset[Role]
     assurance: Assurance
+
+    @property
+    def role(self) -> Role:
+        """The only role, when the account holds one."""
+        return next(iter(self.roles))
 
 
 @dataclass(frozen=True)
 class _Account:
     username: str
     user_ref: str
-    role: Role
+    roles: frozenset[Role]
     password_hash: str
     step_up_hash: str
 
@@ -110,7 +115,6 @@ class StaffDirectory:
                 raise StaffDirectoryInvalid("each staff account must be an object")
             username = str(row.get("username", "")).strip()
             user_ref = str(row.get("user_ref", "")).strip()
-            role_name = str(row.get("role", "")).strip()
             if "password" in row or "step_up_code" in row:
                 raise StaffDirectoryInvalid(
                     f"{username or 'an account'} stores a plaintext secret; "
@@ -126,19 +130,14 @@ class StaffDirectory:
                 raise StaffDirectoryInvalid(f"{username} needs a step_up_hash")
             if username in seen_users or user_ref in seen_refs:
                 raise StaffDirectoryInvalid(f"duplicate staff account: {username}")
-            try:
-                role = Role(role_name)
-            except ValueError as error:
-                raise StaffDirectoryInvalid(f"unknown role for {username}") from error
-            if role is Role.CUSTOMER:
-                raise StaffDirectoryInvalid(f"{username} cannot be a customer")
+            roles = _roles_for(row, username or "an account")
             seen_users.add(username)
             seen_refs.add(user_ref)
             accounts.append(
                 _Account(
                     username=username,
                     user_ref=user_ref,
-                    role=role,
+                    roles=roles,
                     password_hash=str(password_hash),
                     step_up_hash=str(step_up_hash),
                 )
@@ -159,4 +158,25 @@ class StaffDirectory:
         if code and not _matches(code, account.step_up_hash):
             raise LoginRefused("sign-in failed")
         assurance = Assurance.MFA_RECENT if code else Assurance.MFA
-        return StaffIdentity(user_ref=account.user_ref, role=account.role, assurance=assurance)
+        return StaffIdentity(user_ref=account.user_ref, roles=account.roles, assurance=assurance)
+
+
+def _roles_for(row: dict[str, object], username: str) -> frozenset[Role]:
+    """One `role`, or a `roles` list. Both name existing jobs; neither is invented."""
+    listed = row.get("roles")
+    if isinstance(listed, list) and listed:
+        names = [str(item).strip() for item in listed]
+    else:
+        names = [str(row.get("role", "")).strip()]
+    if not names or any(not name for name in names):
+        raise StaffDirectoryInvalid(f"{username} needs a role")
+    found: set[Role] = set()
+    for name in names:
+        try:
+            role = Role(name)
+        except ValueError as error:
+            raise StaffDirectoryInvalid(f"unknown role for {username}") from error
+        if role is Role.CUSTOMER:
+            raise StaffDirectoryInvalid(f"{username} cannot be a customer")
+        found.add(role)
+    return frozenset(found)
