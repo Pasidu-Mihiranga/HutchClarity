@@ -252,6 +252,10 @@ jobs:
       - name: Build every app
         run: npm run build
 
+      - name: Test the WhatsApp transport
+        working-directory: services/whatsapp-baileys
+        run: npm ci && npm test
+
   secrets:
     name: secret scanning (gitleaks)
     runs-on: ubuntu-latest
@@ -380,6 +384,9 @@ jobs:
               -t "clarity-$app:ci" .
           done
 
+      - name: Build the WhatsApp transport
+        run: docker build -f deploy/docker/Dockerfile.whatsapp -t clarity-whatsapp:ci .
+
       - name: Validate the single-VPS deployment
         run: |
           set -euo pipefail
@@ -395,6 +402,7 @@ jobs:
           POSTGRES_DB=clarity
           KEYCLOAK_ADMIN=clarity-admin
           KEYCLOAK_ADMIN_PASSWORD=ci-only-not-a-secret
+          WHATSAPP_ENABLED=false
           EOF
           for script in deploy/scripts/*.sh; do bash -n "$script"; done
           docker compose --env-file /opt/hutch-clarity/.env.production \
