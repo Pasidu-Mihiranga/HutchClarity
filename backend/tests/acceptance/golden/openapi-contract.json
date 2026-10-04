@@ -194,14 +194,6 @@
       "response": "object",
       "status": "200"
     },
-    "GET /v1/demo/foresight": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "GET /v1/demo/inbox": {
       "parameters": [
         "query:msisdn"

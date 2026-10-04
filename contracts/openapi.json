@@ -5421,58 +5421,6 @@
         ]
       }
     },
-    "/v1/demo/foresight": {
-      "get": {
-        "description": "Rehearse retiring a pack. Scenarios, not certainties.",
-        "operationId": "demo_foresight_v1_demo_foresight_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Foresight V1 Demo Foresight Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Foresight",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
     "/v1/demo/inbox": {
       "get": {
         "description": "The simulated SMS inbox. Prototype only, and labelled everywhere.",
@@ -6624,7 +6572,7 @@
     },
     "/v1/foresight/spikes": {
       "get": {
-        "description": "Early-warning spikes. C5 supplies the detector that fills this.",
+        "description": "Early-warning spikes, raised by the radar (C5).",
         "operationId": "list_spikes_v1_foresight_spikes_get",
         "parameters": [
           {

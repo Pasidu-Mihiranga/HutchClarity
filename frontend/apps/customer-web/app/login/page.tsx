@@ -34,7 +34,7 @@ export default function LoginPage() {
       setChallengeId(result.challenge_id);
       setSimulatedDelivery(result.simulated === true);
       setStatus({
-        text: result.detail ?? result.message ?? "OTP sent to your number.",
+        text: result.detail ?? "OTP sent to your number.",
         tone: "ok",
       });
       setStep("verify");

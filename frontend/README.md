@@ -74,9 +74,9 @@ npm run dev -w @clarity/customer-web
 - Bottom **role switcher** (agent … security_admin) + step-up MFA toggle
 - `/` - home with permission-aware section cards
 - `/desk` - live queue + cockpit + approve (via `@clarity/sdk`)
-- `/insights` - `/v1/insights/dashboards` summary, with the autopsy clusters and the foresight rehearsal alongside
+- `/insights` - `/v1/insights/dashboards` summary, with the autopsy clusters alongside and the latest stored rehearsal when the reader holds `foresight:read`
 - `/autopsy` - Complaint Autopsy reviewer workspace on `/v1/autopsy/clusters`: confirm, reject and supersede-with-reason, gated on `autopsy:review`
-- `/foresight` - synthetic baseline-vs-swarm scenario rehearsal workspace
+- `/foresight` - scenario rehearsal on `/v1/foresight`: pick a scenario, request a run, read the stored report, calibration and radar spikes. Reading is `foresight:read`, rehearsing is `foresight:run`
 - `/studio` - Policy Studio on `/v1/admin/policy/changes`: draft, replay, approve, schedule, activate and propose a reversal
 - `/admin` - kill switches (`/v1/admin/switches`)
 

@@ -14,7 +14,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "sdk:generate": "openapi-typescript ../contracts/openapi.json -o packages/sdk/src/generated/schema.ts",
     "sdk:check": "node scripts/check-sdk.mjs",
-    "typecheck": "tsc -p packages/sdk/tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "test": "npm run test --workspaces --if-present"

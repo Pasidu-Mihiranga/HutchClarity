@@ -159,7 +159,6 @@ SIGNED_IN = {
     ("POST", "/v1/admin/policy/changes/{change_id}/schedule"),
     ("POST", "/v1/admin/policy/changes/{change_id}/activate"),
     ("POST", "/v1/admin/policy/changes/{change_id}/rollback"),
-    ("GET", "/v1/demo/foresight"),
     ("GET", "/v1/me/home"),
     ("GET", "/v1/me/app"),
     ("GET", "/v1/me/cases"),
