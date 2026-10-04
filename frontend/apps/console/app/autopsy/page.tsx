@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Card } from "@clarity/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input } from "@clarity/ui";
 import type { AutopsyCluster, AutopsyWorkspace } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
@@ -22,6 +22,12 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
  * No business logic lives here (UI02). The page sends a verdict and renders
  * what comes back; it never computes a status, never decides whether a
  * cluster is a hypothesis, and never constructs a rule.
+ *
+ * E2 added the structure: the clusters are a list so their number is
+ * announced, each one is a named section, the verdict buttons carry the
+ * cluster in their accessible name (eight pairs of "Confirm" and "Reject" on
+ * one page are otherwise indistinguishable), and the note is a real labelled
+ * field rather than an `aria-label` standing in for one.
  */
 
 type Busy = { clusterId: string; action: string } | null;
@@ -73,72 +79,82 @@ export default function AutopsyPage() {
 
   return (
     <div className="space-y-5">
-      <header>
+      <div>
         <Badge tone="warning">SYNTHETIC DATA</Badge>
         <h1 className="mt-2 text-2xl font-semibold">Complaint Autopsy</h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-muted">
           Clusters are hypotheses until a person reviews them. A suggested mapping never
           activates a rule.
         </p>
-      </header>
+      </div>
 
-      {error ? (
-        <Card className="text-rose-900" role="alert">
-          {error}
-        </Card>
-      ) : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Card>
-        <p className="text-sm">
-          <strong>{data?.complaint_count ?? 0}</strong> masked complaints ·{" "}
-          {data?.clustering_method ?? "loading"}
-        </p>
-        <p className="text-xs text-slate-500">{data?.clustering_disclosure ?? ""}</p>
-        {!canReview ? (
-          <p className="mt-2 text-xs text-amber-800">
-            You can read this workspace. Ruling on a cluster needs{" "}
-            <code>autopsy:review</code>.
+      <section aria-labelledby="autopsy-basis">
+        <Card>
+          <h2 id="autopsy-basis" className="sr-only">
+            What this workspace is reading
+          </h2>
+          <p className="text-sm">
+            <strong>{data?.complaint_count ?? 0}</strong> masked complaints ·{" "}
+            {data?.clustering_method ?? "loading"}
           </p>
-        ) : null}
-      </Card>
+          <p className="text-xs text-fg-muted">{data?.clustering_disclosure ?? ""}</p>
+          {!canReview ? (
+            <p className="mt-2 text-xs text-warning">
+              You can read this workspace. Ruling on a cluster needs{" "}
+              <code>autopsy:review</code>.
+            </p>
+          ) : null}
+        </Card>
+      </section>
 
       {data && clusters.length === 0 ? (
-        <Card className="text-sm text-slate-600">
-          No clusters yet. They appear once complaints have been ingested and clustered.
+        <Card>
+          <EmptyState
+            title="No clusters yet"
+            description="They appear once complaints have been ingested and clustered."
+          />
         </Card>
       ) : null}
 
-      <div className="space-y-3">
-        {clusters.map((cluster) => (
-          <ClusterCard
-            key={cluster.cluster_id}
-            cluster={cluster}
-            canReview={canReview}
-            canDraft={canDraft}
-            busy={busy}
-            note={notes[cluster.cluster_id] ?? ""}
-            onNote={(value) =>
-              setNotes((current) => ({ ...current, [cluster.cluster_id]: value }))
-            }
-            onReview={(accept) =>
-              act(cluster.cluster_id, "review", () =>
-                client.reviewCluster(cluster.cluster_id, {
-                  accept,
-                  note: notes[cluster.cluster_id] ?? "",
-                }),
-              )
-            }
-            onSupersede={(accept) =>
-              act(cluster.cluster_id, "supersede", () =>
-                client.supersedeClusterReview(cluster.cluster_id, {
-                  accept,
-                  note: notes[cluster.cluster_id] ?? "",
-                }),
-              )
-            }
-          />
-        ))}
-      </div>
+      <section aria-labelledby="autopsy-clusters">
+        <h2 id="autopsy-clusters" className="sr-only">
+          Clusters awaiting a verdict
+        </h2>
+        <ul className="space-y-3">
+          {clusters.map((cluster) => (
+            <li key={cluster.cluster_id}>
+              <ClusterCard
+                cluster={cluster}
+                canReview={canReview}
+                canDraft={canDraft}
+                busy={busy}
+                note={notes[cluster.cluster_id] ?? ""}
+                onNote={(value) =>
+                  setNotes((current) => ({ ...current, [cluster.cluster_id]: value }))
+                }
+                onReview={(accept) =>
+                  act(cluster.cluster_id, "review", () =>
+                    client.reviewCluster(cluster.cluster_id, {
+                      accept,
+                      note: notes[cluster.cluster_id] ?? "",
+                    }),
+                  )
+                }
+                onSupersede={(accept) =>
+                  act(cluster.cluster_id, "supersede", () =>
+                    client.supersedeClusterReview(cluster.cluster_id, {
+                      accept,
+                      note: notes[cluster.cluster_id] ?? "",
+                    }),
+                  )
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -167,18 +183,26 @@ function ClusterCard({
   // A reversal needs a reason, and the API refuses one without it. The button
   // is disabled rather than the refusal being a surprise after the click.
   const canSupersede = ruled && note.trim().length > 0;
+  const headingId = `cluster-${cluster.cluster_id}`;
 
   return (
-    <Card className="space-y-2" data-testid="autopsy-cluster">
+    <Card
+      role="group"
+      aria-labelledby={headingId}
+      className="space-y-2"
+      data-testid="autopsy-cluster"
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-semibold">{cluster.label}</h2>
+        <h3 id={headingId} className="font-semibold">
+          {cluster.label}
+        </h3>
         <Badge tone={cluster.hypothesis ? "warning" : "success"}>
           {cluster.hypothesis ? "HYPOTHESIS" : cluster.status.toUpperCase()}
         </Badge>
         <span className="text-sm">{cluster.size} complaints</span>
       </div>
       <p className="text-sm">{cluster.status_label}</p>
-      <p className="text-xs text-amber-800">{cluster.mapping_label}</p>
+      <p className="text-xs text-warning">{cluster.mapping_label}</p>
       <p className="text-xs">
         Languages:{" "}
         {Object.entries(cluster.languages)
@@ -187,17 +211,17 @@ function ClusterCard({
       </p>
 
       <div>
-        <h3 className="text-xs font-semibold uppercase text-slate-500">
+        <h4 className="text-xs font-semibold uppercase text-fg-muted">
           Representative masked complaints
-        </h3>
+        </h4>
         {cluster.representative_masked_complaints.map((text, i) => (
-          <blockquote key={i} className="mt-1 border-l-2 pl-2 text-sm">
+          <blockquote key={i} className="mt-1 border-l-2 border-border pl-2 text-sm">
             {text}
           </blockquote>
         ))}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fg-muted">
         Synthetic trend:{" "}
         {Object.entries(cluster.synthetic_demo_trend)
           .map(([k, v]) => `${k}: ${v}`)
@@ -205,12 +229,12 @@ function ClusterCard({
       </p>
 
       {cluster.reviews?.length ? (
-        <div className="rounded-lg bg-slate-50 p-2">
-          <h3 className="text-xs font-semibold uppercase text-slate-500">Verdicts</h3>
+        <div className="rounded-lg bg-surface-2 p-2">
+          <h4 className="text-xs font-semibold uppercase text-fg-muted">Verdicts</h4>
           {/* Every verdict, including the ones that were superseded. A
               reversal that hid what it reversed would leave the trail saying
               the cluster was always judged this way. */}
-          <ul className="mt-1 space-y-1 text-xs text-slate-700">
+          <ul className="mt-1 space-y-1 text-xs text-fg">
             {cluster.reviews.map((review, i) => (
               <li key={i}>
                 <strong>{review.accepted ? "confirmed" : "rejected"}</strong> by{" "}
@@ -223,64 +247,65 @@ function ClusterCard({
       ) : null}
 
       {canReview ? (
-        <div className="space-y-2 border-t border-slate-200 pt-2">
-          <label className="flex flex-col gap-1 text-xs text-slate-500">
-            {ruled ? "Reason for changing this verdict (required)" : "Note (optional)"}
-            <input
-              value={note}
-              onChange={(e) => onNote(e.target.value)}
-              aria-label={`Review note for ${cluster.label}`}
-              className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
+        <div className="space-y-2 border-t border-border pt-2">
+          <Field
+            label={ruled ? "Reason for changing this verdict (required)" : "Note (optional)"}
+          >
+            {(control) => (
+              <Input {...control} value={note} onChange={(e) => onNote(e.target.value)} />
+            )}
+          </Field>
+          <div className="flex flex-wrap items-center gap-2">
             {ruled ? (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={working || !canSupersede}
+                  aria-label={`Change ${cluster.label} to confirmed`}
                   onClick={() => onSupersede(true)}
-                  className="rounded-full border border-emerald-600 px-3 py-1 text-xs font-medium text-emerald-700 disabled:opacity-40"
                 >
                   Change to confirmed
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={working || !canSupersede}
+                  aria-label={`Change ${cluster.label} to rejected`}
                   onClick={() => onSupersede(false)}
-                  className="rounded-full border border-rose-600 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
                 >
                   Change to rejected
-                </button>
+                </Button>
                 {!canSupersede ? (
-                  <span className="self-center text-xs text-slate-500">
+                  <span className="self-center text-xs text-fg-muted">
                     Changing a verdict needs a reason.
                   </span>
                 ) : null}
               </>
             ) : (
               <>
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   disabled={working}
+                  aria-label={`Confirm ${cluster.label}`}
                   onClick={() => onReview(true)}
-                  className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
                 >
                   Confirm
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
                   disabled={working}
+                  aria-label={`Reject ${cluster.label}`}
                   onClick={() => onReview(false)}
-                  className="rounded-full bg-rose-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
                 >
                   Reject
-                </button>
+                </Button>
               </>
             )}
           </div>
           {canDraft && ruled ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-fg-muted">
               A confirmed cluster can be proposed as a policy change from Policy Studio. It
               becomes a draft for somebody else to approve, never a live rule.
             </p>

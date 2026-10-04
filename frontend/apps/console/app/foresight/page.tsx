@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Field,
   Select,
   Spinner,
   Table,
@@ -145,8 +146,8 @@ export default function ForesightPage() {
           )}
         </div>
         <h1 className="text-2xl font-semibold">Foresight rehearsal</h1>
-        <p className="font-medium text-amber-900">SCENARIO, NOT CERTAINTY</p>
-        <p className="text-sm text-slate-600">
+        <p className="font-medium text-warning">SCENARIO, NOT CERTAINTY</p>
+        <p className="text-sm text-fg-muted">
           A rehearsal predicts which themes and segments a change is likely to stir up. It
           is a scenario, never a forecast of what will happen, and no launch decision rests
           on it until the model has been backtested against real launches.
@@ -155,8 +156,9 @@ export default function ForesightPage() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
+      <section aria-labelledby="foresight-rehearse">
       <Card className="space-y-3">
-        <h2 className="font-semibold">Rehearse a scenario</h2>
+        <h2 id="foresight-rehearse" className="font-semibold">Rehearse a scenario</h2>
         {scenarios === null ? (
           <Spinner />
         ) : scenarios.length === 0 ? (
@@ -166,35 +168,41 @@ export default function ForesightPage() {
           />
         ) : (
           <>
-            <Select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-              aria-label="Scenario version to rehearse"
-            >
-              {scenarios.map((s) => (
-                <option key={s.version_id} value={s.version_id}>
-                  {s.name} · v{s.version} · {s.change_type} · effective{" "}
-                  {s.effective_date}
-                </option>
-              ))}
-            </Select>
+            <Field label="Scenario version to rehearse">
+              {(control) => (
+                <Select
+                  {...control}
+                  value={selected}
+                  onChange={(e) => setSelected(e.target.value)}
+                >
+                  {scenarios.map((s) => (
+                    <option key={s.version_id} value={s.version_id}>
+                      {s.name} · v{s.version} · {s.change_type} · effective{" "}
+                      {s.effective_date}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
             {canRun ? (
               <Button disabled={busy || !selected} onClick={() => void rehearse()}>
                 {busy ? "Rehearsing..." : "Rehearse"}
               </Button>
             ) : (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-muted">
                 Asking for a rehearsal needs <code>foresight:run</code>.
               </p>
             )}
           </>
         )}
       </Card>
+      </section>
 
       {report ? (
+        <section aria-labelledby="foresight-report">
         <Card className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold">{report.scenario}</h2>
+            <h2 id="foresight-report" className="font-semibold">{report.scenario}</h2>
             <Badge tone={report.decision_ready ? "success" : "warning"}>
               {report.decision_ready ? "DECISION READY" : "NOT DECISION READY"}
             </Badge>
@@ -202,9 +210,9 @@ export default function ForesightPage() {
           </div>
           {/* The basis and the caveats are the honest part of the report, so
               they sit with the numbers rather than under a disclosure. */}
-          <p className="text-xs text-slate-500">{report.basis}</p>
+          <p className="text-xs text-fg-muted">{report.basis}</p>
           {report.caveats.length ? (
-            <ul className="list-disc space-y-1 pl-5 text-xs text-amber-900">
+            <ul className="list-disc space-y-1 pl-5 text-xs text-warning">
               {report.caveats.map((c, i) => (
                 <li key={i}>{c}</li>
               ))}
@@ -248,12 +256,14 @@ export default function ForesightPage() {
             </Table>
           )}
         </Card>
+        </section>
       ) : null}
 
+      <section aria-labelledby="foresight-runs">
       <Card className="space-y-2">
-        <h2 className="font-semibold">Runs</h2>
+        <h2 id="foresight-runs" className="font-semibold">Runs</h2>
         {runs.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-fg-muted">
             No rehearsals yet. A run is stored, so a report can be cited later.
           </p>
         ) : (
@@ -270,44 +280,48 @@ export default function ForesightPage() {
                 >
                   {run.run_id}
                 </button>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-fg-muted">
                   by {run.requested_by} · {new Date(run.requested_at).toLocaleString()}
                 </span>
                 {run.failure ? (
-                  <span className="text-xs text-rose-800">{run.failure}</span>
+                  <span className="text-xs text-danger">{run.failure}</span>
                 ) : null}
               </li>
             ))}
           </ul>
         )}
       </Card>
+      </section>
 
+      <section aria-labelledby="foresight-calibration">
       <Card className="space-y-2">
-        <h2 className="font-semibold">Calibration</h2>
+        <h2 id="foresight-calibration" className="font-semibold">Calibration</h2>
         {calibration === null ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-fg-muted">
             No backtest has been run, so the model is not calibrated and no launch decision
             should rest on a rehearsal.
           </p>
         ) : (
           <>
             <p className="text-sm">{calibration.summary}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-fg-muted">
               {calibration.real_launches} real of {calibration.launches} launches ·{" "}
               {calibration.compared} compared · band error{" "}
               {calibration.mean_absolute_band_error ?? "not computable"} · theme recall{" "}
               {calibration.theme_recall ?? "not computable"} · rank correlation{" "}
               {calibration.segment_rank_correlation ?? "not computable"}
             </p>
-            <p className="text-xs text-slate-500">{calibration.basis}</p>
+            <p className="text-xs text-fg-muted">{calibration.basis}</p>
           </>
         )}
       </Card>
+      </section>
 
+      <section aria-labelledby="foresight-spikes">
       <Card className="space-y-2">
-        <h2 className="font-semibold">Early-warning spikes</h2>
+        <h2 id="foresight-spikes" className="font-semibold">Early-warning spikes</h2>
         {spikes.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-fg-muted">
             Nothing above the baseline. The radar counts complaints per channel and never
             reads what anybody wrote.
           </p>
@@ -324,6 +338,7 @@ export default function ForesightPage() {
           </ul>
         )}
       </Card>
+      </section>
     </div>
   );
 }

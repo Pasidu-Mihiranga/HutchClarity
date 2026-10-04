@@ -142,6 +142,11 @@ const LOGIN_BY_LABEL: Record<string, { username: string; password: string }> = {
   Auditor: { username: "auditor", password: "auditor-clarity" },
   Security: { username: "security", password: "security-clarity" },
   Platform: { username: "platform", password: "platform-clarity" },
+  // CX engineering holds `foresight:read` and `config:draft`, which no other
+  // synthetic account does, so Foresight and Policy Studio can only be
+  // reached as this person (WT-13 steps 7 and 8).
+  CX: { username: "cx", password: "cx-clarity" },
+  "VAS Ops": { username: "vasops", password: "vasops-clarity" },
 };
 
 export async function staffToken(
