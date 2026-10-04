@@ -16,6 +16,7 @@ test.describe("sign in", () => {
     // spends one to prove a refusal makes the next test fail for a reason that
     // has nothing to do with what it tests.
     await page.goto("/login");
+    await expect(page.getByTestId("simulated-sms-inbox")).toHaveCount(0);
     await page.getByLabel("Hutch number").fill(DILANI);
     await page.getByRole("button", { name: "Continue" }).click();
 
@@ -23,6 +24,7 @@ test.describe("sign in", () => {
     // false: the backend generates a code per challenge and answers 401 to
     // anything else, so nobody following that instruction could sign in.
     const shown = page.getByTestId("demo-otp-code");
+    await expect(page.getByTestId("simulated-sms-inbox")).toBeVisible();
     await expect(shown).toBeVisible();
     const code = (await shown.innerText()).trim();
     expect(code).toMatch(/^\d{6}$/);

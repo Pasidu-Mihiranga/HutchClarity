@@ -22,6 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from clarity.app.container import Clarity
+from clarity.app.settings import Settings
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.channels.gateway import (
     DELIVERY_HEADER,
@@ -163,6 +164,26 @@ def test_a_stale_webhook_is_rejected_even_with_a_good_signature(api):
     sent = post(api, timestamp=NOW - timedelta(hours=1))
 
     assert sent.json()["reason"] == "stale_timestamp"
+
+
+def test_real_webhook_freshness_does_not_use_the_frozen_domain_clock():
+    """Provider authentication follows receipt time, not replay/domain time."""
+    core = Clarity(
+        world=build_demo_world(),
+        clock=NOW - timedelta(days=30),
+        settings=Settings(
+            _env_file=None,
+            CLARITY_CHANNEL_WEBHOOK_SECRET=SECRET,
+        ),
+    )
+    client = TestClient(
+        create_channel_gateway_app(core, webhook_clock=lambda: NOW),
+        raise_server_exceptions=False,
+    )
+
+    sent = post(client, timestamp=NOW, delivery="real-provider-time")
+
+    assert sent.status_code == 200
 
 
 def test_a_far_future_timestamp_is_rejected(api):

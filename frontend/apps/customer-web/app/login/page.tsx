@@ -21,6 +21,7 @@ export default function LoginPage() {
   // backend generates a code per challenge and refuses anything else, so the
   // panel below has to show the real one or nobody can sign in.
   const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [simulatedDelivery, setSimulatedDelivery] = useState(false);
   // `verifyOtp` needs the challenge this code belongs to, not the number.
   const [challengeId, setChallengeId] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ export default function LoginPage() {
     try {
       const result = await client.requestOtp(msisdn);
       setChallengeId(result.challenge_id);
+      setSimulatedDelivery(result.simulated === true);
       setStatus({
         text: result.detail ?? result.message ?? "OTP sent to your number.",
         tone: "ok",
@@ -48,6 +50,8 @@ export default function LoginPage() {
         setDemoCode(null);
       }
     } catch (err) {
+      setSimulatedDelivery(false);
+      setDemoCode(null);
       setStatus({
         text: err instanceof Error ? err.message : "Request failed",
         tone: "info",
@@ -227,8 +231,9 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Simulated OTP inbox */}
-      <div
+      {/* Synthetic-profile inbox, shown only when this request used it. */}
+      {simulatedDelivery && <div
+        data-testid="simulated-sms-inbox"
         style={{
           marginTop: 16,
           border: "1px dashed var(--warn)",
@@ -263,7 +268,7 @@ export default function LoginPage() {
             "Enter your Hutch number to receive a simulated code here."
           )}
         </p>
-      </div>
+      </div>}
     </main>
   );
 }
