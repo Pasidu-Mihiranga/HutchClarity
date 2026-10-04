@@ -49,6 +49,20 @@ def test_otlp_without_an_endpoint_is_refused() -> None:
         Settings(OTEL_EXPORTER="otlp", OTEL_EXPORTER_OTLP_ENDPOINT=None, _env_file=None)
 
 
+def test_httpsms_needs_both_the_user_key_and_sender() -> None:
+    with pytest.raises(SettingsInvalid, match="HTTPSMS_API_KEY and HTTPSMS_SENDER"):
+        Settings(HTTPSMS_API_KEY="key-only", HTTPSMS_SENDER=None, _env_file=None)
+
+
+def test_httpsms_refuses_a_phone_scoped_key_for_sending() -> None:
+    with pytest.raises(SettingsInvalid, match="phone-scoped pk_ key"):
+        Settings(
+            HTTPSMS_API_KEY="pk_phone-key",
+            HTTPSMS_SENDER="+94780000000",
+            _env_file=None,
+        )
+
+
 def test_the_defaults_run_with_no_environment_at_all() -> None:
     """ADR-0006: clone and run, no infrastructure and no configuration."""
     settings = Settings(_env_file=None)

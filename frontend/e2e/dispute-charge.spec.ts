@@ -23,6 +23,12 @@ import { customerToken, signedIn } from "./session";
 
 test.describe("DISPUTE_CHARGE in the browser", () => {
   test("a customer disputing a charge reaches a verified receipt", async ({ page, request }) => {
+    let proposalPosts = 0;
+    page.on("request", (sent) => {
+      if (sent.method() === "POST" && /\/v1\/cases\/[^/]+\/proposals$/.test(sent.url())) {
+        proposalPosts += 1;
+      }
+    });
     await signedIn(page, await customerToken(request));
         await page.goto("/clarity");
 
@@ -35,10 +41,17 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await expect(page.getByRole("heading", { name: /found the reason/i })).toBeVisible();
     await expect(page.getByText("LKR 49.00").first()).toBeVisible();
 
-    // 2. The remedy is offered, and taking it opens a confirmation rather than
-    //    acting. This is the assertion that matters for ADR-0007: the button a
-    //    customer taps proposes, and a second, explicit confirm executes.
-    await page.getByRole("button", { name: /refund & disable/i }).click();
+    // A follow-up enters the stateful flow. It creates the one pending plan
+    // that the confirm card displays; the browser must execute that plan, not
+    // silently create a replacement when Confirm is tapped.
+    await box.fill("Please refund it and stop the subscription");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: /^confirm$/i }).first()).toBeVisible();
+
+    // 2. The flow-owned plan opens a confirmation rather than acting. This is
+    //    the assertion that matters for ADR-0007: the visible plan belongs to
+    //    this case, and a second, explicit confirm executes it.
+    await page.getByRole("button", { name: /^confirm$/i }).first().click();
 
     const sheet = page.getByRole("heading", { name: /disable this subscription/i });
     await expect(sheet).toBeVisible();
@@ -46,7 +59,8 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await expect(page.getByText(/refunds the disputed amount/i)).toBeVisible();
 
     // 3. Confirming is what executes it.
-    await page.getByRole("button", { name: /^confirm$/i }).click();
+    await page.getByRole("button", { name: /^confirm$/i }).last().click();
+    expect(proposalPosts).toBe(0);
 
     // 4. The receipt, and the backend's own verdict on it. `verified` comes
     //    from `POST /v1/receipts/{id}/verify`, which recomputes the hash chain

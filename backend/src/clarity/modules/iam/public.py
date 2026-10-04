@@ -30,12 +30,14 @@ from clarity.modules.iam.grants import (
     SubjectKind,
     is_subject,
 )
+from clarity.modules.iam.httpsms import HttpSmsDelivery, HttpSmsDeliveryFailed
 from clarity.modules.iam.keycloak import CompositeTokenVerifier, KeycloakTokenVerifier
 from clarity.modules.iam.otp import (
     OTP_CHALLENGES,
     OTP_REQUESTS,
     OtpRefused,
     OtpService,
+    RoutedOtpDelivery,
     SimulatedInbox,
 )
 from clarity.modules.iam.tokens import (
@@ -61,6 +63,8 @@ __all__ = [
     "GrantNotFound",
     "GrantRefused",
     "GrantState",
+    "HttpSmsDelivery",
+    "HttpSmsDeliveryFailed",
     "IssuedToken",
     "KeycloakTokenVerifier",
     "LoginRefused",
@@ -68,6 +72,7 @@ __all__ = [
     "OtpRefused",
     "OtpService",
     "PythonAuthorizationPolicy",
+    "RoutedOtpDelivery",
     "SimulatedInbox",
     "StaffDirectory",
     "StaffDirectoryInvalid",
