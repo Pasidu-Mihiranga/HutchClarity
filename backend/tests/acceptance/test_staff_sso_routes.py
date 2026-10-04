@@ -193,3 +193,86 @@ def test_the_header_wins_over_a_stale_cookie() -> None:
 
     assert me.status_code == 200
     assert me.json()["subject"] == "sup-1"
+
+
+# --------------------------------------------------------------------------- #
+# Seeing and ending your own sessions (B3)
+# --------------------------------------------------------------------------- #
+
+
+def _signed_in() -> tuple[TestClient, Clarity, str]:
+    from clarity.platform.security.principal import Role
+
+    clarity = Clarity(world=build_demo_world())
+    api = TestClient(create_app(clarity))
+    issued = clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+    api.cookies.set(STAFF_COOKIE, issued.value)
+    return api, clarity, issued.value
+
+
+def test_the_session_list_needs_a_session(configured: TestClient) -> None:
+    assert configured.get("/v1/auth/sessions").status_code == 401
+    assert configured.request("DELETE", "/v1/auth/sessions").status_code == 401
+
+
+def test_a_person_sees_their_own_sessions_and_which_one_is_here() -> None:
+    api, clarity, _ = _signed_in()
+    from clarity.platform.security.principal import Role
+
+    clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    listed = api.get("/v1/auth/sessions")
+
+    assert listed.status_code == 200
+    sessions = listed.json()["sessions"]
+    assert len(sessions) == 2
+    assert sum(1 for s in sessions if s["current"]) == 1
+
+
+def test_the_session_list_hands_out_nothing_that_resumes_a_session() -> None:
+    """A list read over somebody's shoulder must not also be a way in."""
+    api, _, token = _signed_in()
+
+    body = api.get("/v1/auth/sessions").text
+
+    assert token not in body
+    for field in ("token", "refresh_token", "jti"):
+        assert field not in body
+
+
+def test_signing_out_everywhere_keeps_this_device_by_default() -> None:
+    api, clarity, _token = _signed_in()
+    from clarity.platform.security.principal import Role
+
+    clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+    clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    ended = api.request("DELETE", "/v1/auth/sessions")
+
+    assert ended.status_code == 200
+    assert ended.json() == {"ended": 2, "kept_current": True}
+    # Still signed in here.
+    assert api.get("/v1/auth/sessions").status_code == 200
+
+
+def test_signing_out_everywhere_can_include_this_device() -> None:
+    api, clarity, _ = _signed_in()
+    from clarity.platform.security.principal import Role
+
+    clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+
+    ended = api.request("DELETE", "/v1/auth/sessions", params={"keep_current": False})
+
+    assert ended.json()["ended"] == 2
+    assert api.get("/v1/auth/sessions").status_code == 401
+
+
+def test_one_person_cannot_end_another_persons_sessions() -> None:
+    api, clarity, _ = _signed_in()
+    from clarity.platform.security.principal import Role
+
+    theirs = clarity.tokens.for_staff("agent-1", roles={Role.AGENT})
+
+    api.request("DELETE", "/v1/auth/sessions", params={"keep_current": False})
+
+    assert clarity.tokens.verify(theirs.value).ref == "agent-1"

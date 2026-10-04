@@ -19,8 +19,13 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - `FlowToolAdapter` serves all nine tools the flow files name. Five (`get_case_timeline`, `get_cause_assessment`, `explain_rule`, `get_customer_safeguards`, `request_handoff`) raised `ToolUnavailable`; the gap was invisible because they are only reachable through the bounded agent step, which has never run without a configured planner. `tests/unit/test_flow_tool_adapter.py` reads the tool names out of the shipped flow files, so a flow declaring a tool the adapter does not serve now fails the build.
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
 
+### Added
+
+- **`GET /v1/auth/sessions`** lists a person's own live sessions (channel, assurance, when it started, when it ends, which one is this request) and **`DELETE /v1/auth/sessions`** ends them, keeping the current device unless `keep_current=false`. The subject comes from the verified token, so there is nothing to enumerate, and the list carries nothing that could resume a session.
+
 ### Changed
 
+- **A session now has an absolute deadline.** `REFRESH_TOKEN_TTL` bounded nothing on its own: it was recomputed on every issue, including every refresh, so the window slid forward each time and a session refreshed once a month never expired. `ABSOLUTE_SESSION_TTL` is counted from the authentication that started the session and never extended, and a refresh token is capped so it cannot outlive the session that issued it.
 - The OPA driver sends `granted`, which the Rego has always read. Without it the branch that stops a holder of a granted audit duty from moving money could not fire: measured against the real Rego, a supervisor holding `audit:read` by grant was allowed `action:approve`. Nothing was reachable through the gap, because `GrantAwareAuthorizationPolicy` enforces the same rule in Python first; what was wrong is that the two drivers were only in parity because one of them was wrapped.
 - A missing token verifier or a missing authorization policy answers **503** instead of falling back. The verifier fallback made an authenticated caller anonymous; the policy fallback improvised a fresh `PythonAuthorizationPolicy()` per request, so a deployment that configures OPA would have had every decision silently revert to the local driver with nothing in the logs.
 

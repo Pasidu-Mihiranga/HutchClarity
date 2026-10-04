@@ -1,5 +1,14 @@
 {
   "operations": {
+    "DELETE /v1/auth/sessions": {
+      "parameters": [
+        "header:authorization?",
+        "query:keep_current?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /.well-known/clarity-audit-checkpoint.json": {
       "parameters": [],
       "request": null,
@@ -107,6 +116,14 @@
       ],
       "request": null,
       "response": "SessionView",
+      "status": "200"
+    },
+    "GET /v1/auth/sessions": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
       "status": "200"
     },
     "GET /v1/auth/staff/oidc/callback": {

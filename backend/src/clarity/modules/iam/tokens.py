@@ -50,6 +50,21 @@ CUSTOMER_TOKEN_TTL = timedelta(minutes=10)
 STAFF_TOKEN_TTL = timedelta(hours=8)
 REFRESH_TOKEN_TTL = timedelta(days=30)
 
+#: The longest a session may live, counted from the authentication that started
+#: it and never extended.
+#:
+#: `REFRESH_TOKEN_TTL` alone did not bound anything. It was recomputed on every
+#: issue, including every refresh, so the window slid forward each time: a
+#: session refreshed once a month never expired, and a stolen refresh token was
+#: a permanent credential for an account whose owner had proved a one-time code
+#: once, long ago. The sliding window is still what makes an idle session
+#: expire; this is what makes an *active* one end (B3).
+#:
+#: **ASSUMPTION - REQUIRES HUTCH CONFIRMATION.** Thirty days matches the
+#: refresh window that was already here, so a session that is used regularly
+#: now ends where an idle one always did.
+ABSOLUTE_SESSION_TTL = timedelta(days=30)
+
 #: How recently MFA must have happened to count as step-up.
 STEP_UP_WINDOW = timedelta(minutes=5)
 
@@ -105,6 +120,16 @@ class SessionRecord:
     expires_at: datetime
     refresh_expires_at: datetime
     revoked: bool = False
+    #: When the authentication that started this session happened. Carried
+    #: across every refresh, never reset, so the absolute cap means something.
+    #: Defaulted for records written before B3 added it, which read back as a
+    #: session that started when it was last issued: the cap then applies from
+    #: that point rather than retroactively signing everybody out.
+    started_at: datetime | None = None
+
+    def started(self) -> datetime:
+        """When this session began, falling back to its own issue time."""
+        return self.started_at or self.refresh_expires_at - REFRESH_TOKEN_TTL
 
 
 def _load_or_create_key(key_path: Path | None) -> Ed25519PrivateKey:
@@ -186,6 +211,7 @@ class TokenIssuer:
         channel: str,
         delegations: set[str] | None = None,
         now: datetime | None = None,
+        started_at: datetime | None = None,
     ) -> IssuedToken:
         """A customer token. The subject is the pseudonym, never the number."""
         moment = now or utc_now()
@@ -202,7 +228,7 @@ class TokenIssuer:
             "exp": int(expires.timestamp()),
             "jti": secrets.token_urlsafe(18),
         }
-        return self._issue(claims, expires=expires, now=moment)
+        return self._issue(claims, expires=expires, now=moment, started_at=started_at)
 
     def for_staff(
         self,
@@ -211,6 +237,7 @@ class TokenIssuer:
         roles: set[Role],
         assurance: Assurance = Assurance.MFA,
         now: datetime | None = None,
+        started_at: datetime | None = None,
     ) -> IssuedToken:
         moment = now or utc_now()
         expires = moment + STAFF_TOKEN_TTL
@@ -227,17 +254,29 @@ class TokenIssuer:
             # rather than trusting a claim that never ages.
             "auth_time": int(moment.timestamp()),
         }
-        return self._issue(claims, expires=expires, now=moment)
+        return self._issue(claims, expires=expires, now=moment, started_at=started_at)
 
-    def _issue(self, claims: dict[str, object], *, expires: datetime, now: datetime) -> IssuedToken:
+    def _issue(
+        self,
+        claims: dict[str, object],
+        *,
+        expires: datetime,
+        now: datetime,
+        started_at: datetime | None = None,
+    ) -> IssuedToken:
         principal = self._to_principal(claims, now=now)
         refresh = secrets.token_urlsafe(32)
         refresh_hash = hashlib.sha256(refresh.encode("utf-8")).hexdigest()
+        began = started_at or now
+        # The idle window still slides, but never past the absolute deadline:
+        # a refresh token handed out near the end of a session's life expires
+        # with the session rather than outliving it.
         record = SessionRecord(
             jti=str(claims["jti"]),
             principal=principal,
             expires_at=expires,
-            refresh_expires_at=now + REFRESH_TOKEN_TTL,
+            refresh_expires_at=min(now + REFRESH_TOKEN_TTL, began + ABSOLUTE_SESSION_TTL),
+            started_at=began,
         )
         with self._lock, self._open_unit() as unit:
             sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
@@ -309,6 +348,59 @@ class TokenIssuer:
             sessions.put(jti, record)
             unit.commit()
 
+    def session_id(self, token: str) -> str | None:
+        """The stored session a token belongs to, or None if it is not valid.
+
+        Verified first, so an unverifiable token cannot name a session it does
+        not own. Returning the id rather than the record keeps the caller from
+        reading somebody's session out of a token they merely hold.
+        """
+        try:
+            self.verify(token)
+        except TokenInvalid:
+            return None
+        claims = jwt.decode(token, options={"verify_signature": False})
+        return str(claims["jti"])
+
+    def sessions_for(self, ref: str, *, now: datetime | None = None) -> list[SessionRecord]:
+        """Every live session belonging to one subject, newest first.
+
+        Scans the collection. That is honest for the sizes involved and wrong
+        at HUTCH's: the `full` profile wants an index on the subject, which is
+        a migration rather than a change here. Recorded so it is a decision and
+        not an oversight.
+        """
+        moment = now or utc_now()
+        with self._lock, self._open_unit() as unit:
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            live = [
+                record
+                for record in sessions.values()
+                if record.principal.ref == ref
+                and not record.revoked
+                and moment < record.refresh_expires_at
+            ]
+        return sorted(live, key=lambda record: record.started(), reverse=True)
+
+    def revoke_all(self, ref: str, *, keep: str | None = None) -> int:
+        """End every session this subject holds. Returns how many were ended.
+
+        `keep` spares one session id, which is what "sign out everywhere else"
+        needs: somebody who has just discovered a session they do not recognise
+        should not have to sign in again on the device they are holding.
+        """
+        ended = 0
+        with self._lock, self._open_unit() as unit:
+            sessions: Repository[str, SessionRecord] = unit.repository(SESSIONS)
+            for record in sessions.values():
+                if record.principal.ref != ref or record.revoked or record.jti == keep:
+                    continue
+                record.revoked = True
+                sessions.put(record.jti, record)
+                ended += 1
+            unit.commit()
+        return ended
+
     def refresh(self, refresh_token: str, *, now: datetime | None = None) -> IssuedToken:
         """Rotate a refresh token and issue a new access session."""
         moment = now or utc_now()
@@ -325,6 +417,13 @@ class TokenIssuer:
             refreshes.delete(digest)
             unit.commit()
 
+        began = record.started()
+        if moment >= began + ABSOLUTE_SESSION_TTL:
+            # The session has run its full life. Refreshing again would extend
+            # it indefinitely, which is what this cap exists to stop: the
+            # person signs in again and proves who they are.
+            raise TokenInvalid
+
         principal = record.principal
         if Role.CUSTOMER in principal.roles:
             assert principal.subscriber_ref is not None
@@ -334,6 +433,7 @@ class TokenIssuer:
                 channel=principal.channel or "web",
                 delegations=set(principal.delegations),
                 now=moment,
+                started_at=began,
             )
         assurance = (
             Assurance.MFA if principal.assurance is Assurance.MFA_RECENT else principal.assurance
@@ -343,6 +443,7 @@ class TokenIssuer:
             roles=set(principal.roles),
             assurance=assurance,
             now=moment,
+            started_at=began,
         )
 
     def _to_principal(self, claims: dict[str, object], *, now: datetime | None = None) -> Principal:

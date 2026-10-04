@@ -35,7 +35,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Re
 from fastapi.responses import RedirectResponse
 
 from clarity.interfaces.http import trail
-from clarity.interfaces.http.auth import requires
+from clarity.interfaces.http.auth import ANONYMOUS, current_principal, requires
 from clarity.interfaces.http.cookies import ID_TOKEN_COOKIE, STAFF_COOKIE
 from clarity.interfaces.http.deps import ClarityDep
 from clarity.kernel.common import utc_now
@@ -67,6 +67,26 @@ def _safe_return_to(value: str | None, console_base: str) -> str:
     if not value.startswith("/"):
         return console_base
     return f"{console_base.rstrip('/')}{value}"
+
+
+def _bearer(request: Request) -> str:
+    """The token this request arrived with, from either carrier."""
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("bearer "):
+        return header.split(" ", 1)[1].strip()
+    return (request.cookies.get(STAFF_COOKIE) or "").strip()
+
+
+def _session_id(clarity: Any, request: Request) -> str | None:
+    """Which stored session this request is using.
+
+    Read from the request's own token, because that is the only thing that
+    identifies one session among several. An earlier version guessed from the
+    subject's session list and only worked when there was exactly one, which
+    is precisely the case "sign out everywhere" is not for.
+    """
+    token = _bearer(request)
+    return clarity.tokens.session_id(token) if token else None
 
 
 def _set_session_cookie(response: Response, token: str, *, secure: bool, max_age: int) -> None:
@@ -241,6 +261,70 @@ def register(app: FastAPI) -> None:
             detail={"level": LOA_MFA},
         )
         return {"redirect_to": url, "level": LOA_MFA}
+
+    @app.get("/v1/auth/sessions", tags=["auth"])
+    def list_sessions(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(current_principal)],
+    ) -> dict[str, Any]:
+        """Every live session this person holds (B3).
+
+        Signed in callers only, and it shows **their own** sessions: the
+        subject comes from the verified token, never from a parameter, so there
+        is no id to tamper with and nothing to enumerate.
+
+        What it deliberately does not show: the token, or anything that could
+        be used to resume a session. A list that can be read over somebody's
+        shoulder should not also be a way in. Channel and timings are enough to
+        recognise a device you do not know.
+        """
+        if principal is ANONYMOUS or not principal.roles:
+            raise HTTPException(status_code=401, detail="a session is required")
+
+        current = _session_id(clarity, request)
+        return {
+            "sessions": [
+                {
+                    "session_ref": trail.session_ref_for(record.jti),
+                    "channel": record.principal.channel,
+                    "assurance": record.principal.assurance.value,
+                    "started_at": record.started().isoformat(),
+                    "expires_at": record.expires_at.isoformat(),
+                    "refresh_expires_at": record.refresh_expires_at.isoformat(),
+                    "current": record.jti == current,
+                }
+                for record in clarity.tokens.sessions_for(principal.ref)
+            ]
+        }
+
+    @app.delete("/v1/auth/sessions", tags=["auth"])
+    def end_other_sessions(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(current_principal)],
+        keep_current: bool = True,
+    ) -> dict[str, Any]:
+        """Sign out everywhere (B3).
+
+        `keep_current` defaults to true, so somebody who has just found a
+        session they do not recognise does not also sign themselves out of the
+        device they are holding while they deal with it.
+        """
+        if principal is ANONYMOUS or not principal.roles:
+            raise HTTPException(status_code=401, detail="a session is required")
+
+        current = _session_id(clarity, request) if keep_current else None
+        ended = clarity.tokens.revoke_all(principal.ref, keep=current)
+        trail.record(
+            clarity,
+            AuditEventType.STAFF_SESSION_ENDED,
+            actor_ref=principal.ref,
+            actor_kind=ActorKind.STAFF,
+            object_ref=principal.ref,
+            detail={"method": "sign_out_everywhere", "ended": ended, "kept_current": keep_current},
+        )
+        return {"ended": ended, "kept_current": keep_current}
 
     @app.post("/v1/auth/logout", tags=["auth"])
     def logout(
