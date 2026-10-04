@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
+import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
 import {
   Citations,
   ConfirmCard,
@@ -186,6 +187,8 @@ export default function ClarityPage() {
   const [showEvidence, setShowEvidence] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; bullets: string[]; outcome: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const voiceSupported = useVoiceSupported();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -513,9 +516,6 @@ export default function ClarityPage() {
 
   return (
     <>
-      {/* bouncing dots keyframe */}
-      <style>{`@keyframes ccBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
-
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: "#fafafa" }}>
 
         {/* ── Header ── */}
@@ -744,11 +744,23 @@ export default function ClarityPage() {
             background: "#fff", border: "1px solid var(--line)", borderRadius: 22,
             padding: "8px 10px", boxShadow: "0 8px 24px rgba(24,24,27,.08)",
           }}>
-            <button type="button" style={{
-              border: 0, background: "transparent", color: "var(--orange-ink)",
-              fontWeight: 700, fontSize: 14, cursor: "pointer", padding: "8px 4px",
-              fontFamily: "inherit", flexShrink: 0,
-            }}>{tl(lang, "speak")}</button>
+            {/* Shown only where the browser can turn speech into text, so
+                the button never opens something that cannot work. */}
+            {voiceSupported ? (
+              <button type="button" aria-haspopup="dialog" onClick={() => setVoiceOpen(true)} disabled={busy} style={{
+                border: 0, background: "var(--orange-soft)", color: "var(--orange-ink)",
+                fontWeight: 700, fontSize: 14, cursor: busy ? "not-allowed" : "pointer", padding: "8px 12px",
+                fontFamily: "inherit", flexShrink: 0, borderRadius: 999,
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0" />
+                  <path d="M12 18v3" />
+                </svg>
+                {tl(lang, "speak")}
+              </button>
+            ) : null}
 
             <textarea
               ref={textareaRef}
@@ -831,6 +843,15 @@ export default function ClarityPage() {
       )}
 
       {/* ── Confirm modal ── */}
+      {voiceOpen && (
+        <VoiceSheet
+          lang={lang}
+          onClose={() => setVoiceOpen(false)}
+          onAsk={(spoken) => { setVoiceOpen(false); ask(null, spoken); }}
+          onEdit={(spoken) => { setVoiceOpen(false); setInput(spoken); textareaRef.current?.focus(); }}
+        />
+      )}
+
       {pendingConfirm && (
         <div onClick={() => setPendingConfirm(null)} style={{
           position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,.5)",
