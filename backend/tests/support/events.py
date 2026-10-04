@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from clarity.contracts.decision import ActionType, Outcome
 from clarity.contracts.events import (
@@ -20,6 +20,7 @@ from clarity.contracts.events import (
     DecisionGeneratedV1,
     DomainEventType,
     EventPayload,
+    ForecastReadyV1,
     KnowledgePublishedV1,
     McpInvokedV1,
     PackExpiringV1,
@@ -29,6 +30,7 @@ from clarity.contracts.events import (
     ReconciliationMismatchV1,
     RiskDetectedV1,
     RulePublishedV1,
+    SpikeDetectedV1,
     UsageThresholdReachedV1,
     VasRenewedV1,
 )
@@ -184,6 +186,28 @@ SAMPLES: dict[DomainEventType, EventPayload] = {
             size=12,
             suggested_rule_id="VAS_NO_CONSENT",
             reviewed_by="cx:ruwan",
+        ),
+        ForecastReadyV1(
+            run_id="RUN-1",
+            report_id="FOR-1",
+            scenario_id="SIM-1",
+            scenario_version_id="SCV-1",
+            change_type="pack_retired",
+            effective_date=date(2027, 10, 1),
+            predicted_pairs=15,
+            high_band_pairs=2,
+            backtested=False,
+            calibration_status="not_calibrated",
+        ),
+        SpikeDetectedV1(
+            spike_id="SPK-app-1798783200",
+            scope="channel",
+            scope_ref="app",
+            window_start=AT,
+            window_end=AT,
+            observed=12,
+            baseline="2.000",
+            threshold_multiple="3",
         ),
     )
 }

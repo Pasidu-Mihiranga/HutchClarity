@@ -334,9 +334,11 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `switch.changed` | platform config | decision, ai gateway, audit | planned |
 | `mcp.invoked` | interfaces.mcp | audit, security alerts | exists |
 | `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |
-| `complaint.created` | channels / case | autopsy | exists |
+| `complaint.created` | channels / case | autopsy, **foresight (the radar, counts only)** | exists |
 | `cluster.updated` | autopsy | foresight (post-launch comparison; codes and counts only) | exists |
 | `conversation.turn.completed` | conversation | insights, audit | exists |
+| `forecast.ready` | foresight | console (Foresight page), audit | exists |
+| `spike.detected` | foresight (the radar) | console, alerts | exists |
 | `payment.recorded`, `charge.applied`, `usage.threshold_reached`, `pack.expiring`, `vas.renewed` | integration (HUTCH feeds) | proactive, timeline cache | exists |
 
 ### 11.4 Delivery rules

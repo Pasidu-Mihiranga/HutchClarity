@@ -22,6 +22,7 @@ from clarity.modules.foresight.catalogue import (
     ChangeType,
     ForesightCatalogue,
     PersonaRounds,
+    RadarSettings,
     Segment,
     ThemeCatalogue,
     ThemeWeight,
@@ -47,6 +48,13 @@ from clarity.modules.foresight.personas import (
     RoleRouterPersonas,
     RoundBasedPersonaSimulator,
     StatisticalBaseline,
+)
+from clarity.modules.foresight.radar import (
+    OBSERVATIONS as FORESIGHT_OBSERVATIONS,
+)
+from clarity.modules.foresight.radar import (
+    ComplaintObservation,
+    ComplaintRadar,
 )
 from clarity.modules.foresight.records import (
     DetectedSpike,
@@ -112,6 +120,7 @@ __all__ = [
     "FORESIGHT_CALIBRATIONS",
     "FORESIGHT_CANDIDATES",
     "FORESIGHT_LAUNCHES",
+    "FORESIGHT_OBSERVATIONS",
     "FORESIGHT_OUTCOMES",
     "FORESIGHT_REPORTS",
     "FORESIGHT_RUNS",
@@ -127,6 +136,8 @@ __all__ = [
     "ChangeType",
     "ClusterRate",
     "ClusterRateSource",
+    "ComplaintObservation",
+    "ComplaintRadar",
     "DetectedSpike",
     "Foresight",
     "ForesightCatalogue",
@@ -149,6 +160,7 @@ __all__ = [
     "Prediction",
     "Propensity",
     "Provenance",
+    "RadarSettings",
     "RealLaunchNotPermitted",
     "RecordedOutcome",
     "RehearsalReport",

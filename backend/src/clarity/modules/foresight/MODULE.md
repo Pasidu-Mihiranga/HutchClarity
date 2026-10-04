@@ -8,6 +8,7 @@
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
 | Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `personas.py`, `rehearsal.py`, `records.py`, `repository.py`, `service.py` |
+| Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `swarm.py`, `records.py`, `repository.py`, `service.py`, `radar.py` |
 
 ## 1. Purpose
 Foresight: scenario simulation over aggregates only, reported as relative bands, not counts, plus the backtest that measures how wrong the baseline was and refuses to call that a calibration.
@@ -66,6 +67,16 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `GET /v1/foresight/launches`, `.../backtests`, `.../calibration`, `.../spikes` | `foresight:read` |
 
 `Role.PRODUCT` holds `foresight:read`, `foresight:scenario:draft` and `foresight:run`. It deliberately does **not** hold `foresight:outcome:record`: the person who wants the calibration gate open must not be the one recording the evidence that opens it. `Role.CX_ENGINEER` holds `foresight:read` and `foresight:outcome:record` and cannot draft.
+`clarity.app.container` (builds the catalogue, engine, backtest, service and radar, and registers the radar as a `complaint.created` consumer), `clarity.app.collections` (the eight collection names) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+
+### Events
+| Event | Direction | Notes |
+|---|---|---|
+| `complaint.created` | consumed | The radar counts per channel. It reads no complaint text; `autopsy` is what does. |
+| `forecast.ready` | produced | A run finished. Codes and counts only. |
+| `spike.detected` | produced | A window reached the threshold. A channel code, never a channel name. |
+
+Both produced events go through the outbox in the same transaction as the state change (I7). Plan 21 section 11.3 carries all three rows.
 
 ### Events
 | Event | Direction | Notes |
@@ -91,7 +102,8 @@ Eight collections in the `clarity_foresight` schema, with their own role (I6, AD
 | `foresight.launches` | `StoredLaunch`: a rehearsed change that shipped | yes |
 | `foresight.outcomes` | `RecordedOutcome`, one observed theme-segment band | yes |
 | `foresight.calibrations` | `StoredCalibration`, one backtest | yes |
-| `foresight.spikes` | `DetectedSpike` from the radar (C5 supplies the detector) | yes |
+| `foresight.spikes` | `DetectedSpike` raised by the radar (C5) | yes |
+| `foresight.observations` | `ComplaintObservation`: one complaint, counted, keyed by event id (C5) | yes |
 | `foresight.candidates` | `OutcomeCandidate`: a cluster that might be evidence (C7) | **no** |
 
 `foresight.runs` and `foresight.candidates` are the two mutable collections, and both exceptions are the same point: a run has a lifecycle a caller polls, and a candidate has one transition (unconfirmed to confirmed). Their rows move by design. Everything else is a claim about the past that a later reader relies on. The launches and outcomes matter most, because they are the evidence the plan 02 section 3.4 gate opens on, so they are exactly the rows somebody would have to rewrite to make an uncalibrated engine look calibrated. Append-only is backed by database grants (`INSERT`, `SELECT` and nothing else), read back from `information_schema` by `tests/integration/test_append_only_grants.py`.
@@ -137,6 +149,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 - `tests/unit/test_foresight_calibration.py` (C6: the four locks, the golden test, and plan 08 section 12.9's two metrics)
 - `tests/unit/test_foresight_loop.py` (C7: foresight stays a leaf, a candidate is inert, predicted-versus-actual, cluster rates as context)
 - `tests/acceptance/test_foresight_api.py` (C4: the `/v1/foresight` contract, deny-by-default on every route, the duty split, 202 and idempotency)
+- `tests/unit/test_foresight_radar.py` (C5: what a spike is and is not, idempotency, scope, the policy inputs, and both events)
 - `tests/unit/test_foresight_persistence.py` (C2: ownership, append-only, versions, idempotent runs, the run lifecycle, evidence, backtest assembly)
 - `tests/integration/test_append_only_grants.py` and `tests/integration/test_postgres_isolation.py` cover the seven tables generically, against a real PostgreSQL
 
@@ -152,3 +165,4 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C6-calibration-gate.md` | `theme_recall` and `segment_rank_correlation` (exact, no scipy); the four locks on the calibration gate, including making `Guardrail.permits` actually check a quoted number (C6/F09; ADR-0044) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C7-autopsy-loop.md` | `cluster.updated`, a `ClusterRateSource` port wired by the composition root, inert outcome candidates a person confirms, and post-launch predicted-versus-actual (C7/F10) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C4-foresight-api.md` | `/v1/foresight`: scenarios, versions, runs (202 + poll URL + required `Idempotency-Key`), launches, outcomes, backtests, calibration and spikes; four permissions and a new `Role.PRODUCT` (C4/F06) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C2-foresight-persistence.md` | Eight collections in the `clarity_foresight` schema, six append-only; scenario versions, idempotent runs with a lifecycle, launches, outcomes, calibrations and spikes (C2/F05) |

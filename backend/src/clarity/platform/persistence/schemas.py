@@ -72,6 +72,10 @@ APPEND_ONLY: frozenset[str] = frozenset(
         "foresight.outcomes",
         "foresight.calibrations",
         "foresight.spikes",
+        # One complaint, counted, keyed by its event id (C5). Append-only
+        # because the only way to make a spike disappear would be to delete
+        # some of the observations that raised it.
+        "foresight.observations",
     }
 )
 
