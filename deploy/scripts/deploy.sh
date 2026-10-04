@@ -22,7 +22,10 @@ fi
 sed -i -E "s/^IMAGE_TAG=.*/IMAGE_TAG=$candidate/" "$environment"
 export IMAGE_TAG=$candidate
 "${compose[@]}" config --quiet
-"${compose[@]}" pull
+# Only what is missing: the release's four images always are (a new SHA tag),
+# the pinned infrastructure images are already here, and asking the registry
+# about each of them again on every deploy only costs time.
+"${compose[@]}" pull --policy missing
 "${compose[@]}" up -d --wait --remove-orphans
 # Recreate, not reload: the configs are single-file bind mounts, and the
 # release tarball replaces those files, so a running proxy keeps reading the

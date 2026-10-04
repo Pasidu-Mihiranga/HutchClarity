@@ -4,22 +4,27 @@ set -euo pipefail
 root=${CLARITY_DEPLOY_ROOT:-/opt/hutch-clarity}
 compose=(docker compose --env-file "$root/.env.production" -f "$root/deploy/compose/vps.yml")
 
-for target in \
-  postgres:5432 kafka:19092 keycloak:8080 opa:8181 \
-  clarity-api:8000 clarity-mcp:8099 clarity-channel-gateway:8102 hutch-sim:8103 \
-  customer-web:3000 clarity-console:3000 receipt-verify:3000; do
-  host=${target%:*}
-  port=${target#*:}
-  "${compose[@]}" exec -T clarity-api python -c \
-    "import socket; s=socket.create_connection(('$host',$port),5); s.close()"
-done
+# Every internal check in one Python process inside clarity-api: each
+# `docker compose exec` costs about a second, and there were fourteen.
+"${compose[@]}" exec -T clarity-api python - <<'PY'
+import socket
+import urllib.request
 
-"${compose[@]}" exec -T clarity-api python -c \
-  "import urllib.request; urllib.request.urlopen('http://clarity-api:8000/health',timeout=5)"
-"${compose[@]}" exec -T clarity-api python -c \
-  "import urllib.request; urllib.request.urlopen('http://clarity-channel-gateway:8102/health',timeout=5)"
-"${compose[@]}" exec -T clarity-api python -c \
-  "import urllib.request; urllib.request.urlopen('http://hutch-sim:8103/health',timeout=5)"
+ports = {
+    "postgres": 5432, "kafka": 19092, "keycloak": 8080, "opa": 8181,
+    "clarity-api": 8000, "clarity-mcp": 8099, "clarity-channel-gateway": 8102,
+    "hutch-sim": 8103, "customer-web": 3000, "clarity-console": 3000,
+    "receipt-verify": 3000,
+}
+for host, port in ports.items():
+    socket.create_connection((host, port), 5).close()
+for url in (
+    "http://clarity-api:8000/health",
+    "http://clarity-channel-gateway:8102/health",
+    "http://hutch-sim:8103/health",
+):
+    urllib.request.urlopen(url, timeout=5)
+PY
 
 curl_flags=(--fail --silent --show-error --max-time 15)
 if [[ ${CLARITY_BOOTSTRAP_TLS:-0} == 1 ]]; then
