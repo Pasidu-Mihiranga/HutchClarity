@@ -4,7 +4,19 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every guardrail in the policy store was declared and none of them checked anything** (C6). Policy YAML quotes its numbers so they load as exact decimals rather than binary floats, so every value reaching `Guardrail.permits` was a `str`, and the first line returned `True` for anything that was not a `Decimal` or an `int`. A numeric string is now checked, so `detection.*.confidence_base`, the throttle limits and `foresight.calibration.min_real_launches` all enforce their bounds. A string that is not a number still passes, because some keys are genuinely textual. Nothing broke when it started checking: every existing value was already inside its declared bounds.
+
 ### Added
+
+- **The foresight calibration gate is held shut by four independent locks** (C6/F09, ADR-0044). Plan 02 §3.4 says no launch decision rests on the baseline until it is backtested against three real launches; a gate is only worth the difficulty of opening it.
+  - The threshold is a C4-classed policy key whose `min: 3` guardrail now refuses a lower value at load.
+  - `CALIBRATED` is computed from `Provenance.REAL` alone; synthetic launches are counted, reported and excluded.
+  - Recording a `REAL` launch takes **two keys**: a `RealLaunchCapability` supplied by the composition root, and a non-empty external evidence reference somebody can check. No shipped profile wires the capability, because the prototype has no real launch records. The capability's description is stored on the launch, so a calibrated report can say what permitted it.
+  - The evidence is append-only, backed by database grants.
+  - A golden test drives every lever a caller has in a shipped profile and asserts the status never moves.
+- **Plan 08 §12.9's two calibration metrics**: `theme_recall` and `segment_rank_correlation`, exact over integer ranks with no float and no new dependency. Recall catches what the band error cannot: themes the model never predicted are excluded from the error, so without it the error improves as the model predicts less.
 
 - **`/v1/foresight`: a real API for rehearsing a change** (C4/F06). Draft and version a scenario, ask for a run, record what a launch actually produced, run a backtest, read the latest calibration and the early-warning spikes. Fourteen routes, all staff-only.
   - `POST /v1/foresight/runs` answers **202 with a `Location` poll URL** and **requires an `Idempotency-Key`**. A repeat returns the original run and its original outcome, marked `replayed`. Foresight moves no money, so the risk is not a double charge; it is a double finding.
