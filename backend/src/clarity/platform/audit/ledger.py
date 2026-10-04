@@ -144,6 +144,24 @@ class AuditEventType(StrEnum):
     CHECKPOINT_ISSUED = "checkpoint.issued"
     """The head was signed with the checkpoint key (Phase 2, ADR-0035)."""
 
+    # -- recovery (audit assurance plan Phase 6) -------------------------- #
+
+    BACKUP_CREATED = "backup.created"
+    """A backup of the trail was written: its checksum and the range it covers."""
+
+    BACKUP_READ = "backup.read"
+    """A backup was opened. Restoring is the one operation that can put a
+    different past in place of the real one, so reading one leaves a mark."""
+
+    RESTORE_PERFORMED = "restore.performed"
+    """A trail was restored, with the loss report that measured it against an
+    external checkpoint. Written into the restored trail, so the restore is part
+    of the history it created."""
+
+    RECONCILED = "reconciled"
+    """Reconciliation asked HUTCH about the lost window and sorted what it
+    found. It never executes anything; this records what it concluded."""
+
     REQUEST_PERFORMED = "request.performed"
     """A state-changing request reached its route: who made it, with which
     session, on which route and case, and the status it got. Domain events say

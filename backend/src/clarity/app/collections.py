@@ -38,6 +38,7 @@ from clarity.modules.receipts.public import (
     SUPERSEDED,
 )
 from clarity.modules.reconciliation.public import EXPECTED_ACTIONS, MISMATCHES
+from clarity.platform.audit.checkpoints import AUDIT_CHECKPOINTS
 from clarity.platform.audit.ledger import AUDIT, AUDIT_HEAD
 from clarity.platform.messaging.consumers import ATTEMPTS as CONSUMER_ATTEMPTS
 from clarity.platform.messaging.consumers import DEAD_LETTERS, PROCESSED
@@ -99,6 +100,10 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # scoped: the trail is cross-cutting, and read through AUDIT_READ instead.
     AUDIT,
     AUDIT_HEAD,
+    # The signed checkpoints that make the trail tamper-evident (ADR-0035). They
+    # live beside the trail for the same reason: a checkpoint in a different
+    # store from the records it vouches for can be lost separately from them.
+    AUDIT_CHECKPOINTS,
 )
 
 __all__ = ["ALL_COLLECTIONS"]

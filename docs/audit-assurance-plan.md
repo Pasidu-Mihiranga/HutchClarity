@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phases 1, 3 and 4, and the core of Phase 2, landed 2026-10-04; the Phase 2 and 4 deferrals closed the same day (revision 8); Phase 5 (dashboard) is next. **Created:** 2026-10-04. **Revision:** 8.
+> **Status:** In progress. Phases 1, 2, 3, 4 and 6 landed 2026-10-04, with the Phase 2 and 4 deferrals; Phase 7 (lifecycle) and Phase 5 (dashboard) remain. **Created:** 2026-10-04. **Revision:** 9.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -385,11 +385,11 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 6: Recovery
 
-- [ ] Backups encrypted and checksummed; backup access audited
-- [ ] Restore procedure with external checkpoint comparison and a loss report
-- [ ] Replay without side effects; reconciliation for the lost window
-- [ ] Destroy-and-restore drill in the `full` CI lane on every merge
-- [ ] Restore runbook as a walkthrough, re-verified with each drill
+- [x] Backups encrypted (AES-256-GCM under `CLARITY_AUDIT_BACKUP_KEY`, refused if unset) and checksummed, with the checksum in the header in the clear so an operator can name a bundle without the key. `backup.created`, `backup.read` and `restore.performed` are all recorded; the record names the file, never the path
+- [x] Restore measured against a checkpoint held **outside** the bundle, which is the only thing that can answer completeness: a bundle is internally consistent by construction. `inspect` reports before the database is touched; `restore` refuses a measurable loss unless the operator passes `accept_loss` (ADR-0038)
+- [x] `SealedCommandPort` raises on every call and counts attempts, so zero adapter calls is a property of the type rather than a hope; `ReadOnlyCommandPort` passes `status_of` and still refuses `execute`. Reconciliation sorts the window into agreed, missing locally, not done and unknown, and never executes anything
+- [x] `tests/integration/test_audit_restore_drill.py`, its own named step in the `full` lane. **Not yet executed:** no PostgreSQL in the container this was built in, so it skipped. The memory-store drill in `tests/security/test_audit_recovery.py` is green
+- [x] `docs/walkthroughs/WT-14-audit-restore-runbook.md`, including the one thing to do before it is needed: keep a witness copy of a checkpoint off this deployment
 
 | # | Given | When | Then |
 |---|---|---|---|

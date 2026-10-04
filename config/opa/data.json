@@ -5,7 +5,8 @@
       "alert:dispose",
       "audit:assign",
       "audit:export",
-      "audit:read"
+      "audit:read",
+      "audit:restore"
     ],
     "money_permissions": [
       "action:approve",
@@ -16,6 +17,7 @@
       "action:approve:high_value",
       "admin:manage",
       "audit:assign",
+      "audit:restore",
       "config:approve",
       "merchant:suspend",
       "rule:publish"
@@ -103,7 +105,13 @@
         "receipt:read",
         "receipt:read:any"
       ],
-      "platform_admin": ["admin:manage", "audit:read", "flags:kill_switch"],
+      "platform_admin": [
+        "admin:manage",
+        "audit:export",
+        "audit:read",
+        "audit:restore",
+        "flags:kill_switch"
+      ],
       "security_admin": ["admin:manage", "audit:assign", "audit:read"]
     }
   }

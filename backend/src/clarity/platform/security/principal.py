@@ -74,6 +74,13 @@ class Permission(StrEnum):
     """Grant, approve, revoke and recertify audit duties for other people."""
     ALERT_DISPOSE = "alert:dispose"
     """Close an assurance alert with a disposition (Phase 4)."""
+    AUDIT_RESTORE = "audit:restore"
+    """Open a backup of the trail and restore it (Phase 6).
+
+    Its own authority, separate from reading or exporting, because it is the only
+    one in the system that can put a different past in place of the real one. Not
+    grantable: it comes from a role, so taking it is a change somebody approved
+    rather than a duty that can be handed out for an afternoon."""
     KILL_SWITCH = "flags:kill_switch"
     ADMIN_MANAGE = "admin:manage"
     SELF_READ = "self:read"
@@ -104,11 +111,13 @@ AUDIT_DUTIES: frozenset[Permission] = frozenset(
         Permission.AUDIT_EXPORT,
         Permission.AUDIT_ASSIGN,
         Permission.ALERT_DISPOSE,
+        Permission.AUDIT_RESTORE,
     }
 )
 
 #: What a grant may carry. Money is never grantable, and neither is the
-#: authority to grant: ``AUDIT_ASSIGN`` comes from a role only.
+#: authority to grant or to restore: ``AUDIT_ASSIGN`` and ``AUDIT_RESTORE`` come
+#: from a role only.
 GRANTABLE_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.AUDIT_READ, Permission.AUDIT_EXPORT, Permission.ALERT_DISPOSE}
 )
@@ -122,6 +131,7 @@ STEP_UP_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.MERCHANT_SUSPEND,
         Permission.ADMIN_MANAGE,
         Permission.AUDIT_ASSIGN,
+        Permission.AUDIT_RESTORE,
     }
 )
 
@@ -230,6 +240,11 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ADMIN_MANAGE,
             Permission.KILL_SWITCH,
             Permission.AUDIT_READ,
+            # Restoring the trail is an operations job, and the only role that
+            # holds it: it needs step-up, and holding it costs every money
+            # permission (rule 1), so it is not a convenience anybody carries.
+            Permission.AUDIT_RESTORE,
+            Permission.AUDIT_EXPORT,
         }
     ),
     Role.SECURITY_ADMIN: frozenset(

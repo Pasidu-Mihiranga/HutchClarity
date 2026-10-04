@@ -17,3 +17,4 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | WT-11 | Running the `full` profile | 21 §9 | planned (R2) | - |
 | WT-12 | Deploying: containers for the core, serverless edges | 21 §5 | planned (R7) | - |
 | WT-13 | [Staff console roles: role switcher, desk, kill switches](walkthroughs/WT-13-staff-console.md) | 18 §5.4 | verified: queue and the four-eyes approval are driven by `frontend/e2e/staff-desk.spec.ts` (FE01) | 2026-10-04 |
+| WT-14 | [Audit trail backup and restore runbook](walkthroughs/WT-14-audit-restore-runbook.md) | audit assurance plan Phase 6, ADR-0038 | verified in `lite`; the PostgreSQL drill is written and runs in the `full` CI lane, not yet executed | 2026-10-04 |

@@ -120,12 +120,14 @@ from clarity.modules.receipts.public import (
 from clarity.modules.reconciliation.public import ReconciliationService
 from clarity.modules.resolution.public import ResolutionService
 from clarity.modules.timeline.public import TimelineBuilder
+from clarity.platform.audit.backup import backup_key_from
 from clarity.platform.audit.checkpoints import Checkpointer, CheckpointSigner
 from clarity.platform.audit.ledger import (
     ActorKind,
     AuditEventType,
     AuditLedger,
 )
+from clarity.platform.audit.vault import AuditVault
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard
 from clarity.platform.messaging.consumers import CollectingAlertHook, ConsumerRegistry
@@ -709,6 +711,16 @@ class Clarity:
         # Audit duties by grant (Phase 3). They live beside the trail, so a
         # demo reset carries them with it, as it carries identity.
         self.audit_grants = audit_grants or self._new_audit_grants(clock)
+        # Backups and restores of the trail (Phase 6). The key is read when a
+        # backup is actually taken, so a process that never takes one never
+        # holds it; an unset key refuses the backup rather than writing it in
+        # the clear.
+        self.audit_vault = AuditVault(
+            self.audit,
+            self.audit_checkpoints,
+            key=lambda: backup_key_from(self.settings.audit_backup_key),
+            clock=(lambda: clock) if clock is not None else None,
+        )
         self._open_audit_trail()
         self.switches = SwitchBoard(
             audit_sink=self.audit,

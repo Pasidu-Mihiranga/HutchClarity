@@ -126,6 +126,20 @@ class Settings(BaseSettings):
             "from the receipt key, so a compromise of one cannot forge the other."
         ),
     )
+    audit_backup_key: str | None = Field(
+        default=None,
+        alias="CLARITY_AUDIT_BACKUP_KEY",
+        description=(
+            "Secret that encrypts audit backup bundles (Phase 6). Unset: backups "
+            "are refused rather than written in the clear. A deployment sets a "
+            "32-byte random value; any length works and is hashed to the key."
+        ),
+    )
+    audit_backup_dir: Path = Field(
+        default=Path(".backups"),
+        alias="CLARITY_AUDIT_BACKUP_DIR",
+        description="Where backup bundles are written. A mounted volume in full.",
+    )
     signer_mount: str = Field(default="transit", alias="CLARITY_SIGNER_MOUNT")
     signer_namespace: str | None = Field(default=None, alias="CLARITY_SIGNER_NAMESPACE")
     signer_timeout_seconds: float = Field(default=3.0, alias="CLARITY_SIGNER_TIMEOUT", gt=0)
