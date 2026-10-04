@@ -1164,6 +1164,14 @@ class Clarity:
             plan = next(iter(record.plans.values()))
             self.cases.auto_fix(record.case_id, plan.plan_id)
 
+    def pending_event_count(self) -> int:
+        """How many events are committed but not yet published.
+
+        The chain health panel's writer lag. A count, not the rows: a dashboard
+        has no business holding the events themselves.
+        """
+        return len(self._pending_events())
+
     def _pending_events(self) -> list[OutboxRow]:
         """Outbox rows the relay has not published yet, for the lag check.
 

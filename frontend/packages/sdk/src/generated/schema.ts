@@ -491,6 +491,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audit/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Health
+         * @description The chain health panel (plan 5.8): is the trail sound, and is it fresh.
+         *
+         *     **Deliberately not recorded as ``audit.read``.** A dashboard polls this,
+         *     and recording every poll would make the console trip the
+         *     ``mass_audit_read`` rule within minutes: the monitor would raise alerts
+         *     about the act of monitoring. It reads no record contents, only aggregates
+         *     and the verification verdict, so there is nothing here to read about a
+         *     person. Reading the trail *itself* is recorded, on ``GET /v1/audit``.
+         *
+         *     The verification is **incremental** for the same reason: a full recompute
+         *     on every poll turns the dashboard into the most expensive thing in the
+         *     system. ``AuditLedger.verify`` is explicit about what that does and does
+         *     not cover; the full recompute runs at startup and on the policy interval.
+         */
+        get: operations["audit_health_v1_audit_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/records/{seq}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Audit Record
+         * @description Recompute one record's hashes, for the trail explorer's "verify" action.
+         *
+         *     It answers a narrow question honestly: does this row hash to what it says,
+         *     and does it link to the row before it. It cannot confirm the payload,
+         *     because the ledger never stored one: ``proves()`` does that, and it needs
+         *     the document the caller is holding, which is not something a console has.
+         */
+        post: operations["verify_audit_record_v1_audit_records__seq__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Recovery
+         * @description The recovery panel: the last backup, the last restore, and its loss report.
+         *
+         *     Read out of the trail rather than from a separate status table, which is
+         *     the point of recording them there: a status table can disagree with what
+         *     happened, and the trail is what happened.
+         */
+        get: operations["audit_recovery_v1_audit_recovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/me": {
         parameters: {
             query?: never;
@@ -2833,6 +2914,107 @@ export interface operations {
                 "application/json": components["schemas"]["AuditGrantRevoke"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_health_v1_audit_health_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_audit_record_v1_audit_records__seq__verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_recovery_v1_audit_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

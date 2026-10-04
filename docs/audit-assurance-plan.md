@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phases 1, 2, 3, 4, 6 and 7 landed 2026-10-04, with the Phase 2 and 4 deferrals; Phase 5 (the console dashboard) remains. **Created:** 2026-10-04. **Revision:** 10.
+> **Status:** Every phase landed 2026-10-04 (1 to 7, with the Phase 2 and 4 deferrals). Two items remain open with stated reasons: database-level append-only, which needs an insert-only write path, and cross-anchoring the audit head into the receipt chain, which changes a signed receipt payload. **Created:** 2026-10-04. **Revision:** 11.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -380,8 +380,8 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 5: Dashboard
 
-- [ ] Console Audit section with the panels in section 5.8
-- [ ] Browser tests for chain health, the trail explorer, alert disposition and assignment
+- [x] Console Audit section with all eight panels (`frontend/apps/console/app/audit/page.tsx`), walkthrough WT-15. Two restraints worth naming: health polls and the trail does not, because every trail read is recorded and a polling dashboard would trip `mass_audit_read`; and each panel degrades on its own, because deny by default means different roles legitimately see different panels
+- [x] `frontend/e2e/audit-console.spec.ts`, 9 tests, green (whole suite 28 of 28). They prove the panels are wired to the real API and the real permission checks; the rules and the chain itself are proven in the backend suite, where they can be set up precisely
 
 ### Phase 6: Recovery
 

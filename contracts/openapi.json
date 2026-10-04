@@ -3021,6 +3021,171 @@
         ]
       }
     },
+    "/v1/audit/health": {
+      "get": {
+        "description": "The chain health panel (plan 5.8): is the trail sound, and is it fresh.\n\n**Deliberately not recorded as ``audit.read``.** A dashboard polls this,\nand recording every poll would make the console trip the\n``mass_audit_read`` rule within minutes: the monitor would raise alerts\nabout the act of monitoring. It reads no record contents, only aggregates\nand the verification verdict, so there is nothing here to read about a\nperson. Reading the trail *itself* is recorded, on ``GET /v1/audit``.\n\nThe verification is **incremental** for the same reason: a full recompute\non every poll turns the dashboard into the most expensive thing in the\nsystem. ``AuditLedger.verify`` is explicit about what that does and does\nnot cover; the full recompute runs at startup and on the policy interval.",
+        "operationId": "audit_health_v1_audit_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Health V1 Audit Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Health",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/records/{seq}/verify": {
+      "post": {
+        "description": "Recompute one record's hashes, for the trail explorer's \"verify\" action.\n\nIt answers a narrow question honestly: does this row hash to what it says,\nand does it link to the row before it. It cannot confirm the payload,\nbecause the ledger never stored one: ``proves()`` does that, and it needs\nthe document the caller is holding, which is not something a console has.",
+        "operationId": "verify_audit_record_v1_audit_records__seq__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Verify Audit Record V1 Audit Records  Seq  Verify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Audit Record",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/recovery": {
+      "get": {
+        "description": "The recovery panel: the last backup, the last restore, and its loss report.\n\nRead out of the trail rather than from a separate status table, which is\nthe point of recording them there: a status table can disagree with what\nhappened, and the trail is what happened.",
+        "operationId": "audit_recovery_v1_audit_recovery_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Recovery V1 Audit Recovery Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Recovery",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "description": "Who the current token says you are, and what it lets you do.",

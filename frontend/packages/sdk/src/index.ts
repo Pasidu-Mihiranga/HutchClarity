@@ -19,6 +19,15 @@ export {
   type SwitchStateView,
   type StaffSessionRequest,
   type RuledOutItem,
+  // Audit assurance (plan 5.8, ADR-0037 to ADR-0039).
+  type AuditRecordView,
+  type AuditTrailPage,
+  type AuditHealth,
+  type AuditRecovery,
+  type AuditRecordVerdict,
+  type AuditGrantView,
+  type AlertView,
+  type AlertQueue,
 } from "./client";
 
 // Generated from contracts/openapi.json by `npm run sdk:generate` (B09).

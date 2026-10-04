@@ -23,6 +23,11 @@ const links = [
     anyOf: ["rule:draft", "rule:publish", "config:draft", "config:approve"],
   },
   {
+    href: "/audit",
+    label: "Audit",
+    anyOf: ["audit:read"],
+  },
+  {
     href: "/admin",
     label: "Admin",
     anyOf: ["admin:manage", "flags:kill_switch"],

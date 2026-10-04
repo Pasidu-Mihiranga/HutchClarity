@@ -119,7 +119,7 @@ from clarity.modules.iam.public import (
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
 from clarity.platform.audit.checkpoints import checkpoint_document
 from clarity.platform.audit.export import AuditExport, export_document
-from clarity.platform.audit.ledger import ActorKind, AuditEventType
+from clarity.platform.audit.ledger import ActorKind, AuditEventType, record_hash
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
 from clarity.platform.messaging.correlation import correlated
@@ -735,6 +735,121 @@ def _register_routes(app: FastAPI) -> None:
                 "lost_from": verification.lost_from,
                 "lost_to": verification.lost_to,
             },
+        }
+
+    @app.get("/v1/audit/health", tags=["audit"])
+    def audit_health(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """The chain health panel (plan 5.8): is the trail sound, and is it fresh.
+
+        **Deliberately not recorded as ``audit.read``.** A dashboard polls this,
+        and recording every poll would make the console trip the
+        ``mass_audit_read`` rule within minutes: the monitor would raise alerts
+        about the act of monitoring. It reads no record contents, only aggregates
+        and the verification verdict, so there is nothing here to read about a
+        person. Reading the trail *itself* is recorded, on ``GET /v1/audit``.
+
+        The verification is **incremental** for the same reason: a full recompute
+        on every poll turns the dashboard into the most expensive thing in the
+        system. ``AuditLedger.verify`` is explicit about what that does and does
+        not cover; the full recompute runs at startup and on the policy interval.
+        """
+        verification = clarity.audit_checkpoints.verify(incremental=True)
+        latest = clarity.audit_checkpoints.latest()
+        now = clarity.now()
+        last_detection = clarity.assurance.last_run()
+        pending = clarity.pending_event_count()
+        floor = clarity.audit.floor
+        return {
+            "intact": verification.intact,
+            "length": verification.length,
+            "verified_from": verification.verified_from,
+            "broken_at": verification.broken_at,
+            "reason": verification.reason,
+            "lost_from": verification.lost_from,
+            "lost_to": verification.lost_to,
+            "checkpoints": verification.checkpoints,
+            "last_checkpoint_seq": verification.last_checkpoint_seq,
+            "last_checkpoint_at": latest.recorded_at.isoformat() if latest else None,
+            "last_checkpoint_age_seconds": (
+                int((now - latest.recorded_at).total_seconds()) if latest else None
+            ),
+            "detection_last_ran_at": last_detection.isoformat() if last_detection else None,
+            "writer_lag_events": pending,
+            "archived_below_seq": int(floor["seq"]) if floor else 0,
+            "witness_url": "/.well-known/clarity-audit-checkpoint.json",
+            "simulated": True,
+        }
+
+    @app.get("/v1/audit/recovery", tags=["audit"])
+    def audit_recovery(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """The recovery panel: the last backup, the last restore, and its loss report.
+
+        Read out of the trail rather than from a separate status table, which is
+        the point of recording them there: a status table can disagree with what
+        happened, and the trail is what happened.
+        """
+
+        def latest(event: AuditEventType) -> dict[str, Any] | None:
+            found = clarity.audit.of_type(event)
+            if not found:
+                return None
+            record = found[-1]
+            return {
+                "seq": record.seq,
+                "at": record.recorded_at.isoformat(),
+                "actor_ref": record.actor_ref,
+                **record.detail,
+            }
+
+        return {
+            "last_backup": latest(AuditEventType.BACKUP_CREATED),
+            "last_backup_read": latest(AuditEventType.BACKUP_READ),
+            "last_restore": latest(AuditEventType.RESTORE_PERFORMED),
+            "last_segment_sealed": latest(AuditEventType.SEGMENT_SEALED),
+            "last_erasure": latest(AuditEventType.ERASURE_PERFORMED),
+            "backups_configured": clarity.settings.audit_backup_key is not None,
+            "simulated": True,
+        }
+
+    @app.post("/v1/audit/records/{seq}/verify", tags=["audit"])
+    def verify_audit_record(
+        seq: int,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """Recompute one record's hashes, for the trail explorer's "verify" action.
+
+        It answers a narrow question honestly: does this row hash to what it says,
+        and does it link to the row before it. It cannot confirm the payload,
+        because the ledger never stored one: ``proves()`` does that, and it needs
+        the document the caller is holding, which is not something a console has.
+        """
+        record = next((r for r in clarity.audit.records if r.seq == seq), None)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"no audit record at seq {seq}")
+        previous = next((r for r in clarity.audit.records if r.seq == seq - 1), None)
+        detail_matches = hash_payload(record.detail) == record.detail_hash
+        hash_matches = record_hash(record) == record.chain_hash
+        links = record.prev_hash == (previous.chain_hash if previous else None)
+        if previous is None and seq > 1:
+            # Archived: the row before it is in a segment, so the link cannot be
+            # checked from here. Said, not assumed either way.
+            links = record.prev_hash is not None
+        return {
+            "seq": seq,
+            "detail_matches_its_hash": detail_matches,
+            "record_hash_matches_its_contents": hash_matches,
+            "follows_its_predecessor": links,
+            "predecessor_available": previous is not None or seq == 1,
+            "intact": detail_matches and hash_matches and links,
+            "hash_version": record.hash_version,
+            "chain_hash": record.chain_hash,
         }
 
     @app.get("/v1/audit/export", tags=["audit"])

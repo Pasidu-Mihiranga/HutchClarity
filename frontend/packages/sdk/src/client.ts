@@ -163,6 +163,119 @@ export type SwitchStateView = {
   }>;
 };
 
+export type AuditRecordView = {
+  seq: number;
+  hash_version: number;
+  event_type: string;
+  actor_ref: string;
+  actor_kind: string;
+  session_ref?: string | null;
+  object_ref: string;
+  case_id?: string | null;
+  payload_hash: string;
+  detail: Record<string, unknown>;
+  detail_hash: string;
+  occurred_at: string;
+  recorded_at: string;
+  prev_hash?: string | null;
+  chain_hash: string;
+};
+
+export type AuditTrailPage = {
+  records: AuditRecordView[];
+  next_after_seq: number | null;
+  verification: {
+    intact: boolean;
+    length: number;
+    checkpoints: number;
+    last_checkpoint_seq: number | null;
+    broken_at: number | null;
+    reason: string | null;
+    lost_from: number | null;
+    lost_to: number | null;
+  };
+};
+
+export type AuditHealth = {
+  intact: boolean;
+  length: number;
+  verified_from: number;
+  broken_at: number | null;
+  reason: string | null;
+  lost_from: number | null;
+  lost_to: number | null;
+  checkpoints: number;
+  last_checkpoint_seq: number | null;
+  last_checkpoint_at: string | null;
+  last_checkpoint_age_seconds: number | null;
+  detection_last_ran_at: string | null;
+  writer_lag_events: number;
+  archived_below_seq: number;
+  witness_url: string;
+};
+
+export type AuditRecovery = {
+  last_backup: Record<string, unknown> | null;
+  last_backup_read: Record<string, unknown> | null;
+  last_restore: Record<string, unknown> | null;
+  last_segment_sealed: Record<string, unknown> | null;
+  last_erasure: Record<string, unknown> | null;
+  backups_configured: boolean;
+};
+
+export type AuditRecordVerdict = {
+  seq: number;
+  detail_matches_its_hash: boolean;
+  record_hash_matches_its_contents: boolean;
+  follows_its_predecessor: boolean;
+  predecessor_available: boolean;
+  intact: boolean;
+  hash_version: number;
+  chain_hash: string;
+};
+
+export type AuditGrantView = {
+  grant_id: string;
+  subject_kind: string;
+  subject_ref: string;
+  permission: string;
+  state: string;
+  reason: string;
+  requested_by: string;
+  requested_at: string;
+  approved_by?: string | null;
+  expires_at?: string | null;
+  review_due_at?: string | null;
+  break_glass: boolean;
+};
+
+export type AlertView = {
+  alert_id: string;
+  rule_id: string;
+  band: string;
+  group_key: string;
+  summary: string;
+  evidence: number[];
+  subject_ref?: string | null;
+  case_id?: string | null;
+  state: string;
+  raised_at: string;
+  last_seen_at: string;
+  occurrences: number;
+  acknowledged_by?: string | null;
+  acknowledged_at?: string | null;
+  escalated_at?: string | null;
+  disposed_by?: string | null;
+  disposed_at?: string | null;
+  disposition?: string | null;
+  disposition_reason?: string | null;
+};
+
+export type AlertQueue = {
+  alerts: AlertView[];
+  detection_last_ran_at: string | null;
+};
+
 export type StaffSessionRequest = {
   user_ref: string;
   roles: string[];
@@ -399,6 +512,72 @@ export class ClarityClient {
     reason: string;
   }): Promise<SwitchStateView> {
     return this.request("/v1/admin/switches", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  // -- audit assurance (plan 5.8) ------------------------------------------ //
+
+  /**
+   * Chain health. Deliberately *not* recorded as `audit.read` by the server: a
+   * dashboard polls this, and recording every poll would make the console trip
+   * the `mass_audit_read` rule. Reading the trail itself is recorded.
+   */
+  auditHealth(): Promise<AuditHealth> {
+    return this.request("/v1/audit/health");
+  }
+
+  /** The trail. This one *is* recorded: who looked, with which filters. */
+  auditTrail(params?: {
+    actor_ref?: string;
+    event_type?: string;
+    case_id?: string;
+    after_seq?: number;
+    limit?: number;
+  }): Promise<AuditTrailPage> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params || {})) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    const suffix = query.toString();
+    return this.request(`/v1/audit${suffix ? `?${suffix}` : ""}`);
+  }
+
+  auditRecovery(): Promise<AuditRecovery> {
+    return this.request("/v1/audit/recovery");
+  }
+
+  /** Recompute one record's hashes. Changes nothing. */
+  verifyAuditRecord(seq: number): Promise<AuditRecordVerdict> {
+    return this.request(`/v1/audit/records/${seq}/verify`, { method: "POST" });
+  }
+
+  listAuditGrants(): Promise<{ grants: AuditGrantView[] }> {
+    return this.request("/v1/audit/grants");
+  }
+
+  listAlerts(openOnly = false): Promise<AlertQueue> {
+    return this.request(`/v1/assurance/alerts?open_only=${openOnly}`);
+  }
+
+  acknowledgeAlert(alertId: string): Promise<AlertView> {
+    return this.request(`/v1/assurance/alerts/${alertId}/acknowledge`, {
+      method: "POST",
+    });
+  }
+
+  investigateAlert(alertId: string): Promise<AlertView> {
+    return this.request(`/v1/assurance/alerts/${alertId}/investigate`, {
+      method: "POST",
+    });
+  }
+
+  disposeAlert(
+    alertId: string,
+    body: { disposition: string; reason: string },
+  ): Promise<AlertView> {
+    return this.request(`/v1/assurance/alerts/${alertId}/dispose`, {
       method: "POST",
       body: JSON.stringify(body),
     });

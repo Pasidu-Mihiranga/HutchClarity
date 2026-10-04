@@ -85,6 +85,22 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/audit/health": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/audit/recovery": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/auth/me": {
       "parameters": [
         "header:authorization?"
@@ -386,6 +402,15 @@
         "path:grant_id"
       ],
       "request": "AuditGrantRevoke",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/audit/records/{seq}/verify": {
+      "parameters": [
+        "header:authorization?",
+        "path:seq"
+      ],
+      "request": null,
       "response": "object",
       "status": "200"
     },

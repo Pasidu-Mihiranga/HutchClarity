@@ -94,6 +94,10 @@ NOT_RECORDED_AS_REQUESTS: dict[str, str] = {
     "POST /v1/receipts/{receipt_id}/verify": "read only: public verification changes nothing",
     "POST /v1/conversation/suggestions": "read only: returns suggestion chips",
     "POST /v1/clarity/route": "read only: classifies a question",
+    "POST /v1/audit/records/{seq}/verify": (
+        "read only: recomputes one record's hashes and changes nothing. POST "
+        "because it is an action a person takes, not because it writes"
+    ),
 }
 
 

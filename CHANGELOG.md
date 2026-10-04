@@ -22,6 +22,20 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - **`SwitchBoard` takes a `clock`**, so a flip is stamped from the injected clock
   (I11) rather than the wall clock.
 
+### Added (audit assurance Phase 5: the console Audit section)
+
+- **Console `/audit`** with the eight panels from plan 5.8: chain health, trail
+  explorer, actor timeline, alerts with their lifecycle, monitors, access,
+  recovery and export. Nav entry gated on `audit:read`.
+- **New `/v1` routes**, all needing `audit:read`: `GET /v1/audit/health`,
+  `GET /v1/audit/recovery`, `POST /v1/audit/records/{seq}/verify`. `health` is
+  deliberately **not** recorded as `audit.read`: a dashboard polls it, and
+  recording every poll would make the console trip the `mass_audit_read` rule.
+- **SDK**: `auditHealth`, `auditTrail`, `auditRecovery`, `verifyAuditRecord`,
+  `listAuditGrants`, `listAlerts`, `acknowledgeAlert`, `investigateAlert`,
+  `disposeAlert`, with their types exported.
+- `frontend/e2e/audit-console.spec.ts`, 9 browser tests; the suite is now 28.
+
 ### Added (audit assurance Phases 6 and 7, ADR-0038 and ADR-0039)
 
 - **New `/v1` route**: `GET /v1/audit/export`, a bundle a regulator verifies with
