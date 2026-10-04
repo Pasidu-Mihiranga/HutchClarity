@@ -18,7 +18,7 @@ from clarity.modules.case.public import CaseAggregate, CaseNotFound
 from clarity.modules.resolution.public import ResolutionService
 from clarity.platform.messaging.envelope import EventType
 
-DILANI = "+94771234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
+DILANI = "+94781234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
 
 
 @pytest.fixture
@@ -143,7 +143,7 @@ def test_case_created_carries_no_raw_number(cases: ResolutionService, clarity: C
 
     serialised = event.model_dump_json()
     assert DILANI not in serialised
-    assert "771234567" not in serialised
+    assert "781234567" not in serialised
 
 
 # -- the public surface the interfaces use is unchanged ------------------- #

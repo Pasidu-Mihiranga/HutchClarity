@@ -54,7 +54,7 @@ FORBIDDEN = {
 
 def test_a_payload_with_personal_data_is_rejected():
     data = SAMPLES[DomainEventType.ACTION_COMPLETED].model_dump(mode="json") | {
-        "msisdn": "+94771234567"
+        "msisdn": "+94781234567"
     }
 
     with pytest.raises(InvalidEventPayload):

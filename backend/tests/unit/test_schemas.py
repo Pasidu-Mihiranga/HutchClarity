@@ -80,10 +80,10 @@ def test_money_serializes_as_a_fixed_string():
 
 
 @pytest.mark.parametrize(
-    "raw", ["0771234567", "771234567", "+94771234567", "077 123 4567", "077-123-4567"]
+    "raw", ["0781234567", "781234567", "+94781234567", "078 123 4567", "078-123-4567"]
 )
 def test_msisdn_forms_all_normalise_to_one_value(raw):
-    assert normalise_msisdn(raw) == "+94771234567"
+    assert normalise_msisdn(raw) == "+94781234567"
 
 
 @pytest.mark.parametrize("raw", ["", "12345", "0881234567", "+1771234567", "abc"])
@@ -94,17 +94,17 @@ def test_invalid_msisdns_are_rejected(raw):
 
 
 def test_subscriber_ref_is_stable_pseudonymous_and_key_dependent():
-    same = subscriber_ref("0771234567", key=b"k1") == subscriber_ref("+94771234567", key=b"k1")
-    different_key = subscriber_ref("0771234567", key=b"k2")
+    same = subscriber_ref("0781234567", key=b"k1") == subscriber_ref("+94781234567", key=b"k1")
+    different_key = subscriber_ref("0781234567", key=b"k2")
 
     assert same, "every form of a number maps to one ref"
-    assert subscriber_ref("0771234567", key=b"k1") != different_key
-    ref = subscriber_ref("0771234567", key=b"k1")
-    assert "771234567" not in ref, "the ref must not leak the number"
+    assert subscriber_ref("0781234567", key=b"k1") != different_key
+    ref = subscriber_ref("0781234567", key=b"k1")
+    assert "781234567" not in ref, "the ref must not leak the number"
 
 
 def test_masked_msisdn_hides_the_middle():
-    masked = mask_msisdn("+94771234567")
+    masked = mask_msisdn("+94781234567")
 
     assert masked == "07X XXX 4567"
     assert "1234" not in masked

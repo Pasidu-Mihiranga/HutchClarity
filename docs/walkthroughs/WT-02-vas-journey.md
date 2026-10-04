@@ -43,7 +43,7 @@ Open the customer app at <http://localhost:3000>. FE01 retired the static UI
 the API used to serve, so `make dev` on its own gives you the API and no
 pages.
 
-Demo subscriber (synthetic): MSISDN `0771234567` (Dilani) / VAS silent renewal.
+Demo subscriber (synthetic): MSISDN `0781234567` (Dilani) / VAS silent renewal.
 
 ## 3. Steps
 

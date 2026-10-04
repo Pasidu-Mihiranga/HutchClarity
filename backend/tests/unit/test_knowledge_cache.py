@@ -99,13 +99,13 @@ def test_the_cache_stores_no_customer_text(service) -> None:
     I13: nothing recoverable as what somebody typed is stored.
     """
     key = CacheKey.for_query(
-        "my number is 0771234567 and my speed is slow",
+        "my number is 0781234567 and my speed is slow",
         language=Language.EN,
         audience=Audience.CUSTOMER,
         corpus_version="v1",
     )
 
-    assert "0771234567" not in key.terms_hash
+    assert "0781234567" not in key.terms_hash
     assert "speed" not in key.terms_hash
     assert key.terms_hash.startswith("sha256:")
 

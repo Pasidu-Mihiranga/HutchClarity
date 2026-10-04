@@ -46,8 +46,8 @@ ISSUER = "https://issuer.test/realms/clarity"
 RESOURCE = "https://mcp.clarity.test/mcp"
 AUDIENCE = "clarity-api"
 
-DILANI = "+94771234567"
-PRIYA = "+94774445555"
+DILANI = "+94781234567"
+PRIYA = "+94784445555"
 
 
 class _TestIdentityProvider:
@@ -454,10 +454,10 @@ async def test_a_search_query_is_masked_before_it_is_returned_or_audited(
     token = idp.token(scopes=(CUSTOMER_SCOPE,), case_id=case_id)
 
     async with _Connection(app, token) as session:
-        answer = await session.call_tool("search_knowledge", {"query": "VAS charge on 0771234567"})
+        answer = await session.call_tool("search_knowledge", {"query": "VAS charge on 0781234567"})
 
-    assert "0771234567" not in str(answer.content)
-    assert "0771234567" not in str(answer.structured_content)
+    assert "0781234567" not in str(answer.content)
+    assert "0781234567" not in str(answer.structured_content)
 
 
 @pytest.mark.asyncio

@@ -39,10 +39,10 @@ from clarity.modules.receipts.signing import DevSigningService  # noqa: E402
 from clarity.modules.timeline.builder import TimelineBuilder, TimelineRequest  # noqa: E402
 
 JOURNEYS = [
-    ("1. VAS charged with no consent", "+94771234567", "Dilani · Sinhala · app"),
-    ("2. Reload taken twice", "+94772223333", "Nimal · English · no contact"),
-    ("3. 'Unlimited' hit a fair-use cap", "+94773334444", "Kumar · Tamil · WhatsApp"),
-    ("4. Large reload not credited", "+94774445555", "Priya · English · recent SIM swap"),
+    ("1. VAS charged with no consent", "+94781234567", "Dilani · Sinhala · app"),
+    ("2. Reload taken twice", "+94782223333", "Nimal · English · no contact"),
+    ("3. 'Unlimited' hit a fair-use cap", "+94783334444", "Kumar · Tamil · WhatsApp"),
+    ("4. Large reload not credited", "+94784445555", "Priya · English · recent SIM swap"),
 ]
 
 OUTCOME_NOTE = {

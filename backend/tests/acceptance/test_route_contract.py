@@ -106,7 +106,7 @@ SYNTHETIC_ONLY = {
 BODIES: dict[str, dict[str, object]] = {
     "/v1/me/reload": {"amount_lkr": "100"},
     "/v1/me/safeguards": {"kind": "spend_cap", "value": "100"},
-    "/v1/me/family": {"msisdn": "+94771234567"},
+    "/v1/me/family": {"msisdn": "+94781234567"},
     "/v1/me/preferences": {"language": "en"},
     "/v1/conversation/turn": {"text": "why was I charged"},
 }
@@ -132,8 +132,8 @@ def _call(client: TestClient, method: str, path: str) -> int:
     concrete = re.sub(r"\{[^}]+\}", "X", path)
     if path == "/v1/demo/inbox":
         # The inbox holds a code only after one was requested.
-        client.post("/v1/auth/otp/request", json={"msisdn": "+94771234567"})
-        concrete += "?msisdn=%2B94771234567"
+        client.post("/v1/auth/otp/request", json={"msisdn": "+94781234567"})
+        concrete += "?msisdn=%2B94781234567"
     if method == "GET":
         return client.get(concrete).status_code
     return client.request(method, concrete, json=BODIES.get(path, {})).status_code

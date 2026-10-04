@@ -101,7 +101,7 @@ _MSISDN_RE = re.compile(r"^(?:\+?94|0)?(7\d{8})$")
 def normalise_msisdn(raw: str) -> str:
     """Normalise a Sri Lankan mobile number to E.164 (``+947XXXXXXXX``).
 
-    Accepts ``0771234567``, ``771234567``, ``+94771234567`` and spaced or
+    Accepts ``0781234567``, ``781234567``, ``+94781234567`` and spaced or
     hyphenated variants. Raises ``ValueError`` for anything else, so a bad
     identifier is caught at the edge rather than producing a wrong timeline.
     """
@@ -123,7 +123,7 @@ def subscriber_ref(msisdn: str, *, key: bytes) -> str:
 
 
 def mask_msisdn(msisdn: str) -> str:
-    """Mask for display and receipts: ``+94771234567`` -> ``07X XXX 4567``."""
+    """Mask for display and receipts: ``+94781234567`` -> ``07X XXX 4567``."""
     national = "0" + normalise_msisdn(msisdn)[3:]
     return f"{national[:2]}X XXX {national[-4:]}"
 

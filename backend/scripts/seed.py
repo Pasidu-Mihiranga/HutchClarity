@@ -37,7 +37,7 @@ def main() -> None:
     create_schema()
     world = build_demo_world(now=DEMO_NOW, persist=False)
     generate_volume_customers(world, count=40)
-    dilani_ref = ref_for("+94771234567")
+    dilani_ref = ref_for("+94781234567")
     with session_scope() as session:
         save_world(session, world)
         save_network(

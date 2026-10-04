@@ -462,7 +462,7 @@ def _journey_mixed_dilani(world: SyntheticWorld) -> Account:
     otp_at = now - timedelta(days=20)
     account = world.add_account(
         Account(
-            msisdn="+94771234567",
+            msisdn="+94781234567",
             name="Dilani Perera",
             balance_lkr=money("451.00"),
             language=Language.SI,
@@ -523,7 +523,7 @@ def _journey_mixed_dilani(world: SyntheticWorld) -> Account:
                     active=False,
                 ),
             ],
-            family=["+94772223333"],
+            family=["+94782223333"],
         )
     )
 
@@ -729,7 +729,7 @@ def _journey_nimal_thin(world: SyntheticWorld) -> Account:
     second = now - timedelta(minutes=11)
     account = world.add_account(
         Account(
-            msisdn="+94772223333",
+            msisdn="+94782223333",
             name="Nimal Fernando",
             balance_lkr=money("3500.00"),
             language=Language.EN,
@@ -767,7 +767,7 @@ def _journey_kavitha_thin(world: SyntheticWorld) -> Account:
     now = world.now
     account = world.add_account(
         Account(
-            msisdn="+94773334444",
+            msisdn="+94783334444",
             name="Kavitha Selvan",
             balance_lkr=money("120.00"),
             language=Language.TA,
@@ -824,7 +824,7 @@ def _journey_priya_thin(world: SyntheticWorld) -> Account:
     captured_at = now - timedelta(hours=3)
     account = world.add_account(
         Account(
-            msisdn="+94774445555",
+            msisdn="+94784445555",
             name="Priya Jayawardena",
             balance_lkr=money("15.00"),
             language=Language.EN,

@@ -21,7 +21,7 @@ import { expect, type Page, type APIRequestContext } from "@playwright/test";
  * sign in, and the rest spend their budget on what they are actually for.
  */
 
-export const DILANI = "+94771234567";
+export const DILANI = "+94781234567";
 
 const API = process.env.E2E_API_BASE ?? "http://127.0.0.1:8100";
 
@@ -89,9 +89,9 @@ export const CONSOLE = process.env.E2E_CONSOLE_BASE ?? "http://127.0.0.1:3101";
 export const VERIFY = process.env.E2E_VERIFY_BASE ?? "http://127.0.0.1:3102";
 
 /** The other synthetic subscribers, by the outcome their case reaches. */
-export const NIMAL = "+94772223333"; // duplicate reload -> AUTO_FIX
-export const KUMAR = "+94773334444"; // disclosed fair-use cap -> EXPLAIN_ONLY
-export const PRIYA = "+94774445555"; // LKR 12,000 reload, SIM swap -> STAFF_APPROVAL
+export const NIMAL = "+94782223333"; // duplicate reload -> AUTO_FIX
+export const KUMAR = "+94783334444"; // disclosed fair-use cap -> EXPLAIN_ONLY
+export const PRIYA = "+94784445555"; // LKR 12,000 reload, SIM swap -> STAFF_APPROVAL
 
 /**
  * A staff token, minted through the development role picker's own endpoint.

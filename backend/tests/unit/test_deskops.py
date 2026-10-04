@@ -605,7 +605,7 @@ def real_desk():
         with contextlib.suppress(Exception):
             clarity.cases.propose(case.case_id, created_by=MAKER)
         cases[outcome] = case.case_id
-    return clarity, ref_for("+94771234567"), cases
+    return clarity, ref_for("+94781234567"), cases
 
 
 def test_a_real_bulk_fix_by_its_maker_alone_moves_no_money():

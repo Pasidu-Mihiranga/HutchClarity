@@ -19,8 +19,8 @@ from clarity.interfaces.mcp.server import ClarityMCPServer, Principal, Profile, 
 from clarity.kernel.common import ActionSafetyLevel, Channel
 from clarity.modules.resolution.public import ResolutionService
 
-DILANI = "+94771234567"
-PRIYA = "+94774445555"
+DILANI = "+94781234567"
+PRIYA = "+94784445555"
 
 
 @pytest.fixture
@@ -247,7 +247,7 @@ def test_proposing_an_action_the_decision_forbids_is_refused(
     server: ClarityMCPServer, clarity: Clarity
 ):
     """Kumar's case is explain-only, so no action is available at all."""
-    case_id = open_and_evaluate(clarity, "+94773334444")
+    case_id = open_and_evaluate(clarity, "+94783334444")
 
     with pytest.raises(ToolDenied) as error:
         server.call(

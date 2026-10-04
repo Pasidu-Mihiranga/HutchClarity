@@ -260,7 +260,7 @@ def test_two_replicas_executing_one_plan_execute_it_once(store: PostgresStore) -
     from clarity.platform.persistence.postgres import PostgresAutocommitRepository
 
     world = build_demo_world()
-    subscriber = ref_for("+94771234567")
+    subscriber = ref_for("+94781234567")
     tools = ToolLayer(
         MockCommandAdapter(world),
         plans=StoredPlanRepository(PostgresAutocommitRepository(store, PLANS)),

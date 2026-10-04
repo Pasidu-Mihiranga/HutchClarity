@@ -407,7 +407,7 @@ def test_the_real_event_log_rebuilds_to_the_same_dashboards():
     from clarity.platform.messaging.outbox import outbox_in
 
     clarity = Clarity(world=build_demo_world())
-    subscriber = ref_for("+94771234567")
+    subscriber = ref_for("+94781234567")
     for _ in range(3):
         case = clarity.cases.open_case(
             subscriber_ref=subscriber,

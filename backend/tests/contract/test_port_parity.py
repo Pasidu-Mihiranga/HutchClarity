@@ -47,7 +47,7 @@ from clarity.modules.receipts.openbao import OpenBaoSigningService
 from clarity.modules.receipts.recurrence import RecurrenceProbe, run_check
 from clarity.modules.receipts.signing import DevSigningService, SigningService, verify_signature
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 
 
 # --------------------------------------------------------------------------- #

@@ -30,7 +30,7 @@ from clarity.modules.actions.results import ConfirmedBy
 from ..acceptance.conftest import NIMAL, bearer, customer_token
 from ..support.repositories import confirmations
 
-DILANI = "+94771234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
+DILANI = "+94781234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
 
 
 @pytest.fixture

@@ -51,9 +51,9 @@ def a_decision(**overrides) -> Decision:
 @pytest.mark.parametrize(
     "text",
     [
-        "call me on 0771234567",
-        "my number is +94 77 123 4567",
-        "077-123-4567 was charged",
+        "call me on 0781234567",
+        "my number is +94 78 123 4567",
+        "078-123-4567 was charged",
     ],
 )
 def test_phone_numbers_are_detected_in_any_format(text):
@@ -74,25 +74,25 @@ def test_a_long_number_that_is_not_a_nic_is_not_called_one():
 
 def test_masking_replaces_personal_data_and_keeps_the_rest():
     masker = Masker()
-    original = "I am Nimal, 0771234567, NIC 951234567V - LKR 49.00 was taken"
+    original = "I am Nimal, 0781234567, NIC 951234567V - LKR 49.00 was taken"
 
     masked = masker.mask(original)
 
-    assert "0771234567" not in masked.text
+    assert "0781234567" not in masked.text
     assert "951234567V" not in masked.text
     assert "LKR 49.00" in masked.text, "the facts must survive masking"
 
 
 def test_the_same_value_always_gets_the_same_token():
     """So a model can refer to one number consistently across a message."""
-    masked = Masker().mask("0771234567 called 0771234567 again")
+    masked = Masker().mask("0781234567 called 0781234567 again")
 
     assert masked.text.count("<PHONE_1>") == 2
 
 
 def test_masking_is_reversible_inside_the_boundary():
     masker = Masker()
-    original = "my number 0771234567 and email a@b.lk"
+    original = "my number 0781234567 and email a@b.lk"
 
     assert masker.restore(masker.mask(original).text) == original
 
@@ -116,7 +116,7 @@ def test_a_refused_message_stores_nothing():
     masker = Masker()
 
     with pytest.raises(ForbiddenContent):
-        masker.mask("my pin 4821 and number 0771234567")
+        masker.mask("my pin 4821 and number 0781234567")
 
     assert len(masker.vault) == 0, "nothing from a refused message may be kept"
 
@@ -134,15 +134,15 @@ def test_a_random_long_number_is_not_treated_as_a_card():
 def test_vault_entries_expire():
     vault = TokenVault(ttl=timedelta(minutes=30))
     now = utc_now()
-    vault.store("<PHONE_1>", "0771234567", PiiKind.PHONE, now=now)
+    vault.store("<PHONE_1>", "0781234567", PiiKind.PHONE, now=now)
 
-    assert vault.resolve("<PHONE_1>", now=now) == "0771234567"
+    assert vault.resolve("<PHONE_1>", now=now) == "0781234567"
     assert vault.resolve("<PHONE_1>", now=now + timedelta(minutes=31)) is None
 
 
 def test_vault_restores_are_counted_for_audit():
     masker = Masker()
-    masked = masker.mask("0771234567")
+    masked = masker.mask("0781234567")
 
     masker.restore(masked.text)
 
@@ -191,7 +191,7 @@ def test_a_promise_beyond_the_decision_is_blocked(facts):
 
 
 def test_personal_data_in_the_reply_is_blocked(facts):
-    result = OutputVerifier().verify("Call 0771234567 about your refund.", facts)
+    result = OutputVerifier().verify("Call 0781234567 about your refund.", facts)
 
     assert any(i.code == "PII_IN_OUTPUT" for i in result.issues)
 
@@ -352,11 +352,11 @@ def test_customer_text_is_masked_before_it_reaches_a_provider():
     gateway.explain(
         a_decision(),
         rule_id="VAS_NO_CONSENT",
-        customer_text="I am on 0771234567 and LKR 49 went missing",
+        customer_text="I am on 0781234567 and LKR 49 went missing",
     )
 
     assert seen, "the provider should have been called"
-    assert "0771234567" not in seen[0], "a raw number must never reach a model"
+    assert "0781234567" not in seen[0], "a raw number must never reach a model"
 
 
 def test_a_message_containing_an_otp_is_dropped_not_forwarded():
