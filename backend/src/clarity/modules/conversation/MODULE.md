@@ -12,7 +12,7 @@
 ## 1. Purpose
 Customer chat for the immersive "Clarity chat". Two paths:
 
-- **Stateless** (`handle_turn`): one message in, one answer out. Keeps nothing. Used where there is no case to attach a conversation to.
+- **Stateless** (`handle_turn`): one message in, one answer out. Keeps nothing. Used where there is no case to attach a conversation to, which makes it the anonymous surface. It applies the same cheap refusals, forbidden-content refusal, injection guard and reply verifier as the stateful path, from the same definitions (A3); the shared pieces live in `service.py` because `orchestrator.py` imports from it and the dependency cannot run the other way. It does **not** mask: `Masker` holds a token vault and belongs to the orchestrator, which has somewhere to put what it learns, and nothing on this path is stored.
 - **Stateful** (`ConversationOrchestrator`): the turn pipeline of plan 22 section 4, with conversation state per case. Guards the input, masks personal data, classifies intent with deterministic keyword rules, checks for handoff on every turn, steps the flow, composes from an approved template, verifies the result against FACTS, and records the turn.
 
 No language model decides anything here. Intake is keyword rules; composition is templates. The `extract` and `fast-text` roles are optional assists behind the AI gateway (plan 19 section 4), and the `guard` role can only ever add a refusal.
@@ -114,6 +114,8 @@ conversation completes, and the codes are in the turn audit under
 - A tool result is untrusted data: delimited, labelled and length-capped before
   it reaches the next prompt. It is never read as an instruction.
 - A reply only ever quotes a figure from FACTS. `compose_reply` used to fall back to the amount in the customer's own text, which read as agreement to a number nothing decided.
+- **FACTS never contain anything the caller sent.** Both turn routes filter the request body through `_client_context` (product, chat intent, safeguard: UI selections, not money) and take every other value from the case record. The stateless route passed the body straight through until A3, and with no case there is no decision, so on that path no amount may be quoted at all.
+- **The input checks apply to both paths, from one definition.** The stateless path is the anonymous one, so it is the last place that should have been the lenient one; it was, until A3.
 
 ## 7. Migration status (enterprise-plan 21)
 Keyword rules in code, with the `extract` role wired as an optional assist (C04). Target: intents and phrases as versioned content under the policy lifecycle (plan 20), which is the same gap the flows have.
@@ -156,3 +158,4 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C02-flow-registry.md` | Flow DSL as policy content, the seven flows, the router, and the tool allowlist |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C03-bounded-agent-step.md` | Bounded agent step: planner validation, argument allowlist, per-turn limits and the deterministic fallback |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C04-intake-singlish.md` | Ordered intake rules, Singlish detection and vocabulary, the `extract` seam, and a held-out set |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-W0-A1-receipt-otp-and-reply-honesty.md` | A3: the stateless path gains the cheap refusals, forbidden-content refusal, injection guard and reply verifier; the shared pieces move into `service.py` and client facts are filtered on both routes |

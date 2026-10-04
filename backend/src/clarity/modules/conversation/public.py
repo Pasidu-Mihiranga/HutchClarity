@@ -43,8 +43,6 @@ from clarity.modules.conversation.intake import (
 )
 from clarity.modules.conversation.intents import Intent, Route
 from clarity.modules.conversation.orchestrator import (
-    MAX_MESSAGE_CHARS,
-    REFUSALS,
     ConversationOrchestrator,
     FlowEngine,
     FlowOutcome,
@@ -58,6 +56,8 @@ from clarity.modules.conversation.router import (
     ToolNotAllowed,
 )
 from clarity.modules.conversation.service import (
+    MAX_MESSAGE_CHARS,
+    REFUSALS,
     extract_intake,
     handle_turn,
     suggest_for_snapshot,

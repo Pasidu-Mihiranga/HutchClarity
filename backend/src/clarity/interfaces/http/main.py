@@ -2209,7 +2209,13 @@ def _register_routes(app: FastAPI) -> None:
             result = handle_turn(
                 text,
                 case_id=None,
-                facts=facts,
+                # The same filter as the stateful branch above (A3). This used
+                # to pass the body's `facts` straight through, and
+                # `compose_reply` quotes `amount_lkr` for two intents, so an
+                # anonymous caller could post a figure and have Clarity read it
+                # back as though it had found it. There is no case here, so
+                # there is no amount anything decided, and none may be quoted.
+                facts=_client_context(facts),
                 language_hint=body.get("language"),
                 intent_override=body.get("intent"),
             )
