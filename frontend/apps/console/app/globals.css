@@ -14,13 +14,13 @@ body {
 }
 
 body {
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, system-ui, sans-serif;
 }
 
 h1,
 h2,
 .font-display {
-  font-family: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  font-family: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
 }
 
 ::selection {

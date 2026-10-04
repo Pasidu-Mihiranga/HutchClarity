@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+// Self-hosted (OFL-1.1): no font download at build time or at runtime, which
+// keeps the build offline-safe and the page inside `font-src 'self'`.
+import "@fontsource-variable/inter";
+import "@fontsource-variable/space-grotesk";
 import { ConsoleNav } from "@/components/ConsoleNav";
 import { RoleSwitcherBar } from "@/components/RoleSwitcherBar";
 import { StaffSessionProvider } from "@/components/StaffSessionProvider";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const display = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
-});
 
 export const metadata: Metadata = {
   title: "Clarity Desk",
@@ -23,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${display.variable}`}>
-      <body className={inter.className}>
+    <html lang="en">
+      <body>
         <StaffSessionProvider>
           <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
             <ConsoleNav />
