@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** DRAFT, not approved. **Created:** 2026-10-04. **Revision:** 2.
+> **Status:** In progress. Phase 0 (first two ADRs) and Phase 1 W0 and W1 landed 2026-10-04. **Created:** 2026-10-04. **Revision:** 3.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -22,7 +22,7 @@
 | Piece | What it does |
 |---|---|
 | `platform/audit/ledger.py` | Append-only, hash-chained. `verify()` recomputes the chain; `proves(record, payload)` lets an auditor match a document without the ledger holding it. Stores payload **hashes**, never payloads. 13 event types. |
-| Writers | Conversation, governance, knowledge citations, policy resolver, kill switches, MCP server, channel webhooks and the container already append records. |
+| Writers | **Corrected in revision 3.** Only three of the 13 event types were ever appended: conversation turns, rule publications and kill-switch overrides. The MCP server kept calls in its own list, not the ledger. Decisions, executions and receipts were published on the bus and never audited. W1 closed this (section 7). |
 | `platform/persistence` (B05) | The `full` profile persists `case.records`, `actions.plans`, `actions.attempts`, `actions.confirmations`, `receipts.chain`, `platform.outbox`, `iam.sessions`, `reconciliation.*` and more, one PostgreSQL schema and role per module, with row-level security. |
 | Receipts | Ed25519-signed, hash-chained, publicly verifiable at `/r/{id}`; public keys at `/.well-known/clarity-keys.json`. |
 | `modules/reconciliation` | T+1 match against adapter confirmations; publishes `reconciliation.mismatch`. |
@@ -300,8 +300,8 @@ Updated as work proceeds. Checkbox states are the source of truth.
 
 ### Phase 0: Decide and record (no code)
 
-- [ ] ADR: audit record hash version 2 covers the whole record
-- [ ] ADR: one trail through the outbox; state changes fail closed without an audit record
+- [x] ADR: audit record hash version 2 covers the whole record ([ADR-0033](adr/0033-audit-record-hash-covers-the-whole-record.md))
+- [x] ADR: one trail through the outbox; state changes fail closed without an audit record ([ADR-0034](adr/0034-one-persisted-audit-trail.md))
 - [ ] ADR: signed checkpoints with a dedicated key; anchoring by cross-anchor and witness, no WORM storage
 - [ ] ADR: audit access as time-boxed grants under separation of duties
 - [ ] ADR: retention, archival, legal hold and erasure for the audit trail
@@ -312,10 +312,11 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 1: Integrity foundation
 
-- [ ] **W0** Hash version 2 over the whole record; `detail_hash`; `actor_kind`, `session_ref`, `occurred_at`, `recorded_at`
-- [ ] **W1** Persist the trail: `platform.audit` and `platform.audit_checkpoints` collections; writer role INSERT and SELECT only; a repository port with a parity suite (`lite` and `full`)
-- [ ] **W1** Audit writer consuming `audit.recorded` from the outbox; one chain across the API, MCP server, channel gateway and workers
-- [ ] **W1** Startup verification; refuse state changes on a broken chain; audited break-glass
+- [x] **W0** Hash version 2 over the whole record; `detail_hash`; `actor_kind`, `session_ref`, `occurred_at`, `recorded_at`
+- [x] **W1** Persist the trail: `platform.audit` and `platform.audit_head` collections through the existing persistence port, ordered insert-only append (checkpoints move to Phase 2)
+- [ ] **W1** Database-level append-only: revoke UPDATE and DELETE on `platform.audit` from the writing role. Blocked on an insert-only write path: the generic row store writes with `INSERT ... ON CONFLICT DO UPDATE`, which needs UPDATE. Not verifiable in the container this was built in (no PostgreSQL)
+- [x] **W1** Audit writer: an `audit` consumer group on every domain event type, deduplicated; the MCP server writes to the shared trail
+- [x] **W1** Startup verification; a broken chain stops the process; `CLARITY_AUDIT_BREAK_GLASS` starts it and is recorded; a demo reset carries the trail and records itself
 - [ ] **W2** Identity and access events (section 5.5)
 - [ ] **W2** Coverage contract test over every state-changing route and MCP tool
 
@@ -422,4 +423,4 @@ The second is **G2**. The trail is lost on every restart and split across proces
 
 Everything after Phase 2 is larger in volume than in difficulty, and every part of it runs without new infrastructure.
 
-**Work in progress note.** Uncommitted edits adding `AuditRecordRow` and `AuditCheckpointRow` to the mock store appeared in the working tree on 2026-10-04 without being written in the session that produced this plan. They persist the **version 1** chain hash, so committing them as they stand would store G1 permanently. They should be reviewed against W0 and W1 before any use.
+**Work in progress note.** Uncommitted edits adding `AuditRecordRow` and `AuditCheckpointRow` to the mock store appeared in the working tree on 2026-10-04 without being written in the session that produced this plan. They persisted the **version 1** chain hash. They were set aside with `git stash` (message "unexplained audit rows (v1 hash)") rather than deleted, and W1 was built on the persistence port instead, so the trail works in both profiles rather than only the mock store. Nothing in them is used.

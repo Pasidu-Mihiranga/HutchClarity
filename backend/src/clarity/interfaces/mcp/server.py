@@ -43,6 +43,7 @@ from clarity.kernel.common import ActionSafetyLevel, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady
+from clarity.platform.audit.ledger import ActorKind, AuditEventType, AuditLedger
 
 
 def _words(text: str) -> list[str]:
@@ -104,11 +105,16 @@ class MCPInvocation:
 class ClarityMCPServer:
     """Tool registry, policy and audit over the case service."""
 
-    def __init__(self, cases: MCPCaseView) -> None:
+    def __init__(self, cases: MCPCaseView, *, ledger: AuditLedger | None = None) -> None:
         # Deliberately typed as the narrow view, not CaseService: this object
         # has no execute, confirm, approve or auto-fix method to call.
         self._cases = cases
+        #: This process's own view of calls, kept for the denial-spike check.
+        #: It is not the audit trail: ``ledger`` is (ADR-0034). Before W1 this
+        #: list was the only record of an MCP call, and it lived and died with
+        #: the MCP process where no dashboard could see it.
         self.audit: list[MCPInvocation] = []
+        self._ledger = ledger
         self._tools: dict[str, ToolSpec] = {}
         self._register_tools()
 
@@ -315,19 +321,37 @@ class ClarityMCPServer:
         decision: str,
         error_code: str | None = None,
     ) -> None:
-        self.audit.append(
-            MCPInvocation(
-                invocation_id=new_id("MCP"),
-                tool=tool,
-                level=spec.level if spec else ActionSafetyLevel.L1_READ,
-                principal_ref=principal.ref,
-                profile=principal.profile,
-                case_id=args.get("case_id"),
-                args_hash=hash_payload(args),
-                decision=decision,
-                error_code=error_code,
-            )
+        invocation = MCPInvocation(
+            invocation_id=new_id("MCP"),
+            tool=tool,
+            level=spec.level if spec else ActionSafetyLevel.L1_READ,
+            principal_ref=principal.ref,
+            profile=principal.profile,
+            case_id=args.get("case_id"),
+            args_hash=hash_payload(args),
+            decision=decision,
+            error_code=error_code,
         )
+        self.audit.append(invocation)
+        if self._ledger is not None:
+            # Arguments are hashed, never stored: an MCP client may put a
+            # customer's words in them (I13).
+            self._ledger.append(
+                AuditEventType.MCP_INVOKED,
+                actor_ref=principal.ref,
+                actor_kind=ActorKind.AGENT,
+                object_ref=tool,
+                payload={"invocation_id": invocation.invocation_id, "args": args},
+                case_id=invocation.case_id,
+                detail={
+                    "invocation_id": invocation.invocation_id,
+                    "level": str(invocation.level),
+                    "profile": str(invocation.profile),
+                    "decision": decision,
+                    "error_code": error_code,
+                    "args_hash": invocation.args_hash,
+                },
+            )
 
     @property
     def denials(self) -> list[MCPInvocation]:

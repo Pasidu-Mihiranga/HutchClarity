@@ -116,7 +116,11 @@ from clarity.modules.receipts.public import (
 from clarity.modules.reconciliation.public import ReconciliationService
 from clarity.modules.resolution.public import ResolutionService
 from clarity.modules.timeline.public import TimelineBuilder
-from clarity.platform.audit.ledger import AuditLedger
+from clarity.platform.audit.ledger import (
+    ActorKind,
+    AuditEventType,
+    AuditLedger,
+)
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard
 from clarity.platform.messaging.consumers import CollectingAlertHook, ConsumerRegistry
@@ -500,6 +504,31 @@ def _persistence_for_profile(profile: Profile, settings: Settings) -> _Persisten
     )
 
 
+class AuditChainBroken(RuntimeError):
+    """The audit trail failed verification when this process opened it.
+
+    Raised instead of serving: a process that cannot vouch for its own trail
+    must not add to it (ADR-0034). ``CLARITY_AUDIT_BREAK_GLASS`` starts it
+    anyway for an incident, and that start is recorded.
+    """
+
+
+#: Domain events that have an audit type of their own. Every other event is
+#: recorded as ``event.published`` with its type as the object, so nothing
+#: that crosses the bus goes unrecorded (audit assurance plan, W1).
+AUDIT_TYPE_FOR_EVENT: dict[EventType, AuditEventType] = {
+    EventType.CAUSE_DETECTED: AuditEventType.CAUSE_ASSESSED,
+    EventType.DECISION_GENERATED: AuditEventType.DECISION_MADE,
+    EventType.ACTION_COMPLETED: AuditEventType.ACTION_EXECUTED,
+    EventType.RECEIPT_ISSUED: AuditEventType.RECEIPT_ISSUED,
+    EventType.MCP_INVOKED: AuditEventType.MCP_INVOKED,
+    EventType.RULE_PUBLISHED: AuditEventType.RULE_PUBLISHED,
+}
+
+#: Keys in an event's data that name the object it is about, most specific first.
+_OBJECT_KEYS = ("receipt_id", "plan_id", "decision_id", "action_id", "case_id", "rule_id")
+
+
 class Clarity:
     """The assembled application."""
 
@@ -519,6 +548,7 @@ class Clarity:
         tokens: TokenIssuer | None = None,
         otp: OtpService | None = None,
         settings: Settings | None = None,
+        audit: AuditLedger | None = None,
     ) -> None:
         # The only place this process reads its environment (B07, I20). Tests
         # pass a Settings instance instead of setting variables.
@@ -565,7 +595,16 @@ class Clarity:
             open_unit=self.open_unit,
             budget=RefundBudget(daily_limit_lkr=daily_refund_limit_lkr),
         )
-        self.audit = AuditLedger()
+        # One trail for every process (ADR-0034): the ledger writes through
+        # the same persistence driver as everything else, so in `full` the
+        # API, the MCP server and the workers append to one PostgreSQL chain.
+        # A reset carries it across, like identity: the audit trail is not
+        # demo data either.
+        self.audit = audit or AuditLedger(
+            self.open_unit,
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        self._open_audit_trail()
         # Identity is not demo data: a reset of the synthetic world must not
         # sign everyone out mid-demonstration, so these carry over.
         self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
@@ -719,6 +758,12 @@ class Clarity:
             group="proactive-cases",
             handler=self._open_zero_contact_case,
         )
+        # The audit writer (ADR-0034). It consumes every event type, so a
+        # decision, an execution or a receipt reaches the trail from the
+        # outbox row that was committed with it (I7). The consumer framework's
+        # deduplication makes a redelivered event one record, not two.
+        for event_type in EventType:
+            self.consumers.register(event_type, group="audit", handler=self._audit_event)
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
@@ -839,6 +884,68 @@ class Clarity:
         if payload.corpus_version:
             self.answers.on_knowledge_published(payload.corpus_version)
 
+    def _open_audit_trail(self) -> None:
+        """Verify the trail before serving, and record that this process opened it.
+
+        A broken chain stops the process unless break-glass is set (ADR-0034).
+        Signed checkpoints, which also catch a rewound head, come in Phase 2 of
+        the audit assurance plan.
+        """
+        result = self.audit.verify()
+        break_glass = self.settings.audit_break_glass
+        if not result.intact and not break_glass:
+            raise AuditChainBroken(
+                f"audit trail broken at seq {result.broken_at}: {result.reason}. "
+                "Investigate before serving; CLARITY_AUDIT_BREAK_GLASS=true starts "
+                "anyway and is recorded."
+            )
+        self.audit.append(
+            AuditEventType.LEDGER_OPENED,
+            actor_ref=f"process:{self.profile.value}",
+            object_ref="audit-trail",
+            payload={"intact": result.intact, "length": result.length},
+            detail={
+                "intact": result.intact,
+                "length": result.length,
+                "broken_at": result.broken_at,
+                "reason": result.reason,
+                "break_glass": break_glass and not result.intact,
+            },
+        )
+
+    def _audit_event(self, event: Event) -> None:
+        """Record one domain event in the trail (ADR-0034).
+
+        The payload is hashed, never stored. The detail holds only what an
+        investigator filters on: the event's type, id, source and correlation.
+        ``subject`` is a ``subscriber_ref`` pseudonym, never an MSISDN (I13).
+        """
+        data = event.data
+        object_ref = next(
+            (str(data[key]) for key in _OBJECT_KEYS if data.get(key)),
+            event.id,
+        )
+        audit_type = AUDIT_TYPE_FOR_EVENT.get(event.type, AuditEventType.EVENT_PUBLISHED)
+        self.audit.append(
+            audit_type,
+            actor_ref=event.source,
+            actor_kind=ActorKind.SYSTEM,
+            object_ref=(
+                str(event.type) if audit_type is AuditEventType.EVENT_PUBLISHED else object_ref
+            ),
+            payload={"id": event.id, "type": str(event.type), "data": data},
+            case_id=str(data["case_id"]) if data.get("case_id") else None,
+            detail={
+                "event_type": str(event.type),
+                "event_id": event.id,
+                "source": event.source,
+                "subject": event.subject,
+                "correlation_id": event.correlation_id,
+                "object": object_ref,
+            },
+            now=event.time,
+        )
+
     def _open_zero_contact_case(self, event: Event) -> None:
         payload = event.payload()
         if not isinstance(payload, RiskDetectedV1) or payload.risk_type != "duplicate_reload":
@@ -925,8 +1032,16 @@ class Clarity:
         """Build a fresh instance with the same configuration.
 
         The demo mutates balances and subscriptions, so a reset gives a clean
-        synthetic world without restarting the process.
+        synthetic world without restarting the process. The audit trail is
+        carried across and the reset itself is recorded: a reset that erased
+        the trail would be the easiest way to hide anything.
         """
+        self.audit.append(
+            AuditEventType.DEMO_RESET,
+            actor_ref=f"process:{self.profile.value}",
+            object_ref="synthetic-world",
+            payload={"profile": self.profile.value},
+        )
         if self.profile is Profile.FULL:
             from clarity.integration.drivers.mock.store import reset_engine
 
@@ -962,6 +1077,7 @@ class Clarity:
                 profile=self.profile,
                 tokens=self.tokens,
                 otp=self.otp,
+                audit=self.audit,
             )
         return Clarity(
             rules_dir=self._rules_dir,
@@ -975,4 +1091,5 @@ class Clarity:
             profile=self.profile,
             tokens=self.tokens,
             otp=self.otp,
+            audit=self.audit,
         )

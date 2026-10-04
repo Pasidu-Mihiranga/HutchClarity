@@ -22,7 +22,7 @@ def create_app() -> object:
     hosts = [host.strip() for host in settings.mcp_allowed_hosts.split(",") if host.strip()]
     issuer = settings.keycloak_issuer or settings.mcp_resource_url
     return build_mcp_app(
-        ClarityMCPServer(clarity.mcp_view),
+        ClarityMCPServer(clarity.mcp_view, ledger=clarity.audit),
         clarity.token_verifier,
         issuer_url=issuer,
         resource_url=settings.mcp_resource_url,

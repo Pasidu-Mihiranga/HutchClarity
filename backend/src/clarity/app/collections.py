@@ -31,6 +31,7 @@ from clarity.modules.receipts.public import (
     SUPERSEDED,
 )
 from clarity.modules.reconciliation.public import EXPECTED_ACTIONS, MISMATCHES
+from clarity.platform.audit.ledger import AUDIT, AUDIT_HEAD
 from clarity.platform.messaging.consumers import ATTEMPTS as CONSUMER_ATTEMPTS
 from clarity.platform.messaging.consumers import DEAD_LETTERS, PROCESSED
 from clarity.platform.messaging.outbox import OUTBOX
@@ -83,6 +84,10 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     PROCESSED,
     CONSUMER_ATTEMPTS,
     DEAD_LETTERS,
+    # platform: the audit trail and its head pointer (ADR-0034). Not customer
+    # scoped: the trail is cross-cutting, and read through AUDIT_READ instead.
+    AUDIT,
+    AUDIT_HEAD,
 )
 
 __all__ = ["ALL_COLLECTIONS"]

@@ -4,6 +4,39 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (audit assurance W0, ADR-0033)
+
+- **`AuditRecord` hash version 2.** `chain_hash` now covers every field of the
+  record, not only the payload hash: `seq`, `event_type`, `actor_ref`,
+  `object_ref`, `case_id`, the times and the `detail` (through `detail_hash`).
+  New fields `hash_version`, `actor_kind`, `session_ref`, `detail_hash`,
+  `occurred_at` and `recorded_at`; `at` remains as a read-only alias of
+  `recorded_at`. `AuditLedger.append` takes optional `actor_kind` and
+  `session_ref`. Floats in a payload or detail are rendered with `repr` before
+  hashing.
+
+### Added (audit assurance W1, ADR-0034)
+
+- `AuditLedger(open_unit, *, clock)`: the trail persists through the
+  persistence port in collections `platform.audit` and `platform.audit_head`,
+  appended in order, insert-only, retried on `ConcurrentUpdate`. New
+  `AuditUnavailable`, `ActorKind`, `record_hash`, `hashable`.
+- Audit event types `event.published`, `demo.reset`, `ledger.opened`.
+- An `audit` consumer group records every domain event type in the trail.
+- `ClarityMCPServer(cases, *, ledger=None)`: with a ledger, every MCP call is
+  appended as `mcp.invoked`, actor kind `agent`, arguments hashed.
+- `Clarity(audit=...)`; `Clarity.reset()` carries the trail across and records
+  `demo.reset`. A broken trail at startup raises `AuditChainBroken`.
+- Setting `CLARITY_AUDIT_BREAK_GLASS` (default `false`).
+
+### Fixed (audit assurance W0 and W1)
+
+- **An audit record's actor, type, case, time and detail could be rewritten
+  without `verify()` noticing.** Only the payload hash was chained.
+- **The audit trail was lost on every restart, split per process, and erased
+  by a demo reset**, and decisions, executions, receipts and MCP calls were
+  never recorded in it.
+
 ### Removed (FE01, #28)
 
 - **The static UI is retired.** `clarity.interfaces.http` no longer serves

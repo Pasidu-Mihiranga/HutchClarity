@@ -165,6 +165,18 @@ class Settings(BaseSettings):
 
     verify_base: str = Field(default="http://localhost:3002/r", alias="VERIFY_BASE")
 
+    # -- audit ------------------------------------------------------------ #
+
+    audit_break_glass: bool = Field(
+        default=False,
+        alias="CLARITY_AUDIT_BREAK_GLASS",
+        description=(
+            "Start even when the audit chain fails verification (ADR-0034). "
+            "For an incident only: the start itself is recorded as break-glass. "
+            "Unset, a broken chain stops the process from serving."
+        ),
+    )
+
     # -- observability ---------------------------------------------------- #
 
     otel_exporter: str = Field(
