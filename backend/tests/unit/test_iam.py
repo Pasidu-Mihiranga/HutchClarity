@@ -146,6 +146,45 @@ def test_every_failure_looks_the_same(otp: OtpService):
     assert unknown_challenge == wrong_code
 
 
+def test_requesting_a_code_does_not_reveal_who_is_a_subscriber(client: TestClient):
+    """The same rule as `test_every_failure_looks_the_same`, one step earlier.
+
+    `POST /v1/auth/otp/request` used to answer 404 "We could not find this Hutch
+    number" for a number nobody holds, and 200 for a real one. That is a
+    subscriber directory, queryable by anyone, with no credentials and at one
+    number per request: exactly what `OtpRefused` refuses to do at the verify
+    step and what the channel gateway already avoids
+    (`test_an_unknown_number_opens_nothing_and_reveals_nothing`).
+
+    Both answers now have the same status and the same body shape. A challenge
+    is issued either way, so the rate limit applies to both and an attacker
+    cannot separate them by burning the budget either.
+    """
+    known = client.post("/v1/auth/otp/request", json={"msisdn": DILANI})
+    unknown = client.post("/v1/auth/otp/request", json={"msisdn": "+94770000001"})
+
+    assert known.status_code == unknown.status_code == 200
+    assert known.json().keys() == unknown.json().keys()
+
+    # And the answer carries nothing that separates them.
+    assert unknown.json()["simulated"] == known.json()["simulated"]
+    assert unknown.json()["detail"] == known.json()["detail"]
+    assert unknown.json()["challenge_id"]
+
+
+def test_a_code_for_an_unknown_number_still_cannot_sign_anyone_in(client: TestClient):
+    """Indistinguishable up front must not mean a way in at the end."""
+    started = client.post("/v1/auth/otp/request", json={"msisdn": "+94770000001"}).json()
+    code = client.get("/v1/demo/inbox", params={"msisdn": "+94770000001"}).json()["code"]
+
+    refused = client.post(
+        "/v1/auth/otp/verify",
+        json={"challenge_id": started["challenge_id"], "code": code},
+    )
+
+    assert refused.status_code == 404
+
+
 def test_the_demo_inbox_is_labelled_as_simulated():
     inbox = SimulatedInbox()
     inbox.send(DILANI, "123456")

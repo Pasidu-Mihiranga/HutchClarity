@@ -1,8 +1,17 @@
 type ValidityHeroProps = {
-  valid: boolean;
+  /** `null` means the check did not complete. It is not a failure and not a pass. */
+  valid: boolean | null;
 };
 
+const TONES = {
+  valid: { accent: "#047857", glyph: "✓", title: "Valid", note: "Signature and chain verified" },
+  invalid: { accent: "#b91c1c", glyph: "✕", title: "Invalid", note: "Verification failed" },
+  unknown: { accent: "#b45309", glyph: "?", title: "Not checked", note: "We could not verify this receipt" },
+} as const;
+
 export function ValidityHero({ valid }: ValidityHeroProps) {
+  const tone = valid === null ? TONES.unknown : valid ? TONES.valid : TONES.invalid;
+
   return (
     <div
       style={{
@@ -14,28 +23,26 @@ export function ValidityHero({ valid }: ValidityHeroProps) {
         padding: "32px 16px",
         background: "#fff",
         border: "1px solid var(--line)",
-        borderTop: `3px solid ${valid ? "#047857" : "#b91c1c"}`,
+        borderTop: `3px solid ${tone.accent}`,
         borderRadius: "var(--radius)",
         boxShadow: "var(--shadow)",
       }}
     >
-      <span style={{ fontSize: 48, color: valid ? "#047857" : "#b91c1c" }} aria-hidden="true">
-        {valid ? "✓" : "✕"}
+      <span style={{ fontSize: 48, color: tone.accent }} aria-hidden="true">
+        {tone.glyph}
       </span>
       <p
         style={{
           margin: 0,
           fontSize: 20,
           fontWeight: 800,
-          color: valid ? "#047857" : "#b91c1c",
+          color: tone.accent,
           letterSpacing: "-.01em",
         }}
       >
-        {valid ? "Valid" : "Invalid"}
+        {tone.title}
       </p>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
-        {valid ? "Signature and chain verified" : "Verification failed"}
-      </p>
+      <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>{tone.note}</p>
     </div>
   );
 }
