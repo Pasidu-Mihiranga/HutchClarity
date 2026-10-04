@@ -24,15 +24,18 @@ from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response as RawResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from clarity.app.container import Clarity, Profile
 from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
+from clarity.interfaces.http import trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -41,6 +44,7 @@ from clarity.interfaces.http.auth import (
     authorize_action,
     authorize_case_access,
     customer_can_act,
+    principal_from,
     public,
     requires,
 )
@@ -88,6 +92,7 @@ from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
 from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
+from clarity.platform.audit.ledger import ActorKind, AuditEventType
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
 from clarity.platform.messaging.correlation import correlated
@@ -153,6 +158,51 @@ async def _trace_requests(request: Request, call_next: Any) -> Response:
         return response
 
 
+async def _audit_requests(request: Request, call_next: Any) -> Response:
+    """Record who made every state-changing request (audit assurance plan W2).
+
+    Runs after the handler, when routing has filled in the route template and
+    path parameters, so the record names ``POST /v1/cases/{case_id}/approve``
+    and the case rather than a raw URL. 401 and 403 are left to the refusal
+    handler, which records them with the reason.
+
+    **Not fail closed.** This record is written after the handler committed,
+    so a failure here turns the response into an error but cannot undo the
+    change. The domain events a money path publishes are atomic with it
+    (ADR-0034); this record adds who asked, which they cannot carry.
+    """
+    response: Response = await call_next(request)
+    route = getattr(request.scope.get("route"), "path", None)
+    if (
+        route is not None
+        and trail.records_request(request.method, route)
+        and response.status_code not in {401, 403}
+    ):
+        token = trail.bearer_token(request)
+        principal = ANONYMOUS
+        if token:
+            try:
+                principal = principal_from(request, request.headers.get("authorization"))
+            except StarletteHTTPException:
+                principal = ANONYMOUS
+        trail.record(
+            get_clarity(),
+            AuditEventType.REQUEST_PERFORMED,
+            actor_ref=principal.ref,
+            actor_kind=trail.actor_kind_of(principal),
+            session_ref=trail.session_ref_for(token),
+            object_ref=f"{request.method} {route}",
+            detail={
+                "status": response.status_code,
+                "roles": sorted(role.value for role in principal.roles),
+                "assurance": principal.assurance.value,
+                "path_params": dict(request.path_params),
+            },
+            case_id=request.path_params.get("case_id"),
+        )
+    return response
+
+
 def create_app(clarity: Clarity | None = None) -> FastAPI:
     if clarity is not None:
         _app_state["clarity"] = clarity
@@ -171,6 +221,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(_audit_requests)
     app.middleware("http")(_trace_requests)
     # Outermost, so it also covers error responses and static files (X01).
     app.middleware("http")(security_headers)
@@ -202,6 +253,43 @@ def _problem(status: int, title: str, detail: str, code: str | None = None) -> J
 
 
 def _register_handlers(app: FastAPI) -> None:
+    @app.exception_handler(StarletteHTTPException)
+    async def _audited_refusal(request: Request, error: StarletteHTTPException) -> Response:
+        """Record refusals in the trail, then answer exactly as before (W2).
+
+        403 always: a signed-in caller was refused something. 401 only when a
+        token was presented and rejected: forged, expired or revoked. An
+        anonymous request with no token is the ordinary state of the public
+        internet and would bury the signal.
+        """
+        token = trail.bearer_token(request)
+        if error.status_code == 403 or (error.status_code == 401 and token):
+            principal = ANONYMOUS
+            if token:
+                try:
+                    principal = principal_from(request, request.headers.get("authorization"))
+                except StarletteHTTPException:
+                    principal = ANONYMOUS
+            known = principal is not ANONYMOUS
+            trail.record(
+                get_clarity(),
+                AuditEventType.ACCESS_DENIED
+                if error.status_code == 403
+                else AuditEventType.TOKEN_REJECTED,
+                actor_ref=principal.ref if known else "unknown",
+                actor_kind=trail.actor_kind_of(principal),
+                session_ref=trail.session_ref_for(token),
+                object_ref=trail.route_of(request),
+                detail={
+                    "status": error.status_code,
+                    "reason": str(error.detail),
+                    "roles": sorted(role.value for role in principal.roles),
+                    "assurance": principal.assurance.value,
+                },
+                case_id=request.path_params.get("case_id"),
+            )
+        return await http_exception_handler(request, error)
+
     @app.exception_handler(ToolLayerError)
     async def _tool_error(_: Request, error: ToolLayerError) -> JSONResponse:
         status = _STATUS_FOR_CODE.get(error.code, 409)
@@ -484,14 +572,32 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-        if clarity.world.account_by_msisdn(msisdn) is None:
+        account = clarity.world.account_by_msisdn(msisdn)
+        # Who asked, without the number: the pseudonym when it is a customer,
+        # the masked form when it matches nobody (I13).
+        who = account.ref if account is not None else f"unknown:{mask_msisdn(msisdn)}"
+
+        def requested(outcome: str, challenge: str | None = None) -> None:
+            trail.record(
+                clarity,
+                AuditEventType.OTP_REQUESTED,
+                actor_ref=who,
+                actor_kind=ActorKind.CUSTOMER,
+                object_ref=challenge or "otp",
+                detail={"outcome": outcome, "channel": "sms"},
+            )
+
+        if account is None:
+            requested("unknown_number")
             raise HTTPException(status_code=404, detail="We could not find this Hutch number.")
 
         try:
             challenge_id = clarity.otp.request(msisdn)
         except OtpRefused as error:
+            requested("refused")
             raise HTTPException(status_code=429, detail=str(error)) from error
 
+        requested("sent", challenge_id)
         return {
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
@@ -514,6 +620,15 @@ def _register_routes(app: FastAPI) -> None:
         try:
             msisdn = clarity.otp.verify(body.challenge_id, body.code)
         except OtpRefused as error:
+            # The challenge, never the code that was tried.
+            trail.record(
+                clarity,
+                AuditEventType.OTP_FAILED,
+                actor_ref=f"challenge:{body.challenge_id}",
+                actor_kind=ActorKind.CUSTOMER,
+                object_ref=body.challenge_id,
+                detail={"reason": str(error)},
+            )
             raise HTTPException(status_code=401, detail=str(error)) from error
 
         account = clarity.world.account_by_msisdn(msisdn)
@@ -522,6 +637,18 @@ def _register_routes(app: FastAPI) -> None:
 
         issued = clarity.tokens.for_customer(
             account.ref, assurance=Assurance.OTP, channel=body.channel.value
+        )
+        trail.record(
+            clarity,
+            AuditEventType.OTP_VERIFIED,
+            actor_ref=account.ref,
+            actor_kind=ActorKind.CUSTOMER,
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=body.challenge_id,
+            detail={
+                "assurance": issued.principal.assurance.value,
+                "channel": body.channel.value,
+            },
         )
         return SessionView(
             token=issued.value,
@@ -558,6 +685,22 @@ def _register_routes(app: FastAPI) -> None:
             roles=roles,
             assurance=Assurance.MFA_RECENT if body.step_up else Assurance.MFA,
         )
+        # The moment a session *becomes* a supervisor with step-up. Every
+        # approval later made with this token carries the same session_ref.
+        trail.record(
+            clarity,
+            AuditEventType.STAFF_SESSION_STARTED,
+            actor_ref=body.user_ref,
+            actor_kind=ActorKind.STAFF,
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=body.user_ref,
+            detail={
+                "roles": sorted(role.value for role in roles),
+                "step_up": body.step_up,
+                "assurance": issued.principal.assurance.value,
+                "simulated": True,
+            },
+        )
         return SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,
@@ -574,7 +717,25 @@ def _register_routes(app: FastAPI) -> None:
         try:
             issued = clarity.tokens.refresh(body.refresh_token)
         except TokenInvalid as error:
+            trail.record(
+                clarity,
+                AuditEventType.TOKEN_REJECTED,
+                actor_ref="unknown",
+                actor_kind=ActorKind.SYSTEM,
+                session_ref=trail.session_ref_for(body.refresh_token),
+                object_ref="POST /v1/auth/refresh",
+                detail={"kind": "refresh", "reason": str(error)},
+            )
             raise HTTPException(status_code=401, detail=str(error)) from error
+        trail.record(
+            clarity,
+            AuditEventType.TOKEN_REFRESHED,
+            actor_ref=issued.principal.ref,
+            actor_kind=trail.actor_kind_of(issued.principal),
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=issued.principal.ref,
+            detail={"roles": sorted(role.value for role in issued.principal.roles)},
+        )
         return SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,

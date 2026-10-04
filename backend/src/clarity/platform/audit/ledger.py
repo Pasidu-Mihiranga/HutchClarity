@@ -84,6 +84,34 @@ class AuditEventType(StrEnum):
     LEDGER_OPENED = "ledger.opened"
     """A process opened the trail and verified it, or started under break-glass."""
 
+    # -- identity and access (audit assurance plan W2) ------------------- #
+
+    OTP_REQUESTED = "otp.requested"
+    """A sign-in code was asked for, including for a number with no account."""
+
+    OTP_VERIFIED = "otp.verified"
+    """A correct code: a customer session began."""
+
+    OTP_FAILED = "otp.failed"
+    """A wrong, expired or reused code. The raw material of brute force."""
+
+    STAFF_SESSION_STARTED = "staff.session_started"
+    """A staff session began, with the roles and step-up it asserted."""
+
+    TOKEN_REFRESHED = "token.refreshed"
+    TOKEN_REJECTED = "token.rejected"
+    """A presented token or refresh token was refused: forged, expired, reused
+    or revoked. An anonymous request with no token is not recorded."""
+
+    ACCESS_DENIED = "access.denied"
+    """A signed-in caller was refused (403): who, what route, and why."""
+
+    REQUEST_PERFORMED = "request.performed"
+    """A state-changing request reached its route: who made it, with which
+    session, on which route and case, and the status it got. Domain events say
+    what happened; this says who asked for it, which events cannot (an
+    approval's event names a mode, ``staff_approved``, not the approver)."""
+
 
 class ActorKind(StrEnum):
     """Who did it, at the level an investigation filters on first."""

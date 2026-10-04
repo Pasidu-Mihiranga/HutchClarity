@@ -4,6 +4,23 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (audit assurance W2)
+
+- Identity and access events in the audit trail: `otp.requested` (with its
+  outcome, including unknown numbers, masked), `otp.verified`, `otp.failed`,
+  `staff.session_started` (roles and step-up), `token.refreshed`,
+  `token.rejected` (a presented token or refresh token refused) and
+  `access.denied` (every 403, with the reason). Anonymous 401s with no token
+  are not recorded.
+- `request.performed`: every state-changing request records who made it, the
+  session, the route template, the case and the status, so an approval names
+  the supervisor rather than the mode. Opt-out, with reasons, in
+  `clarity.interfaces.http.trail.NOT_RECORDED_AS_REQUESTS`.
+- `session_ref`, a truncated hash of the access token, links a sign-in to
+  everything later done or refused with that token.
+- No `/v1` contract change: responses are byte-for-byte as before; refusals
+  are still answered by FastAPI's default handler after being recorded.
+
 ### Changed (audit assurance W0, ADR-0033)
 
 - **`AuditRecord` hash version 2.** `chain_hash` now covers every field of the

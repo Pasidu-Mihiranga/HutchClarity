@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phase 0 (first two ADRs) and Phase 1 W0 and W1 landed 2026-10-04. **Created:** 2026-10-04. **Revision:** 3.
+> **Status:** In progress. Phase 0 (first two ADRs) and Phase 1 (W0, W1, W2) landed 2026-10-04; Phase 2 is next. **Created:** 2026-10-04. **Revision:** 4.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -317,8 +317,9 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 - [ ] **W1** Database-level append-only: revoke UPDATE and DELETE on `platform.audit` from the writing role. Blocked on an insert-only write path: the generic row store writes with `INSERT ... ON CONFLICT DO UPDATE`, which needs UPDATE. Not verifiable in the container this was built in (no PostgreSQL)
 - [x] **W1** Audit writer: an `audit` consumer group on every domain event type, deduplicated; the MCP server writes to the shared trail
 - [x] **W1** Startup verification; a broken chain stops the process; `CLARITY_AUDIT_BREAK_GLASS` starts it and is recorded; a demo reset carries the trail and records itself
-- [ ] **W2** Identity and access events (section 5.5)
-- [ ] **W2** Coverage contract test over every state-changing route and MCP tool
+- [x] **W2** Identity and access events: OTP requested, verified and failed; staff session started with roles and step-up; token refreshed and rejected; access denied with reason. `session_ref` links every later action to its sign-in
+- [x] **W2** Who made each state-changing request (`request.performed`): an approval's domain event names a mode, `staff_approved`, never the supervisor, so the HTTP layer records the principal. **Not fail closed**: written after the handler commits; the domain events remain the atomic record
+- [x] **W2** Coverage contract: recording is opt-out, exemptions carry a reason and must name real routes, and every recorded route is driven by a test (`tests/security/test_audit_coverage.py`). MCP tools are covered because every call is recorded (W1)
 
 | # | Given | When | Then |
 |---|---|---|---|
@@ -328,6 +329,7 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 | 4 | a state change | the audit write fails | the state change did not happen |
 | 5 | a new state-changing route with no audit event | the suite runs | the build fails |
 | 6 | a wrong OTP code | it is submitted | an `otp.failed` record exists |
+| 7 | a stepped-up supervisor approves | the approval succeeds | the record names the supervisor and the session that signed in with step-up |
 
 ### Phase 2: Tamper resistance
 
