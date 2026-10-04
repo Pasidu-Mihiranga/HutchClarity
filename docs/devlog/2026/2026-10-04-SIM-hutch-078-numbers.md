@@ -22,7 +22,10 @@
 - Unchanged on purpose: `+1771234567` in `test_schemas.py` (an invalid, non-Sri-Lankan input) and `0712345678` in `test_pii_languages.py` (a masking input for a different operator).
 - **ASSUMPTION:** 078 is a Hutch prefix (per the deck). The numbers stay synthetic and labelled `hutch-sim`. Because they now use a live Hutch range, they may belong to real subscribers, so they must never reach a real SMS or WhatsApp provider. Today they cannot: every channel driver in the repository is simulated.
 
+- The `full` profile keeps the world it seeded in PostgreSQL, so deploying this does not change the VPS subscribers by itself. `seed.py` now also runs piped into a container (`python - < seed.py`), and `deploy/README.md` documents the backup-then-reseed step.
+
 ## Docs updated
+- [x] `deploy/README.md` (reseed procedure)
 - [x] Walkthrough WT-02 (demo subscriber number)
 - [ ] CHANGELOG.md / contracts: no `/v1` shape change, only synthetic data values
 
