@@ -17,7 +17,8 @@ against the same shape. The rules:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, ClassVar, Literal
 
@@ -58,6 +59,8 @@ class DomainEventType(StrEnum):
     KNOWLEDGE_PUBLISHED = "knowledge.published"
     RECONCILIATION_MISMATCH = "reconciliation.mismatch"
     CONVERSATION_TURN_COMPLETED = "conversation.turn.completed"
+    FORECAST_READY = "forecast.ready"
+    SPIKE_DETECTED = "spike.detected"
 
 
 #: Field-name segments that indicate personal data. Matched on ``_``-separated
@@ -347,6 +350,72 @@ class ReconciliationMismatchV1(EventPayload):
     reason: str
 
 
+class ForecastReadyV1(EventPayload):
+    """A foresight run finished and its report is readable (C5, plan 18 section 159).
+
+    **Codes and identifiers only, and that is not a style choice.** The base
+    class rejects any field whose `_`-separated segments hit
+    :data:`_FORBIDDEN_SEGMENTS`, and that set contains `name` and `card`. So
+    `scenario_name` and `migration_card_count` are literally uninstantiable
+    here: adding either raises at class definition time. A consumer that wants
+    the scenario's name reads it from `/v1/foresight`, where the permission
+    check is.
+
+    Nothing customer-shaped can appear either way. A foresight run reads segment
+    statistics and never an individual record (deck S8), so there is no
+    subscriber to leak.
+
+    The counts are what a consumer needs to decide whether to look: how many
+    pairs were predicted, and how many landed in the top band. The bands
+    themselves and the themes stay behind the API.
+    """
+
+    event_type = DomainEventType.FORECAST_READY
+    run_id: str
+    report_id: str
+    scenario_id: str
+    scenario_version_id: str
+    change_type: str
+    """The `ChangeType` code, e.g. `pack_retired`."""
+    effective_date: date
+    predicted_pairs: int = Field(ge=0)
+    high_band_pairs: int = Field(ge=0)
+    backtested: bool = False
+    """Whether the report rests on a calibration that reached the plan gate."""
+    calibration_status: str
+
+
+class SpikeDetectedV1(EventPayload):
+    """More complaints in a window than the baseline expects (C5, plan 18 section 159).
+
+    **Channel scope only, for now.** `complaint.created` carries a channel and a
+    language and no cluster, so a cluster-scoped spike would need a field the
+    event does not have, and inferring one in the consumer would be guessing.
+    When the clustering side publishes something that carries a cluster, this
+    gains a scope rather than changing shape.
+
+    `scope_ref` is a **code**: a channel code, never a channel name. Same reason
+    as :class:`ForecastReadyV1`, and the same enforcement.
+
+    `baseline` is a `Money`-typed exact decimal rather than a float because it
+    is divided into `observed` to produce a ratio a person reads, and a binary
+    approximation there would be a number nobody can reproduce. It is not money.
+    """
+
+    event_type = DomainEventType.SPIKE_DETECTED
+    spike_id: str
+    scope: str
+    """`channel` today. A code, matching `SpikeScope`."""
+    scope_ref: str
+    window_start: datetime
+    window_end: datetime
+    observed: int = Field(ge=0)
+    baseline: Decimal
+    """Expected count for a window this long, from the trailing average."""
+    threshold_multiple: Decimal
+    """How many times the baseline counts as a spike, resolved from policy."""
+
+
 class ConversationTurnCompletedV1(EventPayload):
     """One assistant turn finished (C01, plan 22 section 4 step 11).
 
@@ -407,6 +476,8 @@ _PAYLOADS: tuple[type[EventPayload], ...] = (
     KnowledgePublishedV1,
     ReconciliationMismatchV1,
     ConversationTurnCompletedV1,
+    ForecastReadyV1,
+    SpikeDetectedV1,
 )
 
 #: (event type, schema version) -> payload model.
@@ -455,6 +526,7 @@ __all__ = [
     "DecisionGeneratedV1",
     "DomainEventType",
     "EventPayload",
+    "ForecastReadyV1",
     "InvalidEventPayload",
     "KnowledgePublishedV1",
     "McpInvokedV1",
@@ -465,6 +537,7 @@ __all__ = [
     "ReconciliationMismatchV1",
     "RiskDetectedV1",
     "RulePublishedV1",
+    "SpikeDetectedV1",
     "UnknownEventSchema",
     "UsageThresholdReachedV1",
     "VasRenewedV1",

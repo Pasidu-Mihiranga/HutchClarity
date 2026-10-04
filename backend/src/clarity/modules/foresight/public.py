@@ -25,6 +25,13 @@ from clarity.modules.foresight.catalogue import (
     ThemeCatalogue,
     ThemeWeight,
 )
+from clarity.modules.foresight.radar import (
+    OBSERVATIONS as FORESIGHT_OBSERVATIONS,
+)
+from clarity.modules.foresight.radar import (
+    ComplaintObservation,
+    ComplaintRadar,
+)
 from clarity.modules.foresight.records import (
     DetectedSpike,
     RecordedOutcome,
@@ -88,6 +95,7 @@ __all__ = [
     "DEMO_LAUNCHES",
     "FORESIGHT_CALIBRATIONS",
     "FORESIGHT_LAUNCHES",
+    "FORESIGHT_OBSERVATIONS",
     "FORESIGHT_OUTCOMES",
     "FORESIGHT_REPORTS",
     "FORESIGHT_RUNS",
@@ -100,6 +108,8 @@ __all__ = [
     "CatalogueInvalid",
     "ChangeType",
     "Comparison",
+    "ComplaintObservation",
+    "ComplaintRadar",
     "DetectedSpike",
     "Foresight",
     "ForesightCatalogue",

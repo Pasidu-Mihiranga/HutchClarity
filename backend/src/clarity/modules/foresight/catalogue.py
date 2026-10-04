@@ -26,7 +26,7 @@ and string and nothing else (``platform/config/resolver.py::_coerce``);
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
@@ -42,6 +42,10 @@ THEME_ALIASES_KEY = "foresight.theme_aliases"
 BAND_HIGH_KEY = "foresight.band.high"
 BAND_MEDIUM_KEY = "foresight.band.medium"
 MIN_REAL_LAUNCHES_KEY = "foresight.calibration.min_real_launches"
+RADAR_WINDOW_KEY = "foresight.radar.window_minutes"
+RADAR_BASELINE_WINDOWS_KEY = "foresight.radar.baseline_windows"
+RADAR_THRESHOLD_KEY = "foresight.radar.threshold_multiple"
+RADAR_MIN_OBSERVATIONS_KEY = "foresight.radar.min_observations"
 
 
 def themes_key(change_type: ChangeType) -> str:
@@ -120,6 +124,20 @@ class ThemeCatalogue:
 
 
 @dataclass(frozen=True)
+class RadarSettings:
+    """The early-warning radar's parameters (C5/F08).
+
+    Here beside the keys they are read from, so the detector has no constant to
+    shadow one with (D2).
+    """
+
+    window: timedelta
+    baseline_windows: int
+    threshold_multiple: Decimal
+    min_observations: int
+
+
+@dataclass(frozen=True)
 class Bands:
     """Score thresholds for the three volume bands."""
 
@@ -179,6 +197,23 @@ class ForesightCatalogue:
             high=_decimal(self._policies.resolve(BAND_HIGH_KEY, as_of=as_of), BAND_HIGH_KEY),
             medium=_decimal(self._policies.resolve(BAND_MEDIUM_KEY, as_of=as_of), BAND_MEDIUM_KEY),
         )
+
+    def radar(self, as_of: datetime) -> RadarSettings:
+        """The radar's parameters at ``as_of``."""
+        return RadarSettings(
+            window=timedelta(minutes=self._whole(RADAR_WINDOW_KEY, as_of)),
+            baseline_windows=self._whole(RADAR_BASELINE_WINDOWS_KEY, as_of),
+            threshold_multiple=_decimal(
+                self._policies.resolve(RADAR_THRESHOLD_KEY, as_of=as_of), RADAR_THRESHOLD_KEY
+            ),
+            min_observations=self._whole(RADAR_MIN_OBSERVATIONS_KEY, as_of),
+        )
+
+    def _whole(self, key: str, as_of: datetime) -> int:
+        value = _decimal(self._policies.resolve(key, as_of=as_of), key)
+        if value != value.to_integral_value() or value <= 0:
+            raise CatalogueInvalid(f"{key}: {value} is not a positive whole number")
+        return int(value)
 
     def min_real_launches(self, as_of: datetime) -> int:
         """Plan 02 section 3.4's gate, resolved rather than compiled in."""
@@ -287,12 +322,17 @@ __all__ = [
     "BAND_MEDIUM_KEY",
     "DRIVERS",
     "MIN_REAL_LAUNCHES_KEY",
+    "RADAR_BASELINE_WINDOWS_KEY",
+    "RADAR_MIN_OBSERVATIONS_KEY",
+    "RADAR_THRESHOLD_KEY",
+    "RADAR_WINDOW_KEY",
     "SEGMENTS_KEY",
     "THEME_ALIASES_KEY",
     "Bands",
     "CatalogueInvalid",
     "ChangeType",
     "ForesightCatalogue",
+    "RadarSettings",
     "Segment",
     "ThemeCatalogue",
     "ThemeWeight",
