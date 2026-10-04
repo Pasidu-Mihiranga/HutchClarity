@@ -19,11 +19,8 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
     let cancelled = false;
     (async () => {
       try {
-        const token =
-          typeof window !== "undefined"
-            ? window.sessionStorage.getItem("clarity_token") ?? undefined
-            : undefined;
-        client.setToken(token);
+        // No token to set: the session is an HttpOnly cookie the SDK
+        // sends with credentials (B4).
         const data = await client.getCase(params.id);
         if (!cancelled) setCaseData(data);
       } catch (err) {

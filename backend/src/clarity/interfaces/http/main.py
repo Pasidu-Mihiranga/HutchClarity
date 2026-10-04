@@ -25,7 +25,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -43,7 +43,7 @@ from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
-from clarity.interfaces.http import staff_sso, trail
+from clarity.interfaces.http import csrf, staff_sso, trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -56,6 +56,7 @@ from clarity.interfaces.http.auth import (
     public,
     requires,
 )
+from clarity.interfaces.http.cookies import CUSTOMER_COOKIE
 from clarity.interfaces.http.deps import ClarityDep, get_clarity, set_clarity
 from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
@@ -105,7 +106,7 @@ from clarity.interfaces.http.throttle import (
     RateLimitMiddleware,
 )
 from clarity.kernel.canonical import hash_payload
-from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
+from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn, utc_now
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.assurance.public import (
@@ -369,6 +370,10 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         resolve=_limit_for,
         clock=core.case_aggregate._now,
     )
+
+    # CSRF, for requests relying on a cookie (B4). Inside the rate limiter, so
+    # a flood of forged requests is still throttled before it is inspected.
+    app.middleware("http")(csrf.enforce())
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
@@ -1220,7 +1225,7 @@ def _register_routes(app: FastAPI) -> None:
         return message
 
     @app.post("/v1/auth/otp/verify", response_model=SessionView, tags=["auth"])
-    def verify_otp(body: OtpVerify, clarity: ClarityDep) -> SessionView:
+    def verify_otp(body: OtpVerify, clarity: ClarityDep) -> JSONResponse:
         """Exchange a correct code for a short-lived customer token."""
         try:
             msisdn = clarity.otp.verify(body.challenge_id, body.code)
@@ -1255,7 +1260,11 @@ def _register_routes(app: FastAPI) -> None:
                 "channel": body.channel.value,
             },
         )
-        return SessionView(
+        # The session also goes in an `HttpOnly` cookie (B4). The body still
+        # carries the token, because the WhatsApp gateway and the MCP server
+        # are not browsers and have nowhere to put a cookie; what changes is
+        # that a browser no longer has to keep one where scripts can read it.
+        view = SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
@@ -1263,6 +1272,18 @@ def _register_routes(app: FastAPI) -> None:
             roles=["customer"],
             assurance=issued.principal.assurance.value,
         )
+        payload = JSONResponse(content=view.model_dump(mode="json"))
+        payload.set_cookie(
+            CUSTOMER_COOKIE,
+            issued.value,
+            max_age=max(0, int((issued.expires_at - utc_now()).total_seconds())),
+            httponly=True,
+            secure=clarity.settings.cookie_secure,
+            samesite="lax",
+            path="/",
+        )
+        csrf.issue(payload, secure=clarity.settings.cookie_secure)
+        return payload
 
     @app.post(
         "/v1/auth/staff/login",
@@ -1419,7 +1440,10 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/.well-known/jwks.json", tags=["auth"])
     def jwks(clarity: ClarityDep) -> dict[str, Any]:
         """The public key a separate validator would use."""
-        return {"keys": [clarity.tokens.public_key_jwk()]}
+        # The whole ring, not just the active key. A validator that is not
+        # this process must be able to check a token signed by a key that is
+        # rotating out, or every rotation breaks it (B5).
+        return {"keys": clarity.tokens.public_keys()}
 
     @app.get(
         "/v1/demo/subscribers",
@@ -2516,13 +2540,11 @@ def _register_routes(app: FastAPI) -> None:
         tags=["demo"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
-    def demo_foresight() -> dict[str, Any]:
+    def demo_foresight(clarity: ClarityDep) -> dict[str, Any]:
         """Rehearse retiring a pack. Scenarios, not certainties."""
         from clarity.modules.foresight.public import (
             DEMO_LAUNCHES,
-            Backtest,
             ChangeType,
-            Foresight,
             Scenario,
             ScenarioRehearsal,
         )
@@ -2531,11 +2553,11 @@ def _register_routes(app: FastAPI) -> None:
             name="Retire Unlimited Data",
             change_type=ChangeType.PACK_RETIRED,
             affected_products=("SYNTHETIC-UNLIMITED-30",),
-            effective_date="2027-10-01",
+            effective_date=date(2027, 10, 1),
         )
-        calibration = Backtest().run(DEMO_LAUNCHES)
-        report = Foresight().run(scenario, calibration=calibration)
-        swarm = ScenarioRehearsal().run(scenario, seed=42)
+        calibration = clarity.foresight_backtest.run(DEMO_LAUNCHES)
+        report = clarity.foresight.run(scenario, calibration=calibration)
+        swarm = ScenarioRehearsal(clarity.foresight_catalogue).run(scenario, seed=42)
         return {
             "run_id": report.run_id,
             "scenario": report.scenario,

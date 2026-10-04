@@ -25,6 +25,13 @@ export const DILANI = "+94781234567";
 
 const API = process.env.E2E_API_BASE ?? "http://127.0.0.1:8100";
 
+/** The app's own origin, which is where its cookies live. */
+const BASE = process.env.E2E_BASE ?? "http://127.0.0.1:3100";
+
+/** Echoed in the `X-CSRF-Token` header by anything the page sends. */
+export const E2E_CSRF = "e2e-csrf-token";
+
+
 const cached = new Map<string, string>();
 
 /**
@@ -71,15 +78,35 @@ export async function customerToken(request: APIRequestContext): Promise<string>
   return customerTokenFor(request, DILANI);
 }
 
-/** Put the session in place before any page script runs. */
+/**
+ * Put the session in place before any page script runs.
+ *
+ * The session is an `HttpOnly` cookie now (B4), so this sets a cookie rather
+ * than writing `sessionStorage`, and the long-standing note about
+ * `storageState` not being able to carry it no longer applies: Playwright
+ * persists cookies perfectly well. The CSRF token goes in beside it, because a
+ * browser holding a session also holds the token it echoes, and a
+ * state-changing call without it is refused.
+ */
 export async function signedIn(page: Page, token: string): Promise<void> {
-  await page.addInitScript((value) => {
-    try {
-      window.sessionStorage.setItem("clarity_token", value);
-    } catch {
-      /* a private context without storage still renders the page */
-    }
-  }, token);
+  const origin = new URL(BASE);
+  await page.context().addCookies([
+    {
+      name: "clarity_customer_session",
+      value: token,
+      domain: origin.hostname,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+    {
+      name: "clarity_csrf",
+      value: E2E_CSRF,
+      domain: origin.hostname,
+      path: "/",
+      sameSite: "Lax",
+    },
+  ]);
 }
 
 /**

@@ -1,0 +1,169 @@
+# Foresight scenario parameters (C1/F03). ASSUMPTION - REQUIRES HUTCH VALIDATION.
+#
+# Every number and catalogue here used to be a Python constant inside
+# `modules/foresight/simulation.py`, which meant a product manager could not
+# change a band threshold or add a segment without a code release. They are
+# policy artefacts instead: versioned, effective-dated, owned and bounded (I10).
+#
+# Effective dating is not decoration. A scenario rehearses a change that takes
+# effect on a stated date, and it resolves these keys `as_of` that date, so a
+# rehearsal of an October change uses October's segment mix rather than the one
+# that happens to be current when somebody presses the button.
+#
+# **Why catalogues are CSV strings.** The resolver coerces money, number, bool
+# and string only (`platform/config/resolver.py::_coerce`), so a nested YAML
+# table is not a type it can return. `config/policy/proactive.yaml` already
+# takes this escape hatch for its threshold list. Rows are separated by `;` and
+# fields within a row by `|`, neither of which appears in a segment or theme
+# name.
+#
+# Shares, rates and weights are ILLUSTRATIVE. They were authored for the
+# prototype from the deck's segments (S11) and are not measured aggregates.
+
+keys:
+  # -- banding ---------------------------------------------------------- #
+  #
+  # A band is relative within one run, so these are scores on the same scale
+  # the engine produces, not complaint counts. Lowering `high` widens the HIGH
+  # band and makes the report louder; it does not make the underlying change
+  # riskier, which is why this is operational rather than outcome-affecting.
+
+  - key: foresight.band.high
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Relative score at or above which a predicted theme-segment pair is
+      reported HIGH. Scores are comparable within one run only.
+    guardrail: { min: "0", max: "1" }
+    values:
+      - value: "0.045"
+        version: 1
+
+  - key: foresight.band.medium
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Relative score at or above which a pair is reported MEDIUM. Must be below
+      foresight.band.high; the engine reports a caveat when it is not.
+    guardrail: { min: "0", max: "1" }
+    values:
+      - value: "0.015"
+        version: 1
+
+  # -- segment catalogue ------------------------------------------------- #
+
+  - key: foresight.segments
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: >
+      Aggregated personas, one row per segment, as
+      name|share_of_base|monthly_complaint_rate|price_sensitivity|data_intensity.
+      Shares are fractions of the subscriber base and rates are historic
+      complaints per subscriber per month. These are aggregates by construction:
+      no individual customer record is read anywhere in foresight (deck S8).
+    values:
+      - value: >-
+          students|0.28|0.09|1.6|1.8;dual-SIM users|0.22|0.06|1.3|0.9;parents|0.19|0.07|1.1|1.0;tourists|0.06|0.12|0.7|1.4;low-usage prepaid|0.25|0.04|1.4|0.5
+        version: 1
+
+  # -- theme catalogues, one key per change type -------------------------- #
+  #
+  # One key per type rather than one key holding all of them: a product manager
+  # changing what a price increase is expected to produce should be approving a
+  # diff about price increases, not scrolling past four other change types.
+
+  - key: foresight.themes.pack_retired
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: >
+      Themes a retired pack tends to produce, as theme|weight|driver. The driver
+      names the segment attribute the weight is scaled by, and must be one of
+      price_sensitivity or data_intensity.
+    values:
+      - value: >-
+          pack sunset confusion|1.8|data_intensity;wrong pack after migration|1.2|data_intensity;balance burn after pack ends|1.0|data_intensity
+        version: 1
+
+  - key: foresight.themes.price_increase
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: Themes a price increase tends to produce, as theme|weight|driver.
+    values:
+      - value: >-
+          unexpected charge amount|1.6|price_sensitivity;balance disappeared faster|1.1|price_sensitivity
+        version: 1
+
+  - key: foresight.themes.fup_tightened
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: Themes a tightened fair-use policy tends to produce, as theme|weight|driver.
+    values:
+      - value: >-
+          data stopped at cap|2.0|data_intensity;unlimited not unlimited|1.4|data_intensity
+        version: 1
+
+  - key: foresight.themes.policy_change
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: Themes a policy change tends to produce, as theme|weight|driver.
+    values:
+      - value: "consent and subscription confusion|1.3|price_sensitivity"
+        version: 1
+
+  - key: foresight.themes.outage
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: Themes an outage tends to produce, as theme|weight|driver.
+    values:
+      - value: >-
+          service unavailable|2.4|data_intensity;pack validity lost during outage|1.5|data_intensity
+        version: 1
+
+  # -- borrowed themes ---------------------------------------------------- #
+  #
+  # Seven of the twelve change types have no catalogue of their own and borrow
+  # another type's. That was a silent dict in Python; here it is declared, and
+  # the engine puts the borrowing in the report's caveats so a reader knows the
+  # themes were not authored for the change they are rehearsing.
+
+  - key: foresight.theme_aliases
+    kind: string
+    owner_role: product
+    tags: [operational]
+    description: >
+      Change types that borrow another type's theme catalogue, as
+      change_type=lender rows separated by `;`. A type absent from both this key
+      and the themes catalogue produces no predictions and says so.
+    values:
+      - value: >-
+          pack_migration=pack_retired;fup_disclosure_change=fup_tightened;vas_consent_change=policy_change;social_pack_scope_change=pack_retired;payg_price_change=price_increase;new_pack=pack_retired;promotion_end=price_increase
+        version: 1
+
+  # -- the calibration gate ----------------------------------------------- #
+  #
+  # Plan 02 section 3.4's gate, as a key rather than a Python constant. It is
+  # tagged regulatory, so `class_for` derives C4 and the change needs a second
+  # approver: raising the bar is routine, and lowering it is how a synthetic
+  # backtest would be made to look like evidence. The guardrail refuses a value
+  # under three whatever the approval says.
+
+  - key: foresight.calibration.min_real_launches
+    kind: number
+    owner_role: risk
+    tags: [regulatory]
+    description: >
+      Real launches with recorded outcomes required before a backtest may report
+      CALIBRATED. Three is the plan's number, not a statistical claim. Synthetic
+      launches never count towards it, whatever this value is.
+    guardrail: { min: "3" }
+    values:
+      - value: "3"
+        version: 1

@@ -683,6 +683,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description Every live session this person holds (B3).
+         *
+         *     Signed in callers only, and it shows **their own** sessions: the
+         *     subject comes from the verified token, never from a parameter, so there
+         *     is no id to tamper with and nothing to enumerate.
+         *
+         *     What it deliberately does not show: the token, or anything that could
+         *     be used to resume a session. A list that can be read over somebody's
+         *     shoulder should not also be a way in. Channel and timings are enough to
+         *     recognise a device you do not know.
+         */
+        get: operations["list_sessions_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        /**
+         * End Other Sessions
+         * @description Sign out everywhere (B3).
+         *
+         *     `keep_current` defaults to true, so somebody who has just found a
+         *     session they do not recognise does not also sign themselves out of the
+         *     device they are holding while they deal with it.
+         */
+        delete: operations["end_other_sessions_v1_auth_sessions_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/sign-in-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign In Methods
+         * @description How staff may sign in to this deployment.
+         *
+         *     The console has to know, because the two paths look nothing alike: one
+         *     is a redirect to the provider, the other a form. Asking is better than
+         *     guessing, and better than the console carrying its own build-time
+         *     setting that can disagree with what the API is actually configured for.
+         *
+         *     Public: it names mechanisms, not people, and a caller who cannot sign
+         *     in learns only what they would see on the sign-in screen anyway.
+         */
+        get: operations["sign_in_methods_v1_auth_sign_in_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/staff/login": {
         parameters: {
             query?: never;
@@ -3422,6 +3487,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_other_sessions_v1_auth_sessions_delete: {
+        parameters: {
+            query?: {
+                keep_current?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_in_methods_v1_auth_sign_in_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from clarity.modules.foresight.backtest import (
     DEMO_LAUNCHES,
-    MIN_REAL_LAUNCHES,
     Backtest,
     CalibrationReport,
     CalibrationStatus,
@@ -17,14 +16,22 @@ from clarity.modules.foresight.backtest import (
     ObservedOutcome,
     Provenance,
 )
-from clarity.modules.foresight.simulation import (
+from clarity.modules.foresight.catalogue import (
+    Bands,
+    CatalogueInvalid,
     ChangeType,
+    ForesightCatalogue,
+    Segment,
+    ThemeCatalogue,
+    ThemeWeight,
+)
+from clarity.modules.foresight.simulation import (
     Foresight,
     ForesightReport,
     Prediction,
     Scenario,
-    Segment,
     VolumeBand,
+    as_of_for,
 )
 from clarity.modules.foresight.swarm import (
     Comparison,
@@ -36,13 +43,15 @@ from clarity.modules.foresight.swarm import (
 
 __all__ = [
     "DEMO_LAUNCHES",
-    "MIN_REAL_LAUNCHES",
     "Backtest",
+    "Bands",
     "CalibrationReport",
     "CalibrationStatus",
+    "CatalogueInvalid",
     "ChangeType",
     "Comparison",
     "Foresight",
+    "ForesightCatalogue",
     "ForesightReport",
     "HistoricLaunch",
     "ObservedOutcome",
@@ -54,5 +63,8 @@ __all__ = [
     "SeededPersonaSimulator",
     "Segment",
     "SwarmReport",
+    "ThemeCatalogue",
+    "ThemeWeight",
     "VolumeBand",
+    "as_of_for",
 ]

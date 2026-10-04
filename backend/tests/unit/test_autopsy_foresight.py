@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -18,21 +19,49 @@ from clarity.modules.autopsy.pipeline import (
 )
 from clarity.modules.foresight.backtest import (
     DEMO_LAUNCHES,
-    MIN_REAL_LAUNCHES,
     Backtest,
     CalibrationStatus,
     HistoricLaunch,
     ObservedOutcome,
     Provenance,
 )
+from clarity.modules.foresight.catalogue import ChangeType, ForesightCatalogue, Segment
 from clarity.modules.foresight.simulation import (
-    DEMO_SEGMENTS,
-    ChangeType,
     Foresight,
     Scenario,
-    Segment,
     VolumeBand,
 )
+from clarity.platform.config.resolver import PolicyResolver
+from tests.conftest import POLICY_DIR
+
+# C1 moved every foresight tunable into `config/policy/foresight.yaml` and gave
+# `Scenario` a required effective date, so neither `Foresight()` nor
+# `scenario(name=..., change_type=...)` constructs any more. These helpers are
+# the whole of that change as far as these tests are concerned: they build the
+# engine on the repository's real artefacts, which is also what the container
+# does, so a broken catalogue fails here rather than in production.
+_CATALOGUE = ForesightCatalogue(PolicyResolver.from_directory(POLICY_DIR))
+#: Every run resolves policy as of its scenario's effective date; this is the
+#: date the helpers use, and the moment the gate is read at.
+_EFFECTIVE = date(2027, 1, 1)
+_RUN_AT = datetime(2027, 1, 1, tzinfo=UTC)
+_SEGMENTS = _CATALOGUE.segments(_RUN_AT)
+_MIN_REAL_LAUNCHES = _CATALOGUE.min_real_launches(_RUN_AT)
+
+
+def engine() -> Foresight:
+    """The baseline engine on the real policy artefacts, at a fixed clock."""
+    return Foresight(_CATALOGUE, clock=lambda: _RUN_AT)
+
+
+def backtest() -> Backtest:
+    return Backtest(_CATALOGUE, clock=lambda: _RUN_AT)
+
+
+def scenario(name: str, change_type: ChangeType, **extra: object) -> Scenario:
+    """A scenario with the effective date these tests resolve policy at."""
+    extra.setdefault("effective_date", _EFFECTIVE)
+    return Scenario(name=name, change_type=change_type, **extra)  # type: ignore[arg-type]
 
 
 def complaints(*texts: str) -> list[Complaint]:
@@ -200,38 +229,38 @@ def test_the_report_counts_what_happened_to_everything():
 
 
 def test_a_scenario_predicts_themes_per_segment():
-    report = Foresight().run(
-        Scenario(name="Retire the 10GB pack", change_type=ChangeType.PACK_RETIRED)
+    report = engine().run(
+        scenario(name="Retire the 10GB pack", change_type=ChangeType.PACK_RETIRED)
     )
 
     assert report.predictions
     assert "pack sunset confusion" in report.top_themes
-    assert {p.segment for p in report.predictions} == {s.name for s in DEMO_SEGMENTS}
+    assert {p.segment for p in report.predictions} == {s.name for s in _SEGMENTS}
 
 
 def test_predictions_are_bands_never_counts():
     """Deck S11: 'scenarios, not certainties'."""
-    report = Foresight().run(Scenario(name="FUP change", change_type=ChangeType.FUP_TIGHTENED))
+    report = engine().run(scenario(name="FUP change", change_type=ChangeType.FUP_TIGHTENED))
 
     assert all(isinstance(p.band, VolumeBand) for p in report.predictions)
 
 
 def test_every_prediction_comes_with_something_to_do_about_it():
-    report = Foresight().run(Scenario(name="Outage", change_type=ChangeType.OUTAGE))
+    report = engine().run(scenario(name="Outage", change_type=ChangeType.OUTAGE))
 
     assert all(p.suggested_mitigation for p in report.predictions)
 
 
 def test_a_report_states_that_it_used_no_individual_data():
     """Deck S8: Foresight on aggregates only."""
-    report = Foresight().run(Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE))
+    report = engine().run(scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE))
 
     assert "no individual" in report.basis.lower()
 
 
 def test_a_report_is_not_decision_ready_until_backtested():
     """Plan §3.4 gate: no launch decision rests on an uncalibrated model."""
-    report = Foresight().run(Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE))
+    report = engine().run(scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE))
 
     assert not report.is_decision_ready
     assert any("backtest" in c.lower() for c in report.caveats)
@@ -239,18 +268,18 @@ def test_a_report_is_not_decision_ready_until_backtested():
 
 
 def test_a_bigger_change_predicts_more_complaints_than_a_smaller_one():
-    big = Foresight().run(
-        Scenario(name="big", change_type=ChangeType.FUP_TIGHTENED, severity=Decimal("2.0"))
+    big = engine().run(
+        scenario(name="big", change_type=ChangeType.FUP_TIGHTENED, severity=Decimal("2.0"))
     )
-    small = Foresight().run(
-        Scenario(name="small", change_type=ChangeType.FUP_TIGHTENED, severity=Decimal("0.5"))
+    small = engine().run(
+        scenario(name="small", change_type=ChangeType.FUP_TIGHTENED, severity=Decimal("0.5"))
     )
 
     assert big.predictions[0].relative_score > small.predictions[0].relative_score
 
 
 def test_data_heavy_segments_dominate_a_data_change():
-    report = Foresight().run(Scenario(name="FUP", change_type=ChangeType.FUP_TIGHTENED))
+    report = engine().run(scenario(name="FUP", change_type=ChangeType.FUP_TIGHTENED))
 
     assert report.predictions[0].segment == "students", "the most data-intensive segment"
 
@@ -261,10 +290,10 @@ def test_a_segment_share_outside_zero_to_one_is_rejected():
 
 
 def test_the_run_is_deterministic():
-    scenario = Scenario(name="Retire pack", change_type=ChangeType.PACK_RETIRED)
+    rehearsed = scenario(name="Retire pack", change_type=ChangeType.PACK_RETIRED)
 
-    first = [p.relative_score for p in Foresight().run(scenario).predictions]
-    second = [p.relative_score for p in Foresight().run(scenario).predictions]
+    first = [p.relative_score for p in engine().run(rehearsed).predictions]
+    second = [p.relative_score for p in engine().run(rehearsed).predictions]
 
     assert first == second
 
@@ -626,7 +655,7 @@ def real(launch: HistoricLaunch) -> HistoricLaunch:
 
 def test_a_backtest_states_the_calibration_error_and_that_results_are_scenarios():
     """Acceptance 1. The number and the hedge travel together or not at all."""
-    report = Backtest().run(DEMO_LAUNCHES)
+    report = backtest().run(DEMO_LAUNCHES)
 
     assert report.compared > 0
     assert report.mean_absolute_band_error is not None
@@ -636,7 +665,7 @@ def test_a_backtest_states_the_calibration_error_and_that_results_are_scenarios(
 
 
 def test_the_error_is_measured_in_band_steps_not_complaints():
-    report = Backtest().run(DEMO_LAUNCHES)
+    report = backtest().run(DEMO_LAUNCHES)
 
     assert "band steps" in report.summary()
     assert any("not in complaints" in c.lower() for c in report.caveats)
@@ -645,7 +674,7 @@ def test_the_error_is_measured_in_band_steps_not_complaints():
 
 def test_a_synthetic_backtest_never_claims_calibration():
     """I16: a launch we authored cannot validate the model that predicted it."""
-    report = Backtest().run(DEMO_LAUNCHES)
+    report = backtest().run(DEMO_LAUNCHES)
 
     assert report.real_launches == 0
     assert report.status is CalibrationStatus.NOT_CALIBRATED
@@ -657,18 +686,18 @@ def test_a_synthetic_backtest_never_claims_calibration():
 def test_real_launches_below_the_gate_are_insufficient_not_calibrated():
     below = (real(DEMO_LAUNCHES[0]), real(DEMO_LAUNCHES[1]))
 
-    report = Backtest().run(below)
+    report = backtest().run(below)
 
-    assert report.real_launches == 2 < MIN_REAL_LAUNCHES
+    assert report.real_launches == 2 < _MIN_REAL_LAUNCHES
     assert report.status is CalibrationStatus.INSUFFICIENT
     assert not report.is_calibrated
-    assert any(str(MIN_REAL_LAUNCHES) in c and "gate" in c for c in report.caveats)
+    assert any(str(_MIN_REAL_LAUNCHES) in c and "gate" in c for c in report.caveats)
 
 
 def test_the_gate_opens_only_at_three_real_launches():
-    report = Backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
+    report = backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
 
-    assert report.real_launches == MIN_REAL_LAUNCHES
+    assert report.real_launches == _MIN_REAL_LAUNCHES
     assert report.status is CalibrationStatus.CALIBRATED
     assert report.is_calibrated
 
@@ -676,12 +705,12 @@ def test_the_gate_opens_only_at_three_real_launches():
 def test_mixing_synthetic_launches_in_does_not_help_reach_the_gate():
     mixed = (real(DEMO_LAUNCHES[0]), DEMO_LAUNCHES[1], DEMO_LAUNCHES[2])
 
-    assert Backtest().run(mixed).status is CalibrationStatus.INSUFFICIENT
+    assert backtest().run(mixed).status is CalibrationStatus.INSUFFICIENT
 
 
 def test_an_observed_theme_the_model_missed_is_reported_not_dropped():
     """Under-prediction is the dangerous direction, so it must stay visible."""
-    report = Backtest().run(DEMO_LAUNCHES)
+    report = backtest().run(DEMO_LAUNCHES)
 
     missed = {(o.theme, o.segment) for o in report.unpredicted}
     assert ("roaming bill shock", "tourists") in missed
@@ -692,7 +721,7 @@ def test_an_observed_theme_the_model_missed_is_reported_not_dropped():
 
 
 def test_a_prediction_with_no_record_is_not_treated_as_a_quiet_launch():
-    report = Backtest().run(DEMO_LAUNCHES)
+    report = backtest().run(DEMO_LAUNCHES)
 
     assert report.unobserved, "the demo launches record a few themes, not all of them"
     assert any("absence of a record is not a low observation" in c.lower() for c in report.caveats)
@@ -703,12 +732,12 @@ def test_nothing_comparable_reports_no_error_rather_than_a_perfect_one():
     nothing = (
         HistoricLaunch(
             launch_id="SIM-LAUNCH-EMPTY",
-            scenario=Scenario(name="quiet", change_type=ChangeType.POLICY_CHANGE),
+            scenario=scenario(name="quiet", change_type=ChangeType.POLICY_CHANGE),
             observed=(),
         ),
     )
 
-    report = Backtest().run(nothing)
+    report = backtest().run(nothing)
 
     assert report.compared == 0
     assert report.mean_absolute_band_error is None
@@ -720,14 +749,14 @@ def test_nothing_comparable_reports_no_error_rather_than_a_perfect_one():
 
 
 def test_an_exact_match_scores_zero_error():
-    perfect = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    perfect = engine().run(scenario(name="probe", change_type=ChangeType.OUTAGE))
     launch = HistoricLaunch(
         launch_id="SIM-LAUNCH-PERFECT",
-        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        scenario=scenario(name="probe", change_type=ChangeType.OUTAGE),
         observed=tuple(ObservedOutcome(p.theme, p.segment, p.band) for p in perfect.predictions),
     )
 
-    report = Backtest().run((launch,))
+    report = backtest().run((launch,))
 
     assert report.mean_absolute_band_error == Decimal("0.000")
     assert report.exact_band_rate == Decimal("1.000")
@@ -735,16 +764,16 @@ def test_an_exact_match_scores_zero_error():
 
 
 def test_under_prediction_is_called_out_as_the_dangerous_direction():
-    pessimistic = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    pessimistic = engine().run(scenario(name="probe", change_type=ChangeType.OUTAGE))
     worse_than_predicted = HistoricLaunch(
         launch_id="SIM-LAUNCH-WORSE",
-        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        scenario=scenario(name="probe", change_type=ChangeType.OUTAGE),
         observed=tuple(
             ObservedOutcome(p.theme, p.segment, VolumeBand.HIGH) for p in pessimistic.predictions
         ),
     )
 
-    report = Backtest().run((worse_than_predicted,))
+    report = backtest().run((worse_than_predicted,))
 
     assert report.signed_band_error is not None
     assert report.signed_band_error < 0
@@ -752,16 +781,16 @@ def test_under_prediction_is_called_out_as_the_dangerous_direction():
 
 
 def test_over_prediction_is_not_called_dangerous():
-    optimistic = Foresight().run(Scenario(name="probe", change_type=ChangeType.OUTAGE))
+    optimistic = engine().run(scenario(name="probe", change_type=ChangeType.OUTAGE))
     quieter_than_predicted = HistoricLaunch(
         launch_id="SIM-LAUNCH-QUIET",
-        scenario=Scenario(name="probe", change_type=ChangeType.OUTAGE),
+        scenario=scenario(name="probe", change_type=ChangeType.OUTAGE),
         observed=tuple(
             ObservedOutcome(p.theme, p.segment, VolumeBand.LOW) for p in optimistic.predictions
         ),
     )
 
-    report = Backtest().run((quieter_than_predicted,))
+    report = backtest().run((quieter_than_predicted,))
 
     assert report.signed_band_error is not None
     assert report.signed_band_error > 0
@@ -770,12 +799,12 @@ def test_over_prediction_is_not_called_dangerous():
 
 def test_the_backtest_reads_no_individual_data():
     """Deck S8, carried through from the simulation to the backtest."""
-    assert "no individual" in Backtest().run(DEMO_LAUNCHES).basis.lower()
+    assert "no individual" in backtest().run(DEMO_LAUNCHES).basis.lower()
 
 
 def test_the_backtest_is_deterministic():
-    first = Backtest().run(DEMO_LAUNCHES)
-    second = Backtest().run(DEMO_LAUNCHES)
+    first = backtest().run(DEMO_LAUNCHES)
+    second = backtest().run(DEMO_LAUNCHES)
 
     assert first.mean_absolute_band_error == second.mean_absolute_band_error
     assert first.exact_band_rate == second.exact_band_rate
@@ -784,24 +813,24 @@ def test_the_backtest_is_deterministic():
 
 
 def test_a_calibration_report_stays_advisory():
-    assert any("advisory only" in c.lower() for c in Backtest().run(DEMO_LAUNCHES).caveats)
+    assert any("advisory only" in c.lower() for c in backtest().run(DEMO_LAUNCHES).caveats)
 
 
 def test_a_foresight_report_is_decision_ready_only_with_a_calibrated_backtest():
     """Plan §3.4: the gate is wired to evidence, not hard-coded shut."""
-    synthetic = Backtest().run(DEMO_LAUNCHES)
-    calibrated = Backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
-    scenario = Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE)
+    synthetic = backtest().run(DEMO_LAUNCHES)
+    calibrated = backtest().run(tuple(real(launch) for launch in DEMO_LAUNCHES))
+    rehearsed = scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE)
 
-    assert not Foresight().run(scenario, calibration=synthetic).is_decision_ready
-    assert Foresight().run(scenario, calibration=calibrated).is_decision_ready
+    assert not engine().run(rehearsed, calibration=synthetic).is_decision_ready
+    assert engine().run(rehearsed, calibration=calibrated).is_decision_ready
 
 
 def test_a_foresight_report_carries_the_calibration_error_it_rests_on():
-    calibration = Backtest().run(DEMO_LAUNCHES)
+    calibration = backtest().run(DEMO_LAUNCHES)
 
-    report = Foresight().run(
-        Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
+    report = engine().run(
+        scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
         calibration=calibration,
     )
 
@@ -811,9 +840,9 @@ def test_a_foresight_report_carries_the_calibration_error_it_rests_on():
 
 
 def test_an_uncalibrated_foresight_report_says_it_is_not_launch_ready():
-    report = Foresight().run(
-        Scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
-        calibration=Backtest().run(DEMO_LAUNCHES),
+    report = engine().run(
+        scenario(name="Price up", change_type=ChangeType.PRICE_INCREASE),
+        calibration=backtest().run(DEMO_LAUNCHES),
     )
 
     assert not report.is_decision_ready

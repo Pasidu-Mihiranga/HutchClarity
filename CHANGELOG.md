@@ -4,6 +4,14 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed
+
+- **Foresight reads its parameters from the policy store** (C1/F03). The segment mix, the per-change-type theme catalogues, which change types borrow another's themes, the band thresholds and the calibration gate were Python constants, so a product manager could not change one without a release (I10, D2). They are now `config/policy/foresight.yaml`, resolved **as of the scenario's effective date** rather than "now", so a rehearsal of an October change uses October's parameters. Mitigation and caveat wording moved to `platform/content/foresight.py`.
+  - Public surface, breaking: `Foresight(catalogue, clock=None)`, `Backtest(catalogue, clock=None)` and `ScenarioRehearsal(catalogue)` replace the no-argument constructors; `MIN_REAL_LAUNCHES` and `DEMO_SEGMENTS` are removed rather than kept as fallbacks.
+  - `Scenario` is frozen, `scenario_id` is a real field (it was a `@property` returning a different id on every read, so nothing could store or cite a scenario), and `effective_date` is a required `date` rather than an optional string nothing read.
+  - A report now names the lender when a change type borrows another's themes, and says so explicitly when no catalogue is configured at all, instead of returning an empty prediction list that reads as "no risk".
+  - `GET /v1/demo/foresight` is unchanged in shape.
+
 ### Added
 
 - An opt-in Baileys WhatsApp transport forwards signed one-to-one messages to
@@ -19,7 +27,25 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 - `FlowToolAdapter` serves all nine tools the flow files name. Five (`get_case_timeline`, `get_cause_assessment`, `explain_rule`, `get_customer_safeguards`, `request_handoff`) raised `ToolUnavailable`; the gap was invisible because they are only reachable through the bounded agent step, which has never run without a configured planner. `tests/unit/test_flow_tool_adapter.py` reads the tool names out of the shipped flow files, so a flow declaring a tool the adapter does not serve now fails the build.
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
 
+### Added
+
+- **The staff console signs in through the provider** (B1, B2). `GET /v1/auth/sign-in-methods` reports which paths a deployment offers, so the console shows what the API will actually accept rather than what it was built expecting; where a provider is configured it offers "Sign in with HUTCH SSO", and a signed-in session that is not stepped up offers "Re-authenticate", which is the first caller the step-up route has ever had. Signing out now tells the API and follows the provider's logout, rather than only clearing what the page can see.
+
+- **CSRF protection for cookie-borne sessions** (B4). A double-submit token: the API sets a readable `clarity_csrf` cookie beside the session, and a state-changing request relying on a cookie must echo it in `X-CSRF-Token`. A request carrying a bearer token is exempt, because another origin cannot make a browser send a header it does not know. Sign-in routes and the POSTs the trail already declares read-only are exempt too.
+- **The customer session is an `HttpOnly` cookie**, set by `POST /v1/auth/otp/verify`. The token stayed in `sessionStorage`, readable by any script on the page, and it is the credential that opens a dispute and confirms a refund. The response body still carries the token, because the WhatsApp gateway and the MCP server are not browsers.
+
+- **The issuer key can be rotated** (`TokenIssuer.rotate()`). A retired key keeps verifying for `KEY_OVERLAP_WINDOW`, so rotation is not an outage: without an overlap, changing the key signs out everyone holding a token. Key ids are derived from the key itself rather than the fixed `clarity-iam-dev`, so a token says which key signed it. `/.well-known/clarity-keys.json` publishes the whole ring, and the ring is written to the shared key volume so a rotation performed by one replica is honoured by the others.
+
+- **An SMS driver for one-time codes** (`CLARITY_SMS_URL`, `CLARITY_SMS_TOKEN`). `OtpDelivery` had one implementation, `SimulatedInbox`, so in `prod` a customer's code was generated into an inbox nobody can reach and sign-in could not complete. Both drivers pass `tests/contract/test_otp_delivery_parity.py`, which asserts the code never reaches a log or an exception and that a delivery failure says nothing about whether the number exists. The gateway interface is **REQUIRES HUTCH CONFIRMATION**.
+- Sign-in routes are rate limited by the application (`throttle.auth.per_minute`), not only by nginx. The OTP service bounds challenges per number; this bounds them per caller, which is what stops one script working through a list of numbers, and it exists in `lite` where no reverse proxy does.
+
+- **`GET /v1/auth/sessions`** lists a person's own live sessions (channel, assurance, when it started, when it ends, which one is this request) and **`DELETE /v1/auth/sessions`** ends them, keeping the current device unless `keep_current=false`. The subject comes from the verified token, so there is nothing to enumerate, and the list carries nothing that could resume a session.
+
 ### Changed
+
+- **A session now has an absolute deadline.** `REFRESH_TOKEN_TTL` bounded nothing on its own: it was recomputed on every issue, including every refresh, so the window slid forward each time and a session refreshed once a month never expired. `ABSOLUTE_SESSION_TTL` is counted from the authentication that started the session and never extended, and a refresh token is capped so it cannot outlive the session that issued it.
+- The OPA driver sends `granted`, which the Rego has always read. Without it the branch that stops a holder of a granted audit duty from moving money could not fire: measured against the real Rego, a supervisor holding `audit:read` by grant was allowed `action:approve`. Nothing was reachable through the gap, because `GrantAwareAuthorizationPolicy` enforces the same rule in Python first; what was wrong is that the two drivers were only in parity because one of them was wrapped.
+- A missing token verifier or a missing authorization policy answers **503** instead of falling back. The verifier fallback made an authenticated caller anonymous; the policy fallback improvised a fresh `PythonAuthorizationPolicy()` per request, so a deployment that configures OPA would have had every decision silently revert to the local driver with nothing in the logs.
 
 - `KeycloakTokenVerifier` derives `MFA_RECENT` from `auth_time` against `STEP_UP_WINDOW` rather than requiring `acr == "mfa-recent"`. No real Keycloak sends that value: with a level-of-assurance map configured the provider returns the level's own name, so a correctly completed step-up never reached the assurance an above-cap approval requires.
 - The realm declares the `basic` and `acr` client scopes and assigns them to every client. A realm import replaces Keycloak's built-ins rather than adding to them, so tokens carried no `sub` (which the verifier requires) and no `acr` (which step-up depends on).

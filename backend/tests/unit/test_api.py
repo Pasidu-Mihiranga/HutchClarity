@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
+from clarity.platform.security.principal import Role
 
 DILANI = "+94781234567"  # VAS charged with no consent -> one-tap
 NIMAL = "+94782223333"  # duplicate reload -> auto-fix
@@ -544,3 +545,53 @@ def test_only_the_composition_root_reads_the_profile():
     ]
 
     assert offenders == [], f"CLARITY_PROFILE read outside the composition root: {offenders}"
+
+
+# --------------------------------------------------------------------------- #
+# A server that cannot decide says so (B7)
+#
+# Both of these used to fall back silently. A missing verifier made an
+# authenticated caller anonymous, and a missing policy improvised a fresh
+# `PythonAuthorizationPolicy()` per request. The second is the worse one: in a
+# deployment that configures OPA, every decision would have reverted to the
+# local driver, giving the same answers from a different authority than the one
+# operations believes is deciding, with nothing in the logs to say so.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_token_with_no_verifier_wired_is_not_treated_as_anonymous() -> None:
+    """The caller presented a credential. 'Made by nobody' is the wrong answer.
+
+    503, not 401: the caller has done nothing wrong, and reporting a wiring
+    fault as a refusal sends somebody to look at credentials that are fine.
+    """
+    clarity = Clarity(world=build_demo_world())
+    app = create_app(clarity)
+    issued = clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+    app.state.token_verifier = None
+
+    refused = TestClient(app).get(
+        "/v1/desk/queue", headers={"Authorization": f"Bearer {issued.value}"}
+    )
+
+    assert refused.status_code == 503
+
+
+def test_a_request_with_no_authorization_policy_is_refused_not_improvised() -> None:
+    clarity = Clarity(world=build_demo_world())
+    app = create_app(clarity)
+    issued = clarity.tokens.for_staff("sup-1", roles={Role.SUPERVISOR})
+    app.state.authorization_policy = None
+
+    refused = TestClient(app).get(
+        "/v1/desk/queue", headers={"Authorization": f"Bearer {issued.value}"}
+    )
+
+    assert refused.status_code == 503
+
+
+def test_an_anonymous_caller_still_gets_401_not_503() -> None:
+    """The new 503 must not swallow the ordinary unauthenticated case."""
+    clarity = Clarity(world=build_demo_world())
+
+    assert TestClient(create_app(clarity)).get("/v1/desk/queue").status_code == 401

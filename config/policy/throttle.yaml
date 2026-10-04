@@ -50,3 +50,18 @@ keys:
     values:
       - value: "45"
         version: 1
+
+  - key: throttle.auth.per_minute
+    kind: number
+    owner_role: platform
+    tags: [operational]
+    guardrail: { min: 1, max: 120 }
+    description: >
+      Sign-in attempts one caller may make per minute, across requesting a
+      code, verifying one, staff sign-in and refresh together. Lower than the
+      rest because a person signs in once and a script does not: the OTP
+      service bounds challenges per number already, and this is what stops one
+      caller working through a list of numbers.
+    values:
+      - value: "10"
+        version: 1

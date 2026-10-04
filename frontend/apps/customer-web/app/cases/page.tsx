@@ -43,11 +43,8 @@ export default function CasesPage() {
     let cancelled = false;
     (async () => {
       try {
-        const token =
-          typeof window !== "undefined"
-            ? (window.sessionStorage.getItem("clarity_token") ?? undefined)
-            : undefined;
-        client.setToken(token);
+        // No token to set: the session is an HttpOnly cookie the SDK
+        // sends with credentials (B4).
         // Typed through a narrow shape rather than `Record<string, unknown>`,
         // whose values are `unknown` and so not callable. Pre-existing error,
         // invisible because `npm run typecheck` only covers packages/sdk and

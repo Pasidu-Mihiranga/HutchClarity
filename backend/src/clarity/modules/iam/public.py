@@ -48,6 +48,7 @@ from clarity.modules.iam.oidc import (
 from clarity.modules.iam.otp import (
     OTP_CHALLENGES,
     OTP_REQUESTS,
+    OtpDelivery,
     OtpRefused,
     OtpService,
     RoutedOtpDelivery,
@@ -89,6 +90,7 @@ __all__ = [
     "OidcLogin",
     "OidcSettings",
     "OpaAuthorizationPolicy",
+    "OtpDelivery",
     "OtpRefused",
     "OtpService",
     "PendingLogin",

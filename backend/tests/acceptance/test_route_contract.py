@@ -31,6 +31,7 @@ PUBLIC = {
     # starts, and the callback arrives from the provider's redirect, not from
     # an authenticated caller. What protects them is the single-use `state`,
     # PKCE, and the nonce check on the id token.
+    ("GET", "/v1/auth/sign-in-methods"),
     ("GET", "/v1/auth/staff/oidc/start"),
     ("GET", "/v1/auth/staff/oidc/callback"),
     ("POST", "/v1/auth/logout"),
@@ -65,6 +66,10 @@ SIGNED_IN = {
     # Beginning a step-up needs a session: it re-authenticates somebody who is
     # already here (B2).
     ("POST", "/v1/auth/staff/step-up"),
+    # A person's own sessions (B3). Signed in only, and the subject comes from
+    # the token, so there is nothing to enumerate.
+    ("GET", "/v1/auth/sessions"),
+    ("DELETE", "/v1/auth/sessions"),
     # The audit trail and audit duties (audit assurance Phase 3): reading needs
     # audit:read, granting needs audit:assign, break-glass needs admin:manage.
     ("GET", "/v1/audit"),

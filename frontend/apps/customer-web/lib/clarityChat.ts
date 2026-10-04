@@ -1,7 +1,7 @@
 // Clarity chat state machine and API calls.
 // All API calls target the hutch-sim backend at NEXT_PUBLIC_API_BASE (default :8000).
 
-import { expireSession, readToken } from "@/lib/session";
+import { expireSession, withSession } from "@/lib/session";
 
 export type Lang = "en" | "si" | "ta";
 
@@ -294,10 +294,13 @@ export function makeInitialState(): ClarityState {
 // ─── API ───────────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
+  // The session is an HttpOnly cookie (B4), so there is no token to attach:
+  // `withSession` supplies credentials and the CSRF header instead.
+  const opts: RequestInit = withSession({
+    method,
+    headers: { "Content-Type": "application/json" },
+  });
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const token = typeof window !== "undefined" ? (readToken() ?? "") : "";
-  if (token) (opts.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, opts);
   if (res.status === 401 && typeof window !== "undefined") expireSession();
   if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}`);
@@ -445,15 +448,14 @@ export async function streamTurn(
   }
 
   try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = readToken() ?? "";
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    const res = await fetch(`${BASE}/v1/conversation/turn/stream`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(turnBody(text, lang, intentOverride, facts, app, caseId)),
-    });
+    const res = await fetch(
+      `${BASE}/v1/conversation/turn/stream`,
+      withSession({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(turnBody(text, lang, intentOverride, facts, app, caseId)),
+      })
+    );
     if (res.status === 401) {
       expireSession();
       return {};

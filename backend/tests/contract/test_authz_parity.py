@@ -127,3 +127,67 @@ def test_opa_driver_denies_when_the_policy_service_is_unavailable() -> None:
     )
 
     assert not policy.allows(principal, Permission.CASE_READ)
+
+
+# --------------------------------------------------------------------------- #
+# Audit duties held by grant (B7)
+#
+# The Rego has always read `input.granted`, and the driver never sent it, so
+# the branch that stops a holder of a granted audit duty from moving money
+# could not fire. Nothing was reachable through the gap, because
+# `GrantAwareAuthorizationPolicy` enforces the same rule in Python before the
+# request reaches OPA. What was wrong is subtler: the two drivers were only in
+# parity because one of them was wrapped, so removing the wrapper would have
+# left the Rego quietly not enforcing rule 1.
+#
+# Measured against the real Rego with the field omitted: a supervisor holding
+# `audit:read` by grant was allowed `action:approve`. With it sent: denied.
+# --------------------------------------------------------------------------- #
+
+
+def _granted_principal(permission: Permission) -> Principal:
+    """A supervisor who also holds an audit duty by grant."""
+    return Principal(
+        ref="parity-granted",
+        roles=frozenset({Role.SUPERVISOR}),
+        assurance=Assurance.MFA_RECENT,
+        granted=frozenset({permission}),
+    )
+
+
+def test_a_granted_audit_duty_blocks_money_in_the_policy_itself(
+    authorization: OpaAuthorizationPolicy,
+) -> None:
+    """Rule 1, decided by the policy rather than by the wrapper around it."""
+    holder = _granted_principal(Permission.AUDIT_READ)
+
+    assert authorization.allows(holder, Permission.ACTION_APPROVE) is False
+
+
+def test_without_a_grant_the_same_supervisor_may_approve(
+    authorization: OpaAuthorizationPolicy,
+) -> None:
+    """The denial above has to come from the grant, not from something else."""
+    plain = Principal(
+        ref="parity-granted",
+        roles=frozenset({Role.SUPERVISOR}),
+        assurance=Assurance.MFA_RECENT,
+    )
+
+    assert authorization.allows(plain, Permission.ACTION_APPROVE) is True
+
+
+def test_the_driver_sends_the_grants_the_policy_reads() -> None:
+    """The defect was one missing key, so the key itself is worth asserting."""
+    seen: dict[str, object] = {}
+
+    def capture(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content)["input"])
+        return httpx.Response(200, json={"result": False})
+
+    driver = OpaAuthorizationPolicy(
+        "http://opa", client=httpx.Client(transport=httpx.MockTransport(capture))
+    )
+    driver.allows(_granted_principal(Permission.AUDIT_READ), Permission.ACTION_APPROVE)
+
+    assert seen["granted"] == [Permission.AUDIT_READ.value]

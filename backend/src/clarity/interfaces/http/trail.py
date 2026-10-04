@@ -92,6 +92,10 @@ NOT_RECORDED_AS_REQUESTS: dict[str, str] = {
     "POST /v1/auth/staff/session": "recorded as staff.session_started, with roles and step-up",
     "POST /v1/auth/staff/login": "recorded as staff.session_started, with the directory role",
     "POST /v1/auth/refresh": "recorded as token.refreshed or token.rejected",
+    "DELETE /v1/auth/sessions": (
+        "recorded as staff.session_ended with how many were ended; the cookie "
+        "is read inside the route, not by a permission dependency"
+    ),
     "POST /v1/auth/logout": (
         "recorded as staff.session_ended, naming the session that was revoked. "
         "A request record would name the anonymous caller it arrives as: the "
