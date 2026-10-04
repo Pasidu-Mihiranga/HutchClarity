@@ -37,11 +37,17 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import DBAPIError
 
-from clarity.platform.persistence.errors import ConcurrentUpdate, UnitOfWorkClosed
+from clarity.platform.persistence.errors import (
+    ConcurrentUpdate,
+    CustodianUnavailable,
+    UnitOfWorkClosed,
+)
 from clarity.platform.persistence.ports import Repository
 from clarity.platform.persistence.schemas import (
     APP_ROLE,
+    CUSTODIAN_ROLE,
     OWNERS,
+    is_append_only,
     is_customer_scoped,
     role_of,
     schema_of,
@@ -124,6 +130,7 @@ class PostgresUnitOfWork:
         #: silently overwrite the earlier one: those are still version checked.
         self._written: set[tuple[str, Any]] = set()
         self._closed = False
+        self._custodian_depth = 0
         self._connection.execute(text(f"SET LOCAL lock_timeout = '{lock_timeout_ms}ms'"))
         # Requests run as the application role, never as the database owner: an
         # owner or superuser bypasses row-level security, which would make the
@@ -190,6 +197,40 @@ class PostgresUnitOfWork:
         self._written.add((collection, key))
 
     def _write(self, collection: str, key: Any, value: Any) -> None:
+        """Upsert, except on an append-only collection, which plainly inserts.
+
+        The ``ON CONFLICT DO UPDATE`` is why the audit tables could not be made
+        append-only at the database level before: a statement that *needs*
+        ``UPDATE`` cannot run under a role that has been denied it, so revoking
+        the privilege would have broken every append rather than just a rewrite.
+        An append-only collection therefore takes a path that never updates, and
+        the migration can then take ``UPDATE`` away (``is_append_only``).
+
+        The unique violation that a conflicting insert raises keeps its existing
+        meaning, ``ConcurrentUpdate``, and that is deliberate: on the audit trail
+        it is exactly a race, two writers reaching for the same sequence number,
+        and ``AuditLedger._append_with_retry`` is written to retry on the new
+        head. What changes is that the loser can no longer *overwrite* the
+        winner's row, which the upsert would have done silently.
+        """
+        parameters = {
+            "key": str(key),
+            "value": pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
+            "document": _readable(value),
+            "subscriber_ref": self._subscriber_of(collection, value),
+        }
+        if is_append_only(collection):
+            self._connection.execute(
+                text(
+                    f"""
+                    INSERT INTO {_qualified(collection)}
+                        (key, value, document, version, subscriber_ref)
+                    VALUES (:key, :value, :document, 1, :subscriber_ref)
+                    """
+                ),
+                parameters,
+            )
+            return
         self._connection.execute(
             text(
                 f"""
@@ -202,12 +243,7 @@ class PostgresUnitOfWork:
                        updated_at = now()
                 """
             ),
-            {
-                "key": str(key),
-                "value": pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
-                "document": _readable(value),
-                "subscriber_ref": self._subscriber_of(collection, value),
-            },
+            parameters,
         )
 
     def remove(self, collection: str, key: Any) -> None:
@@ -237,6 +273,62 @@ class PostgresUnitOfWork:
             self._transaction.rollback()
             self._close()
             raise ConcurrentUpdate(collection, key, expected=0, found=0) from error
+
+    @contextmanager
+    def as_custodian(self) -> Iterator[None]:
+        """Assume the audit custodian for this span, then return to the app role.
+
+        ``SET ROLE`` is authorised against the session user, not the current
+        role, so this succeeds for the database owner even though ``clarity_app``
+        is not a member of the custodian and cannot inherit ``DELETE``. A login
+        that is already the application role is refused, which is the property
+        the separation exists for.
+
+        The plain insert this driver uses for an append-only collection is
+        already valid after a delete, so the span does not need ``UPDATE`` on
+        those tables. The pointer tables are not append-only and are rewritten
+        in the same span, which is why the custodian is granted that narrower
+        write on them.
+
+        A failed statement aborts the transaction, and a ``SET ROLE`` in this
+        ``finally`` would then raise and hide the original error. After a
+        commit the role change was transaction-local and has already ended.
+        """
+        self._guard()
+        if self._custodian_depth == 0:
+            self._assume(CUSTODIAN_ROLE)
+        self._custodian_depth += 1
+        try:
+            yield
+        finally:
+            self._custodian_depth -= 1
+            if self._custodian_depth == 0 and not self._closed:
+                self._resume_application_role()
+
+    def _assume(self, role: str) -> None:
+        try:
+            self._connection.execute(text(f"SET LOCAL ROLE {role}"))
+        except DBAPIError as error:
+            self._transaction.rollback()
+            self._close()
+            raise CustodianUnavailable(
+                f"this connection cannot assume {role}. Restore and archival "
+                "require a database login that is allowed to SET ROLE to the "
+                "audit custodian. The application role is not that login."
+            ) from error
+
+    def _resume_application_role(self) -> None:
+        try:
+            self._connection.execute(text(f"SET LOCAL ROLE {APP_ROLE}"))
+        except DBAPIError as error:
+            # 25P02: the body already aborted the transaction. Raising here would
+            # hide that error. Any other failure would leave the rest of the unit
+            # running as the custodian, so it is rolled back instead.
+            if getattr(error.orig, "sqlstate", None) == "25P02":
+                return
+            self._transaction.rollback()
+            self._close()
+            raise
 
     def all_keys(self, collection: str) -> list[Any]:
         self._guard()

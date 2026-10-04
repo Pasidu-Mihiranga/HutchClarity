@@ -294,6 +294,7 @@ Source of truth: `backend/tests/architecture/test_module_dependencies.py`. A new
 | `governance` | `decision` | Replays decisions under candidate policy |
 | `receipts` | `actions` | Reads result types (vocabulary only) |
 | `timeline`, `detection`, `actions`, `iam`, `conversation`, `autopsy`, `foresight`, `reconciliation` | none | Leaf modules; reconciliation consumes events and queries the lower-layer adapter confirmation port |
+| `assurance` | none | Reads the audit trail and raises alerts (ADR-0037). Nothing on a money path calls it, so a slow or failing risk rule can never block a refund. |
 
 ```mermaid
 flowchart LR

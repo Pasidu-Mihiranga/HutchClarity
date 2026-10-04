@@ -20,19 +20,29 @@ these routes exactly as plan §19 describes.
 
 from __future__ import annotations
 
+import asyncio
+import logging
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response as RawResponse
+from pydantic import TypeAdapter
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from clarity.app.container import Clarity, Profile
 from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
+from clarity.interfaces.http import trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -41,13 +51,18 @@ from clarity.interfaces.http.auth import (
     authorize_action,
     authorize_case_access,
     customer_can_act,
+    principal_from,
     public,
     requires,
 )
 from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
     ActionView,
+    AlertDisposal,
     ApproveRequest,
+    AuditGrantRequest,
+    AuditGrantRevoke,
+    BreakGlassRequest,
     CaseSummary,
     CauseView,
     ConfirmRequest,
@@ -84,10 +99,27 @@ from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn
 from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
+from clarity.modules.assurance.public import (
+    Alert,
+    AlertNotFound,
+    AlertRefused,
+    Disposition,
+)
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
-from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
+from clarity.modules.iam.public import (
+    AuditGrant,
+    GrantNotFound,
+    GrantRefused,
+    OtpRefused,
+    SimulatedInbox,
+    SubjectKind,
+    TokenInvalid,
+)
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
+from clarity.platform.audit.checkpoints import anchor_verifies, checkpoint_document
+from clarity.platform.audit.export import AuditExport, export_document
+from clarity.platform.audit.ledger import ActorKind, AuditEventType, record_hash
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
 from clarity.platform.messaging.correlation import correlated
@@ -107,6 +139,11 @@ _STATUS_FOR_CODE = {
     "PLAN_NOT_PENDING": 409,
     "EXECUTION_FAILED": 502,
 }
+
+#: ISO 8601 durations in request bodies, such as ``P30D``.
+_DURATION_ADAPTER: TypeAdapter[timedelta] = TypeAdapter(timedelta)
+
+_log = logging.getLogger("clarity.audit.grants")
 
 _app_state: dict[str, Clarity] = {}
 
@@ -153,11 +190,137 @@ async def _trace_requests(request: Request, call_next: Any) -> Response:
         return response
 
 
+async def _audit_requests(request: Request, call_next: Any) -> Response:
+    """Record who made every state-changing request, and which staff read whom.
+
+    Runs after the handler, when routing has filled in the route template and
+    path parameters, so the record names ``POST /v1/cases/{case_id}/approve``
+    and the case rather than a raw URL. 401 and 403 are left to the refusal
+    handler, which records them with the reason.
+
+    A staff ``GET`` on a route naming one subject is recorded too, as
+    ``data.read`` (audit assurance plan 5.5): without it nothing distinguishes
+    an agent working their queue from one reading a neighbour's bill, which is
+    what the ``snooping`` rule counts. ``trail.records_data_read`` says which
+    reads qualify and why the rest are left out.
+
+    **Not fail closed.** This record is written after the handler committed,
+    so a failure here turns the response into an error but cannot undo the
+    change. The domain events a money path publishes are atomic with it
+    (ADR-0034); this record adds who asked, which they cannot carry.
+    """
+    response: Response = await call_next(request)
+    route = getattr(request.scope.get("route"), "path", None)
+    if route is None or response.status_code in {401, 403}:
+        return response
+
+    writes = trail.records_request(request.method, route)
+    if not writes and request.method != "GET":
+        return response
+
+    token = trail.bearer_token(request)
+    principal = ANONYMOUS
+    if token:
+        try:
+            principal = principal_from(request, request.headers.get("authorization"))
+        except StarletteHTTPException:
+            principal = ANONYMOUS
+    if not writes and not trail.records_data_read(request.method, route, principal):
+        return response
+
+    trail.record(
+        get_clarity(),
+        AuditEventType.REQUEST_PERFORMED if writes else AuditEventType.DATA_READ,
+        actor_ref=principal.ref,
+        actor_kind=trail.actor_kind_of(principal),
+        session_ref=trail.session_ref_for(token),
+        object_ref=f"{request.method} {route}",
+        detail={
+            "status": response.status_code,
+            "roles": sorted(role.value for role in principal.roles),
+            "assurance": principal.assurance.value,
+            "path_params": dict(request.path_params),
+        },
+        case_id=request.path_params.get("case_id"),
+    )
+    return response
+
+
+async def _sweep_grant_endings(stop: asyncio.Event) -> None:
+    """Record expired and lapsed grants on a schedule (audit assurance Phase 3).
+
+    The trail's own scheduler, with no new infrastructure: one loop per server
+    process, on ``audit.grant.sweep_interval``. Every authenticated request
+    also records endings first, so this loop is what covers the quiet hours
+    when nobody signs in. A failed sweep is logged and retried on the next
+    tick: it must never take the server down, and a claim it could not record
+    is released for the next attempt.
+    """
+    while not stop.is_set():
+        try:
+            interval = get_clarity().grant_sweep_interval().total_seconds()
+        except Exception:  # policy unreadable: fall back, keep sweeping
+            _log.exception("could not resolve audit.grant.sweep_interval; using 60s")
+            interval = 60.0
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(interval, 1.0))
+            return
+        except TimeoutError:
+            pass
+        try:
+            await run_in_threadpool(get_clarity().audit_grants.record_endings)
+        except Exception:
+            _log.exception("recording grant endings failed; retrying next sweep")
+
+
+async def _run_detection(stop: asyncio.Event) -> None:
+    """Run risk detection over the trail on a schedule (Phase 4, ADR-0037).
+
+    Liveness is checked *before* each run, not inside it: a loop that has
+    stopped cannot report that it stopped, so the check has to see the
+    heartbeat from the outside. One failed run is logged and retried on the
+    next tick; a run that keeps failing stops the heartbeat, and the liveness
+    check turns that silence into a critical alert.
+    """
+    while not stop.is_set():
+        try:
+            interval = get_clarity().assurance.sweep_interval().total_seconds()
+        except Exception:
+            _log.exception("could not resolve assurance.detection.interval; using 300s")
+            interval = 300.0
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(interval, 1.0))
+            return
+        except TimeoutError:
+            pass
+        try:
+            await run_in_threadpool(get_clarity().assurance.check_liveness)
+            await run_in_threadpool(get_clarity().assurance.run)
+        except Exception:
+            _log.exception("risk detection failed; retrying next interval")
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    stop = asyncio.Event()
+    background = [
+        asyncio.create_task(_sweep_grant_endings(stop)),
+        asyncio.create_task(_run_detection(stop)),
+    ]
+    try:
+        yield
+    finally:
+        stop.set()
+        for task in background:
+            await task
+
+
 def create_app(clarity: Clarity | None = None) -> FastAPI:
     if clarity is not None:
         _app_state["clarity"] = clarity
 
     app = FastAPI(
+        lifespan=_lifespan,
         title="Hutch Clarity API",
         version="0.1.0",
         description=(
@@ -171,6 +334,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(_audit_requests)
     app.middleware("http")(_trace_requests)
     # Outermost, so it also covers error responses and static files (X01).
     app.middleware("http")(security_headers)
@@ -179,6 +343,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
     core = clarity or get_clarity()
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
+    app.state.audit_grants = core.audit_grants
     _register_handlers(app)
     _register_routes(app)
     return app
@@ -202,6 +367,43 @@ def _problem(status: int, title: str, detail: str, code: str | None = None) -> J
 
 
 def _register_handlers(app: FastAPI) -> None:
+    @app.exception_handler(StarletteHTTPException)
+    async def _audited_refusal(request: Request, error: StarletteHTTPException) -> Response:
+        """Record refusals in the trail, then answer exactly as before (W2).
+
+        403 always: a signed-in caller was refused something. 401 only when a
+        token was presented and rejected: forged, expired or revoked. An
+        anonymous request with no token is the ordinary state of the public
+        internet and would bury the signal.
+        """
+        token = trail.bearer_token(request)
+        if error.status_code == 403 or (error.status_code == 401 and token):
+            principal = ANONYMOUS
+            if token:
+                try:
+                    principal = principal_from(request, request.headers.get("authorization"))
+                except StarletteHTTPException:
+                    principal = ANONYMOUS
+            known = principal is not ANONYMOUS
+            trail.record(
+                get_clarity(),
+                AuditEventType.ACCESS_DENIED
+                if error.status_code == 403
+                else AuditEventType.TOKEN_REJECTED,
+                actor_ref=principal.ref if known else "unknown",
+                actor_kind=trail.actor_kind_of(principal),
+                session_ref=trail.session_ref_for(token),
+                object_ref=trail.route_of(request),
+                detail={
+                    "status": error.status_code,
+                    "reason": str(error.detail),
+                    "roles": sorted(role.value for role in principal.roles),
+                    "assurance": principal.assurance.value,
+                },
+                case_id=request.path_params.get("case_id"),
+            )
+        return await http_exception_handler(request, error)
+
     @app.exception_handler(ToolLayerError)
     async def _tool_error(_: Request, error: ToolLayerError) -> JSONResponse:
         status = _STATUS_FOR_CODE.get(error.code, 409)
@@ -456,6 +658,425 @@ def _register_routes(app: FastAPI) -> None:
         """Public keys anyone can verify a receipt with (plan §15.2)."""
         return {"keys": clarity.signing.public_keys(), "alg": "Ed25519"}
 
+    @app.get("/.well-known/clarity-audit-checkpoint.json", tags=["audit"])
+    def audit_checkpoint(clarity: ClarityDep) -> dict[str, Any]:
+        """The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).
+
+        Public on purpose. A copy held outside the database is what catches an
+        insider who rewrites the trail *and* deletes the stored checkpoints:
+        their trail will no longer reach this ``seq`` with this head. It holds
+        a sequence number, two hashes, a time and a signature, nothing personal.
+        """
+        latest = clarity.audit_checkpoints.latest()
+        if latest is None:
+            raise HTTPException(status_code=404, detail="no audit checkpoint has been issued yet")
+        return checkpoint_document(latest, clarity.audit_checkpoints.public_keys())
+
+    # ------------------------------------------------------------------ #
+    # Audit trail and audit duties (audit assurance plan Phase 3)
+    # ------------------------------------------------------------------ #
+
+    @app.get("/v1/audit", tags=["audit"])
+    def read_audit_trail(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+        actor_ref: str | None = None,
+        event_type: str | None = None,
+        case_id: str | None = None,
+        after_seq: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read the trail: hashes and masked detail only, never a payload.
+
+        **The read is itself recorded** (rule 5): who looked, with which
+        filters, and how many records they saw. Who watched the watchers is
+        part of what is watched.
+        """
+        if limit < 1 or limit > 200:
+            raise HTTPException(status_code=422, detail="limit is between 1 and 200")
+        matching = [
+            record
+            for record in clarity.audit.records
+            if record.seq > after_seq
+            and (actor_ref is None or record.actor_ref == actor_ref)
+            and (event_type is None or str(record.event_type) == event_type)
+            and (case_id is None or record.case_id == case_id)
+        ]
+        page = matching[:limit]
+        verification = clarity.audit_checkpoints.verify()
+        filters = {
+            "actor_ref": actor_ref,
+            "event_type": event_type,
+            "case_id": case_id,
+            "after_seq": after_seq,
+            "limit": limit,
+        }
+        trail.record(
+            clarity,
+            AuditEventType.AUDIT_READ,
+            actor_ref=principal.ref,
+            actor_kind=trail.actor_kind_of(principal),
+            session_ref=trail.session_ref_for(trail.bearer_token(request)),
+            object_ref="GET /v1/audit",
+            detail={"filters": filters, "returned": len(page)},
+            case_id=case_id,
+        )
+        return {
+            "records": [record.model_dump(mode="json") for record in page],
+            "next_after_seq": page[-1].seq if len(matching) > limit else None,
+            "verification": {
+                "intact": verification.intact,
+                "length": verification.length,
+                "checkpoints": verification.checkpoints,
+                "last_checkpoint_seq": verification.last_checkpoint_seq,
+                "broken_at": verification.broken_at,
+                "reason": verification.reason,
+                "lost_from": verification.lost_from,
+                "lost_to": verification.lost_to,
+            },
+        }
+
+    @app.get("/v1/audit/health", tags=["audit"])
+    def audit_health(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """The chain health panel (plan 5.8): is the trail sound, and is it fresh.
+
+        **Deliberately not recorded as ``audit.read``.** A dashboard polls this,
+        and recording every poll would make the console trip the
+        ``mass_audit_read`` rule within minutes: the monitor would raise alerts
+        about the act of monitoring. It reads no record contents, only aggregates
+        and the verification verdict, so there is nothing here to read about a
+        person. Reading the trail *itself* is recorded, on ``GET /v1/audit``.
+
+        The verification is **incremental** for the same reason: a full recompute
+        on every poll turns the dashboard into the most expensive thing in the
+        system. ``AuditLedger.verify`` is explicit about what that does and does
+        not cover; the full recompute runs at startup and on the policy interval.
+        """
+        verification = clarity.audit_checkpoints.verify(incremental=True)
+        latest = clarity.audit_checkpoints.latest()
+        now = clarity.now()
+        last_detection = clarity.assurance.last_run()
+        pending = clarity.pending_event_count()
+        floor = clarity.audit.floor
+        return {
+            "intact": verification.intact,
+            "length": verification.length,
+            "verified_from": verification.verified_from,
+            "broken_at": verification.broken_at,
+            "reason": verification.reason,
+            "lost_from": verification.lost_from,
+            "lost_to": verification.lost_to,
+            "checkpoints": verification.checkpoints,
+            "last_checkpoint_seq": verification.last_checkpoint_seq,
+            "last_checkpoint_at": latest.recorded_at.isoformat() if latest else None,
+            "last_checkpoint_age_seconds": (
+                int((now - latest.recorded_at).total_seconds()) if latest else None
+            ),
+            "detection_last_ran_at": last_detection.isoformat() if last_detection else None,
+            "writer_lag_events": pending,
+            "archived_below_seq": int(floor["seq"]) if floor else 0,
+            "witness_url": "/.well-known/clarity-audit-checkpoint.json",
+            "simulated": True,
+        }
+
+    @app.get("/v1/audit/recovery", tags=["audit"])
+    def audit_recovery(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """The recovery panel: the last backup, the last restore, and its loss report.
+
+        Read out of the trail rather than from a separate status table, which is
+        the point of recording them there: a status table can disagree with what
+        happened, and the trail is what happened.
+        """
+
+        def latest(event: AuditEventType) -> dict[str, Any] | None:
+            found = clarity.audit.of_type(event)
+            if not found:
+                return None
+            record = found[-1]
+            return {
+                "seq": record.seq,
+                "at": record.recorded_at.isoformat(),
+                "actor_ref": record.actor_ref,
+                **record.detail,
+            }
+
+        return {
+            "last_backup": latest(AuditEventType.BACKUP_CREATED),
+            "last_backup_read": latest(AuditEventType.BACKUP_READ),
+            "last_restore": latest(AuditEventType.RESTORE_PERFORMED),
+            "last_segment_sealed": latest(AuditEventType.SEGMENT_SEALED),
+            "last_erasure": latest(AuditEventType.ERASURE_PERFORMED),
+            "backups_configured": clarity.settings.audit_backup_key is not None,
+            "simulated": True,
+        }
+
+    @app.post("/v1/audit/records/{seq}/verify", tags=["audit"])
+    def verify_audit_record(
+        seq: int,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+    ) -> dict[str, Any]:
+        """Recompute one record's hashes, for the trail explorer's "verify" action.
+
+        It answers a narrow question honestly: does this row hash to what it says,
+        and does it link to the row before it. It cannot confirm the payload,
+        because the ledger never stored one: ``proves()`` does that, and it needs
+        the document the caller is holding, which is not something a console has.
+        """
+        record = next((r for r in clarity.audit.records if r.seq == seq), None)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"no audit record at seq {seq}")
+        previous = next((r for r in clarity.audit.records if r.seq == seq - 1), None)
+        detail_matches = hash_payload(record.detail) == record.detail_hash
+        hash_matches = record_hash(record) == record.chain_hash
+        links = record.prev_hash == (previous.chain_hash if previous else None)
+        if previous is None and seq > 1:
+            # Archived: the row before it is in a segment, so the link cannot be
+            # checked from here. Said, not assumed either way.
+            links = record.prev_hash is not None
+        return {
+            "seq": seq,
+            "detail_matches_its_hash": detail_matches,
+            "record_hash_matches_its_contents": hash_matches,
+            "follows_its_predecessor": links,
+            "predecessor_available": previous is not None or seq == 1,
+            "intact": detail_matches and hash_matches and links,
+            "hash_version": record.hash_version,
+            "chain_hash": record.chain_hash,
+        }
+
+    @app.get("/v1/audit/export", tags=["audit"])
+    def export_audit_trail(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_EXPORT))],
+        case_id: str | None = None,
+    ) -> dict[str, Any]:
+        """A bundle a regulator can verify without trusting Clarity (Phase 7).
+
+        Records, the signed checkpoints that cover them, the public keys, and the
+        instructions for recomputing both. ``backend/scripts/verify_audit_export.py``
+        does exactly that with nothing from Clarity imported, which is the point:
+        a verifier that imports the code it checks proves only that the code
+        agrees with itself.
+
+        With ``case_id`` the export is a **selection**, and says so: a chain of
+        only one case's records is not contiguous, and a verifier that read a
+        selection as the whole trail would accept a redacted export as complete.
+
+        Exporting is recorded like any other read of the trail, and needs
+        ``audit:export``, which costs its holder every money permission.
+        """
+        records = clarity.audit.for_case(case_id) if case_id else clarity.audit.records
+        export = AuditExport(
+            created_at=clarity.now(),
+            scope=f"case {case_id}" if case_id else "the whole trail",
+            contiguous=case_id is None,
+            records=records,
+            checkpoints=clarity.audit_checkpoints.all(),
+            public_keys=clarity.audit_checkpoints.public_keys(),
+        )
+        trail.record(
+            clarity,
+            AuditEventType.AUDIT_READ,
+            actor_ref=principal.ref,
+            actor_kind=trail.actor_kind_of(principal),
+            session_ref=trail.session_ref_for(trail.bearer_token(request)),
+            object_ref="GET /v1/audit/export",
+            detail={
+                "scope": export.scope,
+                "records": len(records),
+                "contiguous": export.contiguous,
+                "digest": export.digest,
+            },
+            case_id=case_id,
+        )
+        return export_document(export)
+
+    def _grant_call(call: Callable[[], AuditGrant]) -> dict[str, Any]:
+        """Run one grant operation and map its refusals onto HTTP.
+
+        Separation-of-duties refusals are 403s, so the refusal handler records
+        them in the trail as ``access.denied`` with the rule that refused them.
+        """
+        try:
+            return call().model_dump(mode="json")
+        except GrantNotFound as error:
+            raise HTTPException(status_code=404, detail="no such grant") from error
+        except GrantRefused as error:
+            status = {
+                "NOT_PERMITTED": 403,
+                "SELF_GRANT": 403,
+                "FOUR_EYES": 403,
+                "NOT_PENDING": 409,
+                "NOT_ACTIVE": 409,
+            }.get(error.code, 422)
+            raise HTTPException(status_code=status, detail=f"{error.code}: {error}") from error
+
+    def _permission(value: str) -> Permission:
+        try:
+            return Permission(value)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=f"unknown permission {value!r}") from error
+
+    @app.get("/v1/audit/grants", tags=["audit"])
+    def list_audit_grants(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Every audit grant, active or not, for review and recertification."""
+        return {"grants": [grant.model_dump(mode="json") for grant in clarity.audit_grants.all()]}
+
+    @app.post("/v1/audit/grants", tags=["audit"], status_code=201)
+    def request_audit_grant(
+        body: AuditGrantRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Ask for an audit duty for a named person or a role. Someone else approves."""
+        try:
+            kind = SubjectKind(body.subject_kind)
+            duration = _DURATION_ADAPTER.validate_python(body.duration)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        permission = _permission(body.permission)
+        return _grant_call(
+            lambda: clarity.audit_grants.request(
+                principal,
+                subject_kind=kind,
+                subject_ref=body.subject_ref,
+                permission=permission,
+                reason=body.reason,
+                duration=duration,
+            )
+        )
+
+    @app.post("/v1/audit/grants/{grant_id}/approve", tags=["audit"])
+    def approve_audit_grant(
+        grant_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """The second pair of eyes. The requester cannot approve their own request."""
+        return _grant_call(lambda: clarity.audit_grants.approve(principal, grant_id))
+
+    @app.post("/v1/audit/grants/{grant_id}/revoke", tags=["audit"])
+    def revoke_audit_grant(
+        grant_id: str,
+        body: AuditGrantRevoke,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        return _grant_call(
+            lambda: clarity.audit_grants.revoke(principal, grant_id, reason=body.reason)
+        )
+
+    @app.post("/v1/audit/grants/{grant_id}/recertify", tags=["audit"])
+    def recertify_audit_grant(
+        grant_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Keep a grant alive one more review interval. Unreviewed grants lapse."""
+        return _grant_call(lambda: clarity.audit_grants.recertify(principal, grant_id))
+
+    @app.post("/v1/audit/break-glass", tags=["audit"], status_code=201)
+    def break_glass(
+        body: BreakGlassRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ADMIN_MANAGE))],
+    ) -> dict[str, Any]:
+        """An admin's immediate audit duty for an incident: short, and always recorded."""
+        permission = _permission(body.permission)
+        return _grant_call(
+            lambda: clarity.audit_grants.break_glass(
+                principal, permission=permission, reason=body.reason
+            )
+        )
+
+    # ------------------------------------------------------------------ #
+    # Assurance: alerts raised from the trail (audit assurance plan Phase 4)
+    # ------------------------------------------------------------------ #
+
+    def _alert_call(call: Callable[[], Alert]) -> dict[str, Any]:
+        """Run one lifecycle move and map its refusals onto HTTP.
+
+        Rule refusals are 403s, so the refusal handler records each one in the
+        trail with the rule that refused it.
+        """
+        try:
+            return call().model_dump(mode="json")
+        except AlertNotFound as error:
+            raise HTTPException(status_code=404, detail="no such alert") from error
+        except AlertRefused as error:
+            status = {
+                "NOT_PERMITTED": 403,
+                "SELF_DISPOSAL": 403,
+                "SECOND_PERSON": 403,
+            }.get(error.code, 409)
+            raise HTTPException(status_code=status, detail=f"{error.code}: {error}") from error
+
+    @app.get("/v1/assurance/alerts", tags=["assurance"])
+    def list_alerts(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+        open_only: bool = False,
+    ) -> dict[str, Any]:
+        """The alert queue. Each alert cites the trail records that justify it."""
+        alerts = clarity.assurance.alerts(open_only=open_only)
+        last = clarity.assurance.last_run()
+        return {
+            "alerts": [alert.model_dump(mode="json") for alert in alerts],
+            "detection_last_ran_at": last.isoformat() if last else None,
+        }
+
+    @app.post("/v1/assurance/alerts/{alert_id}/acknowledge", tags=["assurance"])
+    def acknowledge_alert(
+        alert_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        return _alert_call(lambda: clarity.assurance.acknowledge(principal, alert_id))
+
+    @app.post("/v1/assurance/alerts/{alert_id}/investigate", tags=["assurance"])
+    def investigate_alert(
+        alert_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        return _alert_call(lambda: clarity.assurance.investigate(principal, alert_id))
+
+    @app.post("/v1/assurance/alerts/{alert_id}/dispose", tags=["assurance"])
+    def dispose_alert(
+        alert_id: str,
+        body: AlertDisposal,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ALERT_DISPOSE))],
+    ) -> dict[str, Any]:
+        """Close an alert with a disposition and a reason.
+
+        Never by its own subject, and a high or critical alert is closed by
+        someone other than whoever acknowledged it.
+        """
+        try:
+            disposition = Disposition(body.disposition)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=422, detail=f"unknown disposition {body.disposition!r}"
+            ) from error
+        return _alert_call(
+            lambda: clarity.assurance.dispose(
+                principal, alert_id, disposition=disposition, reason=body.reason
+            )
+        )
+
     @app.post("/v1/demo/reset", tags=["demo"], dependencies=[Depends(demo_only)])
     def demo_reset() -> dict[str, Any]:
         """Rebuild the synthetic world so the demo can be run again cleanly.
@@ -484,14 +1105,32 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-        if clarity.world.account_by_msisdn(msisdn) is None:
+        account = clarity.world.account_by_msisdn(msisdn)
+        # Who asked, without the number: the pseudonym when it is a customer,
+        # the masked form when it matches nobody (I13).
+        who = account.ref if account is not None else f"unknown:{mask_msisdn(msisdn)}"
+
+        def requested(outcome: str, challenge: str | None = None) -> None:
+            trail.record(
+                clarity,
+                AuditEventType.OTP_REQUESTED,
+                actor_ref=who,
+                actor_kind=ActorKind.CUSTOMER,
+                object_ref=challenge or "otp",
+                detail={"outcome": outcome, "channel": "sms"},
+            )
+
+        if account is None:
+            requested("unknown_number")
             raise HTTPException(status_code=404, detail="We could not find this Hutch number.")
 
         try:
             challenge_id = clarity.otp.request(msisdn)
         except OtpRefused as error:
+            requested("refused")
             raise HTTPException(status_code=429, detail=str(error)) from error
 
+        requested("sent", challenge_id)
         return {
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
@@ -514,6 +1153,15 @@ def _register_routes(app: FastAPI) -> None:
         try:
             msisdn = clarity.otp.verify(body.challenge_id, body.code)
         except OtpRefused as error:
+            # The challenge, never the code that was tried.
+            trail.record(
+                clarity,
+                AuditEventType.OTP_FAILED,
+                actor_ref=f"challenge:{body.challenge_id}",
+                actor_kind=ActorKind.CUSTOMER,
+                object_ref=body.challenge_id,
+                detail={"reason": str(error)},
+            )
             raise HTTPException(status_code=401, detail=str(error)) from error
 
         account = clarity.world.account_by_msisdn(msisdn)
@@ -522,6 +1170,18 @@ def _register_routes(app: FastAPI) -> None:
 
         issued = clarity.tokens.for_customer(
             account.ref, assurance=Assurance.OTP, channel=body.channel.value
+        )
+        trail.record(
+            clarity,
+            AuditEventType.OTP_VERIFIED,
+            actor_ref=account.ref,
+            actor_kind=ActorKind.CUSTOMER,
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=body.challenge_id,
+            detail={
+                "assurance": issued.principal.assurance.value,
+                "channel": body.channel.value,
+            },
         )
         return SessionView(
             token=issued.value,
@@ -558,6 +1218,22 @@ def _register_routes(app: FastAPI) -> None:
             roles=roles,
             assurance=Assurance.MFA_RECENT if body.step_up else Assurance.MFA,
         )
+        # The moment a session *becomes* a supervisor with step-up. Every
+        # approval later made with this token carries the same session_ref.
+        trail.record(
+            clarity,
+            AuditEventType.STAFF_SESSION_STARTED,
+            actor_ref=body.user_ref,
+            actor_kind=ActorKind.STAFF,
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=body.user_ref,
+            detail={
+                "roles": sorted(role.value for role in roles),
+                "step_up": body.step_up,
+                "assurance": issued.principal.assurance.value,
+                "simulated": True,
+            },
+        )
         return SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,
@@ -574,7 +1250,25 @@ def _register_routes(app: FastAPI) -> None:
         try:
             issued = clarity.tokens.refresh(body.refresh_token)
         except TokenInvalid as error:
+            trail.record(
+                clarity,
+                AuditEventType.TOKEN_REJECTED,
+                actor_ref="unknown",
+                actor_kind=ActorKind.SYSTEM,
+                session_ref=trail.session_ref_for(body.refresh_token),
+                object_ref="POST /v1/auth/refresh",
+                detail={"kind": "refresh", "reason": str(error)},
+            )
             raise HTTPException(status_code=401, detail=str(error)) from error
+        trail.record(
+            clarity,
+            AuditEventType.TOKEN_REFRESHED,
+            actor_ref=issued.principal.ref,
+            actor_kind=trail.actor_kind_of(issued.principal),
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=issued.principal.ref,
+            detail={"roles": sorted(role.value for role in issued.principal.roles)},
+        )
         return SessionView(
             token=issued.value,
             refresh_token=issued.refresh_token,
@@ -1644,8 +2338,20 @@ def _verification_view(clarity: Clarity, receipt_id: str) -> VerificationView:
 
     result = clarity.receipts.verify_document(receipt)
     view = clarity.receipts.public_view(receipt)
+    # The anchor is reported separately from the receipt's own validity, and
+    # deliberately does not affect it: a receipt is a statement about one
+    # customer's money, and it stays true whether or not the audit checkpoint it
+    # happened to carry still verifies. Conflating them would let an audit-side
+    # problem tell a customer their refund never happened.
+    anchor = receipt.payload.audit_anchor
     return VerificationView(
         receipt_id=receipt_id,
+        audit_anchor_seq=anchor.checkpoint_seq if anchor else None,
+        audit_anchor_ok=(
+            anchor_verifies(anchor, clarity.audit_checkpoints.public_keys())
+            if anchor is not None
+            else None
+        ),
         status=result.display,
         valid=result.valid,
         reason=result.reason,

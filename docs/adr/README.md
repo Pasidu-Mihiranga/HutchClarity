@@ -37,7 +37,13 @@ reversed.
 | [0029](0029-module-interaction-calls-and-events.md) | Module interaction: public calls for answers, outbox events for side effects | Accepted |
 | [0030](0030-bounded-agency-flows-and-grounded-rag.md) | Bounded agency: flows as state machines, tools by allowlist, grounded RAG | Accepted |
 | [0031](0031-next-js-14-until-16-passes-the-browser-suite.md) | Next.js 14 until 16 passes the browser suite | Accepted |
-
+| [0033](0033-audit-record-hash-covers-the-whole-record.md) | The audit record hash covers the whole record | Accepted |
+| [0034](0034-one-persisted-audit-trail.md) | One persisted audit trail for every process | Accepted |
+| [0035](0035-signed-audit-checkpoints-with-a-separate-key.md) | Signed audit checkpoints with a separate key, and a public witness | Accepted |
+| [0036](0036-audit-access-as-grants-under-separation-of-duties.md) | Audit access as time-boxed grants under separation of duties | Accepted |
+| [0037](0037-assurance-is-a-leaf-module-that-reacts-to-the-trail.md) | Assurance is a leaf module that reacts to the trail | Accepted |
+| [0038](0038-audit-recovery-measured-against-an-external-checkpoint.md) | Audit recovery is measured against an external checkpoint | Accepted |
+| [0039](0039-audit-lifecycle-archive-hold-and-crypto-shred.md) | The audit trail is archived, held and crypto-shredded, never deleted | Accepted |
 ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 
 ## Writing one

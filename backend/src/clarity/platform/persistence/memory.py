@@ -12,12 +12,15 @@ exists so a reviewer can run Clarity with no infrastructure.
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Self
 
 from clarity.platform.persistence.errors import ConcurrentUpdate, UnitOfWorkClosed
 from clarity.platform.persistence.ports import Repository
+from clarity.platform.persistence.schemas import is_append_only
 
 _Key = tuple[str, Any]
 
@@ -36,6 +39,24 @@ class _Staged:
 
     value: Any = None
     deleted: bool = False
+
+
+class AppendOnlyWrite(RuntimeError):
+    """Something tried to overwrite a row in a collection that only ever grows.
+
+    The database answers a conflicting insert with a unique violation, which the
+    PostgreSQL driver turns into ``ConcurrentUpdate`` so an audit append retries
+    on the next sequence number. This is the memory store saying the same thing
+    at the same moment; callers that retry already handle it, because it is
+    raised from the same place.
+    """
+
+    def __init__(self, collection: str, key: Any) -> None:
+        super().__init__(
+            f"{collection} is append-only and already holds {key!r}: a row there is never replaced"
+        )
+        self.collection = collection
+        self.key = key
 
 
 class MemoryStore:
@@ -88,6 +109,7 @@ class MemoryUnitOfWork:
         self._staged: dict[_Key, _Staged] = {}
         self._baselines: dict[_Key, int] = {}
         self._closed = False
+        self._custodian = False
 
     # -- the UnitOfWork port --------------------------------------------- #
 
@@ -134,14 +156,35 @@ class MemoryUnitOfWork:
         return None if row is None else row.value
 
     def write(self, collection: str, key: Any, value: Any) -> None:
+        """Stage a write. On an append-only collection, never over an existing row.
+
+        Parity with the PostgreSQL driver, which plainly inserts into these
+        collections so the migration can take ``UPDATE`` away (I20: every driver
+        passes its port's parity suite). Without this the memory store would
+        happily overwrite an audit record and ``lite`` would behave differently
+        from ``full`` on exactly the guarantee the audit trail rests on.
+        """
         self._guard()
-        self._remember(collection, key, self._store.row(collection, key))
+        existing = self._store.row(collection, key)
+        if not self._custodian and is_append_only(collection) and existing is not None:
+            raise AppendOnlyWrite(collection, key)
+        self._remember(collection, key, existing)
         self._staged[(collection, key)] = _Staged(value=value)
 
     def remove(self, collection: str, key: Any) -> None:
         self._guard()
         self._remember(collection, key, self._store.row(collection, key))
         self._staged[(collection, key)] = _Staged(deleted=True)
+
+    @contextmanager
+    def as_custodian(self) -> Iterator[None]:
+        """See ``UnitOfWork.as_custodian``: the named exception to append-only."""
+        before = self._custodian
+        self._custodian = True
+        try:
+            yield
+        finally:
+            self._custodian = before
 
     def all_keys(self, collection: str) -> list[Any]:
         self._guard()

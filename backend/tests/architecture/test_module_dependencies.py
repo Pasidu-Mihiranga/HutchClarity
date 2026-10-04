@@ -39,6 +39,9 @@ ALLOWED: dict[str, set[str]] = {
     "conversation": set(),
     "autopsy": set(),
     "foresight": set(),
+    # Reacts to the trail and raises alerts; calls no module, and nothing on a
+    # money path calls it (ADR-0037). A leaf by design.
+    "assurance": set(),
     # scaffold modules: no synchronous calls declared yet
     "content": set(),
     "customer": set(),

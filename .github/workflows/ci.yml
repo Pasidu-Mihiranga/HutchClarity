@@ -182,6 +182,19 @@ jobs:
         run: pytest tests/contract -v -ra
       - name: Integration (schema isolation, row-level security, two replicas)
         run: pytest tests/integration -v -ra
+      - name: Audit append-only grants
+        # Its own step: W1 is the claim that the database refuses an audit
+        # rewrite, and a claim nobody runs against a real PostgreSQL is a
+        # convention with better wording.
+        run: pytest tests/integration/test_append_only_grants.py -v -ra
+      - name: Audit destroy-and-restore drill
+        # Its own step, named, so a recovery regression is legible in the run
+        # list rather than one dot inside the integration suite. The drill is the
+        # only thing that proves a backup can actually be restored, and a backup
+        # nobody has restored is a hope (audit assurance plan Phase 6).
+        env:
+          CLARITY_AUDIT_BACKUP_KEY: a-ci-only-drill-key-not-a-secret
+        run: pytest tests/integration/test_audit_restore_drill.py -v -ra
       - name: Fail if the full-profile tests only skipped
         # The lane exists to exercise the real drivers. If they all skipped, the
         # services did not come up and the lane proved nothing.

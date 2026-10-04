@@ -18,6 +18,7 @@ Three properties this service is responsible for:
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,6 +30,7 @@ from clarity.contracts.receipt import (
     ActorType,
     ReceiptAction,
     ReceiptActor,
+    ReceiptAuditAnchor,
     ReceiptCause,
     ReceiptDecision,
     ReceiptEvidence,
@@ -99,10 +101,17 @@ class ReceiptService:
         verify_base: str = DEFAULT_VERIFY_BASE,
         persist: bool = False,
         open_unit: UnitOfWorkFactory | None = None,
+        audit_anchor: Callable[[], ReceiptAuditAnchor | None] | None = None,
     ) -> None:
         self._signing = signing
         self._probe = probe
         self._verify_base = verify_base.rstrip("/")
+        #: The current signed audit checkpoint, so a receipt carries an external
+        #: witness of the audit head (ADR-0035). A callable supplied by the
+        #: composition root rather than the checkpointer itself: this module must
+        #: not depend on ``platform.audit`` (I4), and a receipt must still be
+        #: issuable where there is no checkpointer at all.
+        self._audit_anchor = audit_anchor
         # The chain lives in the repository (B02); the service keeps no copy.
         self._ledger = ledger
         self._lock = threading.Lock()
@@ -308,6 +317,22 @@ class ReceiptService:
             unit.repository(RECEIPT_SEQUENCE),
             unit.repository(BY_PLAN),
         )
+
+    def _anchor(self) -> ReceiptAuditAnchor | None:
+        """The current audit checkpoint, or ``None`` rather than a failed receipt.
+
+        A receipt must not fail to issue because the checkpointer is unavailable:
+        the customer is owed their proof of what happened to their money, and an
+        absent anchor weakens the audit witness without weakening the receipt.
+        The absence is visible in the payload, so nobody can mistake a receipt
+        with no anchor for one that was never checked.
+        """
+        if self._audit_anchor is None:
+            return None
+        try:
+            return self._audit_anchor()
+        except Exception:  # never block a receipt on the audit side
+            return None
 
     @staticmethod
     def _chain_head(ledger: ReceiptRepository) -> str | None:

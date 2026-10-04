@@ -11,6 +11,7 @@ one of these; see ``clarity.modules.case.repository``.
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
 
@@ -63,6 +64,28 @@ class UnitOfWork(Protocol):
 
     def rollback(self) -> None:
         """Discard every staged write."""
+        ...
+
+    def as_custodian(self) -> AbstractContextManager[None]:
+        """A span in which an append-only collection may be rewritten.
+
+        Append-only is the ordinary rule and this is the named exception to it,
+        for the two operations that legitimately replace audit rows: restoring a
+        backup, and sealing records into a segment (ADR-0038, ADR-0039). It is a
+        context manager rather than a flag so the privilege is visible at the
+        call site and bounded by it, and so a reviewer can grep for every place
+        that takes it.
+
+        On PostgreSQL the span assumes ``clarity_audit_custodian`` and puts the
+        application role back when it ends. ``DELETE`` on an audit table is
+        granted to that role alone, and the application role is not a member of
+        it, so a request cannot inherit the privilege. The switch is authorised
+        against the session user (the database owner), which is the same reason
+        a unit of work can assume the application role in the first place. A
+        login that is already the application role cannot enter the span. The
+        in-memory driver relaxes its own guard for the same span, so both
+        profiles accept a restore and refuse an ordinary rewrite.
+        """
         ...
 
     def __enter__(self) -> Self: ...

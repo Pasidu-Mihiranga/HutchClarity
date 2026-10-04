@@ -21,7 +21,10 @@ from sqlalchemy.engine import Connection, Engine
 from clarity.platform.persistence.postgres import SUBSCRIBER_SETTING
 from clarity.platform.persistence.schemas import (
     APP_ROLE,
+    APPEND_ONLY,
+    CUSTODIAN_ROLE,
     OWNERS,
+    is_append_only,
     is_customer_scoped,
     owner_of,
     role_of,
@@ -115,6 +118,7 @@ def create_schema(engine: Engine, collections: Iterable[str]) -> None:
 
         _grant_each_role_its_own_schema_only(connection)
         _create_application_role(connection)
+        _make_append_only_tables_append_only(connection, collections)
 
 
 def _create_role(connection: Connection, module: str) -> None:
@@ -180,6 +184,121 @@ def _grant_each_role_its_own_schema_only(connection: Connection) -> None:
             else:
                 connection.execute(text(f"REVOKE ALL ON SCHEMA {schema} FROM {role}"))
                 connection.execute(text(f"REVOKE ALL ON ALL TABLES IN SCHEMA {schema} FROM {role}"))
+
+
+def _make_append_only_tables_append_only(
+    connection: Connection, collections: Iterable[str]
+) -> None:
+    """Take UPDATE and DELETE away from the writing role on the audit tables (W1).
+
+    This is the part a hash chain cannot do. The chain makes an edit *visible*
+    afterwards; this makes it fail at the moment it is attempted, by the database,
+    under the role requests actually run as. An attacker who reaches the
+    application still cannot rewrite a record, and does not get the chance to
+    recompute a chain around it.
+
+    Two things make it possible now and not before.
+
+    The write path for these collections no longer upserts (``is_append_only`` in
+    the PostgreSQL driver). A statement carrying ``ON CONFLICT DO UPDATE`` needs
+    the ``UPDATE`` privilege whether or not it ever updates anything, so revoking
+    it would have broken every append rather than only a rewrite. That is exactly
+    why this step sat blocked.
+
+    And the operations that *do* legitimately remove audit rows, restoring a
+    backup and sealing a segment, get a role of their own. ``CUSTODIAN_ROLE``
+    holds ``DELETE``; the application role is deliberately **not** a member of it.
+    ``as_custodian`` assumes that role with ``SET LOCAL ROLE`` for the span and
+    puts the application role back afterwards. ``SET ROLE`` is checked against
+    the session user, so the database owner can assume it and a connection that
+    logged in as ``clarity_app`` cannot. The custodian also receives the
+    sequences those inserts use, and ``SELECT``, ``INSERT``, ``UPDATE`` and
+    ``DELETE`` on the two pointer tables, because a restore rewrites the head
+    and archival rewrites the floor inside the same span. The pointers hold no
+    history. The plan's wording is precise and worth keeping: revoke from the
+    *writing* role.
+    """
+    connection.execute(
+        text(
+            f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{CUSTODIAN_ROLE}') THEN
+                    CREATE ROLE {CUSTODIAN_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS INHERIT;
+                END IF;
+            END $$
+            """
+        )
+    )
+    for collection in collections:
+        if not is_append_only(collection):
+            continue
+        table = f"{schema_of(collection)}.{table_of(collection)}"
+        role = role_of(owner_of(collection))
+        connection.execute(text(f"REVOKE UPDATE, DELETE ON {table} FROM {role}"))
+        # Granted explicitly rather than left to the schema-wide grant above,
+        # which this has just narrowed.
+        connection.execute(text(f"GRANT SELECT, INSERT ON {table} TO {role}"))
+        connection.execute(
+            text(f"GRANT USAGE ON SCHEMA {schema_of(collection)} TO {CUSTODIAN_ROLE}")
+        )
+        connection.execute(text(f"GRANT SELECT, INSERT, DELETE ON {table} TO {CUSTODIAN_ROLE}"))
+        _grant_sequence(connection, table)
+
+    # Head and floor are pointers. Restore and archival rewrite them while the
+    # transaction is the custodian, so the application role's grants are not in
+    # force for those statements. They are not append-only and hold no history.
+    present = set(collections)
+    for collection in ("platform.audit_head", "platform.audit_floor"):
+        if collection not in present:
+            continue
+        table = f"{schema_of(collection)}.{table_of(collection)}"
+        connection.execute(
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO {CUSTODIAN_ROLE}")
+        )
+        _grant_sequence(connection, table)
+
+
+def _grant_sequence(connection: Connection, table: str) -> None:
+    """Let the custodian insert into ``table``.
+
+    A ``bigserial`` column draws its default from a sequence owned by the table
+    owner. ``INSERT`` without naming that column calls ``nextval``, which the
+    custodian cannot do until it holds ``USAGE``.
+    """
+    sequence = connection.execute(
+        text("SELECT pg_get_serial_sequence(:table, 'sequence')"),
+        {"table": table},
+    ).scalar_one()
+    connection.execute(text(f"GRANT USAGE, SELECT ON SEQUENCE {sequence} TO {CUSTODIAN_ROLE}"))
+
+
+def append_only_report(engine: Engine) -> dict[str, set[str]]:
+    """Which privileges the writing role actually holds on each append-only table.
+
+    Read back from ``information_schema`` rather than from what the migration
+    believes it did: a grant that silently did not apply is the failure this is
+    for, and the integration test asserts on this.
+    """
+    report: dict[str, set[str]] = {}
+    with engine.begin() as connection:
+        for collection in sorted(APPEND_ONLY):
+            role = role_of(owner_of(collection))
+            rows = connection.execute(
+                text(
+                    """
+                    SELECT privilege_type FROM information_schema.table_privileges
+                    WHERE table_schema = :schema AND table_name = :table AND grantee = :role
+                    """
+                ),
+                {
+                    "schema": schema_of(collection),
+                    "table": table_of(collection),
+                    "role": role,
+                },
+            )
+            report[collection] = {row.privilege_type for row in rows}
+    return report
 
 
 def drop_schema(engine: Engine) -> None:

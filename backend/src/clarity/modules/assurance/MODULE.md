@@ -1,0 +1,88 @@
+# assurance - MODULE.md
+
+| Field | Value |
+|---|---|
+| Kind | module |
+| Layer | L4 domain (`clarity.modules.assurance`) |
+| Deployable | `clarity-api` today (modular monolith); a `clarity-worker` schedule later |
+| Owner | TBD |
+| Status | built (`lite` and `full`): audit assurance plan Phase 4, ADR-0037, 2026-10-04 |
+| Files | `rules.py`, `alerts.py`, `service.py`, `public.py` |
+
+## 1. Purpose
+
+Watch the audit trail and raise alerts a person owes an answer on: suspicious
+patterns counted from the trail, the trail's own integrity, and the silence
+that means detection has stopped. It also holds the chain-break playbook, which
+moves the kill switches to the safe side when the trail cannot be trusted.
+
+Nothing here decides anything about a case or moves money (I1).
+
+## 2. Public surface (`public.py`)
+
+`AssuranceService`, `Alert`, `AlertState`, `Disposition`, `AlertRefused`,
+`AlertNotFound`, `Band`, `Finding`, `RULES`, `SECOND_PERSON_BANDS`,
+`PLAYBOOK_SWITCHES`, `CHAIN_BREAK`, `CHECKPOINT_GAP`, `DETECTOR_SILENT`,
+`TRAIL_LAG`, and the owned collection names `ALERTS`, `HEARTBEATS`.
+
+## 3. Used by
+`clarity.app`, `clarity.interfaces.http`
+
+## 4. Depends on
+| Package | Through |
+|---|---|
+| `clarity.kernel` | - |
+| `clarity.platform.audit` | reads the trail; appends alert lifecycle records |
+| `clarity.platform.config` | thresholds from the policy store; kill switches |
+| `clarity.platform.persistence` | `assurance.alerts`, `assurance.heartbeats` |
+| `clarity.platform.security` | `Principal`, `Permission` for the closure rules |
+| `clarity.platform.messaging` | `OutboxRow` as a type only; the rows arrive through a reader the composition root injects |
+
+**No module edges.** It calls no other module and no module calls it: a rule
+that is slow or broken can never block a refund (ADR-0029, ADR-0037).
+
+The messaging dependency is a type import only. Undelivered outbox rows reach
+the lag rule through a `pending` callable that `clarity.app.container` supplies,
+so this module never reaches into the outbox and a deployment without one simply
+has no lag finding.
+
+## 5. Data owned
+Collections `assurance.alerts` and `assurance.heartbeats`. Lite uses the shared
+memory store; full uses the assurance PostgreSQL schema.
+
+## 6. Invariants
+- **Counted, never modelled.** Every rule is a count or a join over trail
+  records, with thresholds resolved from the policy store `as_of` the moment
+  they apply (I1, I10). No model scores risk.
+- Every alert cites the `seq` numbers that justify it, so a reviewer reads
+  evidence rather than trusting a score.
+- A rule reads only `AuditRecord` fields: never a payload, never customer data.
+- Nobody disposes of an alert they are the subject of; a high or critical alert
+  is closed by someone other than whoever acknowledged it; disposing needs
+  `alert:dispose`, which removes money permissions from its holder (ADR-0036).
+- The playbook only ever moves switches to the safe side, never back.
+- Detection writes a heartbeat on every run, including a quiet one: a run that
+  found nothing and a run that never happened must not look the same.
+- Working hours are **configured**, never learned. `off_hours` reads two numbers
+  owned by whoever owns the roster, because a learned baseline is a model and a
+  model scoring a person's working pattern is a guess wearing a number's
+  clothes (I1).
+- Every rule's thresholds must exist in `config/policy`. `run` catches a broken
+  rule so one cannot stop the rest, which means a missing key would otherwise
+  degrade silently to a `<rule>_failed` finding; a contract test resolves every
+  rule against the real policy directory instead.
+
+## 7. Migration status (enterprise-plan 21)
+Built in the modular monolith. Detection runs on a schedule in each API
+process; extracting it to `clarity-worker` is R6/R7 and needs no interface
+change, because it already reacts to the trail rather than being called.
+
+## 8. Tests
+- `tests/unit/test_assurance.py`
+- `tests/security/test_audit_coverage.py` (the trail the rules read)
+
+## 9. Change history
+| Date | Devlog entry | Summary |
+|---|---|---|
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P4-assurance.md` | Detection, alerts, liveness and the chain-break playbook (Phase 4, ADR-0037) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-AUDIT-P4-deferred.md` | Six remaining risk scenarios, outbox lag, and the policy-store contract test |

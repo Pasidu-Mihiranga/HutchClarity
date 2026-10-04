@@ -4,6 +4,229 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed (audit assurance W1 and Phase 2 cross-anchor; **money path, two approvals**)
+
+- **Receipt schema 1.1**: `ReceiptPayload.audit_anchor` carries the current signed
+  audit checkpoint inside the signed payload, so a delivered receipt witnesses the
+  audit head (ADR-0035 amendment). `compute_hash` is version-aware and hashes a
+  1.0 payload without the field, so receipts already issued keep verifying.
+- **`GET /v1/receipts/{id}/verify`** gains `audit_anchor_seq` and
+  `audit_anchor_ok`, reported separately from the receipt's own validity. OpenAPI
+  snapshot and SDK regenerated on purpose.
+- **Audit tables are append-only in the database** (ADR-0034 amendment). The write
+  path for `platform.audit`, `platform.audit_checkpoints` and
+  `platform.audit_segments` plainly inserts; the migration revokes `UPDATE` and
+  `DELETE` from the module role and grants `DELETE` to the new
+  `clarity_audit_custodian` role, which `clarity_app` is not a member of.
+- **`UnitOfWork.as_custodian()`**: the named, bounded exception to append-only,
+  used by restore and archival only. On PostgreSQL the span assumes
+  `clarity_audit_custodian` and returns to `clarity_app`. The custodian is
+  granted the audit sequences and writes on the head and floor pointers, which
+  those two operations rewrite inside the span. `clarity_app` is still not a
+  member of the custodian role.
+
+### Changed (audit assurance Phases 2, 6 and 7, breaking for stored hashes)
+
+- **Record hash version 3** (ADR-0033 amendment). Version 2 hashed the datetimes
+  as `isoformat()` strings, which bypassed the canonical hasher and produced
+  `...+00:00` while the published JSON carries `...Z`: the hash was computed over
+  a form the record is never published in, so no external verifier could
+  reproduce it. Version 3 passes the datetimes as datetimes. `statement_hash` for
+  checkpoints had the same defect and the same fix. Found by writing the offline
+  export verifier; no version 2 record was ever persisted outside a test.
+- **`AuditLedger.verify` takes `since`/`since_hash`** and resumes automatically
+  from an archival floor; `ChainVerification` and `CheckpointVerification` gained
+  `verified_from`. `Checkpointer.verify` takes `incremental`.
+- **Every audit append is screened** and refuses a raw MSISDN, NIC, card number
+  or email in the payload or the detail (`platform.audit.entropy`). The keyed
+  `payload_hash` the plan proposed is **not** being done, and ADR-0033 says why.
+- **`SwitchBoard` takes a `clock`**, so a flip is stamped from the injected clock
+  (I11) rather than the wall clock.
+
+### Added (audit assurance Phase 5: the console Audit section)
+
+- **Console `/audit`** with the eight panels from plan 5.8: chain health, trail
+  explorer, actor timeline, alerts with their lifecycle, monitors, access,
+  recovery and export. Nav entry gated on `audit:read`.
+- **New `/v1` routes**, all needing `audit:read`: `GET /v1/audit/health`,
+  `GET /v1/audit/recovery`, `POST /v1/audit/records/{seq}/verify`. `health` is
+  deliberately **not** recorded as `audit.read`: a dashboard polls it, and
+  recording every poll would make the console trip the `mass_audit_read` rule.
+- **SDK**: `auditHealth`, `auditTrail`, `auditRecovery`, `verifyAuditRecord`,
+  `listAuditGrants`, `listAlerts`, `acknowledgeAlert`, `investigateAlert`,
+  `disposeAlert`, with their types exported.
+- `frontend/e2e/audit-console.spec.ts`, 9 browser tests; the suite is now 28.
+
+### Added (audit assurance Phases 6 and 7, ADR-0038 and ADR-0039)
+
+- **New `/v1` route**: `GET /v1/audit/export`, a bundle a regulator verifies with
+  `backend/scripts/verify_audit_export.py`, which imports nothing from Clarity.
+  Needs `audit:export`. OpenAPI snapshot and SDK types regenerated on purpose.
+- **New permission `audit:restore`** (`Permission.AUDIT_RESTORE`): in
+  `AUDIT_DUTIES` and `STEP_UP_PERMISSIONS`, **not** grantable, held by
+  `PLATFORM_ADMIN`. Mirrored into `config/opa/data.json`.
+- **Backup and restore** (`platform.audit.backup`, `platform.audit.vault`):
+  AES-256-GCM bundles, a loss report measured against a checkpoint held outside
+  the bundle, and a restore that refuses a measurable loss unless the operator
+  accepts it in the call.
+- **Retention, legal hold and erasure** (`platform.audit.lifecycle`): archival
+  into sealed segments with the chain continuous across the floor, holds by
+  subject or seq range that outrank both retention and erasure, and erasure by
+  crypto-shredding the pseudonym link rather than deleting records. ADR-0039
+  states the limitation this leaves.
+- **Sealed ports** (`integration.replay`): `SealedCommandPort` refuses every call
+  and counts attempts, so zero adapter calls during a replay is a property of the
+  type; `ReadOnlyCommandPort` allows `status_of` and still refuses `execute`.
+- **Six more risk rules**: snooping, collusion, budget pressure, off hours, grant
+  abuse, agent pressure, plus `trail_lag` for events committed but never
+  published. Fourteen rules in total.
+- Audit event types `data.read`, `backup.created`, `backup.read`,
+  `restore.performed`, `reconciled`, `segment.sealed`, `hold.placed`,
+  `hold.released`, `erasure.performed`.
+- Collections `platform.audit_checkpoints` (which had never been registered, so
+  the `full` profile had no table for it), `platform.audit_floor`,
+  `platform.audit_segments`, `platform.audit_holds`,
+  `platform.audit_pseudonyms`. 16 new policy keys and two settings
+  (`CLARITY_AUDIT_BACKUP_KEY`, `CLARITY_AUDIT_BACKUP_DIR`).
+
+### Added (audit assurance Phase 4, ADR-0037)
+
+- **New module `clarity.modules.assurance`** (public surface: `AssuranceService`,
+  `Alert`, `AlertState`, `Disposition`, `AlertRefused`, `AlertNotFound`,
+  `Band`, `Finding`, `RULES`, `ALERTS`, `HEARTBEATS`, `PLAYBOOK_SWITCHES`,
+  `SECOND_PERSON_BANDS`, `CHAIN_BREAK`, `CHECKPOINT_GAP`, `DETECTOR_SILENT`).
+  A leaf: it calls no module and no module calls it.
+- **Eight counted risk rules** over the audit trail, thresholds in
+  `config/policy/audit.yaml`: structuring, self-approval, money without proof,
+  switch-then-pay, break-glass used, mass audit read, denial spike, brute
+  force. Plus chain break, checkpoint gap and detector silence.
+- **New `/v1` routes**, all signed-in: `GET /v1/assurance/alerts` and
+  `POST /v1/assurance/alerts/{alert_id}/acknowledge|investigate|dispose`.
+  OpenAPI snapshot regenerated on purpose (four routes added); SDK types
+  regenerated.
+- Audit event types `alert.raised`, `alert.acknowledged`,
+  `alert.investigating`, `alert.disposed`, `alert.escalated`.
+- Collections `assurance.alerts` and `assurance.heartbeats`; 15 new policy keys
+  under `assurance.*`.
+- Detection and liveness run on a schedule in each API process
+  (`assurance.detection.interval`, PT5M).
+
+### Changed (audit assurance Phase 4)
+
+- **Audit records for domain events now carry money facts** in their detail:
+  `amount_lkr`, `total_amount_lkr`, `outcome`, `confirmed_by`,
+  `approver_roles` and the related identifiers, where the event has them. A
+  counted rule has nothing to count without them. No PII (I13).
+
+### Added (audit assurance Phase 3, grant endings)
+
+- Audit event types `grant.expired` and `grant.lapsed` (a missed
+  recertification), each recorded once with `occurred_at` the exact moment the
+  grant ended. `AuditGrants.record_endings()`; `AuditGrant.ended_at`,
+  `end_reason`, `ending()`.
+- A background sweep in each API process (FastAPI lifespan) on new policy key
+  `audit.grant.sweep_interval` (PT1M); `Clarity.grant_sweep_interval()`.
+  Every authenticated request also records endings first.
+- No `/v1` contract change.
+
+### Added (audit assurance Phase 3, ADR-0036)
+
+- **New `/v1` routes**, all signed-in: `GET /v1/audit` (paged trail, hashes
+  and masked detail only, with checkpoint verification; every read recorded),
+  `GET` and `POST /v1/audit/grants`, `POST /v1/audit/grants/{grant_id}/approve`,
+  `.../revoke`, `.../recertify`, and `POST /v1/audit/break-glass`. OpenAPI
+  snapshot regenerated on purpose (seven routes added, nothing changed); SDK
+  types regenerated.
+- Permissions `audit:export`, `audit:assign` (step-up), `alert:dispose`.
+  `security_admin` gains `audit:assign`; `compliance` gains `audit:export` and
+  `alert:dispose`. `config/opa/data.json` and the rego policy updated to match.
+- `clarity.modules.iam.public`: `AuditGrants`, `AuditGrant`, `GrantState`,
+  `SubjectKind`, `GrantRefused`, `GrantNotFound`,
+  `GrantAwareAuthorizationPolicy`, `is_subject`, `GRANTS`.
+- `Principal.granted`; `permissions_for(roles, granted=...)`;
+  `AUDIT_DUTIES`, `GRANTABLE_PERMISSIONS`.
+- Policy keys `audit.grant.max_duration`, `audit.grant.review_interval`,
+  `audit.grant.break_glass_duration`. Audit event types `grant.requested`,
+  `grant.approved`, `grant.revoked`, `grant.recertified`, `grant.break_glass`,
+  `audit.read`.
+
+### Changed (audit assurance Phase 3)
+
+- **Holding any audit duty now removes money permissions**, by role or grant
+  (separation of duties). No existing role held both, so no current role loses
+  anything; it applies to stacked roles and to grants.
+- `Clarity.authorization` is wrapped in `GrantAwareAuthorizationPolicy`.
+
+### Added (audit assurance Phase 2, ADR-0035)
+
+- **Signed audit checkpoints.** `clarity.platform.audit.checkpoints`:
+  `Checkpointer`, `Checkpoint`, `CheckpointVerification`, `statement_hash`,
+  `signature_valid`, `checkpoint_document`. Signed with a key separate from the
+  receipt key. Verification reports a trail cut below a checkpoint with the
+  exact `seq` range lost.
+- **New public route** `GET /.well-known/clarity-audit-checkpoint.json`: the
+  latest checkpoint with its public key, for anyone to keep as a witness. OpenAPI
+  snapshot regenerated on purpose; SDK types regenerated.
+- Policy keys `audit.checkpoint.every_records` and `audit.checkpoint.max_age`
+  (`config/policy/audit.yaml`). Audit event type `checkpoint.issued`.
+- Setting `CLARITY_AUDIT_SIGNER_KEY_NAME`. `Clarity(audit_checkpoints=...)`;
+  `reset()` carries the checkpointer with the trail.
+- `AuditLedger.after_append(hook)` and `AuditLedger.open_unit`.
+
+### Changed (audit assurance Phase 2)
+
+- Startup verification checks the trail against its signed checkpoints, not
+  only its chain, and `ledger.opened` records the result.
+
+### Added (audit assurance W2)
+
+- Identity and access events in the audit trail: `otp.requested` (with its
+  outcome, including unknown numbers, masked), `otp.verified`, `otp.failed`,
+  `staff.session_started` (roles and step-up), `token.refreshed`,
+  `token.rejected` (a presented token or refresh token refused) and
+  `access.denied` (every 403, with the reason). Anonymous 401s with no token
+  are not recorded.
+- `request.performed`: every state-changing request records who made it, the
+  session, the route template, the case and the status, so an approval names
+  the supervisor rather than the mode. Opt-out, with reasons, in
+  `clarity.interfaces.http.trail.NOT_RECORDED_AS_REQUESTS`.
+- `session_ref`, a truncated hash of the access token, links a sign-in to
+  everything later done or refused with that token.
+- No `/v1` contract change: responses are byte-for-byte as before; refusals
+  are still answered by FastAPI's default handler after being recorded.
+
+### Changed (audit assurance W0, ADR-0033)
+
+- **`AuditRecord` hash version 2.** `chain_hash` now covers every field of the
+  record, not only the payload hash: `seq`, `event_type`, `actor_ref`,
+  `object_ref`, `case_id`, the times and the `detail` (through `detail_hash`).
+  New fields `hash_version`, `actor_kind`, `session_ref`, `detail_hash`,
+  `occurred_at` and `recorded_at`; `at` remains as a read-only alias of
+  `recorded_at`. `AuditLedger.append` takes optional `actor_kind` and
+  `session_ref`. Floats in a payload or detail are rendered with `repr` before
+  hashing.
+
+### Added (audit assurance W1, ADR-0034)
+
+- `AuditLedger(open_unit, *, clock)`: the trail persists through the
+  persistence port in collections `platform.audit` and `platform.audit_head`,
+  appended in order, insert-only, retried on `ConcurrentUpdate`. New
+  `AuditUnavailable`, `ActorKind`, `record_hash`, `hashable`.
+- Audit event types `event.published`, `demo.reset`, `ledger.opened`.
+- An `audit` consumer group records every domain event type in the trail.
+- `ClarityMCPServer(cases, *, ledger=None)`: with a ledger, every MCP call is
+  appended as `mcp.invoked`, actor kind `agent`, arguments hashed.
+- `Clarity(audit=...)`; `Clarity.reset()` carries the trail across and records
+  `demo.reset`. A broken trail at startup raises `AuditChainBroken`.
+- Setting `CLARITY_AUDIT_BREAK_GLASS` (default `false`).
+
+### Fixed (audit assurance W0 and W1)
+
+- **An audit record's actor, type, case, time and detail could be rewritten
+  without `verify()` noticing.** Only the payload hash was chained.
+- **The audit trail was lost on every restart, split per process, and erased
+  by a demo reset**, and decisions, executions, receipts and MCP calls were
+  never recorded in it.
 ### Fixed (customer sessions, #57)
 
 - `TokenIssuer` accepts `key_path` (public surface, `clarity.modules.iam`).

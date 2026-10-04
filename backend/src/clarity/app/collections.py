@@ -13,12 +13,19 @@ from __future__ import annotations
 
 from clarity.modules.actions.capability import ATTEMPTS as ACTION_ATTEMPTS
 from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
+from clarity.modules.assurance.public import ALERTS, HEARTBEATS
 from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
 from clarity.modules.deskops.public import BATCHES
 from clarity.modules.governance.public import CHANGES
-from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
+from clarity.modules.iam.public import (
+    GRANTS,
+    OTP_CHALLENGES,
+    OTP_REQUESTS,
+    REFRESH_TOKENS,
+    SESSIONS,
+)
 from clarity.modules.insights.public import PROJECTIONS
 from clarity.modules.knowledge.public import CHUNKS, SOURCES
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
@@ -31,6 +38,9 @@ from clarity.modules.receipts.public import (
     SUPERSEDED,
 )
 from clarity.modules.reconciliation.public import EXPECTED_ACTIONS, MISMATCHES
+from clarity.platform.audit.checkpoints import AUDIT_CHECKPOINTS
+from clarity.platform.audit.ledger import AUDIT, AUDIT_FLOOR, AUDIT_HEAD
+from clarity.platform.audit.lifecycle import HOLDS, PSEUDONYMS, SEGMENTS
 from clarity.platform.messaging.consumers import ATTEMPTS as CONSUMER_ATTEMPTS
 from clarity.platform.messaging.consumers import DEAD_LETTERS, PROCESSED
 from clarity.platform.messaging.outbox import OUTBOX
@@ -60,6 +70,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     OTP_REQUESTS,
     SESSIONS,
     REFRESH_TOKENS,
+    GRANTS,
     # notifications
     NOTIFICATIONS,
     PREFERENCES,
@@ -78,11 +89,30 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     BATCHES,
     # insights
     PROJECTIONS,
+    # assurance
+    ALERTS,
+    HEARTBEATS,
     # platform: the outbox and the consumer framework's bookkeeping
     OUTBOX,
     PROCESSED,
     CONSUMER_ATTEMPTS,
     DEAD_LETTERS,
+    # platform: the audit trail and its head pointer (ADR-0034). Not customer
+    # scoped: the trail is cross-cutting, and read through AUDIT_READ instead.
+    AUDIT,
+    AUDIT_HEAD,
+    # The signed checkpoints that make the trail tamper-evident (ADR-0035). They
+    # live beside the trail for the same reason: a checkpoint in a different
+    # store from the records it vouches for can be lost separately from them.
+    AUDIT_CHECKPOINTS,
+    # The archival floor, the sealed segment index, the legal holds and the
+    # pseudonym links erasure destroys (Phase 7, ADR-0039). All beside the trail:
+    # a floor in a different store from the records it bounds can be lost
+    # separately from them, which would read as a truncated trail.
+    AUDIT_FLOOR,
+    SEGMENTS,
+    HOLDS,
+    PSEUDONYMS,
 )
 
 __all__ = ["ALL_COLLECTIONS"]

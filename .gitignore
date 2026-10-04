@@ -4,6 +4,7 @@
 .env
 .hypothesis/
 .keys/
+.backups/
 .mypy_cache/
 .next/
 # TypeScript's incremental build cache. Committed by accident in e238558 and

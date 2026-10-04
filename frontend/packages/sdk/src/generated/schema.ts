@@ -4,6 +4,31 @@
  */
 
 export interface paths {
+    "/.well-known/clarity-audit-checkpoint.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Checkpoint
+         * @description The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).
+         *
+         *     Public on purpose. A copy held outside the database is what catches an
+         *     insider who rewrites the trail *and* deletes the stored checkpoints:
+         *     their trail will no longer reach this ``seq`` with this head. It holds
+         *     a sequence number, two hashes, a time and a signature, nothing personal.
+         */
+        get: operations["audit_checkpoint__well_known_clarity_audit_checkpoint_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/clarity-keys.json": {
         parameters: {
             query?: never;
@@ -223,6 +248,322 @@ export interface paths {
          * @description Measured token usage, for the AI disclosure (Guidelines §6.2).
          */
         get: operations["ai_usage_v1_ai_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assurance/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Alerts
+         * @description The alert queue. Each alert cites the trail records that justify it.
+         */
+        get: operations["list_alerts_v1_assurance_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assurance/alerts/{alert_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge Alert */
+        post: operations["acknowledge_alert_v1_assurance_alerts__alert_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assurance/alerts/{alert_id}/dispose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dispose Alert
+         * @description Close an alert with a disposition and a reason.
+         *
+         *     Never by its own subject, and a high or critical alert is closed by
+         *     someone other than whoever acknowledged it.
+         */
+        post: operations["dispose_alert_v1_assurance_alerts__alert_id__dispose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assurance/alerts/{alert_id}/investigate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Investigate Alert */
+        post: operations["investigate_alert_v1_assurance_alerts__alert_id__investigate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Audit Trail
+         * @description Read the trail: hashes and masked detail only, never a payload.
+         *
+         *     **The read is itself recorded** (rule 5): who looked, with which
+         *     filters, and how many records they saw. Who watched the watchers is
+         *     part of what is watched.
+         */
+        get: operations["read_audit_trail_v1_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/break-glass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Break Glass
+         * @description An admin's immediate audit duty for an incident: short, and always recorded.
+         */
+        post: operations["break_glass_v1_audit_break_glass_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Audit Trail
+         * @description A bundle a regulator can verify without trusting Clarity (Phase 7).
+         *
+         *     Records, the signed checkpoints that cover them, the public keys, and the
+         *     instructions for recomputing both. ``backend/scripts/verify_audit_export.py``
+         *     does exactly that with nothing from Clarity imported, which is the point:
+         *     a verifier that imports the code it checks proves only that the code
+         *     agrees with itself.
+         *
+         *     With ``case_id`` the export is a **selection**, and says so: a chain of
+         *     only one case's records is not contiguous, and a verifier that read a
+         *     selection as the whole trail would accept a redacted export as complete.
+         *
+         *     Exporting is recorded like any other read of the trail, and needs
+         *     ``audit:export``, which costs its holder every money permission.
+         */
+        get: operations["export_audit_trail_v1_audit_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit Grants
+         * @description Every audit grant, active or not, for review and recertification.
+         */
+        get: operations["list_audit_grants_v1_audit_grants_get"];
+        put?: never;
+        /**
+         * Request Audit Grant
+         * @description Ask for an audit duty for a named person or a role. Someone else approves.
+         */
+        post: operations["request_audit_grant_v1_audit_grants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/grants/{grant_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Audit Grant
+         * @description The second pair of eyes. The requester cannot approve their own request.
+         */
+        post: operations["approve_audit_grant_v1_audit_grants__grant_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/grants/{grant_id}/recertify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recertify Audit Grant
+         * @description Keep a grant alive one more review interval. Unreviewed grants lapse.
+         */
+        post: operations["recertify_audit_grant_v1_audit_grants__grant_id__recertify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/grants/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Audit Grant */
+        post: operations["revoke_audit_grant_v1_audit_grants__grant_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Health
+         * @description The chain health panel (plan 5.8): is the trail sound, and is it fresh.
+         *
+         *     **Deliberately not recorded as ``audit.read``.** A dashboard polls this,
+         *     and recording every poll would make the console trip the
+         *     ``mass_audit_read`` rule within minutes: the monitor would raise alerts
+         *     about the act of monitoring. It reads no record contents, only aggregates
+         *     and the verification verdict, so there is nothing here to read about a
+         *     person. Reading the trail *itself* is recorded, on ``GET /v1/audit``.
+         *
+         *     The verification is **incremental** for the same reason: a full recompute
+         *     on every poll turns the dashboard into the most expensive thing in the
+         *     system. ``AuditLedger.verify`` is explicit about what that does and does
+         *     not cover; the full recompute runs at startup and on the policy interval.
+         */
+        get: operations["audit_health_v1_audit_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/records/{seq}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Audit Record
+         * @description Recompute one record's hashes, for the trail explorer's "verify" action.
+         *
+         *     It answers a narrow question honestly: does this row hash to what it says,
+         *     and does it link to the row before it. It cannot confirm the payload,
+         *     because the ledger never stored one: ``proves()`` does that, and it needs
+         *     the document the caller is holding, which is not something a console has.
+         */
+        post: operations["verify_audit_record_v1_audit_records__seq__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Recovery
+         * @description The recovery panel: the last backup, the last restore, and its loss report.
+         *
+         *     Read out of the trail rather than from a separate status table, which is
+         *     the point of recording them there: a status table can disagree with what
+         *     happened, and the trail is what happened.
+         */
+        get: operations["audit_recovery_v1_audit_recovery_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1126,6 +1467,19 @@ export interface components {
             type: components["schemas"]["ActionType"];
         };
         /**
+         * AlertDisposal
+         * @description Close an alert. A reason is always required.
+         */
+        AlertDisposal: {
+            /**
+             * Disposition
+             * @description confirmed | false_positive | accepted_risk
+             */
+            disposition: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
          * ApproveRequest
          * @description Who approves and whether they stepped up come from the token.
          *
@@ -1138,6 +1492,49 @@ export interface components {
             plan_id: string;
             /** Role */
             role: string;
+        };
+        /**
+         * AuditGrantRequest
+         * @description Ask for an audit duty for someone else. A second person approves it.
+         */
+        AuditGrantRequest: {
+            /**
+             * Duration
+             * @description ISO 8601 duration, e.g. P30D. At most the policy maximum.
+             */
+            duration: string;
+            /**
+             * Permission
+             * @description audit:read | audit:export | alert:dispose
+             */
+            permission: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Subject Kind
+             * @description user | role
+             */
+            subject_kind: string;
+            /**
+             * Subject Ref
+             * @description A staff user_ref, or a role name.
+             */
+            subject_ref: string;
+        };
+        /** AuditGrantRevoke */
+        AuditGrantRevoke: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * BreakGlassRequest
+         * @description An admin's immediate, short, self-granted audit duty. Always recorded.
+         */
+        BreakGlassRequest: {
+            /** Permission */
+            permission: string;
+            /** Reason */
+            reason: string;
         };
         /** CaseSummary */
         CaseSummary: {
@@ -1596,6 +1993,16 @@ export interface components {
         /** VerificationView */
         VerificationView: {
             /**
+             * Audit Anchor Ok
+             * @description Whether that checkpoint's signature verifies. None when the receipt carries no anchor, which is not the same as an anchor that failed.
+             */
+            audit_anchor_ok?: boolean | null;
+            /**
+             * Audit Anchor Seq
+             * @description The audit checkpoint this receipt witnesses (ADR-0035). None on a schema 1.0 receipt, or one issued before any checkpoint was signed.
+             */
+            audit_anchor_seq?: number | null;
+            /**
              * Chain Ok
              * @default false
              */
@@ -1632,6 +2039,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_checkpoint__well_known_clarity_audit_checkpoint_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     public_keys__well_known_clarity_keys_json_get: {
         parameters: {
             query?: never;
@@ -2080,6 +2509,541 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    list_alerts_v1_assurance_alerts_get: {
+        parameters: {
+            query?: {
+                open_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_alert_v1_assurance_alerts__alert_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dispose_alert_v1_assurance_alerts__alert_id__dispose_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertDisposal"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    investigate_alert_v1_assurance_alerts__alert_id__investigate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_audit_trail_v1_audit_get: {
+        parameters: {
+            query?: {
+                actor_ref?: string | null;
+                event_type?: string | null;
+                case_id?: string | null;
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    break_glass_v1_audit_break_glass_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakGlassRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_audit_trail_v1_audit_export_get: {
+        parameters: {
+            query?: {
+                case_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_grants_v1_audit_grants_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_audit_grant_v1_audit_grants_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditGrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_audit_grant_v1_audit_grants__grant_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recertify_audit_grant_v1_audit_grants__grant_id__recertify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_audit_grant_v1_audit_grants__grant_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditGrantRevoke"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_health_v1_audit_health_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_audit_record_v1_audit_records__seq__verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_recovery_v1_audit_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

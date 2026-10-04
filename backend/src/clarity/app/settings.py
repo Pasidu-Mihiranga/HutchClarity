@@ -129,6 +129,28 @@ class Settings(BaseSettings):
     signer_url: str | None = Field(default=None, alias="CLARITY_SIGNER_URL")
     signer_token: str | None = Field(default=None, alias="CLARITY_SIGNER_TOKEN")
     signer_key_name: str = Field(default="clarity-receipts", alias="CLARITY_SIGNER_KEY_NAME")
+    audit_signer_key_name: str = Field(
+        default="clarity-audit-checkpoints",
+        alias="CLARITY_AUDIT_SIGNER_KEY_NAME",
+        description=(
+            "OpenBao Transit key that signs audit checkpoints (ADR-0035). Separate "
+            "from the receipt key, so a compromise of one cannot forge the other."
+        ),
+    )
+    audit_backup_key: str | None = Field(
+        default=None,
+        alias="CLARITY_AUDIT_BACKUP_KEY",
+        description=(
+            "Secret that encrypts audit backup bundles (Phase 6). Unset: backups "
+            "are refused rather than written in the clear. A deployment sets a "
+            "32-byte random value; any length works and is hashed to the key."
+        ),
+    )
+    audit_backup_dir: Path = Field(
+        default=Path(".backups"),
+        alias="CLARITY_AUDIT_BACKUP_DIR",
+        description="Where backup bundles are written. A mounted volume in full.",
+    )
     signer_mount: str = Field(default="transit", alias="CLARITY_SIGNER_MOUNT")
     signer_namespace: str | None = Field(default=None, alias="CLARITY_SIGNER_NAMESPACE")
     signer_timeout_seconds: float = Field(default=3.0, alias="CLARITY_SIGNER_TIMEOUT", gt=0)
@@ -175,6 +197,18 @@ class Settings(BaseSettings):
     # -- interfaces ------------------------------------------------------- #
 
     verify_base: str = Field(default="http://localhost:3002/r", alias="VERIFY_BASE")
+
+    # -- audit ------------------------------------------------------------ #
+
+    audit_break_glass: bool = Field(
+        default=False,
+        alias="CLARITY_AUDIT_BREAK_GLASS",
+        description=(
+            "Start even when the audit chain fails verification (ADR-0034). "
+            "For an incident only: the start itself is recorded as break-glass. "
+            "Unset, a broken chain stops the process from serving."
+        ),
+    )
 
     # -- observability ---------------------------------------------------- #
 

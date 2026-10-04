@@ -64,6 +64,27 @@
         "title": "ActionView",
         "type": "object"
       },
+      "AlertDisposal": {
+        "additionalProperties": false,
+        "description": "Close an alert. A reason is always required.",
+        "properties": {
+          "disposition": {
+            "description": "confirmed | false_positive | accepted_risk",
+            "title": "Disposition",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "disposition",
+          "reason"
+        ],
+        "title": "AlertDisposal",
+        "type": "object"
+      },
       "ApproveRequest": {
         "additionalProperties": false,
         "description": "Who approves and whether they stepped up come from the token.\n\nNeither is accepted here: a caller that could name its own approver could\nsatisfy four-eyes alone, and one that could assert its own step-up would\nmake the approval audit worthless.",
@@ -82,6 +103,79 @@
           "role"
         ],
         "title": "ApproveRequest",
+        "type": "object"
+      },
+      "AuditGrantRequest": {
+        "additionalProperties": false,
+        "description": "Ask for an audit duty for someone else. A second person approves it.",
+        "properties": {
+          "duration": {
+            "description": "ISO 8601 duration, e.g. P30D. At most the policy maximum.",
+            "title": "Duration",
+            "type": "string"
+          },
+          "permission": {
+            "description": "audit:read | audit:export | alert:dispose",
+            "title": "Permission",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "subject_kind": {
+            "description": "user | role",
+            "title": "Subject Kind",
+            "type": "string"
+          },
+          "subject_ref": {
+            "description": "A staff user_ref, or a role name.",
+            "title": "Subject Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_kind",
+          "subject_ref",
+          "permission",
+          "reason",
+          "duration"
+        ],
+        "title": "AuditGrantRequest",
+        "type": "object"
+      },
+      "AuditGrantRevoke": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "AuditGrantRevoke",
+        "type": "object"
+      },
+      "BreakGlassRequest": {
+        "additionalProperties": false,
+        "description": "An admin's immediate, short, self-granted audit duty. Always recorded.",
+        "properties": {
+          "permission": {
+            "title": "Permission",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permission",
+          "reason"
+        ],
+        "title": "BreakGlassRequest",
         "type": "object"
       },
       "CaseSummary": {
@@ -1266,6 +1360,30 @@
       "VerificationView": {
         "additionalProperties": false,
         "properties": {
+          "audit_anchor_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether that checkpoint's signature verifies. None when the receipt carries no anchor, which is not the same as an anchor that failed.",
+            "title": "Audit Anchor Ok"
+          },
+          "audit_anchor_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The audit checkpoint this receipt witnesses (ADR-0035). None on a schema 1.0 receipt, or one issued before any checkpoint was signed.",
+            "title": "Audit Anchor Seq"
+          },
           "chain_ok": {
             "default": false,
             "title": "Chain Ok",
@@ -1383,6 +1501,30 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/.well-known/clarity-audit-checkpoint.json": {
+      "get": {
+        "description": "The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).\n\nPublic on purpose. A copy held outside the database is what catches an\ninsider who rewrites the trail *and* deletes the stored checkpoints:\ntheir trail will no longer reach this ``seq`` with this head. It holds\na sequence number, two hashes, a time and a signature, nothing personal.",
+        "operationId": "audit_checkpoint__well_known_clarity_audit_checkpoint_json_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Checkpoint  Well Known Clarity Audit Checkpoint Json Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Audit Checkpoint",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/.well-known/clarity-keys.json": {
       "get": {
         "description": "Public keys anyone can verify a receipt with (plan \u00a715.2).",
@@ -2093,6 +2235,978 @@
         "summary": "Ai Usage",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/assurance/alerts": {
+      "get": {
+        "description": "The alert queue. Each alert cites the trail records that justify it.",
+        "operationId": "list_alerts_v1_assurance_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Alerts V1 Assurance Alerts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Alerts",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/acknowledge": {
+      "post": {
+        "operationId": "acknowledge_alert_v1_assurance_alerts__alert_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Acknowledge Alert V1 Assurance Alerts  Alert Id  Acknowledge Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge Alert",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/dispose": {
+      "post": {
+        "description": "Close an alert with a disposition and a reason.\n\nNever by its own subject, and a high or critical alert is closed by\nsomeone other than whoever acknowledged it.",
+        "operationId": "dispose_alert_v1_assurance_alerts__alert_id__dispose_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertDisposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dispose Alert V1 Assurance Alerts  Alert Id  Dispose Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dispose Alert",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/assurance/alerts/{alert_id}/investigate": {
+      "post": {
+        "operationId": "investigate_alert_v1_assurance_alerts__alert_id__investigate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Investigate Alert V1 Assurance Alerts  Alert Id  Investigate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Investigate Alert",
+        "tags": [
+          "assurance"
+        ]
+      }
+    },
+    "/v1/audit": {
+      "get": {
+        "description": "Read the trail: hashes and masked detail only, never a payload.\n\n**The read is itself recorded** (rule 5): who looked, with which\nfilters, and how many records they saw. Who watched the watchers is\npart of what is watched.",
+        "operationId": "read_audit_trail_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "actor_ref",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Ref"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Audit Trail V1 Audit Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Audit Trail",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/break-glass": {
+      "post": {
+        "description": "An admin's immediate audit duty for an incident: short, and always recorded.",
+        "operationId": "break_glass_v1_audit_break_glass_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreakGlassRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Break Glass V1 Audit Break Glass Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Break Glass",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/export": {
+      "get": {
+        "description": "A bundle a regulator can verify without trusting Clarity (Phase 7).\n\nRecords, the signed checkpoints that cover them, the public keys, and the\ninstructions for recomputing both. ``backend/scripts/verify_audit_export.py``\ndoes exactly that with nothing from Clarity imported, which is the point:\na verifier that imports the code it checks proves only that the code\nagrees with itself.\n\nWith ``case_id`` the export is a **selection**, and says so: a chain of\nonly one case's records is not contiguous, and a verifier that read a\nselection as the whole trail would accept a redacted export as complete.\n\nExporting is recorded like any other read of the trail, and needs\n``audit:export``, which costs its holder every money permission.",
+        "operationId": "export_audit_trail_v1_audit_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Audit Trail V1 Audit Export Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Audit Trail",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants": {
+      "get": {
+        "description": "Every audit grant, active or not, for review and recertification.",
+        "operationId": "list_audit_grants_v1_audit_grants_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Audit Grants V1 Audit Grants Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit Grants",
+        "tags": [
+          "audit"
+        ]
+      },
+      "post": {
+        "description": "Ask for an audit duty for a named person or a role. Someone else approves.",
+        "operationId": "request_audit_grant_v1_audit_grants_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Request Audit Grant V1 Audit Grants Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/approve": {
+      "post": {
+        "description": "The second pair of eyes. The requester cannot approve their own request.",
+        "operationId": "approve_audit_grant_v1_audit_grants__grant_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Audit Grant V1 Audit Grants  Grant Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/recertify": {
+      "post": {
+        "description": "Keep a grant alive one more review interval. Unreviewed grants lapse.",
+        "operationId": "recertify_audit_grant_v1_audit_grants__grant_id__recertify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Recertify Audit Grant V1 Audit Grants  Grant Id  Recertify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recertify Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/revoke": {
+      "post": {
+        "operationId": "revoke_audit_grant_v1_audit_grants__grant_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditGrantRevoke"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revoke Audit Grant V1 Audit Grants  Grant Id  Revoke Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/health": {
+      "get": {
+        "description": "The chain health panel (plan 5.8): is the trail sound, and is it fresh.\n\n**Deliberately not recorded as ``audit.read``.** A dashboard polls this,\nand recording every poll would make the console trip the\n``mass_audit_read`` rule within minutes: the monitor would raise alerts\nabout the act of monitoring. It reads no record contents, only aggregates\nand the verification verdict, so there is nothing here to read about a\nperson. Reading the trail *itself* is recorded, on ``GET /v1/audit``.\n\nThe verification is **incremental** for the same reason: a full recompute\non every poll turns the dashboard into the most expensive thing in the\nsystem. ``AuditLedger.verify`` is explicit about what that does and does\nnot cover; the full recompute runs at startup and on the policy interval.",
+        "operationId": "audit_health_v1_audit_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Health V1 Audit Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Health",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/records/{seq}/verify": {
+      "post": {
+        "description": "Recompute one record's hashes, for the trail explorer's \"verify\" action.\n\nIt answers a narrow question honestly: does this row hash to what it says,\nand does it link to the row before it. It cannot confirm the payload,\nbecause the ledger never stored one: ``proves()`` does that, and it needs\nthe document the caller is holding, which is not something a console has.",
+        "operationId": "verify_audit_record_v1_audit_records__seq__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Verify Audit Record V1 Audit Records  Seq  Verify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Audit Record",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/recovery": {
+      "get": {
+        "description": "The recovery panel: the last backup, the last restore, and its loss report.\n\nRead out of the trail rather than from a separate status table, which is\nthe point of recording them there: a status table can disagree with what\nhappened, and the trail is what happened.",
+        "operationId": "audit_recovery_v1_audit_recovery_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Recovery V1 Audit Recovery Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Recovery",
+        "tags": [
+          "audit"
         ]
       }
     },

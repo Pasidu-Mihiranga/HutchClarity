@@ -8,12 +8,13 @@ graph with a different world or a frozen clock.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from pydantic import TypeAdapter
 from sqlalchemy import create_engine
 
 from clarity.ai.buckets import TokenBuckets
@@ -37,6 +38,7 @@ from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
 from clarity.contracts.decision import Outcome
 from clarity.contracts.events import KnowledgePublishedV1, RiskDetectedV1
+from clarity.contracts.receipt import ReceiptAuditAnchor
 from clarity.integration.drivers.mock.recurrence import MockRecurrenceProbe
 from clarity.integration.drivers.mock.world import DEMO_NOW, SyntheticWorld, build_demo_world
 from clarity.integration.ports import DriverMode
@@ -48,6 +50,7 @@ from clarity.modules.actions.capability import (
     StoredPlanRepository,
     ToolLayer,
 )
+from clarity.modules.assurance.public import AssuranceService
 from clarity.modules.autopsy.public import AutopsyService, ComplaintSource
 from clarity.modules.case.public import (
     CASE_SEQUENCE,
@@ -74,8 +77,10 @@ from clarity.modules.governance.public import (
     StoredPolicyChangeRepository,
 )
 from clarity.modules.iam.public import (
+    AuditGrants,
     AuthorizationPolicy,
     CompositeTokenVerifier,
+    GrantAwareAuthorizationPolicy,
     KeycloakTokenVerifier,
     OpaAuthorizationPolicy,
     OtpService,
@@ -116,12 +121,21 @@ from clarity.modules.receipts.public import (
 from clarity.modules.reconciliation.public import ReconciliationService
 from clarity.modules.resolution.public import ResolutionService
 from clarity.modules.timeline.public import TimelineBuilder
-from clarity.platform.audit.ledger import AuditLedger
+from clarity.platform.audit.backup import backup_key_from
+from clarity.platform.audit.checkpoints import Checkpointer, CheckpointSigner
+from clarity.platform.audit.ledger import (
+    ActorKind,
+    AuditEventType,
+    AuditLedger,
+)
+from clarity.platform.audit.lifecycle import AuditLifecycle
+from clarity.platform.audit.vault import AuditVault
 from clarity.platform.config.resolver import PolicyResolver
 from clarity.platform.config.switches import SwitchBoard
 from clarity.platform.messaging.consumers import CollectingAlertHook, ConsumerRegistry
 from clarity.platform.messaging.drivers.in_process import InProcessEventBus
 from clarity.platform.messaging.envelope import Event, EventType
+from clarity.platform.messaging.outbox import OutboxRow, outbox_in
 from clarity.platform.messaging.relay import Relay
 from clarity.platform.observability import configure_logging, configure_tracing
 from clarity.platform.persistence import (
@@ -500,6 +514,52 @@ def _persistence_for_profile(profile: Profile, settings: Settings) -> _Persisten
     )
 
 
+class AuditChainBroken(RuntimeError):
+    """The audit trail failed verification when this process opened it.
+
+    Raised instead of serving: a process that cannot vouch for its own trail
+    must not add to it (ADR-0034). ``CLARITY_AUDIT_BREAK_GLASS`` starts it
+    anyway for an incident, and that start is recorded.
+    """
+
+
+#: Domain events that have an audit type of their own. Every other event is
+#: recorded as ``event.published`` with its type as the object, so nothing
+#: that crosses the bus goes unrecorded (audit assurance plan, W1).
+AUDIT_TYPE_FOR_EVENT: dict[EventType, AuditEventType] = {
+    EventType.CAUSE_DETECTED: AuditEventType.CAUSE_ASSESSED,
+    EventType.DECISION_GENERATED: AuditEventType.DECISION_MADE,
+    EventType.ACTION_COMPLETED: AuditEventType.ACTION_EXECUTED,
+    EventType.RECEIPT_ISSUED: AuditEventType.RECEIPT_ISSUED,
+    EventType.MCP_INVOKED: AuditEventType.MCP_INVOKED,
+    EventType.RULE_PUBLISHED: AuditEventType.RULE_PUBLISHED,
+}
+
+#: ISO 8601 durations from the policy store, such as ``PT15M``.
+_DURATION: TypeAdapter[timedelta] = TypeAdapter(timedelta)
+
+#: Event fields carried into the audit detail, where present. Amounts, outcomes
+#: and identifiers: what a counted risk rule reads and an investigator needs.
+_AUDITED_FACTS = (
+    "amount_lkr",
+    "total_amount_lkr",
+    "money_at_stake_lkr",
+    "outcome",
+    "confirmed_by",
+    "approver_roles",
+    "case_id",
+    "plan_id",
+    "decision_id",
+    "receipt_id",
+    "rule_id",
+    "risk_type",
+    "band",
+)
+
+#: Keys in an event's data that name the object it is about, most specific first.
+_OBJECT_KEYS = ("receipt_id", "plan_id", "decision_id", "action_id", "case_id", "rule_id")
+
+
 class Clarity:
     """The assembled application."""
 
@@ -519,6 +579,10 @@ class Clarity:
         tokens: TokenIssuer | None = None,
         otp: OtpService | None = None,
         settings: Settings | None = None,
+        audit: AuditLedger | None = None,
+        audit_checkpoints: Checkpointer | None = None,
+        audit_grants: AuditGrants | None = None,
+        assurance: AssuranceService | None = None,
     ) -> None:
         # The only place this process reads its environment (B07, I20). Tests
         # pass a Settings instance instead of setting variables.
@@ -568,7 +632,15 @@ class Clarity:
             open_unit=self.open_unit,
             budget=RefundBudget(daily_limit_lkr=daily_refund_limit_lkr),
         )
-        self.audit = AuditLedger()
+        # One trail for every process (ADR-0034): the ledger writes through
+        # the same persistence driver as everything else, so in `full` the
+        # API, the MCP server and the workers append to one PostgreSQL chain.
+        # A reset carries it across, like identity: the audit trail is not
+        # demo data either.
+        self.audit = audit or AuditLedger(
+            self.open_unit,
+            clock=(lambda: clock) if clock is not None else None,
+        )
         # Identity is not demo data: a reset of the synthetic world must not
         # sign everyone out mid-demonstration, so these carry over.
         self.tokens = tokens or TokenIssuer(
@@ -589,7 +661,9 @@ class Clarity:
                     timeout_seconds=self.settings.auth_timeout_seconds,
                 ),
             )
-        self.authorization: AuthorizationPolicy = (
+        # Whichever driver decides, grants and the audit-duty money rule hold
+        # under it: the OPA driver sees roles only (audit assurance Phase 3).
+        self.authorization: AuthorizationPolicy = GrantAwareAuthorizationPolicy(
             OpaAuthorizationPolicy(
                 self.settings.opa_url,
                 timeout_seconds=self.settings.auth_timeout_seconds,
@@ -622,6 +696,11 @@ class Clarity:
             verify_base=configured_verify_base,
             persist=persist,
             open_unit=self.open_unit,
+            # Every receipt carries the current signed audit checkpoint, making
+            # a delivered receipt an external witness of the audit head
+            # (ADR-0035). Read lazily: the checkpointer is built below, and a
+            # receipt is only ever issued long after the container is assembled.
+            audit_anchor=self._current_audit_anchor,
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
@@ -641,7 +720,54 @@ class Clarity:
         self.policies = PolicyResolver.from_directory(
             policy_dir or default_policy_dir(self.settings.policy_dir)
         )
-        self.switches = SwitchBoard(audit_sink=self.audit)
+        # Signed checkpoints (ADR-0035), with their own key. Carried across a
+        # reset with the trail: a new key would fail every earlier checkpoint.
+        self.audit_checkpoints = audit_checkpoints or self._new_checkpointer(clock)
+        # Audit duties by grant (Phase 3). They live beside the trail, so a
+        # demo reset carries them with it, as it carries identity.
+        self.audit_grants = audit_grants or self._new_audit_grants(clock)
+        # Backups and restores of the trail (Phase 6). The key is read when a
+        # backup is actually taken, so a process that never takes one never
+        # holds it; an unset key refuses the backup rather than writing it in
+        # the clear.
+        self.audit_vault = AuditVault(
+            self.audit,
+            self.audit_checkpoints,
+            key=lambda: backup_key_from(self.settings.audit_backup_key),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        # Retention, legal hold and erasure (Phase 7). The retention period is a
+        # policy value resolved at the moment it applies, so lengthening it does
+        # not silently re-judge what was already archived.
+        self.audit_lifecycle = AuditLifecycle(
+            self.audit,
+            self.audit_checkpoints,
+            key=lambda: backup_key_from(self.settings.audit_backup_key),
+            directory=lambda: self.settings.audit_backup_dir,
+            retain=lambda as_of: _DURATION.validate_python(
+                str(self.policies.resolve("audit.retention.period", as_of=as_of))
+            ),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        self._open_audit_trail()
+        self.switches = SwitchBoard(
+            audit_sink=self.audit,
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        # Detection, alerts and the chain-break playbook (ADR-0037). It reads
+        # the trail and the switches; no module calls it and it calls none.
+        self.assurance = assurance or AssuranceService(
+            self.audit.open_unit,
+            audit=self.audit,
+            switches=self.switches,
+            verify=self.audit_checkpoints.verify,
+            resolve=lambda key, as_of: self.policies.resolve(key, as_of=as_of),
+            clock=(lambda: clock) if clock is not None else None,
+            # Undelivered events, so a stalled relay shows as a quiet trail
+            # rather than as nothing at all. Read lazily: the relay below does
+            # not exist yet, but the store it drains does.
+            pending=self._pending_events,
+        )
         # Messaging: the bus, the relay that drains the outbox onto it, and the
         # consumer framework that wraps each handler in deduplication, backoff
         # and dead-lettering (B03, B04).
@@ -727,6 +853,12 @@ class Clarity:
             group="proactive-cases",
             handler=self._open_zero_contact_case,
         )
+        # The audit writer (ADR-0034). It consumes every event type, so a
+        # decision, an execution or a receipt reaches the trail from the
+        # outbox row that was committed with it (I7). The consumer framework's
+        # deduplication makes a redelivered event one record, not two.
+        for event_type in EventType:
+            self.consumers.register(event_type, group="audit", handler=self._audit_event)
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
@@ -847,6 +979,154 @@ class Clarity:
         if payload.corpus_version:
             self.answers.on_knowledge_published(payload.corpus_version)
 
+    def _audit_signer(self) -> CheckpointSigner:
+        """The checkpoint key: OpenBao when configured, else a local key.
+
+        A separate key from the receipts' (ADR-0035). In ``full`` without
+        OpenBao the key lives in ``KEYS_DIR`` so checkpoints still verify after
+        a restart; in ``demo`` the trail itself is in memory, so the key is too.
+        """
+        if self.settings.signer_url:
+            return OpenBaoSigningService(
+                self.settings.signer_url,
+                key_name=self.settings.audit_signer_key_name,
+                token=self.settings.signer_token or "",
+                mount=self.settings.signer_mount,
+                namespace=self.settings.signer_namespace,
+                timeout_seconds=self.settings.signer_timeout_seconds,
+            )
+        key_path = (
+            self.settings.keys_dir / "audit-checkpoint-ed25519.pem"
+            if self.profile is Profile.FULL
+            else None
+        )
+        return DevSigningService(kid="clarity-audit-dev-2027-01", key_path=key_path)
+
+    def _new_checkpointer(self, clock: datetime | None) -> Checkpointer:
+        def now() -> datetime:
+            return clock or datetime.now(tz=UTC)
+
+        checkpointer = Checkpointer(
+            self.audit,
+            self._audit_signer(),
+            self.audit.open_unit,
+            # Resolved when they apply, from the policy store (I10).
+            every_records=lambda: int(
+                self.policies.resolve("audit.checkpoint.every_records", as_of=now())
+            ),
+            max_age=lambda: _DURATION.validate_python(
+                str(self.policies.resolve("audit.checkpoint.max_age", as_of=now()))
+            ),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        self.audit.after_append(lambda _record: checkpointer.maybe_checkpoint())
+        return checkpointer
+
+    def grant_sweep_interval(self) -> timedelta:
+        """How often a server records ended grants (policy, I10)."""
+        return _DURATION.validate_python(
+            str(
+                self.policies.resolve(
+                    "audit.grant.sweep_interval", as_of=self._clock or datetime.now(tz=UTC)
+                )
+            )
+        )
+
+    def now(self) -> datetime:
+        """The time this process runs on: the frozen demo clock, or the wall clock.
+
+        Time comes from here rather than from ``datetime.now()`` in a route (I11),
+        so a demo and a replay agree with the trail they are reading.
+        """
+        return self._clock or datetime.now(tz=UTC)
+
+    def _new_audit_grants(self, clock: datetime | None) -> AuditGrants:
+        def now() -> datetime:
+            return clock or datetime.now(tz=UTC)
+
+        def duration(key: str) -> timedelta:
+            return _DURATION.validate_python(str(self.policies.resolve(key, as_of=now())))
+
+        return AuditGrants(
+            self.audit.open_unit,
+            audit=self.audit,
+            max_duration=lambda: duration("audit.grant.max_duration"),
+            review_interval=lambda: duration("audit.grant.review_interval"),
+            break_glass_duration=lambda: duration("audit.grant.break_glass_duration"),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+
+    def _open_audit_trail(self) -> None:
+        """Verify the trail before serving, and record that this process opened it.
+
+        A broken chain stops the process unless break-glass is set (ADR-0034).
+        Signed checkpoints, which also catch a rewound head, come in Phase 2 of
+        the audit assurance plan.
+        """
+        result = self.audit_checkpoints.verify()
+        break_glass = self.settings.audit_break_glass
+        if not result.intact and not break_glass:
+            raise AuditChainBroken(
+                f"audit trail broken at seq {result.broken_at}: {result.reason}. "
+                "Investigate before serving; CLARITY_AUDIT_BREAK_GLASS=true starts "
+                "anyway and is recorded."
+            )
+        self.audit.append(
+            AuditEventType.LEDGER_OPENED,
+            actor_ref=f"process:{self.profile.value}",
+            object_ref="audit-trail",
+            payload={"intact": result.intact, "length": result.length},
+            detail={
+                "intact": result.intact,
+                "length": result.length,
+                "broken_at": result.broken_at,
+                "reason": result.reason,
+                "checkpoints": result.checkpoints,
+                "lost_from": result.lost_from,
+                "lost_to": result.lost_to,
+                "break_glass": break_glass and not result.intact,
+            },
+        )
+
+    def _audit_event(self, event: Event) -> None:
+        """Record one domain event in the trail (ADR-0034).
+
+        The payload is hashed, never stored. The detail holds only what an
+        investigator filters on: the event's type, id, source and correlation.
+        ``subject`` is a ``subscriber_ref`` pseudonym, never an MSISDN (I13).
+        """
+        data = event.data
+        object_ref = next(
+            (str(data[key]) for key in _OBJECT_KEYS if data.get(key)),
+            event.id,
+        )
+        audit_type = AUDIT_TYPE_FOR_EVENT.get(event.type, AuditEventType.EVENT_PUBLISHED)
+        self.audit.append(
+            audit_type,
+            actor_ref=event.source,
+            actor_kind=ActorKind.SYSTEM,
+            object_ref=(
+                str(event.type) if audit_type is AuditEventType.EVENT_PUBLISHED else object_ref
+            ),
+            payload={"id": event.id, "type": str(event.type), "data": data},
+            case_id=str(data["case_id"]) if data.get("case_id") else None,
+            detail={
+                "event_type": str(event.type),
+                "event_id": event.id,
+                "source": event.source,
+                "subject": event.subject,
+                "correlation_id": event.correlation_id,
+                "object": object_ref,
+                # The facts an investigation counts on: an amount, an outcome,
+                # the ids that join one case's records together. No PII: money
+                # and identifiers only (I13). Without these the trail records
+                # that a refund happened but not how much, and a rule counting
+                # refunds near the cap would have nothing to count.
+                **{key: data[key] for key in _AUDITED_FACTS if key in data},
+            },
+            now=event.time,
+        )
+
     def _open_zero_contact_case(self, event: Event) -> None:
         payload = event.payload()
         if not isinstance(payload, RiskDetectedV1) or payload.risk_type != "duplicate_reload":
@@ -898,6 +1178,42 @@ class Clarity:
             plan = next(iter(record.plans.values()))
             self.cases.auto_fix(record.case_id, plan.plan_id)
 
+    def _current_audit_anchor(self) -> ReceiptAuditAnchor | None:
+        """The latest signed audit checkpoint, in the shape a receipt carries.
+
+        The composition root does this translation because ``modules.receipts``
+        must not depend on ``platform.audit``: the receipt contract holds the
+        fields and nothing else (I4, I5).
+        """
+        latest = self.audit_checkpoints.latest()
+        if latest is None:
+            return None
+        return ReceiptAuditAnchor(
+            checkpoint_seq=latest.seq,
+            chain_head=latest.chain_head,
+            recorded_at=latest.recorded_at,
+            statement_hash=latest.statement_hash,
+            kid=latest.kid,
+            signature=latest.signature,
+        )
+
+    def pending_event_count(self) -> int:
+        """How many events are committed but not yet published.
+
+        The chain health panel's writer lag. A count, not the rows: a dashboard
+        has no business holding the events themselves.
+        """
+        return len(self._pending_events())
+
+    def _pending_events(self) -> list[OutboxRow]:
+        """Outbox rows the relay has not published yet, for the lag check.
+
+        The assurance module is a leaf and may not reach into messaging, so the
+        composition root hands it this one read (ADR-0037).
+        """
+        with self.open_unit() as unit:
+            return outbox_in(unit).pending()
+
     def deliver_events(self) -> None:
         """Publish whatever the last unit of work committed, then consume it.
 
@@ -933,8 +1249,16 @@ class Clarity:
         """Build a fresh instance with the same configuration.
 
         The demo mutates balances and subscriptions, so a reset gives a clean
-        synthetic world without restarting the process.
+        synthetic world without restarting the process. The audit trail is
+        carried across and the reset itself is recorded: a reset that erased
+        the trail would be the easiest way to hide anything.
         """
+        self.audit.append(
+            AuditEventType.DEMO_RESET,
+            actor_ref=f"process:{self.profile.value}",
+            object_ref="synthetic-world",
+            payload={"profile": self.profile.value},
+        )
         if self.profile is Profile.FULL:
             from clarity.integration.drivers.mock.store import reset_engine
 
@@ -970,6 +1294,10 @@ class Clarity:
                 profile=self.profile,
                 tokens=self.tokens,
                 otp=self.otp,
+                audit=self.audit,
+                audit_checkpoints=self.audit_checkpoints,
+                audit_grants=self.audit_grants,
+                assurance=self.assurance,
             )
         return Clarity(
             rules_dir=self._rules_dir,
@@ -983,4 +1311,8 @@ class Clarity:
             profile=self.profile,
             tokens=self.tokens,
             otp=self.otp,
+            audit=self.audit,
+            audit_checkpoints=self.audit_checkpoints,
+            audit_grants=self.audit_grants,
+            assurance=self.assurance,
         )

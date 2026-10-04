@@ -36,6 +36,9 @@ PUBLIC = {
     ("GET", "/openapi.json"),
     ("GET", "/health"),
     ("GET", "/.well-known/clarity-keys.json"),
+    # The latest signed audit checkpoint: hashes and a signature, for anyone
+    # to keep as a witness (ADR-0035).
+    ("GET", "/.well-known/clarity-audit-checkpoint.json"),
     ("GET", "/.well-known/jwks.json"),
     ("POST", "/v1/auth/otp/request"),
     ("POST", "/v1/auth/otp/verify"),
@@ -51,6 +54,30 @@ PUBLIC = {
 }
 
 SIGNED_IN = {
+    # The audit trail and audit duties (audit assurance Phase 3): reading needs
+    # audit:read, granting needs audit:assign, break-glass needs admin:manage.
+    ("GET", "/v1/audit"),
+    # The verifiable export a regulator checks offline (Phase 7, ADR-0039).
+    # Needs audit:export, which costs its holder every money permission.
+    ("GET", "/v1/audit/export"),
+    # The console Audit section's panels (Phase 5). All need audit:read.
+    # ``health`` is deliberately not recorded as audit.read: a dashboard polls it,
+    # and recording every poll would make the console trip mass_audit_read.
+    ("GET", "/v1/audit/health"),
+    ("GET", "/v1/audit/recovery"),
+    ("POST", "/v1/audit/records/{seq}/verify"),
+    ("GET", "/v1/audit/grants"),
+    ("POST", "/v1/audit/grants"),
+    ("POST", "/v1/audit/grants/{grant_id}/approve"),
+    ("POST", "/v1/audit/grants/{grant_id}/revoke"),
+    ("POST", "/v1/audit/grants/{grant_id}/recertify"),
+    ("POST", "/v1/audit/break-glass"),
+    # Assurance alerts (Phase 4): reading needs audit:read, the lifecycle
+    # needs alert:dispose.
+    ("GET", "/v1/assurance/alerts"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/acknowledge"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/investigate"),
+    ("POST", "/v1/assurance/alerts/{alert_id}/dispose"),
     ("GET", "/v1/auth/me"),
     ("POST", "/v1/cases"),
     ("GET", "/v1/cases/{case_id}"),

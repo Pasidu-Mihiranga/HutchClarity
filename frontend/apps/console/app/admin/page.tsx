@@ -134,7 +134,7 @@ export default function AdminPage() {
             </li>
             <li className="flex justify-between">
               <span>Audit trail API</span>
-              <Badge tone="warning">not wired</Badge>
+              <Badge tone="success">wired - see Audit</Badge>
             </li>
           </ul>
           <p className="text-xs text-slate-500">

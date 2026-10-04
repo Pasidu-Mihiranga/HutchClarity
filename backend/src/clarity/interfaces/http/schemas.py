@@ -203,6 +203,20 @@ class VerificationView(ApiModel):
     corrected_lkr: str | None = None
     safeguard: str | None = None
     recurrence_test: str | None = None
+    audit_anchor_seq: int | None = Field(
+        default=None,
+        description=(
+            "The audit checkpoint this receipt witnesses (ADR-0035). None on a "
+            "schema 1.0 receipt, or one issued before any checkpoint was signed."
+        ),
+    )
+    audit_anchor_ok: bool | None = Field(
+        default=None,
+        description=(
+            "Whether that checkpoint's signature verifies. None when the receipt "
+            "carries no anchor, which is not the same as an anchor that failed."
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -332,3 +346,36 @@ class MerchantSuspendRequest(ApiModel):
     merchant_id: str
     reason: str = Field(min_length=1)
     subscriber_msisdn: str | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Audit access (audit assurance plan Phase 3)
+# --------------------------------------------------------------------------- #
+
+
+class AuditGrantRequest(ApiModel):
+    """Ask for an audit duty for someone else. A second person approves it."""
+
+    subject_kind: str = Field(description="user | role")
+    subject_ref: str = Field(description="A staff user_ref, or a role name.")
+    permission: str = Field(description="audit:read | audit:export | alert:dispose")
+    reason: str
+    duration: str = Field(description="ISO 8601 duration, e.g. P30D. At most the policy maximum.")
+
+
+class AuditGrantRevoke(ApiModel):
+    reason: str
+
+
+class BreakGlassRequest(ApiModel):
+    """An admin's immediate, short, self-granted audit duty. Always recorded."""
+
+    permission: str
+    reason: str
+
+
+class AlertDisposal(ApiModel):
+    """Close an alert. A reason is always required."""
+
+    disposition: str = Field(description="confirmed | false_positive | accepted_risk")
+    reason: str

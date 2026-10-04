@@ -61,9 +61,13 @@ def principal_from(request: Request, authorization: str | None) -> Principal:
         return ANONYMOUS
 
     try:
-        return verifier.verify(authorization.split(" ", 1)[1].strip())
+        principal = verifier.verify(authorization.split(" ", 1)[1].strip())
     except TokenInvalid as error:
         raise _unauthenticated() from error
+    # Audit duties held by grant (Phase 3). Applied here, once, so every check
+    # after this, route dependency or handler, sees the same permissions.
+    grants = getattr(request.app.state, "audit_grants", None)
+    return grants.apply(principal) if grants is not None else principal
 
 
 async def current_principal(
