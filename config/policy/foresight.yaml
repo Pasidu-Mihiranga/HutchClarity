@@ -147,6 +147,89 @@ keys:
           pack_migration=pack_retired;fup_disclosure_change=fup_tightened;vas_consent_change=policy_change;social_pack_scope_change=pack_retired;payg_price_change=price_increase;new_pack=pack_retired;promotion_end=price_increase
         version: 1
 
+  # -- the round-based persona driver (C3/F11) ---------------------------- #
+  #
+  # A second method, deliberately shaped unlike the baseline. The baseline
+  # multiplies rates together, so reach and severity scale it linearly; this one
+  # compounds over rounds, so a change a tenth of the base notices in round one
+  # can still reach most of them by round five. Where the two disagree is the
+  # column worth reading. Where they agree, neither is evidence for the other:
+  # both rest on the same segment assumptions.
+  #
+  # All five are ILLUSTRATIVE and have never been calibrated against a real
+  # launch. They are operational rather than outcome-affecting because this
+  # driver is a comparison column and never the reported band (I1).
+
+  - key: foresight.persona.rounds
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      How many rounds of awareness a cohort is stepped through. More rounds let
+      a change spread further through a segment before the run ends.
+    guardrail: { min: "1", max: "20" }
+    values:
+      - value: "5"
+        version: 1
+
+  - key: foresight.persona.cohort_size
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Agents per segment. A resolution setting, not a population: an agent is a
+      share of a segment and never corresponds to a subscriber. Larger is
+      steadier and slower; the propensity is an exact ratio of two counts either
+      way.
+    guardrail: { min: "100", max: "100000" }
+    values:
+      - value: "2000"
+        version: 1
+
+  - key: foresight.persona.awareness_per_round
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Chance an unaware agent notices the change in one round, before the
+      scenario's affected share is applied to it.
+    guardrail: { min: "0", max: "1" }
+    values:
+      - value: "0.35"
+        version: 1
+
+  - key: foresight.persona.pressure_scale
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Divides theme weight times segment sensitivity times severity to give the
+      chance an aware agent is actually affected. Raising it makes the driver
+      more conservative. Must be above zero; the catalogue refuses zero rather
+      than dividing by it.
+
+      The shipped value puts this driver within roughly 20% of the statistical
+      baseline on the demo segments, so the two are read on one scale and a
+      disagreement means the methods disagree rather than that their units do.
+      It is a scaling choice, not a measurement: neither method has been
+      calibrated against a real launch.
+    guardrail: { min: "0.1", max: "100" }
+    values:
+      - value: "18"
+        version: 1
+
+  - key: foresight.persona.complaint_multiplier
+    kind: number
+    owner_role: product
+    tags: [operational]
+    description: >
+      Multiplies a segment's historic monthly complaint rate to give the chance
+      an affected agent complains rather than absorbing the change in one round.
+    guardrail: { min: "0", max: "50" }
+    values:
+      - value: "4"
+        version: 1
+
   # -- the calibration gate ----------------------------------------------- #
   #
   # Plan 02 section 3.4's gate, as a key rather than a Python constant. It is

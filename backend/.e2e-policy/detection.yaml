@@ -1,0 +1,152 @@
+# Detection rule parameters (D5, ADR-0001, plan 09 section 13).
+#
+# A rule's base confidence used to be a literal inside its YAML pack, which
+# meant Risk could not change one without a code release and a signed rule
+# bundle. These are artefacts instead: versioned, scoped, effective-dated and
+# bounded by a guardrail, and every decision records which value it used.
+#
+# Effective dating is the part that matters most here. A case about yesterday's
+# charge is judged by yesterday's confidence: a value changed this morning was
+# not the value anyone relied on when the charge happened.
+#
+# All values are ASSUMPTION - REQUIRES HUTCH VALIDATION.
+
+keys:
+  - key: detection.vas_no_consent.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.90", version: 1 }]
+
+  - key: detection.vas_renewal_unnotified.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome]
+    description: >
+      Confidence that a VAS renewal charged without the notice the customer was
+      promised is the cause. The renewal and the absent notification are both
+      system records, so this is high, but a notification gateway that is not
+      reporting completely is a common reason to be unsure.
+    guardrail: { min: "0.5", max: "1.0" }
+    values:
+      - value: "0.90"
+        version: 1
+
+  - key: detection.duplicate_reload.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.97", version: 1 }]
+
+  - key: detection.reload_not_credited.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.80", version: 1 }]
+
+  - key: detection.pack_expiry_burn.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.88", version: 1 }]
+
+  - key: detection.fup_cap_reached.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.94", version: 1 }]
+
+  - key: detection.pack_mismatch.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome]
+    description: >
+      Confidence that the customer was charged for a different pack from the one
+      they bought. Two system records disagreeing is strong evidence.
+    guardrail: { min: "0.5", max: "1.0" }
+    values:
+      - value: "0.92"
+        version: 1
+
+  - key: detection.loan_recovery.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome]
+    description: >
+      Confidence that an unexplained balance drop was an advance being
+      recovered. Lower than the others: a recovery is legitimate, and the
+      customer's complaint is usually that nobody told them, so the rule
+      explains more often than it refunds.
+    guardrail: { min: "0.5", max: "1.0" }
+    values:
+      - value: "0.85"
+        version: 1
+
+  - key: detection.duplicate_vas_charge.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome, money]
+    guardrail: { min: "0.5", max: "1.0" }
+    values: [{ value: "0.95", version: 1 }]
+
+  - key: detection.outage_during_pack.confidence_base
+    kind: number
+    owner_role: risk
+    tags: [outcome]
+    description: >
+      Confidence that a pack was consumed during a network outage the customer
+      could not use. Depends on outage records being complete for the area, so
+      it carries the largest partial-evidence penalty.
+    guardrail: { min: "0.4", max: "1.0" }
+    values:
+      - value: "0.78"
+        version: 1
+
+  # Match windows are policy too. Values use the reviewable ISO-8601 subset
+  # supported by the predicate engine.
+  - key: detection.duplicate_reload.window
+    kind: duration
+    owner_role: risk
+    tags: [outcome, money]
+    values: [{ value: PT30M, version: 1 }]
+
+  - key: detection.duplicate_vas_charge.window
+    kind: duration
+    owner_role: risk
+    tags: [outcome, money]
+    values: [{ value: PT12H, version: 1 }]
+
+  - key: detection.pack_expiry_burn.window
+    kind: duration
+    owner_role: product
+    tags: [outcome]
+    values: [{ value: P7D, version: 1 }]
+
+  - key: detection.vas_renewal_unnotified.notice_window
+    kind: duration
+    owner_role: compliance
+    tags: [outcome, regulatory]
+    values: [{ value: P7D, version: 1 }]
+
+  - key: detection.pack_mismatch.activation_window
+    kind: duration
+    owner_role: product
+    tags: [outcome]
+    values: [{ value: PT1H, version: 1 }]
+
+  - key: detection.loan_recovery.window
+    kind: duration
+    owner_role: finance
+    tags: [outcome, money]
+    values: [{ value: P90D, version: 1 }]
+
+  - key: detection.outage_during_pack.window
+    kind: duration
+    owner_role: network_ops
+    tags: [outcome]
+    values: [{ value: P30D, version: 1 }]

@@ -42,6 +42,11 @@ THEME_ALIASES_KEY = "foresight.theme_aliases"
 BAND_HIGH_KEY = "foresight.band.high"
 BAND_MEDIUM_KEY = "foresight.band.medium"
 MIN_REAL_LAUNCHES_KEY = "foresight.calibration.min_real_launches"
+PERSONA_ROUNDS_KEY = "foresight.persona.rounds"
+PERSONA_COHORT_KEY = "foresight.persona.cohort_size"
+PERSONA_AWARENESS_KEY = "foresight.persona.awareness_per_round"
+PERSONA_PRESSURE_KEY = "foresight.persona.pressure_scale"
+PERSONA_COMPLAINT_KEY = "foresight.persona.complaint_multiplier"
 
 
 def themes_key(change_type: ChangeType) -> str:
@@ -120,6 +125,21 @@ class ThemeCatalogue:
 
 
 @dataclass(frozen=True)
+class PersonaRounds:
+    """The round-based persona driver's parameters (C3/F11).
+
+    Here beside the keys they are read from rather than in ``personas.py``, so
+    the driver has no constant to shadow one with (D2).
+    """
+
+    rounds: int
+    cohort_size: int
+    awareness_per_round: Decimal
+    pressure_scale: Decimal
+    complaint_multiplier: Decimal
+
+
+@dataclass(frozen=True)
 class Bands:
     """Score thresholds for the three volume bands."""
 
@@ -179,6 +199,31 @@ class ForesightCatalogue:
             high=_decimal(self._policies.resolve(BAND_HIGH_KEY, as_of=as_of), BAND_HIGH_KEY),
             medium=_decimal(self._policies.resolve(BAND_MEDIUM_KEY, as_of=as_of), BAND_MEDIUM_KEY),
         )
+
+    def persona_rounds(self, as_of: datetime) -> PersonaRounds:
+        """The round-based driver's parameters at ``as_of``."""
+        scale = _decimal(
+            self._policies.resolve(PERSONA_PRESSURE_KEY, as_of=as_of), PERSONA_PRESSURE_KEY
+        )
+        if scale <= 0:
+            raise CatalogueInvalid(f"{PERSONA_PRESSURE_KEY}: must be above zero, got {scale}")
+        return PersonaRounds(
+            rounds=self._whole(PERSONA_ROUNDS_KEY, as_of),
+            cohort_size=self._whole(PERSONA_COHORT_KEY, as_of),
+            awareness_per_round=_decimal(
+                self._policies.resolve(PERSONA_AWARENESS_KEY, as_of=as_of), PERSONA_AWARENESS_KEY
+            ),
+            pressure_scale=scale,
+            complaint_multiplier=_decimal(
+                self._policies.resolve(PERSONA_COMPLAINT_KEY, as_of=as_of), PERSONA_COMPLAINT_KEY
+            ),
+        )
+
+    def _whole(self, key: str, as_of: datetime) -> int:
+        value = _decimal(self._policies.resolve(key, as_of=as_of), key)
+        if value != value.to_integral_value() or value <= 0:
+            raise CatalogueInvalid(f"{key}: {value} is not a positive whole number")
+        return int(value)
 
     def min_real_launches(self, as_of: datetime) -> int:
         """Plan 02 section 3.4's gate, resolved rather than compiled in."""
@@ -287,12 +332,18 @@ __all__ = [
     "BAND_MEDIUM_KEY",
     "DRIVERS",
     "MIN_REAL_LAUNCHES_KEY",
+    "PERSONA_AWARENESS_KEY",
+    "PERSONA_COHORT_KEY",
+    "PERSONA_COMPLAINT_KEY",
+    "PERSONA_PRESSURE_KEY",
+    "PERSONA_ROUNDS_KEY",
     "SEGMENTS_KEY",
     "THEME_ALIASES_KEY",
     "Bands",
     "CatalogueInvalid",
     "ChangeType",
     "ForesightCatalogue",
+    "PersonaRounds",
     "Segment",
     "ThemeCatalogue",
     "ThemeWeight",
