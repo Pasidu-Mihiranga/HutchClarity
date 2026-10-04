@@ -73,7 +73,12 @@ from clarity.modules.conversation.public import (
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
-from clarity.modules.foresight.public import Backtest, Foresight, ForesightCatalogue
+from clarity.modules.foresight.public import (
+    Backtest,
+    Foresight,
+    ForesightCatalogue,
+    ForesightService,
+)
 from clarity.modules.governance.public import (
     CHANGES,
     PolicyGovernance,
@@ -1080,6 +1085,14 @@ class Clarity:
         self.foresight_catalogue = ForesightCatalogue(self.policies)
         self.foresight = Foresight(self.foresight_catalogue, clock=self.now)
         self.foresight_backtest = Backtest(self.foresight_catalogue, clock=self.now)
+        # What a rehearsal said, and what the change actually did (C2/F05).
+        # Six of its seven collections are append-only; `foresight.runs` is the
+        # exception because a caller polls it.
+        self.foresight_service = ForesightService(
+            open_unit=self.open_unit,
+            catalogue=self.foresight_catalogue,
+            clock=self.now,
+        )
 
         # Insights read models, folded from the event log (I01, #30). The
         # dashboards used to read live objects, which meant whatever was in one
