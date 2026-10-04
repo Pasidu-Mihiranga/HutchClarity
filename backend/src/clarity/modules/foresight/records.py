@@ -207,6 +207,12 @@ class StoredLaunch:
     checkable: somebody has to be able to go and look at the thing it names.
     """
     note: str = ""
+    authority: str = ""
+    """Which capability permitted a ``REAL`` launch (C6).
+
+    Empty for a synthetic one. Recorded so a report that reaches CALIBRATED can
+    say what let it, rather than leaving a reader to trust that something did.
+    """
 
     @property
     def is_real(self) -> bool:
