@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light">
       <body>
         <div className="mx-auto min-h-screen max-w-md px-4 py-10">
           {children}

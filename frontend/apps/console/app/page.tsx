@@ -40,23 +40,15 @@ export default function ConsoleHomePage() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
           Resolve and support
         </p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+        <h1 className="text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">
           Clarity Desk
         </h1>
         <p className="text-base leading-7 text-mute">
           Evidence, a rule decision, and a signed Trust Receipt. The queue is
-          synthetic subscriber data. Sign in with the account you were issued.
-          The server assigns the role.
+          synthetic subscriber data, and the server assigned your role.
         </p>
       </header>
-      {!session ? (
-        <Card className="space-y-3 rounded-card border-line bg-white shadow-card">
-          <p className="text-ink">
-            Sign in from the header. The account decides the role. A wrong
-            password is refused, and the desk cannot grant a role by itself.
-          </p>
-        </Card>
-      ) : (
+      {session ? (
         <Card className="space-y-2 rounded-card border-line bg-white shadow-card">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="success">{activeRole}</Badge>
@@ -74,13 +66,13 @@ export default function ConsoleHomePage() {
             </ul>
           </details>
         </Card>
-      )}
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {sections.map((item) =>
           item.ok || !session ? (
             <Link key={item.href} href={item.href}>
-              <Card className="rounded-card border-line bg-white shadow-card transition hover:-translate-y-0.5 hover:border-[#ffb28b]">
+              <Card className="rounded-card border-line bg-white shadow-card transition hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-3">
                 <h2 className="font-display text-xl font-semibold">{item.title}</h2>
                 <p className="mt-1 text-sm text-mute">{item.body}</p>
               </Card>

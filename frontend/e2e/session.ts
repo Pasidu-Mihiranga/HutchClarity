@@ -191,7 +191,12 @@ export async function signInOnDesk(
       { key: "clarity_console_staff_v2", token: cachedToken },
     );
     await page.reload();
-    if (await page.getByRole("button", { name: "Sign out" }).isVisible({ timeout: 2_000 }).catch(() => false)) {
+    // The desk shows nothing while it checks a stored session, then either
+    // the signed-in bar or the sign-in portal. Wait for whichever it settles
+    // on rather than a fixed delay, which lost the race on a slow check.
+    const settledIn = page.getByRole("button", { name: "Sign out" });
+    await expect(settledIn.or(page.getByLabel("Username"))).toBeVisible();
+    if (await settledIn.isVisible()) {
       return;
     }
     // Sessions can be revoked or rotated by an earlier journey. A cached
@@ -206,7 +211,8 @@ export async function signInOnDesk(
     throw new Error(`no synthetic login for ${roleLabel}`);
   }
   const signOut = page.getByRole("button", { name: "Sign out" });
-  if (await signOut.isVisible().catch(() => false)) {
+  await expect(signOut.or(page.getByLabel("Username"))).toBeVisible();
+  if (await signOut.isVisible()) {
     await signOut.click();
   }
   await page.getByLabel("Username").fill(account.username);
