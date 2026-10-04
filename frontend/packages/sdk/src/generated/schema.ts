@@ -1413,6 +1413,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/foresight/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Candidates
+         * @description Cluster-derived suggestions, inert until a person confirms one (C7).
+         *
+         *     A candidate is not an outcome. A cluster says "these complaints look
+         *     like one cause"; it does not say which rehearsed theme that is or which
+         *     segment complained. Somebody decides that, under their own name.
+         */
+        get: operations["list_candidates_v1_foresight_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/candidates/{cluster_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Candidate
+         * @description Turn a candidate into a recorded outcome, under the caller's name.
+         *
+         *     The theme, segment and band come from the person, not from the cluster.
+         *     This is the only way a cluster becomes evidence the calibration gate
+         *     reads, and it needs `foresight:outcome:record`, which `PRODUCT` does not
+         *     hold.
+         */
+        post: operations["confirm_candidate_v1_foresight_candidates__cluster_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/foresight/launches": {
         parameters: {
             query?: never;
@@ -1433,6 +1482,26 @@ export interface paths {
          *     worth to anybody else.
          */
         post: operations["record_launch_v1_foresight_launches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight/launches/{launch_id}/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Launch Comparison
+         * @description What the rehearsal said, beside what the launch produced (C7/F10).
+         */
+        get: operations["launch_comparison_v1_foresight_launches__launch_id__comparison_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2012,6 +2081,28 @@ export interface components {
             permission: string;
             /** Reason */
             reason: string;
+        };
+        /**
+         * CandidateConfirmRequest
+         * @description What a person decides a cluster means (C7).
+         *
+         *     The theme, the segment and the band all come from the caller. A cluster
+         *     says complaints look like one cause; it does not say which rehearsed theme
+         *     that is, and the system filling these in would be deciding what its own
+         *     evidence means.
+         */
+        CandidateConfirmRequest: {
+            /**
+             * Band
+             * @description low, medium or high.
+             */
+            band: string;
+            /** Launch Id */
+            launch_id: string;
+            /** Segment */
+            segment: string;
+            /** Theme */
+            theme: string;
         };
         /** CaseSummary */
         CaseSummary: {
@@ -4967,6 +5058,78 @@ export interface operations {
             };
         };
     };
+    list_candidates_v1_foresight_candidates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_candidate_v1_foresight_candidates__cluster_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_launches_v1_foresight_launches_get: {
         parameters: {
             query?: never;
@@ -5017,6 +5180,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_comparison_v1_foresight_launches__launch_id__comparison_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                launch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

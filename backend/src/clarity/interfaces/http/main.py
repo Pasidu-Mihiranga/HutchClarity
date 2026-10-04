@@ -66,6 +66,7 @@ from clarity.interfaces.http.schemas import (
     AuditGrantRequest,
     AuditGrantRevoke,
     BreakGlassRequest,
+    CandidateConfirmRequest,
     CaseSummary,
     CauseView,
     ConfirmRequest,
@@ -122,10 +123,13 @@ from clarity.modules.assurance.public import (
 )
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.foresight.public import (
+    AlreadyConfirmed,
     CatalogueInvalid,
     ChangeType,
     DetectedSpike,
     ForesightReport,
+    OutcomeCandidate,
+    PostLaunchComparison,
     Provenance,
     RealLaunchNotPermitted,
     RunAlreadyFinished,
@@ -2746,6 +2750,76 @@ def _register_routes(app: FastAPI) -> None:
             "recorded_by": outcome.recorded_by,
         }
 
+    @app.get("/v1/foresight/candidates", tags=["foresight"])
+    def list_candidates(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """Cluster-derived suggestions, inert until a person confirms one (C7).
+
+        A candidate is not an outcome. A cluster says "these complaints look
+        like one cause"; it does not say which rehearsed theme that is or which
+        segment complained. Somebody decides that, under their own name.
+        """
+        return {
+            "candidates": [_candidate_view(item) for item in clarity.foresight_loop.candidates()]
+        }
+
+    @app.post("/v1/foresight/candidates/{cluster_id}/confirm", tags=["foresight"], status_code=201)
+    def confirm_candidate(
+        cluster_id: str,
+        body: CandidateConfirmRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_OUTCOME_RECORD))],
+    ) -> dict[str, Any]:
+        """Turn a candidate into a recorded outcome, under the caller's name.
+
+        The theme, segment and band come from the person, not from the cluster.
+        This is the only way a cluster becomes evidence the calibration gate
+        reads, and it needs `foresight:outcome:record`, which `PRODUCT` does not
+        hold.
+        """
+        try:
+            band = VolumeBand(body.band)
+        except ValueError as bad:
+            raise HTTPException(status_code=422, detail="unknown band") from bad
+        try:
+            outcome = clarity.foresight_service.confirm_candidate(
+                cluster_id=cluster_id,
+                launch_id=body.launch_id,
+                theme=body.theme,
+                segment=body.segment,
+                band=band,
+                by=principal.ref,
+            )
+        except AlreadyConfirmed as twice:
+            raise HTTPException(
+                status_code=409, detail="this candidate is already recorded as an outcome"
+            ) from twice
+        except KeyError as missing:
+            raise HTTPException(status_code=404, detail="no such candidate or launch") from missing
+        return {
+            "outcome_id": outcome.outcome_id,
+            "launch_id": outcome.launch_id,
+            "theme": outcome.theme,
+            "segment": outcome.segment,
+            "band": outcome.band.value,
+            "recorded_by": outcome.recorded_by,
+            "cluster_id": cluster_id,
+        }
+
+    @app.get("/v1/foresight/launches/{launch_id}/comparison", tags=["foresight"])
+    def launch_comparison(
+        launch_id: str,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """What the rehearsal said, beside what the launch produced (C7/F10)."""
+        comparison = clarity.foresight_service.comparison(launch_id)
+        if comparison is None:
+            raise HTTPException(status_code=404, detail="no such launch")
+        return _comparison_view(comparison)
+
     @app.post("/v1/foresight/backtests", tags=["foresight"], status_code=201)
     def run_backtest(
         clarity: ClarityDep,
@@ -3018,6 +3092,55 @@ def _spike_view(spike: DetectedSpike) -> dict[str, Any]:
         "detected_at": spike.detected_at.isoformat(),
         "basis": spike.basis,
         "caveats": list(spike.caveats),
+    }
+
+
+def _candidate_view(candidate: OutcomeCandidate) -> dict[str, Any]:
+    return {
+        "candidate_id": candidate.candidate_id,
+        "cluster_id": candidate.cluster_id,
+        "status": candidate.status,
+        "size": candidate.size,
+        "rule_id": candidate.rule_id,
+        "reviewed_by": candidate.reviewed_by,
+        "noticed_at": candidate.noticed_at.isoformat(),
+        "confirmed": candidate.is_confirmed,
+        "confirmed_by": candidate.confirmed_by,
+        "confirmed_at": (candidate.confirmed_at.isoformat() if candidate.confirmed_at else None),
+        "outcome_id": candidate.outcome_id,
+    }
+
+
+def _comparison_view(comparison: PostLaunchComparison) -> dict[str, Any]:
+    return {
+        "launch_id": comparison.launch_id,
+        "scenario_version_id": comparison.scenario_version_id,
+        "provenance": comparison.provenance,
+        "compared": comparison.compared,
+        "agreement_rate": _opt_str(comparison.agreement_rate),
+        "pairs": [
+            {
+                "theme": pair.theme,
+                "segment": pair.segment,
+                "predicted": pair.predicted.value,
+                # `null`, never "low": absence of a record is absence of a
+                # record, and the backtest refuses to average it in either.
+                "observed": pair.observed.value if pair.observed else None,
+                "agrees": pair.agrees,
+            }
+            for pair in comparison.pairs
+        ],
+        "unpredicted": [{"theme": t, "segment": g} for t, g in comparison.unpredicted],
+        "cluster_rates": [
+            {
+                "cluster_id": rate.cluster_id,
+                "size": rate.size,
+                "status": rate.status,
+                "rule_id": rate.rule_id,
+            }
+            for rate in comparison.cluster_rates
+        ],
+        "caveats": list(comparison.caveats),
     }
 
 

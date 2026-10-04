@@ -20,6 +20,7 @@ from clarity.modules.conversation.public import CONVERSATION_STATES, CONVERSATIO
 from clarity.modules.deskops.public import BATCHES
 from clarity.modules.foresight.public import (
     FORESIGHT_CALIBRATIONS,
+    FORESIGHT_CANDIDATES,
     FORESIGHT_LAUNCHES,
     FORESIGHT_OUTCOMES,
     FORESIGHT_REPORTS,
@@ -105,6 +106,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     FORESIGHT_OUTCOMES,
     FORESIGHT_CALIBRATIONS,
     FORESIGHT_SPIKES,
+    FORESIGHT_CANDIDATES,
     # deskops
     BATCHES,
     # insights

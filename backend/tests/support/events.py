@@ -14,6 +14,7 @@ from clarity.contracts.events import (
     CaseCreatedV1,
     CauseDetectedV1,
     ChargeAppliedV1,
+    ClusterUpdatedV1,
     ComplaintCreatedV1,
     ConversationTurnCompletedV1,
     DecisionGeneratedV1,
@@ -176,6 +177,13 @@ SAMPLES: dict[DomainEventType, EventPayload] = {
             tools_called=["get_case_timeline"],
             chunk_ids=["chunk-7"],
             verifier_ok=True,
+        ),
+        ClusterUpdatedV1(
+            cluster_id="CL-1",
+            status="confirmed",
+            size=12,
+            suggested_rule_id="VAS_NO_CONSENT",
+            reviewed_by="cx:ruwan",
         ),
     )
 }

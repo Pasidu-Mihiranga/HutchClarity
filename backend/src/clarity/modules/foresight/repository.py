@@ -93,6 +93,8 @@ class ForesightRepository(Protocol):
 
     def report_of_run(self, run_id: str) -> StoredReport | None: ...
 
+    def all_reports(self) -> list[StoredReport]: ...
+
     def save_calibration(self, calibration: StoredCalibration) -> None: ...
 
     def calibration(self, calibration_id: str) -> StoredCalibration | None: ...
@@ -224,6 +226,9 @@ class StoredForesightRepository:
             if report.run_id == run_id:
                 return report
         return None
+
+    def all_reports(self) -> list[StoredReport]:
+        return self._reports.values()
 
     def save_calibration(self, calibration: StoredCalibration) -> None:
         self._calibrations.put(calibration.calibration_id, calibration)

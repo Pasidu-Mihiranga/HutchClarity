@@ -38,6 +38,7 @@ from clarity.modules.foresight.backtest import (
     Provenance,
 )
 from clarity.modules.foresight.catalogue import ForesightCatalogue
+from clarity.modules.foresight.loop import AutopsyLoop, PostLaunchComparison
 from clarity.modules.foresight.records import (
     DetectedSpike,
     RecordedOutcome,
@@ -69,6 +70,15 @@ class RunAlreadyFinished(RuntimeError):
     """
 
 
+class AlreadyConfirmed(RuntimeError):
+    """A candidate a person has already turned into an outcome.
+
+    Refused rather than ignored: a second confirmation would write a second
+    append-only outcome from one observation, which is how a single cluster
+    would count twice towards the calibration gate.
+    """
+
+
 class RealLaunchNotPermitted(PermissionError):
     """Recording a real launch needs the C6 capability, which does not exist yet.
 
@@ -87,10 +97,15 @@ class ForesightService:
         open_unit: UnitOfWorkFactory,
         catalogue: ForesightCatalogue,
         clock: Callable[[], datetime] | None = None,
+        loop: AutopsyLoop | None = None,
     ) -> None:
         self._open_unit = open_unit
         self._catalogue = catalogue
         self._clock = clock or (lambda: datetime.now(tz=UTC))
+        # The autopsy loop (C7). Optional, so a deployment with no complaint
+        # clustering still runs: without it there are no candidates and no
+        # comparison, which is a smaller product rather than a broken one.
+        self._loop = loop
 
     @staticmethod
     def _repository(unit: UnitOfWork) -> StoredForesightRepository:
@@ -297,6 +312,57 @@ class ForesightService:
             unit.commit()
         return outcome
 
+    def confirm_candidate(
+        self,
+        *,
+        cluster_id: str,
+        launch_id: str,
+        theme: str,
+        segment: str,
+        band: VolumeBand,
+        by: str,
+    ) -> RecordedOutcome:
+        """Turn a cluster-derived candidate into a recorded outcome (C7).
+
+        The theme, the segment and the band come from the person, not from the
+        cluster. A cluster says "these complaints look like one cause"; it does
+        not say which rehearsed theme that is or which segment complained, and
+        inventing that mapping here would be the system deciding what its own
+        evidence means (ADR-0044).
+        """
+        if self._loop is None:
+            raise RuntimeError("no autopsy loop is wired, so there are no candidates")
+        candidate = self._loop.candidate(cluster_id)
+        if candidate is None:
+            raise KeyError(cluster_id)
+        if candidate.is_confirmed:
+            raise AlreadyConfirmed(cluster_id)
+        outcome = self.record_outcome(
+            launch_id=launch_id, theme=theme, segment=segment, band=band, by=by
+        )
+        self._loop.mark_confirmed(cluster_id, outcome=outcome, by=by)
+        return outcome
+
+    def comparison(self, launch_id: str) -> PostLaunchComparison | None:
+        """What a rehearsal said, beside what the launch produced (C7/F10)."""
+        if self._loop is None:
+            return None
+        with self._open_unit() as unit:
+            repository = self._repository(unit)
+            launch = repository.launch(launch_id)
+            if launch is None:
+                return None
+            outcomes = repository.outcomes_of(launch_id)
+            report = next(
+                (
+                    stored.report
+                    for stored in repository.all_reports()
+                    if stored.scenario_version_id == launch.scenario_version_id
+                ),
+                None,
+            )
+        return self._loop.compare(launch=launch, report=report, outcomes=outcomes)
+
     def launches(self) -> list[StoredLaunch]:
         with self._open_unit() as unit:
             return self._repository(unit).all_launches()
@@ -367,6 +433,7 @@ class ForesightService:
 
 
 __all__ = [
+    "AlreadyConfirmed",
     "CalibrationReport",
     "ForesightService",
     "RealLaunchNotPermitted",

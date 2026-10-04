@@ -58,6 +58,7 @@ class DomainEventType(StrEnum):
     KNOWLEDGE_PUBLISHED = "knowledge.published"
     RECONCILIATION_MISMATCH = "reconciliation.mismatch"
     CONVERSATION_TURN_COMPLETED = "conversation.turn.completed"
+    CLUSTER_UPDATED = "cluster.updated"
 
 
 #: Field-name segments that indicate personal data. Matched on ``_``-separated
@@ -347,6 +348,33 @@ class ReconciliationMismatchV1(EventPayload):
     reason: str
 
 
+class ClusterUpdatedV1(EventPayload):
+    """A complaint cluster was drawn or its review status changed (C7, plan 18 section 159).
+
+    Promised by plan 18 section 159 and missing until now, which is why
+    foresight had no way to learn what a shipped change actually produced
+    without reaching into autopsy's tables (I6 forbids that).
+
+    **Codes and counts only.** No label and no keywords: a cluster's label is
+    derived from what customers wrote, so publishing it would put a paraphrase
+    of complaint text on the bus, and `autopsy` exists precisely so that text
+    stays in one place. A consumer that needs the label asks autopsy for it.
+
+    `size` is how many complaints the cluster holds. It is the only number here,
+    and it is a count of records rather than of people: one person complaining
+    four times is four.
+    """
+
+    event_type = DomainEventType.CLUSTER_UPDATED
+    cluster_id: str
+    status: str
+    """`hypothesis`, `confirmed` or `rejected`, matching `ClusterStatus`."""
+    size: int = Field(ge=0)
+    suggested_rule_id: str | None = None
+    reviewed_by: str | None = None
+    """Staff reference of whoever ruled on it, or None while it is a hypothesis."""
+
+
 class ConversationTurnCompletedV1(EventPayload):
     """One assistant turn finished (C01, plan 22 section 4 step 11).
 
@@ -407,6 +435,7 @@ _PAYLOADS: tuple[type[EventPayload], ...] = (
     KnowledgePublishedV1,
     ReconciliationMismatchV1,
     ConversationTurnCompletedV1,
+    ClusterUpdatedV1,
 )
 
 #: (event type, schema version) -> payload model.
@@ -450,6 +479,7 @@ __all__ = [
     "CaseCreatedV1",
     "CauseDetectedV1",
     "ChargeAppliedV1",
+    "ClusterUpdatedV1",
     "ComplaintCreatedV1",
     "ConversationTurnCompletedV1",
     "DecisionGeneratedV1",

@@ -26,6 +26,17 @@ from clarity.modules.foresight.catalogue import (
     ThemeCatalogue,
     ThemeWeight,
 )
+from clarity.modules.foresight.loop import (
+    CANDIDATES as FORESIGHT_CANDIDATES,
+)
+from clarity.modules.foresight.loop import (
+    AutopsyLoop,
+    ClusterRate,
+    ClusterRateSource,
+    OutcomeCandidate,
+    PairOutcome,
+    PostLaunchComparison,
+)
 from clarity.modules.foresight.personas import (
     LlmPersonaSimulator,
     PersonaInvoke,
@@ -79,6 +90,7 @@ from clarity.modules.foresight.repository import (
     StoredForesightRepository,
 )
 from clarity.modules.foresight.service import (
+    AlreadyConfirmed,
     ForesightService,
     RealLaunchNotPermitted,
     RunAlreadyFinished,
@@ -98,18 +110,23 @@ from clarity.modules.foresight.simulation import (
 __all__ = [
     "DEMO_LAUNCHES",
     "FORESIGHT_CALIBRATIONS",
+    "FORESIGHT_CANDIDATES",
     "FORESIGHT_LAUNCHES",
     "FORESIGHT_OUTCOMES",
     "FORESIGHT_REPORTS",
     "FORESIGHT_RUNS",
     "FORESIGHT_SCENARIOS",
     "FORESIGHT_SPIKES",
+    "AlreadyConfirmed",
+    "AutopsyLoop",
     "Backtest",
     "Bands",
     "CalibrationReport",
     "CalibrationStatus",
     "CatalogueInvalid",
     "ChangeType",
+    "ClusterRate",
+    "ClusterRateSource",
     "DetectedSpike",
     "Foresight",
     "ForesightCatalogue",
@@ -119,13 +136,16 @@ __all__ = [
     "HistoricLaunch",
     "LlmPersonaSimulator",
     "ObservedOutcome",
+    "OutcomeCandidate",
     "PairComparison",
+    "PairOutcome",
     "PersonaInvoke",
     "PersonaRehearsal",
     "PersonaRounds",
     "PersonaRouter",
     "PersonaRun",
     "PersonaSimulator",
+    "PostLaunchComparison",
     "Prediction",
     "Propensity",
     "Provenance",
