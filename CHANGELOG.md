@@ -4,6 +4,15 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added
+
+- `POST /v1/auth/staff/login` checks a staff directory and assigns that account's role. When `CLARITY_STAFF_DIRECTORY` or `CLARITY_STAFF_DIRECTORY_FILE` is set, `POST /v1/auth/staff/session` returns 404. Both routes stay 404 in `prod`. OpenAPI snapshot and SDK regenerated on purpose.
+- Vertex AI is a text-role provider (`config/ai/models.yaml`). It runs when `CLARITY_VERTEX_PROJECT` is set and `AI_PREFER_TEMPLATES=false`. The model id is `CLARITY_MODEL_NAME`. Credentials are Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`), not a key in the repo. Speech roles stay on Groq, then a local refusal.
+
+### Fixed
+
+- The audit checkpoint key path is built only when `KEYS_DIR` is set, so mypy no longer rejects `None / "audit-checkpoint-ed25519.pem"` on the full profile.
+
 ### Changed (audit assurance W1 and Phase 2 cross-anchor; **money path, two approvals**)
 
 - **Receipt schema 1.1**: `ReceiptPayload.audit_anchor` carries the current signed

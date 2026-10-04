@@ -101,6 +101,20 @@ class Settings(BaseSettings):
     keycloak_issuer: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_ISSUER")
     keycloak_audience: str = Field(default="clarity-api", alias="CLARITY_KEYCLOAK_AUDIENCE")
     keycloak_jwks_url: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_JWKS_URL")
+    staff_directory: str | None = Field(
+        default=None,
+        alias="CLARITY_STAFF_DIRECTORY",
+        description=(
+            "JSON staff accounts. When set, the browser cannot choose a role: "
+            "POST /v1/auth/staff/login checks this directory and "
+            "POST /v1/auth/staff/session answers 404."
+        ),
+    )
+    staff_directory_file: Path | None = Field(
+        default=None,
+        alias="CLARITY_STAFF_DIRECTORY_FILE",
+        description="Path to that JSON document. The inline variable wins when both are set.",
+    )
     opa_url: str | None = Field(default=None, alias="CLARITY_OPA_URL")
     # The clarity-mcp deployable (A04, ADR-0018).
     mcp_resource_url: str = Field(
@@ -181,6 +195,12 @@ class Settings(BaseSettings):
     model_name: str = Field(default="local-model", alias="CLARITY_MODEL_NAME")
     model_api_key: str | None = Field(default=None, alias="CLARITY_MODEL_API_KEY")
     model_timeout_seconds: float = Field(default=20.0, alias="CLARITY_MODEL_TIMEOUT", gt=0)
+    vertex_project: str | None = Field(
+        default=None,
+        alias="CLARITY_VERTEX_PROJECT",
+        description="Vertex AI project. Unset: this process does not call Vertex.",
+    )
+    vertex_location: str = Field(default="global", alias="CLARITY_VERTEX_LOCATION")
     prefer_templates: bool = Field(default=True, alias="AI_PREFER_TEMPLATES")
     cassette_dir: Path = Field(default=Path("cassettes"), alias="AI_CASSETTE_DIR")
     record_cassettes: bool = Field(

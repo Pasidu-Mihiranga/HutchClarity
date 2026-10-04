@@ -13,17 +13,16 @@ export function AccessDenied({ need }: { need: string }) {
     );
   }
   return (
-    <Card className="space-y-2 border-amber-200 bg-amber-50">
-      <h2 className="font-medium text-amber-950">Your current role cannot access this</h2>
-      <p className="text-sm text-amber-900">
+    <Card className="space-y-2 rounded-card border-[#ffd4b6] bg-warm shadow-card">
+      <h2 className="font-display text-lg font-semibold text-ink">This identity cannot open this</h2>
+      <p className="text-sm text-[#82401e]">
         {session
           ? `Signed in as ${session.subject} (${activeRole}). Needs: ${need}.`
-          : "Pick a role in the bar below to start."}
+          : "Sign in from the header to start."}
       </p>
-      <p className="text-xs text-amber-800">
-        Switch roles with the bottom bar. Four-eyes approvals need a different
-        user ref (e.g. supervisor then finance), not only a different role on
-        the same person.
+      <p className="text-xs text-[#8a4a28]">
+        Four-eyes approvals need a different person (supervisor, then finance),
+        not two roles on the same user.
       </p>
     </Card>
   );

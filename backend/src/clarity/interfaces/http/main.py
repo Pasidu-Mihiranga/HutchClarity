@@ -89,6 +89,7 @@ from clarity.interfaces.http.schemas import (
     SafeguardRequest,
     SessionView,
     SourceStatusView,
+    StaffLogin,
     StaffSignIn,
     SwitchFlipRequest,
     TimelineEventView,
@@ -111,6 +112,7 @@ from clarity.modules.iam.public import (
     AuditGrant,
     GrantNotFound,
     GrantRefused,
+    LoginRefused,
     OtpRefused,
     SimulatedInbox,
     SubjectKind,
@@ -1193,6 +1195,55 @@ def _register_routes(app: FastAPI) -> None:
         )
 
     @app.post(
+        "/v1/auth/staff/login",
+        response_model=SessionView,
+        tags=["auth"],
+        dependencies=[Depends(demo_only)],
+    )
+    def staff_login(body: StaffLogin, clarity: ClarityDep) -> SessionView:
+        """Sign in against the staff directory. The server assigns the role.
+
+        **Simulated** accounts, for the synthetic profiles. Production federates
+        HUTCH SSO and this route answers 404 (I9). A wrong password and a wrong
+        step-up code return the same refusal.
+        """
+        directory = clarity.staff_directory
+        if directory is None:
+            raise HTTPException(status_code=401, detail="sign-in failed")
+        try:
+            identity = directory.authenticate(body.username, body.password, body.step_up_code)
+        except LoginRefused as error:
+            raise HTTPException(status_code=401, detail="sign-in failed") from error
+        issued = clarity.tokens.for_staff(
+            identity.user_ref,
+            roles={identity.role},
+            assurance=identity.assurance,
+        )
+        trail.record(
+            clarity,
+            AuditEventType.STAFF_SESSION_STARTED,
+            actor_ref=identity.user_ref,
+            actor_kind=ActorKind.STAFF,
+            session_ref=trail.session_ref_for(issued.value),
+            object_ref=identity.user_ref,
+            detail={
+                "roles": [identity.role.value],
+                "step_up": identity.assurance is Assurance.MFA_RECENT,
+                "assurance": issued.principal.assurance.value,
+                "simulated": True,
+            },
+        )
+        return SessionView(
+            token=issued.value,
+            refresh_token=issued.refresh_token,
+            expires_at=issued.expires_at,
+            subject=identity.user_ref,
+            roles=[identity.role.value],
+            assurance=issued.principal.assurance.value,
+            permissions=sorted(p.value for p in issued.principal.permissions),
+        )
+
+    @app.post(
         "/v1/auth/staff/session",
         response_model=SessionView,
         tags=["auth"],
@@ -1202,10 +1253,12 @@ def _register_routes(app: FastAPI) -> None:
     def staff_session(body: StaffSignIn, clarity: ClarityDep) -> SessionView:
         """Development staff sign-in.
 
-        **Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra)
-        behind this same interface; there is no password here, which is why
-        the Desk labels the role picker as a demo control.
+        **Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra).
+        When a staff directory is configured this route is gone: the browser
+        cannot choose a role.
         """
+        if clarity.staff_directory is not None:
+            raise HTTPException(status_code=404, detail="not found")
         try:
             roles = {Role(name) for name in body.roles}
         except ValueError as error:

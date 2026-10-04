@@ -100,18 +100,68 @@ export const PRIYA = "+94784445555"; // LKR 12,000 reload, SIM swap -> STAFF_APP
  * call this freely. `step_up` simulates recent MFA, which an approval above
  * the cap requires.
  */
+/** Synthetic directory accounts. The e2e API must load config/staff/synthetic-directory.json. */
+const LOGIN_BY_REF: Record<string, { username: string; password: string }> = {
+  "agent:nadeesha": { username: "nadeesha", password: "nadeesha-clarity" },
+  "sec:dilani": { username: "dilani", password: "dilani-clarity" },
+  "ops:stream": { username: "stream", password: "stream-clarity" },
+};
+
+const LOGIN_BY_LABEL: Record<string, { username: string; password: string }> = {
+  Agent: { username: "agent", password: "agent-clarity" },
+  Supervisor: { username: "supervisor", password: "supervisor-clarity" },
+  Finance: { username: "finance", password: "finance-clarity" },
+  Compliance: { username: "compliance", password: "compliance-clarity" },
+  Auditor: { username: "auditor", password: "auditor-clarity" },
+  Security: { username: "security", password: "security-clarity" },
+  Platform: { username: "platform", password: "platform-clarity" },
+};
+
 export async function staffToken(
   request: APIRequestContext,
   userRef: string,
   roles: string[],
   stepUp = false,
 ): Promise<string> {
-  const session = await request.post(`${API}/v1/auth/staff/session`, {
-    data: { user_ref: userRef, roles, step_up: stepUp },
+  const account = LOGIN_BY_REF[userRef];
+  if (!account) {
+    throw new Error(`no synthetic login for ${userRef}`);
+  }
+  const session = await request.post(`${API}/v1/auth/staff/login`, {
+    data: {
+      username: account.username,
+      password: account.password,
+      step_up_code: stepUp ? "step-up" : "",
+    },
   });
-  expect(session.ok(), `staff session failed: ${session.status()}`).toBeTruthy();
-  const { token } = (await session.json()) as { token: string };
-  return token;
+  expect(session.ok(), `staff login failed: ${session.status()}`).toBeTruthy();
+  const body = (await session.json()) as { token: string; roles: string[] };
+  expect(body.roles).toEqual(expect.arrayContaining(roles));
+  return body.token;
+}
+
+/** Sign in through the desk form. The label is the role the directory assigns. */
+export async function signInOnDesk(
+  page: import("@playwright/test").Page,
+  roleLabel: string,
+  stepUp = true,
+): Promise<void> {
+  const account = LOGIN_BY_LABEL[roleLabel];
+  if (!account) {
+    throw new Error(`no synthetic login for ${roleLabel}`);
+  }
+  const signOut = page.getByRole("button", { name: "Sign out" });
+  if (await signOut.isVisible().catch(() => false)) {
+    await signOut.click();
+  }
+  await page.getByLabel("Username").fill(account.username);
+  await page.getByLabel("Password").fill(account.password);
+  if (stepUp) {
+    await page.getByLabel("Step-up code").fill("step-up");
+  } else {
+    await page.getByLabel("Step-up code").fill("");
+  }
+  await page.getByRole("button", { name: "Sign in" }).click();
 }
 
 type OpenedCase = { caseId: string; outcome: string };

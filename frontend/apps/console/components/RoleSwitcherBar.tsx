@@ -1,75 +1,96 @@
 "use client";
 
-import { STAFF_ROLES, useStaffSession } from "./StaffSessionProvider";
+import { useState, type FormEvent } from "react";
+import { useStaffSession } from "./StaffSessionProvider";
 
 export function RoleSwitcherBar() {
-  const { activeRole, stepUp, setStepUp, signInAs, signOut, session, busy, error } =
-    useStaffSession();
+  const { signIn, signOut, session, busy, error } = useStaffSession();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [stepUpCode, setStepUpCode] = useState("");
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    const ok = await signIn(username, password, stepUpCode);
+    if (ok) {
+      setPassword("");
+      setStepUpCode("");
+    }
+  }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-4px_24px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2 sm:px-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-          <div className="min-w-0">
-            {session ? (
-              <span>
-                <strong className="text-slate-900">{session.subject}</strong>
-                {" · "}
-                {session.roles.join(", ")}
-                {" · "}
-                {session.permissions.length} perms
-                {" · "}
-                assurance {session.assurance}
-              </span>
-            ) : (
-              <span>Pick a demo role to start (roles are asserted, not proven)</span>
-            )}
+    <div className="border-t border-[#f0e7e1] bg-warm">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-2 px-4 py-2.5 sm:px-6">
+        {session ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-mute">
+            <span>
+              <strong className="text-ink">{session.subject}</strong>
+              {" · "}
+              {session.roles.join(", ")}
+              {" · "}
+              {session.permissions.length} permissions
+              {" · "}
+              assurance {session.assurance}
+            </span>
+            <button
+              type="button"
+              className="font-medium text-accent-deep underline"
+              onClick={signOut}
+              disabled={busy}
+            >
+              Sign out
+            </button>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-1.5">
+        ) : (
+          <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => void onSubmit(e)}>
+            <label className="flex flex-col gap-1 text-xs text-mute">
+              Username
               <input
-                type="checkbox"
-                checked={stepUp}
-                onChange={(e) => setStepUp(e.target.checked)}
-                disabled={busy}
+                id="staff-username"
+                name="username"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm text-ink"
+                required
               />
-              <span>Step-up MFA</span>
             </label>
-            {session ? (
-              <button
-                type="button"
-                className="text-sky-800 underline"
-                onClick={signOut}
-                disabled={busy}
-              >
-                Sign out
-              </button>
-            ) : null}
-          </div>
-        </div>
+            <label className="flex flex-col gap-1 text-xs text-mute">
+              Password
+              <input
+                id="staff-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm text-ink"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-mute">
+              Step-up code
+              <input
+                id="staff-step-up"
+                name="step_up_code"
+                autoComplete="one-time-code"
+                value={stepUpCode}
+                onChange={(e) => setStepUpCode(e.target.value)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm text-ink"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            >
+              Sign in
+            </button>
+          </form>
+        )}
         {error ? (
-          <p className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-800">{error}</p>
+          <p className="rounded-xl bg-rose-50 px-2 py-1 text-xs text-rose-800">{error}</p>
         ) : null}
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {STAFF_ROLES.map((role) => {
-            const on = activeRole === role.id;
-            return (
-              <button
-                key={role.id}
-                type="button"
-                disabled={busy}
-                onClick={() => void signInAs(role.id)}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  on
-                    ? "bg-sky-700 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                } disabled:opacity-50`}
-              >
-                {role.label}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );

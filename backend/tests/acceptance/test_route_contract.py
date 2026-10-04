@@ -127,6 +127,7 @@ SYNTHETIC_ONLY = {
     ("GET", "/v1/demo/inbox"),
     ("GET", "/v1/demo/subscribers"),
     ("POST", "/v1/auth/staff/session"),
+    ("POST", "/v1/auth/staff/login"),
 }
 
 #: Valid bodies, so a 401 proves the sign-in check rather than input validation.

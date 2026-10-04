@@ -126,38 +126,6 @@ export default function DeskPage() {
     }
   }
 
-  async function seed() {
-    setActing(true);
-    setError(null);
-    try {
-      await client.demoSeed();
-      await loadQueue();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Seed failed");
-    } finally {
-      setActing(false);
-    }
-  }
-
-  async function reset() {
-    setActing(true);
-    setError(null);
-    try {
-      await client.demoReset();
-      setCurrentId(null);
-      setSummary(null);
-      setDecision(null);
-      setTimeline(null);
-      setReceipt(null);
-      setPlanId(null);
-      await loadQueue();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Reset failed");
-    } finally {
-      setActing(false);
-    }
-  }
-
   async function suspendMerchant() {
     setActing(true);
     setError(null);
@@ -187,21 +155,19 @@ export default function DeskPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Desk</h1>
-          <p className="text-sm text-slate-600">
-            Cases that need a person, biggest money at stake first.
+        <div className="max-w-xl space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+            Resolve and support
+          </p>
+          <h1 className="font-display text-4xl font-semibold tracking-tight">Desk</h1>
+          <p className="text-sm leading-6 text-mute">
+            Cases that need a person, largest amount first. The subscribers are
+            synthetic.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => void loadQueue()} disabled={loading || acting || sessionBusy}>
             Refresh
-          </Button>
-          <Button variant="secondary" onClick={() => void seed()} disabled={acting}>
-            Create demo cases
-          </Button>
-          <Button variant="ghost" onClick={() => void reset()} disabled={acting}>
-            Reset demo data
           </Button>
         </div>
       </div>
@@ -214,11 +180,12 @@ export default function DeskPage() {
       ) : null}
 
       {canSuspend ? (
-        <Card className="flex flex-wrap items-center justify-between gap-2">
+        <Card className="flex flex-wrap items-center justify-between gap-3 rounded-card border-line bg-white shadow-card">
           <div>
-            <h2 className="font-medium">Merchant suspend</h2>
-            <p className="text-sm text-slate-600">
-              Block GameZone on Dilani (simulated). Needs step-up MFA.
+            <h2 className="font-display text-lg font-semibold">Merchant block</h2>
+            <p className="text-sm text-mute">
+              Block GameZone for synthetic subscriber 0781234567. Step-up is
+              required. The merchant system is simulated.
             </p>
           </div>
           <Button variant="secondary" onClick={() => void suspendMerchant()} disabled={acting}>
@@ -228,15 +195,17 @@ export default function DeskPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1 max-h-[min(70vh,36rem)] space-y-2 overflow-y-auto">
-          <h2 className="text-sm font-medium uppercase text-slate-500">Queue</h2>
+        <Card className="max-h-[min(70vh,36rem)] space-y-2 overflow-y-auto rounded-card border-line bg-white shadow-card lg:col-span-1">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">
+            Queue · {queue.length}
+          </h2>
           {loading && !queue.length ? (
             <p className="text-sm text-slate-500">Loading…</p>
           ) : null}
           {!queue.length && !loading ? (
-            <p className="text-sm text-slate-500">
-              Nothing waiting. Use Create demo cases, or raise one from the
-              customer app.
+            <p className="text-sm text-mute">
+              Nothing is waiting. Load the synthetic queue, or open a case from
+              the customer app.
             </p>
           ) : null}
           <ul className="space-y-2">
@@ -245,10 +214,10 @@ export default function DeskPage() {
                 <button
                   type="button"
                   onClick={() => void openCase(item.case_id)}
-                  className={`w-full rounded border px-3 py-2 text-left text-sm transition ${
+                  className={`w-full rounded-2xl border px-3 py-3 text-left text-sm transition ${
                     currentId === item.case_id
-                      ? "border-sky-400 bg-sky-50"
-                      : "border-slate-100 hover:border-slate-300"
+                      ? "border-accent bg-warm"
+                      : "border-line hover:border-[#ffb28b]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -273,15 +242,15 @@ export default function DeskPage() {
           </ul>
         </Card>
 
-        <Card className="lg:col-span-2 space-y-4">
-          <h2 className="text-sm font-medium uppercase text-slate-500">Cockpit</h2>
+        <Card className="space-y-4 rounded-card border-line bg-white shadow-card lg:col-span-2">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Case</h2>
           {!decision || !summary ? (
             <p className="text-sm text-slate-500">Open a case from the queue.</p>
           ) : (
             <>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="text-lg font-medium">{String(summary.case_no || currentId)}</p>
+                  <p className="font-display text-2xl font-semibold">{String(summary.case_no || currentId)}</p>
                   <p className="text-sm text-slate-600">
                     {String(summary.msisdn_masked || "")} · {String(summary.channel || "")} ·{" "}
                     {String(summary.state || "")}
@@ -350,8 +319,8 @@ export default function DeskPage() {
               ) : null}
 
               {decision.outcome === "STAFF_APPROVAL" ? (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                  <h3 className="font-medium">Approve</h3>
+                <div className="space-y-3 rounded-card border border-[#ffd4b6] bg-warm p-4">
+                  <h3 className="font-display text-lg font-semibold">Approve</h3>
                   <p className="text-xs text-slate-500">
                     Approval is recorded against the signed-in user. You cannot
                     approve a plan you raised. Four-eyes needs a different person.

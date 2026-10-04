@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { CONSOLE } from "./session";
+import { CONSOLE, signInOnDesk } from "./session";
 
 test.describe("synthetic intelligence workspaces", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`${CONSOLE}/autopsy`);
-    await page.getByRole("button", { name: "Supervisor", exact: true }).click();
+    await signInOnDesk(page, "Supervisor");
   });
 
   test("Autopsy discloses hypotheses, masked examples and its active method", async ({
@@ -32,8 +32,7 @@ test.describe("synthetic intelligence workspaces", () => {
   });
 
   test("a role without desk permission cannot use either workspace", async ({ page }) => {
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.getByRole("button", { name: "Auditor", exact: true }).click();
+    await signInOnDesk(page, "Auditor", false);
     await expect(page.getByText(/desk:queue:read/i)).toBeVisible();
     await expect(page.getByRole("link", { name: "Foresight", exact: true })).toHaveCount(0);
   });

@@ -15,100 +15,77 @@ import {
   type SessionView,
 } from "@clarity/sdk";
 
-export const STAFF_ROLES = [
-  { id: "agent", label: "Agent", userRef: "agent-1" },
-  { id: "supervisor", label: "Supervisor", userRef: "sup-1" },
-  { id: "finance", label: "Finance", userRef: "fin-1" },
-  { id: "vas_ops", label: "VAS ops", userRef: "vas-1" },
-  { id: "cx_engineer", label: "CX eng", userRef: "cxe-1" },
-  { id: "compliance", label: "Compliance", userRef: "comp-1" },
-  { id: "auditor", label: "Auditor", userRef: "aud-1" },
-  { id: "platform_admin", label: "Platform", userRef: "plat-1" },
-  { id: "security_admin", label: "Security", userRef: "sec-1" },
-] as const;
-
-export type StaffRoleId = (typeof STAFF_ROLES)[number]["id"];
-
-const STORAGE_KEY = "clarity_console_staff_v1";
-
-type StoredSession = {
-  token: string;
-  role: StaffRoleId;
-  stepUp: boolean;
-};
+const STORAGE_KEY = "clarity_console_staff_v2";
 
 type StaffSessionContextValue = {
   client: ClarityClient;
   session: SessionView | null;
-  activeRole: StaffRoleId | null;
+  activeRole: string | null;
   stepUp: boolean;
   busy: boolean;
   restoring: boolean;
   error: string | null;
-  setStepUp: (value: boolean) => void;
-  signInAs: (role: StaffRoleId) => Promise<void>;
+  signIn: (username: string, password: string, stepUpCode: string) => Promise<boolean>;
   signOut: () => void;
   hasPermission: (...perms: string[]) => boolean;
   refresh: () => Promise<void>;
   generation: number;
 };
 
-const StaffSessionContext = createContext<StaffSessionContextValue | null>(
-  null,
-);
+const StaffSessionContext = createContext<StaffSessionContextValue | null>(null);
 
-function readStored(): StoredSession | null {
+function readStored(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as StoredSession;
+    return sessionStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
 }
 
-function writeStored(value: StoredSession | null) {
+function writeStored(token: string | null) {
   if (typeof window === "undefined") return;
-  if (!value) sessionStorage.removeItem(STORAGE_KEY);
-  else sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  if (!token) sessionStorage.removeItem(STORAGE_KEY);
+  else sessionStorage.setItem(STORAGE_KEY, token);
 }
 
 export function StaffSessionProvider({ children }: { children: ReactNode }) {
   const [client] = useState(() => createClarityClient());
   const [session, setSession] = useState<SessionView | null>(null);
-  const [activeRole, setActiveRole] = useState<StaffRoleId | null>(null);
-  const [stepUp, setStepUpState] = useState(false);
   const [busy, setBusy] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
 
   const applySession = useCallback(
-    (token: string, me: SessionView, role: StaffRoleId, stepped: boolean) => {
+    (token: string, me: SessionView) => {
       client.setToken(token);
-      setSession(me);
-      setActiveRole(role);
-      setStepUpState(stepped);
-      writeStored({ token, role, stepUp: stepped });
+      setSession({ ...me, token });
+      writeStored(token);
       setGeneration((g) => g + 1);
     },
     [client],
   );
 
+  const signOut = useCallback(() => {
+    client.setToken(undefined);
+    setSession(null);
+    writeStored(null);
+    setGeneration((g) => g + 1);
+    setError(null);
+  }, [client]);
+
   useEffect(() => {
-    const stored = readStored();
-    if (!stored?.token) {
+    const token = readStored();
+    if (!token) {
       setRestoring(false);
       return;
     }
-    client.setToken(stored.token);
+    client.setToken(token);
     void client
       .whoami()
       .then((me) => {
-        setSession(me);
-        setActiveRole(stored.role);
-        setStepUpState(stored.stepUp);
+        setSession({ ...me, token });
         setGeneration((g) => g + 1);
       })
       .catch(() => {
@@ -120,64 +97,29 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       });
   }, [client]);
 
-  const signInAs = useCallback(
-    async (role: StaffRoleId) => {
-      const entry = STAFF_ROLES.find((r) => r.id === role);
-      if (!entry) return;
+  const signIn = useCallback(
+    async (username: string, password: string, stepUpCode: string) => {
       setBusy(true);
       setError(null);
       try {
-        const started = await client.staffSession({
-          user_ref: entry.userRef,
-          roles: [role],
-          step_up: stepUp,
+        const started = await client.staffLogin({
+          username,
+          password,
+          step_up_code: stepUpCode,
         });
         client.setToken(started.token);
         const me = await client.whoami();
-        applySession(started.token, me, role, stepUp);
+        applySession(started.token, me);
+        return true;
       } catch (err) {
+        client.setToken(undefined);
         setError(err instanceof Error ? err.message : "Sign-in failed");
+        return false;
       } finally {
         setBusy(false);
       }
     },
-    [applySession, client, stepUp],
-  );
-
-  const signOut = useCallback(() => {
-    client.setToken(undefined);
-    setSession(null);
-    setActiveRole(null);
-    writeStored(null);
-    setGeneration((g) => g + 1);
-    setError(null);
-  }, [client]);
-
-  const setStepUp = useCallback(
-    (value: boolean) => {
-      setStepUpState(value);
-      if (!activeRole) return;
-      void (async () => {
-        setBusy(true);
-        setError(null);
-        try {
-          const entry = STAFF_ROLES.find((r) => r.id === activeRole)!;
-          const started = await client.staffSession({
-            user_ref: entry.userRef,
-            roles: [activeRole],
-            step_up: value,
-          });
-          client.setToken(started.token);
-          const me = await client.whoami();
-          applySession(started.token, me, activeRole, value);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Step-up failed");
-        } finally {
-          setBusy(false);
-        }
-      })();
-    },
-    [activeRole, applySession, client],
+    [applySession, client],
   );
 
   const refresh = useCallback(async () => {
@@ -199,6 +141,9 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const activeRole = session?.roles[0] ?? null;
+  const stepUp = session?.assurance === "mfa-recent";
+
   const value = useMemo(
     () => ({
       client,
@@ -208,8 +153,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       busy,
       restoring,
       error,
-      setStepUp,
-      signInAs,
+      signIn,
       signOut,
       hasPermission,
       refresh,
@@ -223,8 +167,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       busy,
       restoring,
       error,
-      setStepUp,
-      signInAs,
+      signIn,
       signOut,
       hasPermission,
       refresh,
@@ -233,9 +176,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <StaffSessionContext.Provider value={value}>
-      {children}
-    </StaffSessionContext.Provider>
+    <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>
   );
 }
 

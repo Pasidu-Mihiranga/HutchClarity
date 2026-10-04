@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CONSOLE, PRIYA, evaluatedCase, proposedPlan, staffToken } from "./session";
+import { CONSOLE, PRIYA, evaluatedCase, proposedPlan, signInOnDesk, staffToken } from "./session";
 
 /**
  * The console's Audit section (audit assurance plan Phase 5).
@@ -20,11 +20,10 @@ import { CONSOLE, PRIYA, evaluatedCase, proposedPlan, staffToken } from "./sessi
 
 const API = process.env.E2E_API_BASE ?? "http://127.0.0.1:8100";
 
-/** Sign in through the console's own role picker, as a presenter would. */
+/** Sign in through the desk form, as a staff member would. */
 async function signInAs(page: import("@playwright/test").Page, role: string) {
   await page.goto(`${CONSOLE}/audit`);
-  await page.getByRole("checkbox", { name: /step-up mfa/i }).check();
-  await page.getByRole("button", { name: role, exact: true }).click();
+  await signInOnDesk(page, role);
 }
 
 test.describe("the console audit section", () => {

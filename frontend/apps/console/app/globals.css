@@ -2,9 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+}
+
+html,
 body {
   margin: 0;
-  background: #f1f5f9;
-  color: #0f172a;
-  font-family: system-ui, sans-serif;
+  background: #f6f7f9;
+  color: #171a1f;
+}
+
+body {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(255, 102, 1, 0.22);
+}
+
+/* Shared buttons are sky. The desk uses the IgniteX orange. */
+.bg-sky-700 {
+  background-color: #ff6601;
+}
+.hover\:bg-sky-800:hover {
+  background-color: #d94e00;
+}
+.text-sky-800,
+.hover\:text-sky-950:hover {
+  color: #d94e00;
+}
+.bg-sky-50 {
+  background-color: #fff0e6;
+}
+.border-sky-300,
+.border-sky-400,
+.hover\:border-sky-300:hover {
+  border-color: #ffb28b;
+}
+.focus\:ring-sky-500:focus {
+  --tw-ring-color: #ff6601;
 }

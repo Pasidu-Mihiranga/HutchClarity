@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CONSOLE, PRIYA, evaluatedCase, proposedPlan, staffToken } from "./session";
+import { CONSOLE, PRIYA, evaluatedCase, proposedPlan, signInOnDesk, staffToken } from "./session";
 
 /**
  * The staff console's Desk (FE01, #28).
@@ -22,12 +22,10 @@ test.describe("the staff console desk", () => {
     expect(outcome, "Priya's disputed reload should need a person").toBe("STAFF_APPROVAL");
     await proposedPlan(request, agent, caseId, "agent:nadeesha");
 
-    // Sign in through the console's own role picker, rather than injecting a
-    // session: this is the control a demo presenter uses, and the one the
-    // static Desk had.
+    // Sign in through the desk form. The directory assigns supervisor; the
+    // page cannot pick the role.
     await page.goto(`${CONSOLE}/desk`);
-    await page.getByRole("checkbox", { name: /step-up mfa/i }).check();
-    await page.getByRole("button", { name: "Supervisor", exact: true }).click();
+    await signInOnDesk(page, "Supervisor");
 
     // The queue is the Desk's whole proposition: what needs a person, ordered
     // by what it costs to leave it.
@@ -56,7 +54,7 @@ test.describe("the staff console desk", () => {
     // `desk:queue:read`, and the page has to say so rather than render a desk
     // with nothing in it, which looks like "no work waiting".
     await page.goto(`${CONSOLE}/desk`);
-    await page.getByRole("button", { name: "Auditor", exact: true }).click();
+    await signInOnDesk(page, "Auditor", false);
 
     await expect(page.getByText(/desk:queue:read/i)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: /approve as/i })).toHaveCount(0);

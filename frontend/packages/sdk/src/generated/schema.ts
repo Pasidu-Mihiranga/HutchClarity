@@ -656,6 +656,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/staff/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Staff Login
+         * @description Sign in against the staff directory. The server assigns the role.
+         *
+         *     **Simulated** accounts, for the synthetic profiles. Production federates
+         *     HUTCH SSO and this route answers 404 (I9). A wrong password and a wrong
+         *     step-up code return the same refusal.
+         */
+        post: operations["staff_login_v1_auth_staff_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/staff/session": {
         parameters: {
             query?: never;
@@ -669,9 +693,9 @@ export interface paths {
          * Staff Session
          * @description Development staff sign-in.
          *
-         *     **Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra)
-         *     behind this same interface; there is no password here, which is why
-         *     the Desk labels the role picker as a demo control.
+         *     **Simulated.** Production federates HUTCH SSO (Keycloak over AD/Entra).
+         *     When a staff directory is configured this route is gone: the browser
+         *     cannot choose a role.
          */
         post: operations["staff_session_v1_auth_staff_session_post"];
         delete?: never;
@@ -1910,8 +1934,27 @@ export interface components {
             source: components["schemas"]["EventSource"];
         };
         /**
+         * StaffLogin
+         * @description Username and password. The directory assigns the role. **Simulated** staff.
+         */
+        StaffLogin: {
+            /** Password */
+            password: string;
+            /**
+             * Step Up Code
+             * @description Empty signs in at ordinary MFA. A code raises assurance to recent MFA.
+             * @default
+             */
+            step_up_code: string;
+            /** Username */
+            username: string;
+        };
+        /**
          * StaffSignIn
          * @description Development staff sign-in. **Simulated**: production federates HUTCH SSO.
+         *
+         *     Closed with 404 once ``CLARITY_STAFF_DIRECTORY`` is set. The browser must
+         *     not choose a role.
          */
         StaffSignIn: {
             /** Roles */
@@ -3157,6 +3200,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_login_v1_auth_staff_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffLogin"];
             };
         };
         responses: {

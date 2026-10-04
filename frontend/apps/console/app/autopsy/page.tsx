@@ -24,7 +24,7 @@ export default function AutopsyPage() {
       <p className="text-sm">{cluster.status_label}</p><p className="text-xs text-amber-800">{cluster.mapping_label}</p>
       <p className="text-xs">Languages: {Object.entries(cluster.languages).map(([k,v]) => `${k} ${v}`).join(" · ")}</p>
       <div><h3 className="text-xs font-semibold uppercase text-slate-500">Representative masked complaints</h3>{cluster.representative_masked_complaints.map((text, i) => <blockquote key={i} className="mt-1 border-l-2 pl-2 text-sm">{text}</blockquote>)}</div>
-      <p className="text-xs text-slate-500">Synthetic demo trend: {Object.entries(cluster.synthetic_demo_trend).map(([k,v]) => `${k}: ${v}`).join(" · ")}</p>
+      <p className="text-xs text-slate-500">Synthetic trend: {Object.entries(cluster.synthetic_demo_trend).map(([k,v]) => `${k}: ${v}`).join(" · ")}</p>
     </Card>)}</div>
   </div>;
 }

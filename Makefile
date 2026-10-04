@@ -53,7 +53,8 @@ setup:
 	$(PY)/pip install -e "$(BACKEND)[dev]"
 
 dev:
-	cd $(BACKEND) && $(PY)/uvicorn clarity.entrypoints.asgi:app --reload
+	cd $(BACKEND) && CLARITY_STAFF_DIRECTORY_FILE=../config/staff/synthetic-directory.json \
+		$(PY)/uvicorn clarity.entrypoints.asgi:app --reload
 
 # The clarity-mcp deployable (A04, ADR-0018), on :8099. Needs the simulated
 # Keycloak realm for tokens: `docker compose -f deploy/compose/full.yml up -d
@@ -128,6 +129,7 @@ dev-e2e:
 	@# wait on it, the lite profile so it needs no services (ADR-0006), and
 	@# OTEL off so the output stays readable in the suite's logs.
 	cd $(BACKEND) && CLARITY_PROFILE=lite OTEL_EXPORTER=none \
+		CLARITY_STAFF_DIRECTORY_FILE=../config/staff/synthetic-directory.json \
 		$(PY)/uvicorn clarity.entrypoints.asgi:app --host 127.0.0.1 --port 8100
 
 chaos:
