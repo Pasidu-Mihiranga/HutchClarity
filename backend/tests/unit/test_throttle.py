@@ -117,7 +117,10 @@ def test_an_unthrottled_route_is_untouched(api: TestClient) -> None:
     for _ in range(60):
         api.post("/v1/conversation/turn", json={"text": "why was I charged"})
 
-    assert api.get("/health").status_code == 200
+    health = api.get("/health")
+
+    assert health.status_code == 200
+    assert "RateLimit-Limit" not in health.headers
 
 
 def test_a_refused_call_never_enters_the_pipeline(api: TestClient) -> None:

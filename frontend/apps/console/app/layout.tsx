@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/space-grotesk";
 import { ConsoleNav } from "@/components/ConsoleNav";
 import { RoleSwitcherBar } from "@/components/RoleSwitcherBar";
+import { SessionGate } from "@/components/SessionGate";
 import { StaffSessionProvider } from "@/components/StaffSessionProvider";
 import "@clarity/ui/tokens.css";
 import "./globals.css";
@@ -20,14 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light">
       <body>
         <StaffSessionProvider>
-          <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+          <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur-xl backdrop-saturate-150">
             <ConsoleNav />
             <RoleSwitcherBar />
           </header>
-          <main className="mx-auto max-w-[1240px] px-4 py-8 sm:px-6">{children}</main>
+          <main className="mx-auto max-w-[1240px] px-4 py-8 sm:px-6 sm:py-12">
+            <SessionGate>{children}</SessionGate>
+          </main>
         </StaffSessionProvider>
       </body>
     </html>

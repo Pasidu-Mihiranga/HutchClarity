@@ -31,8 +31,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-        "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  font: 16px/1.55 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 a { color: var(--orange-ink); }

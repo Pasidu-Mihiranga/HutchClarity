@@ -33,6 +33,7 @@ export const E2E_CSRF = "e2e-csrf-token";
 
 
 const cached = new Map<string, string>();
+const staffTokens = new Map<string, string>();
 
 /**
  * Mint a customer token through the API, once per subscriber per worker.
@@ -50,7 +51,9 @@ export async function customerTokenFor(
   const started = await request.post(`${API}/v1/auth/otp/request`, {
     data: { msisdn },
   });
-  expect(started.ok(), `otp request failed: ${started.status()}`).toBeTruthy();
+  if (!started.ok()) {
+    throw new Error(`otp request failed: ${started.status()} ${await started.text()}`);
+  }
   const { challenge_id } = (await started.json()) as { challenge_id: string };
 
   // The code is generated per challenge. There is no "any six digits" path:
@@ -150,6 +153,10 @@ export async function staffToken(
   roles: string[],
   stepUp = false,
 ): Promise<string> {
+  const cacheKey = `${userRef}:${stepUp ? "mfa" : "single"}`;
+  const hit = staffTokens.get(cacheKey);
+  if (hit) return hit;
+
   const account = LOGIN_BY_REF[userRef];
   if (!account) {
     throw new Error(`no synthetic login for ${userRef}`);
@@ -161,9 +168,12 @@ export async function staffToken(
       step_up_code: stepUp ? "step-up" : "",
     },
   });
-  expect(session.ok(), `staff login failed: ${session.status()}`).toBeTruthy();
+  if (!session.ok()) {
+    throw new Error(`staff login failed: ${session.status()} ${await session.text()}`);
+  }
   const body = (await session.json()) as { token: string; roles: string[] };
   expect(body.roles).toEqual(expect.arrayContaining(roles));
+  staffTokens.set(cacheKey, body.token);
   return body.token;
 }
 
@@ -173,12 +183,36 @@ export async function signInOnDesk(
   roleLabel: string,
   stepUp = true,
 ): Promise<void> {
+  const cacheKey = `${roleLabel}:${stepUp ? "mfa" : "single"}`;
+  const cachedToken = staffTokens.get(cacheKey);
+  if (cachedToken) {
+    await page.evaluate(
+      ({ key, token }) => window.sessionStorage.setItem(key, token),
+      { key: "clarity_console_staff_v2", token: cachedToken },
+    );
+    await page.reload();
+    // The desk shows nothing while it checks a stored session, then either
+    // the signed-in bar or the sign-in portal. Wait for whichever it settles
+    // on rather than a fixed delay, which lost the race on a slow check.
+    const settledIn = page.getByRole("button", { name: "Sign out" });
+    await expect(settledIn.or(page.getByLabel("Username"))).toBeVisible();
+    if (await settledIn.isVisible()) {
+      return;
+    }
+    // Sessions can be revoked or rotated by an earlier journey. A cached
+    // credential is only an optimisation; fall back to the real form when the
+    // API no longer accepts it rather than turning that lifecycle into a
+    // browser-suite failure.
+    staffTokens.delete(cacheKey);
+  }
+
   const account = LOGIN_BY_LABEL[roleLabel];
   if (!account) {
     throw new Error(`no synthetic login for ${roleLabel}`);
   }
   const signOut = page.getByRole("button", { name: "Sign out" });
-  if (await signOut.isVisible().catch(() => false)) {
+  await expect(signOut.or(page.getByLabel("Username"))).toBeVisible();
+  if (await signOut.isVisible()) {
     await signOut.click();
   }
   await page.getByLabel("Username").fill(account.username);
@@ -193,6 +227,11 @@ export async function signInOnDesk(
   // next call could look for "Sign out" before the sign-in had landed, skip
   // signing out, and then wait for a login form that is no longer there.
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  const token = await page.evaluate(() =>
+    window.sessionStorage.getItem("clarity_console_staff_v2"),
+  );
+  if (!token) throw new Error(`staff login for ${roleLabel} did not persist a session`);
+  staffTokens.set(cacheKey, token);
 }
 
 type OpenedCase = { caseId: string; outcome: string };

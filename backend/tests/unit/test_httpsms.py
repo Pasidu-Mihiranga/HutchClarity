@@ -9,12 +9,20 @@ from clarity.modules.iam.public import HttpSmsDelivery, HttpSmsDeliveryFailed
 
 
 def test_httpsms_sends_the_otp_with_the_registered_phone() -> None:
+    """The wording changed deliberately (2026-10-05).
+
+    "Your Hutch Clarity code is 123456" from an ordinary SIM was dropped by
+    the receiving network with a delivery report of "delivered". The grouped
+    "sign-in number" wording was tested on the same route and arrives.
+    """
+
     def accepted(request: httpx.Request) -> httpx.Response:
         assert request.url == "https://sms.example/v1/messages/send"
         assert request.headers["x-api-key"] == "secret-key"
         assert request.read() == (
             b'{"from":"+94780000000","to":"+94781234567",'
-            b'"content":"Your Hutch Clarity code is 123456. It expires in 5 minutes."}'
+            b'"content":"Clarity sign-in number 123 456. Valid for 5 minutes. '
+            b'Never share it."}'
         )
         return httpx.Response(200, json={"status": "success"})
 

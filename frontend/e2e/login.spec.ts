@@ -10,6 +10,40 @@ import { DILANI } from "./session";
  * actually uses works.
  */
 test.describe("sign in", () => {
+  test("live delivery skips the synthetic inbox and permits a network retry", async ({ page }) => {
+    let inboxRequests = 0;
+    await page.route("**/v1/auth/otp/request", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          challenge_id: "live-challenge",
+          sent_to: "07X XXX 0767",
+          simulated: false,
+          detail: "A sign-in code was sent by SMS.",
+        }),
+      });
+    });
+    await page.route("**/v1/demo/inbox**", async (route) => {
+      inboxRequests += 1;
+      await route.fulfill({ status: 404, body: "{}" });
+    });
+    await page.route("**/v1/auth/otp/verify", async (route) => {
+      await route.abort("internetdisconnected");
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Hutch number").fill("0787720767");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByTestId("simulated-sms-inbox")).toHaveCount(0);
+    expect(inboxRequests).toBe(0);
+
+    await page.getByLabel("6-digit code").fill("989971");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText(/network changed before your code was submitted/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+  });
+
   test("a wrong code is refused and the right one signs the customer in", async ({ page }) => {
     // Both assertions share one challenge on purpose. The OTP service allows
     // five challenges per number per fifteen minutes (TH1), and a test that

@@ -38,16 +38,20 @@ export default function LoginPage() {
         tone: "ok",
       });
       setStep("verify");
-      // Read the simulated SMS back and prefill it. Synthetic profiles only;
-      // the route 404s in prod, so a failure here is not an error worth
-      // showing, it just means there is no inbox to read.
-      try {
-        const message = await client.demoInbox(msisdn);
-        if (message.code) {
-          setDemoCode(message.code);
-          setCode(message.code);
+      // Read the synthetic inbox only when this request actually used it.
+      // A live request must not probe a development-only route and produce a
+      // misleading 404 in the browser console.
+      if (result.simulated === true) {
+        try {
+          const message = await client.demoInbox(msisdn);
+          if (message.code) {
+            setDemoCode(message.code);
+            setCode(message.code);
+          }
+        } catch {
+          setDemoCode(null);
         }
-      } catch {
+      } else {
         setDemoCode(null);
       }
     } catch (err) {
@@ -82,7 +86,9 @@ export default function LoginPage() {
       // Nothing to clear: the session cookie is the API's to remove.
       client.setToken(undefined);
       setStatus({
-        text: err instanceof Error ? err.message : "Verify failed",
+        text: err instanceof TypeError
+          ? "The network changed before your code was submitted. Reconnect and press Sign in again."
+          : err instanceof Error ? err.message : "Verify failed",
         tone: "info",
       });
     } finally {
@@ -154,9 +160,10 @@ export default function LoginPage() {
                   inputMode="numeric"
                   placeholder="123456"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  // The SMS shows "123 456"; keep the digits, so a pasted or
+                  // spaced code is not cut short by the length limit.
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   required
-                  maxLength={6}
                   className="rounded-[14px] px-3 py-2.5 font-mono text-2xl tracking-[.32em]"
                 />
               )}

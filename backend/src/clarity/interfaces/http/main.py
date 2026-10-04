@@ -109,7 +109,7 @@ from clarity.interfaces.http.throttle import (
     ANONYMOUS_FALLBACK,
     ANONYMOUS_KEY,
     FALLBACK_LIMIT,
-    rate_limit,
+    RateLimitMiddleware,
 )
 from clarity.kernel.canonical import hash_payload
 from clarity.kernel.common import Language, mask_msisdn, normalise_msisdn, utc_now
@@ -389,7 +389,12 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             _throttle_log.warning("rate limit %s unresolved; using the default", policy_key)
             return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
 
-    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
+    app.add_middleware(
+        RateLimitMiddleware,
+        limiter=core.rate_limiter,
+        resolve=_limit_for,
+        clock=core.case_aggregate._now,
+    )
 
     # CSRF, for requests relying on a cookie (B4). Inside the rate limiter, so
     # a flood of forged requests is still throttled before it is inspected.
@@ -1755,13 +1760,25 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/v1/ai/usage", tags=["ops"])
     def ai_usage(clarity: ClarityDep) -> dict[str, Any]:
         """Measured token usage, for the AI disclosure (Guidelines §6.2)."""
+        provider = clarity.ai.provider.name
+        # The note must describe the process that answers, not the default: a
+        # deployment with a model configured said "no language model" while
+        # it was calling one.
+        note = (
+            "No language model is configured in this process. Explanations come "
+            "from CX-approved templates, which is the deck's 'works without the "
+            "LLM' path. Token counts are therefore measured, and zero."
+            if provider == "templates"
+            else (
+                f"Explanations are phrased by {provider} from facts the rules "
+                "decided; the model never sets an amount or an action. Token counts "
+                "are measured in this process since it started, and templates "
+                "answer whenever the model is unavailable."
+            )
+        )
         return {
-            "provider": clarity.ai.provider.name,
-            "note": (
-                "No language model is configured in this prototype. Explanations come "
-                "from CX-approved templates, which is the deck's 'works without the "
-                "LLM' path. Token counts are therefore measured, and zero."
-            ),
+            "provider": provider,
+            "note": note,
             **clarity.ai.usage_summary,
         }
 
