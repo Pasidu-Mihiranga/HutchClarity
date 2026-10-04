@@ -16,6 +16,7 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Changed
 
+- `FlowToolAdapter` serves all nine tools the flow files name. Five (`get_case_timeline`, `get_cause_assessment`, `explain_rule`, `get_customer_safeguards`, `request_handoff`) raised `ToolUnavailable`; the gap was invisible because they are only reachable through the bounded agent step, which has never run without a configured planner. `tests/unit/test_flow_tool_adapter.py` reads the tool names out of the shipped flow files, so a flow declaring a tool the adapter does not serve now fails the build.
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
 
 ### Fixed
