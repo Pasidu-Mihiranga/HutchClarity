@@ -115,6 +115,7 @@ Its **parameters** are owned by the policy store, not by this module: `config/po
 - **A predicted pair with no recorded outcome is `None`, never LOW.** Absence of a record is absence of a record, in the comparison as in the backtest.
 - **Cluster rates are context, never score.** Clusters are not keyed by theme or segment, so they cannot be compared against a prediction. An unreachable complaint side leaves the context empty rather than failing the comparison.
 - **Drafting and recording are different duties** (C4). No role holds both `foresight:scenario:draft` and `foresight:outcome:record`, which is the same maker-checker split the money path uses, applied to evidence.
+- **The calibration gate is held shut by four independent locks** (C6, ADR-0044): a C4-classed policy key whose `min: 3` guardrail refuses a lower value at load, `CALIBRATED` computed from `Provenance.REAL` alone, a `REAL` launch needing both a container-supplied `RealLaunchCapability` and a non-empty external `evidence_ref`, and append-only evidence. No shipped profile wires the capability, and a golden test exercises every lever a caller has to prove the gate stays shut.
 - **A propensity never sets a reported band** (ADR-0043, C3). The port returns a share of one segment in [0, 1]; banding happens once in the module against the policy thresholds; `PersonaRehearsal` constructs its own baseline and takes no headline argument, so no caller can put a model in charge of a band.
 - **An absent comparison is not a zero one.** A driver that could not answer reports `answered=False` and the column is `None`, because a column of zeros reads as the finding that no segment will complain.
 - **Agreement between methods proves nothing** and every rehearsal says so: both rest on the same segment catalogue and neither has been calibrated against a real launch.
@@ -133,6 +134,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 - `tests/unit/test_autopsy_foresight.py`
 - `tests/unit/test_foresight_personas.py` (C3: the parity suite over all three drivers, the round-based driver's determinism and policy inputs, the LLM driver's parsing and refusals, and the I1 boundary)
 - `tests/unit/test_foresight_catalogue.py` (C1: policy-driven parameters, `as_of` resolution, parse refusals, borrowing, the frozen scenario)
+- `tests/unit/test_foresight_calibration.py` (C6: the four locks, the golden test, and plan 08 section 12.9's two metrics)
 - `tests/unit/test_foresight_loop.py` (C7: foresight stays a leaf, a candidate is inert, predicted-versus-actual, cluster rates as context)
 - `tests/acceptance/test_foresight_api.py` (C4: the `/v1/foresight` contract, deny-by-default on every route, the duty split, 202 and idempotency)
 - `tests/unit/test_foresight_persistence.py` (C2: ownership, append-only, versions, idempotent runs, the run lifecycle, evidence, backtest assembly)
@@ -147,5 +149,6 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C1-foresight-policy-and-typed-scenario.md` | Moved every tunable to `config/policy/foresight.yaml` and the wording to `platform/content/foresight.py`; froze `Scenario` with a real id and a required typed `effective_date`; injected the clock (C1/F03) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C2-foresight-persistence.md` | Eight collections in the `clarity_foresight` schema, six append-only; scenario versions, idempotent runs with a lifecycle, launches, outcomes, calibrations and spikes (C2/F05) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C3-persona-simulator-port.md` | Replaced the hash-based swarm with a `PersonaSimulator` port returning propensities, three drivers, and the structural I1 boundary (C3/F04, F11; ADR-0043) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C6-calibration-gate.md` | `theme_recall` and `segment_rank_correlation` (exact, no scipy); the four locks on the calibration gate, including making `Guardrail.permits` actually check a quoted number (C6/F09; ADR-0044) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C7-autopsy-loop.md` | `cluster.updated`, a `ClusterRateSource` port wired by the composition root, inert outcome candidates a person confirms, and post-launch predicted-versus-actual (C7/F10) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C4-foresight-api.md` | `/v1/foresight`: scenarios, versions, runs (202 + poll URL + required `Idempotency-Key`), launches, outcomes, backtests, calibration and spikes; four permissions and a new `Role.PRODUCT` (C4/F06) |

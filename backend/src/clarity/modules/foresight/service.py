@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Protocol
 
 from clarity.kernel.ids import new_id
 from clarity.modules.foresight.backtest import (
@@ -80,12 +81,31 @@ class AlreadyConfirmed(RuntimeError):
 
 
 class RealLaunchNotPermitted(PermissionError):
-    """Recording a real launch needs the C6 capability, which does not exist yet.
+    """Recording a real launch was refused.
 
     Deliberately an error rather than a silent downgrade to ``SYNTHETIC``: a
     caller who meant to record real evidence and got a synthetic row would have
     their evidence quietly not count, and would find out at the gate.
     """
+
+
+class RealLaunchCapability(Protocol):
+    """Permission to record a launch that actually happened (C6, lock 3).
+
+    A capability the composition root supplies, not a flag a caller passes and
+    not a permission a role carries. The difference matters: a permission says
+    *who* may write the row, and this says whether this **deployment** has real
+    launch records at all. In the prototype none exists (REQUIRES HUTCH
+    CONFIRMATION), so no profile wires one and the path is closed everywhere,
+    whatever role a caller holds.
+
+    ``describe`` is recorded on the launch, so a report that reaches CALIBRATED
+    can say which source of truth let it.
+    """
+
+    def permits(self) -> bool: ...
+
+    def describe(self) -> str: ...
 
 
 class ForesightService:
@@ -97,11 +117,16 @@ class ForesightService:
         open_unit: UnitOfWorkFactory,
         catalogue: ForesightCatalogue,
         clock: Callable[[], datetime] | None = None,
+        real_launches: RealLaunchCapability | None = None,
         loop: AutopsyLoop | None = None,
     ) -> None:
         self._open_unit = open_unit
         self._catalogue = catalogue
         self._clock = clock or (lambda: datetime.now(tz=UTC))
+        # Absent in every shipped profile: the prototype has no real launch
+        # records to describe (I16). A deployment that has them wires one here,
+        # which is the single place that decision is made.
+        self._real_launches = real_launches
         # The autopsy loop (C7). Optional, so a deployment with no complaint
         # clustering still runs: without it there are no candidates and no
         # comparison, which is a smaller product rather than a broken one.
@@ -269,11 +294,7 @@ class ForesightService:
         Refuses ``REAL`` until C6 wires the capability and the evidence check.
         """
         if provenance is Provenance.REAL:
-            raise RealLaunchNotPermitted(
-                "recording a real launch needs the injected capability and an "
-                "external evidence reference that C6 adds; nothing in the "
-                "prototype may open the calibration gate"
-            )
+            self._check_real_launch(evidence_ref)
         with self._open_unit() as unit:
             repository = self._repository(unit)
             if repository.version(scenario_version_id) is None:
@@ -286,10 +307,34 @@ class ForesightService:
                 recorded_by=by,
                 evidence_ref=evidence_ref,
                 note=note,
+                authority=(
+                    self._real_launches.describe()
+                    if provenance is Provenance.REAL and self._real_launches is not None
+                    else ""
+                ),
             )
             repository.save_launch(launch)
             unit.commit()
         return launch
+
+    def _check_real_launch(self, evidence_ref: str | None) -> None:
+        """Both keys, or nothing (C6, lock 3).
+
+        Checked before anything is written, so a refusal leaves no partial row
+        and no evidence that half-counts.
+        """
+        if self._real_launches is None or not self._real_launches.permits():
+            raise RealLaunchNotPermitted(
+                "this deployment has no real launch records, so no launch may be "
+                "recorded as REAL. The capability is supplied by the composition "
+                "root, not by a caller or a role."
+            )
+        if not (evidence_ref or "").strip():
+            raise RealLaunchNotPermitted(
+                "a real launch needs an external evidence reference somebody can "
+                "go and check. Without one the record is an assertion, and an "
+                "assertion is what the calibration gate exists to refuse."
+            )
 
     def record_outcome(
         self, *, launch_id: str, theme: str, segment: str, band: VolumeBand, by: str
@@ -436,6 +481,7 @@ __all__ = [
     "AlreadyConfirmed",
     "CalibrationReport",
     "ForesightService",
+    "RealLaunchCapability",
     "RealLaunchNotPermitted",
     "RunAlreadyFinished",
     "UnknownRun",

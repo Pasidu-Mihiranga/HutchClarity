@@ -1184,6 +1184,13 @@ class Clarity:
             open_unit=self.open_unit,
             catalogue=self.foresight_catalogue,
             clock=self.now,
+            # No profile wires a real-launch capability (C6, lock 3). The
+            # prototype has no record of a HUTCH launch and its complaint
+            # outcomes to point at (REQUIRES HUTCH CONFIRMATION), so there is
+            # nothing to permit. A deployment that has such records supplies one
+            # here, which is the single place that decision is made, and the
+            # calibration gate stays shut until it does.
+            real_launches=None,
             loop=self.foresight_loop,
         )
         # The baseline is the headline and a second method sits beside it

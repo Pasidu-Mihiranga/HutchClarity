@@ -3042,6 +3042,7 @@ def _launch_view(launch: StoredLaunch) -> dict[str, Any]:
         "provenance": launch.provenance.value,
         "is_real": launch.is_real,
         "evidence_ref": launch.evidence_ref,
+        "authority": launch.authority,
         "note": launch.note,
         "recorded_at": launch.recorded_at.isoformat(),
         "recorded_by": launch.recorded_by,
@@ -3066,6 +3067,11 @@ def _calibration_view(stored: StoredCalibration) -> dict[str, Any]:
         "signed_band_error": _opt_str(report.signed_band_error),
         "exact_band_rate": _opt_str(report.exact_band_rate),
         "top_theme_hit_rate": _opt_str(report.top_theme_hit_rate),
+        # Plan 08 section 12.9's two. Recall is the one that catches the
+        # dangerous direction: without it the band error improves as the model
+        # predicts less, because what it never predicted is excluded from it.
+        "theme_recall": _opt_str(report.theme_recall),
+        "segment_rank_correlation": _opt_str(report.segment_rank_correlation),
         "unpredicted": [
             {"theme": o.theme, "segment": o.segment, "band": o.band.value}
             for o in report.unpredicted
