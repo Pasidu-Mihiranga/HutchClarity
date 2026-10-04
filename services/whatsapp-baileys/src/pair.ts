@@ -4,6 +4,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys"
 import pino from "pino"
 import { loadConfig, pairingPhone } from "./config.js"
+import { waitForSocketOpen } from "./pairing.js"
 
 const config = loadConfig({ ...process.env, WHATSAPP_ENABLED: "false" })
 const phone = pairingPhone()
@@ -23,6 +24,7 @@ const socket = makeWASocket({
   markOnlineOnConnect: false,
 })
 socket.ev.on("creds.update", saveCreds)
+await waitForSocketOpen(socket.ws)
 const code = await socket.requestPairingCode(phone)
 process.stdout.write(`${code.match(/.{1,4}/g)?.join("-") ?? code}\n`)
 setTimeout(() => process.exit(0), 120_000)
