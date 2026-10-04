@@ -52,10 +52,16 @@ from clarity.modules.conversation.intake import IntakeAssist
 from clarity.modules.conversation.intent_routes import routing_payload
 from clarity.modules.conversation.intents import Intent
 from clarity.modules.conversation.service import (
+    MAX_MESSAGE_CHARS,
+    REFUSALS,
     IntakeResult,
     check_handoff,
     compose_reply,
     extract_intake,
+    refusal_for,
+)
+from clarity.modules.conversation.service import (
+    fallback_intake as _fallback_intake,
 )
 from clarity.modules.conversation.state import ConversationState, ConversationStore
 from clarity.modules.conversation.verify import VerifierResult, verify_reply
@@ -63,27 +69,6 @@ from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.messaging.envelope import Event
 from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.persistence import UnitOfWorkFactory
-
-#: The longest message the pipeline will take. Beyond this the turn is refused
-#: rather than truncated: a truncated complaint is a complaint whose end nobody
-#: read, and the customer is never told which half was dropped.
-MAX_MESSAGE_CHARS = 2_000
-
-#: What the customer is told when a turn is refused. Approved wording only
-#: (I15): no model writes these, and they carry no detail about why beyond the
-#: one thing the customer needs to do differently.
-REFUSALS: Mapping[str, str] = {
-    "FORBIDDEN_CONTENT": (
-        "For your safety, please never send PINs, passwords, card numbers or "
-        "one-time codes. I have not stored that message. Tell me what happened "
-        "instead and I will look into the charge."
-    ),
-    "MESSAGE_TOO_LONG": (
-        "That message is longer than I can read in one go. Could you send me "
-        "the main problem in a few sentences?"
-    ),
-    "EMPTY_MESSAGE": "I did not catch that. Could you tell me what happened?",
-}
 
 
 @dataclass(frozen=True)
@@ -471,12 +456,12 @@ class ConversationOrchestrator:
 
     @staticmethod
     def _refusal_for(text: str) -> str | None:
-        """The cheap input checks, before masking or any model."""
-        if not text or not text.strip():
-            return "EMPTY_MESSAGE"
-        if len(text) > MAX_MESSAGE_CHARS:
-            return "MESSAGE_TOO_LONG"
-        return None
+        """The cheap input checks, before masking or any model.
+
+        Shared with the stateless path (A3), which has to apply the same ones:
+        it is the surface an anonymous caller reaches.
+        """
+        return refusal_for(text)
 
     def _inspect(self, text: str) -> GuardVerdict:
         """The guard, with the model tier when one is configured.
@@ -612,21 +597,6 @@ def _language_or_none(value: str | None) -> Language | None:
         return Language(value)
     except ValueError:
         return None
-
-
-def _fallback_intake(text: str, language: str) -> IntakeResult:
-    """A neutral intake: no intent claimed, no slots carried over."""
-    routing = routing_payload(Intent.FALLBACK.value)
-    return IntakeResult(
-        intent=Intent.FALLBACK.value,
-        confidence=0.0,
-        slots={},
-        language=language,
-        needs_handoff=False,
-        raw_text=text,
-        route=routing["route"],
-        client_intent=routing["client_intent"],
-    )
 
 
 def citations_of(outcome: FlowOutcome) -> Sequence[str]:

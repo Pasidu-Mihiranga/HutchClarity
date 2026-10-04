@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from clarity.ai.guard import inspect
+from clarity.ai.pii import find_forbidden
 from clarity.modules.conversation.intake import IntakeAssist, classify, reply_language
 from clarity.modules.conversation.intake import detect_language as _detect_language
 from clarity.modules.conversation.intent_routes import routing_payload
@@ -14,6 +17,42 @@ from clarity.modules.conversation.suggestions import (
     build_suggestions,
     signals_from_snapshot,
 )
+from clarity.modules.conversation.verify import verify_reply
+
+#: The longest message the pipeline will take. Beyond this the turn is refused
+#: rather than truncated: a truncated complaint is a complaint whose end nobody
+#: read, and the customer is never told which half was dropped.
+MAX_MESSAGE_CHARS = 2_000
+
+#: What the customer is told when a turn is refused. Approved wording only
+#: (I15): no model writes these, and they carry no detail about why beyond the
+#: one thing the customer needs to do differently.
+#:
+#: These live here rather than in `orchestrator.py` because both paths need
+#: them and the orchestrator already imports from this module. One definition,
+#: so the stateless path cannot drift into refusing in different words.
+REFUSALS: Mapping[str, str] = {
+    "FORBIDDEN_CONTENT": (
+        "For your safety, please never send PINs, passwords, card numbers or "
+        "one-time codes. I have not stored that message. Tell me what happened "
+        "instead and I will look into the charge."
+    ),
+    "MESSAGE_TOO_LONG": (
+        "That message is longer than I can read in one go. Could you send me "
+        "the main problem in a few sentences?"
+    ),
+    "EMPTY_MESSAGE": "I did not catch that. Could you tell me what happened?",
+}
+
+
+def refusal_for(text: str) -> str | None:
+    """The cheap input checks, before masking or any model."""
+    if not text or not text.strip():
+        return "EMPTY_MESSAGE"
+    if len(text) > MAX_MESSAGE_CHARS:
+        return "MESSAGE_TOO_LONG"
+    return None
+
 
 _SINHALA = re.compile(r"[඀-෿]")
 _TAMIL = re.compile(r"[஀-௿]")
@@ -208,6 +247,42 @@ class TurnResult:
         }
 
 
+def _refused_turn(code: str, language_hint: str | None, case_id: str | None) -> TurnResult:
+    """A refusal in the stateless shape, in approved wording only (I15)."""
+    intake = _stateless_fallback(language_hint)
+    return TurnResult(
+        intake=intake,
+        handoff=check_handoff(intake),
+        reply=REFUSALS[code],
+        case_id=case_id,
+        follow_ups=[],
+        card_hints={"title_key": "foundReason", "show_evidence": False, "refused": code},
+    )
+
+
+def fallback_intake(text: str = "", language: str = "en") -> IntakeResult:
+    """A neutral intake: no intent claimed, no slots carried over.
+
+    Shared by the stateful path (held text must not choose an intent) and the
+    stateless one (A3), so a neutralised turn looks the same on both.
+    """
+    routing = routing_payload(Intent.FALLBACK.value)
+    return IntakeResult(
+        intent=Intent.FALLBACK.value,
+        confidence=0.0,
+        slots={},
+        language=language,
+        needs_handoff=False,
+        raw_text=text,
+        route=routing["route"],
+        client_intent=routing["client_intent"],
+    )
+
+
+def _stateless_fallback(language_hint: str | None) -> IntakeResult:
+    return fallback_intake("", language_hint if language_hint in {"si", "ta", "en"} else "en")
+
+
 def handle_turn(
     text: str,
     *,
@@ -216,7 +291,46 @@ def handle_turn(
     language_hint: str | None = None,
     intent_override: str | None = None,
 ) -> TurnResult:
+    """One turn with no conversation state behind it.
+
+    **This is the anonymous surface** (`/v1/conversation/turn` without a
+    `case_id`, and `/v1/clarity/route`), and until A3 it was the only one with
+    no input inspection at all: no length cap, no forbidden-content check and
+    no guard, while the stateful path next to it had all three. The cheap
+    checks and the heuristic guard are pure functions, so they apply here with
+    no dependency on a store, a masker instance or a model.
+
+    Masking is **not** done here, and deliberately: `Masker` holds a token vault
+    and belongs to the orchestrator, which has somewhere to put what it learns.
+    Nothing on this path is stored, which is why that gap is survivable, and
+    forbidden content is refused outright rather than masked either way.
+    """
     facts = facts or {}
+
+    refusal = refusal_for(text)
+    if refusal is not None:
+        return _refused_turn(refusal, language_hint, case_id)
+    if find_forbidden(text):
+        # A PIN, card number, CVV or one-time code. Refused, never masked and
+        # never echoed: the stateful path does the same through the masker.
+        return _refused_turn("FORBIDDEN_CONTENT", language_hint, case_id)
+
+    verdict = inspect(text)
+    if not verdict.allowed:
+        # Neutralised rather than refused, as the orchestrator does: text that
+        # is addressing the system does not get to choose an intent, but the
+        # customer is not accused of anything either.
+        intake = _stateless_fallback(language_hint)
+        handoff = check_handoff(intake)
+        return TurnResult(
+            intake=intake,
+            handoff=handoff,
+            reply=compose_reply(intake, facts={}),
+            case_id=case_id,
+            follow_ups=routing_payload(intake.intent)["follow_ups"],
+            card_hints={"title_key": "foundReason", "show_evidence": False},
+        )
+
     intake = extract_intake(text)
     # Prior turn context from the UI (product under discussion, amount, case).
     for key in ("product", "amount_lkr", "case_id", "chat_intent"):
@@ -245,6 +359,13 @@ def handle_turn(
         intake.route = "handoff"
         intake.client_intent = "human"
     reply = compose_reply(intake, facts=facts)
+    # The same check the stateful path runs before anything is sent: every
+    # figure in the reply has to appear in FACTS. On this path FACTS holds only
+    # what the HTTP layer allowed through, so a figure the caller supplied
+    # cannot be quoted back as though Clarity had found it (I2). A failure
+    # drops to the template, which carries no figure at all.
+    if not verify_reply(reply, facts=facts, language=intake.language).ok:
+        reply = compose_reply(intake, facts={})
     routing = routing_payload(intake.intent)
     return TurnResult(
         intake=intake,
