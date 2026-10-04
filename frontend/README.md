@@ -67,6 +67,7 @@ npm run dev -w @clarity/customer-web
 - `/receipt/[id]` - receipt view
 - `app/manifest.ts` - PWA basics
 - `/clarity` waiting state - `components/ui/thinking-orb.tsx`: dotted canvas orb with rotating, localised status labels while a turn is pending, and the real check steps during account checks (`e2e/thinking-orb.spec.ts`)
+- `/clarity` voice input - **Speak** opens `components/VoiceSheet.tsx`: an opt-in sheet with the WebGL `components/ui/voice-powered-orb.tsx` (reacts to mic loudness, read locally), browser speech recognition in en/si/ta, and a transcript the customer checks before **Ask** or **Edit**. Hidden where the browser has no speech recognition (`e2e/voice.spec.ts`)
 
 **console**
 

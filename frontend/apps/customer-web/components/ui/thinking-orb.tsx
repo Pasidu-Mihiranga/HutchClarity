@@ -104,12 +104,18 @@ const DZ = Float32Array.from(DOTS, (d) => d.z);
 const DU = Float32Array.from(DOTS, (d) => d.u);
 const DS = Float32Array.from(DOTS, (d) => d.seed);
 
-/* Dots are drawn in Hutch orange: the original's light grey disappears on the
-   chat's white background. Precomputed per alpha step so frames allocate no
-   strings. */
-const A_STEPS = 48;
-const DOT_RGB = "242,98,38";
-const COLORS = Array.from({ length: A_STEPS + 1 }, (_, i) => `rgba(${DOT_RGB},${(i / A_STEPS).toFixed(3)})`);
+/* Dots are drawn in the Hutch palette: the original's light grey disappears
+   on the chat's white background. Resting dots are --orange (#f26226); a lit
+   dot deepens towards --orange-strong (#c2410c). Precomputed per lit and
+   alpha step so frames allocate no strings. */
+const A_STEPS = 48, L_STEPS = 12;
+const REST = [242, 98, 38], LIT = [194, 65, 12];
+const COLORS: string[] = [];
+for (let li = 0; li <= L_STEPS; li++) {
+  const k = li / L_STEPS;
+  const [r, g, b] = REST.map((c, i) => Math.round(lerp(c, LIT[i], k)));
+  for (let ai = 0; ai <= A_STEPS; ai++) COLORS.push(`rgba(${r},${g},${b},${(ai / A_STEPS).toFixed(3)})`);
+}
 
 type OrbKey = "k" | "alpha" | "spin" | "pop";
 type OrbParams = Record<OrbKey, number> & { rot: number; prog: number };
@@ -205,7 +211,7 @@ function createOrb(canvas: HTMLCanvasElement, size: number, isReduced: () => boo
       SY[n] = C0 - y2 * radius * kk * f;
       SR[n] = (size / 132) * (1.15 * (0.45 + 0.75 * depth) * f + 0.9 * l) * (0.4 + 0.6 * eo);
       SD[n] = depth;
-      SC[n] = ai;
+      SC[n] = Math.round(clamp01(l) * L_STEPS) * (A_STEPS + 1) + ai;
     }
 
     /* back half first, then the front half over it */

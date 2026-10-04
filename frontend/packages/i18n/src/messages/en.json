@@ -49,5 +49,20 @@
   "wait.thinking": "Thinking",
   "wait.searching": "Searching",
   "wait.analyzing": "Analyzing",
-  "wait.composing": "Composing"
+  "wait.composing": "Composing",
+  "voice.title": "Speak to Clarity",
+  "voice.close": "Close voice input",
+  "voice.hint": "Ask about a charge, your balance or a pack.",
+  "voice.listening": "Listening...",
+  "voice.hearing": "I can hear you...",
+  "voice.heard": "Is this what you said?",
+  "voice.notice": "Your browser turns speech into text. In Chrome or Safari, the audio goes to Google or Apple for this, not to Hutch. Only the text is sent to Clarity, and you can check it first.",
+  "voice.start": "Start speaking",
+  "voice.retry": "Try again",
+  "voice.stop": "Stop",
+  "voice.ask": "Ask",
+  "voice.edit": "Edit",
+  "voice.error.denied": "Microphone access is blocked. Allow it in your browser settings, or type your question.",
+  "voice.error.nospeech": "I did not hear anything. Try again, or type your question.",
+  "voice.error.unavailable": "Voice input is not available right now. Please type your question."
 }
