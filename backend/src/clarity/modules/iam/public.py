@@ -17,6 +17,7 @@ from clarity.modules.iam.directory import (
     StaffDirectory,
     StaffDirectoryInvalid,
     StaffIdentity,
+    hash_secret,
 )
 from clarity.modules.iam.grants import (
     GRANTS,
@@ -75,5 +76,6 @@ __all__ = [
     "TokenInvalid",
     "TokenIssuer",
     "TokenVerifier",
+    "hash_secret",
     "is_subject",
 ]

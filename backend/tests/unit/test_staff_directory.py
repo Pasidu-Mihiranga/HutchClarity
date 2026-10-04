@@ -11,7 +11,12 @@ from fastapi.testclient import TestClient
 from clarity.app.container import Clarity, Profile
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.interfaces.http.main import create_app
-from clarity.modules.iam.directory import LoginRefused, StaffDirectory
+from clarity.modules.iam.directory import (
+    LoginRefused,
+    StaffDirectory,
+    StaffDirectoryInvalid,
+    hash_secret,
+)
 from clarity.platform.security.principal import Assurance, Role
 
 DIRECTORY = json.dumps(
@@ -21,15 +26,15 @@ DIRECTORY = json.dumps(
                 "username": "supervisor",
                 "user_ref": "sup-1",
                 "role": "supervisor",
-                "password": "supervisor-clarity",
-                "step_up_code": "step-up",
+                "password_hash": hash_secret("supervisor-clarity"),
+                "step_up_hash": hash_secret("step-up"),
             },
             {
                 "username": "auditor",
                 "user_ref": "aud-1",
                 "role": "auditor",
-                "password": "auditor-clarity",
-                "step_up_code": "step-up",
+                "password_hash": hash_secret("auditor-clarity"),
+                "step_up_hash": hash_secret("step-up"),
             },
         ]
     }
@@ -122,3 +127,35 @@ def test_directory_refuses_an_unknown_user_without_raising_a_different_error() -
     directory = StaffDirectory.load(DIRECTORY)
     with pytest.raises(LoginRefused):
         directory.authenticate("nobody", "supervisor-clarity", "step-up")
+
+
+def test_a_plaintext_password_in_the_file_is_refused() -> None:
+    raw = json.dumps(
+        {
+            "accounts": [
+                {
+                    "username": "agent",
+                    "user_ref": "a-1",
+                    "role": "agent",
+                    "password": "agent-clarity",
+                    "step_up_code": "step-up",
+                }
+            ]
+        }
+    )
+    with pytest.raises(StaffDirectoryInvalid, match="plaintext"):
+        StaffDirectory.load(raw)
+
+
+def test_an_unknown_username_is_refused_like_a_wrong_password() -> None:
+    directory = StaffDirectory.load(DIRECTORY)
+    with pytest.raises(LoginRefused):
+        directory.authenticate("nobody", "supervisor-clarity", "")
+
+
+def test_the_committed_synthetic_directory_holds_no_plaintext_secret() -> None:
+    path = Path(__file__).resolve().parents[3] / "config" / "staff" / "synthetic-directory.json"
+    raw = path.read_text()
+    directory = StaffDirectory.load(raw)
+    assert 'clarity"' not in raw and '"password"' not in raw
+    assert directory.authenticate("supervisor", "supervisor-clarity", "").role is Role.SUPERVISOR

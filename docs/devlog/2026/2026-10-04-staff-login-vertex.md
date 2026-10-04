@@ -40,6 +40,14 @@ The role picker let any caller choose finance. The deployed image had no Vertex 
 - `mypy` on container, providers, directory, and the HTTP app: clean.
 - VPS healthcheck: recorded after the root deploy.
 
+## Takeover (agent: Claude Code, Claude Opus 5.5)
+- Taken over from the uncommitted tree and committed as is (`a0e5bfb`), then hardened.
+- Staff directory stores salted scrypt hashes (`password_hash`, `step_up_hash`), never secrets; a plaintext field is refused at load; an unknown username costs one scrypt like a wrong password. `scripts/staff_password.py` makes hashes from stdin. The synthetic file was converted with the same dev passwords, which stay in `frontend/e2e/session.ts`.
+- Nginx: `/v1/auth/` has its own limit, 10 per minute per IP with a burst of 20, answering 429.
+- VPS: service account at `/opt/hutch-clarity/private/google-service-account.json` and a staff directory with generated passwords, both uid 10001 and mode 0400; `.env.production` (backed up first) gained the Vertex settings, `AI_PREFER_TEMPLATES=false` and `CLARITY_STAFF_DIRECTORY_FILE`. The plaintext staff passwords live only on the operator's machine.
+- Live Vertex check with the service account and synthetic facts: `gemini-2.5-flash` answered (89 input, 22 output tokens).
+- `GEMINI_API_KEY` and `GROQ_API_KEY` are not read by the backend. With Vertex configured, the Gemini and Groq fallbacks in `models.yaml` are not registered, so the chain falls back to templates.
+
 ## Open issues / next step
 
 The service-account key was pasted in chat earlier. Rotate it. This tree is not committed, so GitHub CD will not keep this image.
