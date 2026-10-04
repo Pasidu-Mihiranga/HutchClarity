@@ -4,6 +4,15 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added
+
+- **Foresight stores what it rehearsed and what actually happened** (C2/F05). Seven collections in a `clarity_foresight` schema with its own role: scenario versions, runs, reports, launches, recorded outcomes, calibrations and detected spikes. A run was built, returned and discarded before this, so nothing could be cited later and the calibration gate had nowhere to keep the evidence it opens on.
+  - **Six of the seven are append-only**, backed by database grants (`INSERT` and `SELECT`, nothing else) rather than by the code remembering. `foresight.runs` is the exception, because a run has a lifecycle a caller polls. The launches and outcomes matter most: they are the evidence the plan 02 section 3.4 gate opens on, so they are the rows somebody would have to rewrite to make an uncalibrated engine look calibrated.
+  - **Nothing is customer-scoped**, by construction. Foresight reads segment statistics and never an individual record (deck S8), so there is no subscriber to bind a row to.
+  - A scenario is versioned: a change is a new version, so a run that cites version 1 still means what it meant. A repeated run request returns the original run and its original outcome (I8).
+  - `record_launch` refuses `Provenance.REAL` until C6 wires the capability and the required external evidence reference, rather than leaving an ungated way to write the evidence the gate reads.
+  - Public surface: `ForesightService`, `ForesightRepository`, `StoredForesightRepository`, the record types, and the seven collection names.
+
 ### Changed
 
 - **Foresight rehearses a change with real persona methods, not a hash** (C3/F04, F11). The previous "swarm" took the statistical baseline, hashed `seed:scenario:theme:segment`, took two hex digits modulo three minus one, shifted the band by that, and compared the result against a second run of the same baseline. It measured a hash. Its tests passed because a hash is reproducible.

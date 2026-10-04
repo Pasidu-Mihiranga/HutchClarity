@@ -77,6 +77,7 @@ from clarity.modules.foresight.public import (
     Backtest,
     Foresight,
     ForesightCatalogue,
+    ForesightService,
     LlmPersonaSimulator,
     PersonaRehearsal,
     PersonaSimulator,
@@ -1131,6 +1132,14 @@ class Clarity:
         self.foresight_catalogue = ForesightCatalogue(self.policies)
         self.foresight = Foresight(self.foresight_catalogue, clock=self.now)
         self.foresight_backtest = Backtest(self.foresight_catalogue, clock=self.now)
+        # What a rehearsal said, and what the change actually did (C2/F05).
+        # Six of its seven collections are append-only; `foresight.runs` is the
+        # exception because a caller polls it.
+        self.foresight_service = ForesightService(
+            open_unit=self.open_unit,
+            catalogue=self.foresight_catalogue,
+            clock=self.now,
+        )
         # The baseline is the headline and a second method sits beside it
         # (C3/F11). `PersonaRehearsal` constructs the baseline itself, so the
         # only thing wired here is the comparison column.

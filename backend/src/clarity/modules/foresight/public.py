@@ -37,10 +37,53 @@ from clarity.modules.foresight.personas import (
     RoundBasedPersonaSimulator,
     StatisticalBaseline,
 )
+from clarity.modules.foresight.records import (
+    DetectedSpike,
+    RecordedOutcome,
+    RunStatus,
+    ScenarioRun,
+    ScenarioVersion,
+    SpikeScope,
+    StoredCalibration,
+    StoredLaunch,
+    StoredReport,
+)
 from clarity.modules.foresight.rehearsal import (
     PairComparison,
     PersonaRehearsal,
     RehearsalReport,
+)
+from clarity.modules.foresight.repository import (
+    CALIBRATIONS as FORESIGHT_CALIBRATIONS,
+)
+from clarity.modules.foresight.repository import (
+    LAUNCHES as FORESIGHT_LAUNCHES,
+)
+from clarity.modules.foresight.repository import (
+    OUTCOMES as FORESIGHT_OUTCOMES,
+)
+from clarity.modules.foresight.repository import (
+    REPORTS as FORESIGHT_REPORTS,
+)
+from clarity.modules.foresight.repository import (
+    RUNS as FORESIGHT_RUNS,
+)
+from clarity.modules.foresight.repository import (
+    SCENARIOS as FORESIGHT_SCENARIOS,
+)
+from clarity.modules.foresight.repository import (
+    SPIKES as FORESIGHT_SPIKES,
+)
+from clarity.modules.foresight.repository import (
+    ForesightRepository,
+    StoredForesightRepository,
+)
+from clarity.modules.foresight.service import (
+    ForesightService,
+    RealLaunchNotPermitted,
+    RunAlreadyFinished,
+    UnknownRun,
+    UnknownScenario,
 )
 from clarity.modules.foresight.simulation import (
     Foresight,
@@ -54,15 +97,25 @@ from clarity.modules.foresight.simulation import (
 
 __all__ = [
     "DEMO_LAUNCHES",
+    "FORESIGHT_CALIBRATIONS",
+    "FORESIGHT_LAUNCHES",
+    "FORESIGHT_OUTCOMES",
+    "FORESIGHT_REPORTS",
+    "FORESIGHT_RUNS",
+    "FORESIGHT_SCENARIOS",
+    "FORESIGHT_SPIKES",
     "Backtest",
     "Bands",
     "CalibrationReport",
     "CalibrationStatus",
     "CatalogueInvalid",
     "ChangeType",
+    "DetectedSpike",
     "Foresight",
     "ForesightCatalogue",
     "ForesightReport",
+    "ForesightRepository",
+    "ForesightService",
     "HistoricLaunch",
     "LlmPersonaSimulator",
     "ObservedOutcome",
@@ -76,14 +129,27 @@ __all__ = [
     "Prediction",
     "Propensity",
     "Provenance",
+    "RealLaunchNotPermitted",
+    "RecordedOutcome",
     "RehearsalReport",
     "RoleRouterPersonas",
     "RoundBasedPersonaSimulator",
+    "RunAlreadyFinished",
+    "RunStatus",
     "Scenario",
+    "ScenarioRun",
+    "ScenarioVersion",
     "Segment",
+    "SpikeScope",
     "StatisticalBaseline",
+    "StoredCalibration",
+    "StoredForesightRepository",
+    "StoredLaunch",
+    "StoredReport",
     "ThemeCatalogue",
     "ThemeWeight",
+    "UnknownRun",
+    "UnknownScenario",
     "VolumeBand",
     "as_of_for",
     "score_of",
