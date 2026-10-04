@@ -1,5 +1,10 @@
 # Demo script - Hutch Clarity
 
+Hosted synthetic demo endpoints: customer `https://116.203.101.73/`, Clarity
+Desk `https://116.203.101.73:8443/`, and Trust Receipt verifier
+`https://116.203.101.73:9443/`. These IP endpoints use short-lived trusted TLS
+and contain synthetic data only. The local commands below remain the fallback.
+
 Target 5–6 minutes (Guidelines §10 allows 3–7). Based on the storyboard in
 plan §42.5.
 

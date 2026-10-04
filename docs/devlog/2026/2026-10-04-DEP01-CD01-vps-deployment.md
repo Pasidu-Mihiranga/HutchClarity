@@ -29,8 +29,8 @@ can start. The existing `full.yml` remains development-only.
 
 - [x] Deployment and frontend READMEs
 - [x] Backlog and changelog
-- [ ] ARCHITECTURE.md after live verification
-- [ ] Walkthrough and demo script after live journeys
+- [x] ARCHITECTURE.md after live verification
+- [x] Demo script after live journeys
 
 ## Tests
 
@@ -42,8 +42,14 @@ can start. The existing `full.yml` remains development-only.
   mount. First-deployment rollback restored all ten previously running
   BikeRentHub containers healthy; the mount was corrected to the versioned
   cluster parent before retry.
+- Second start made all 12 services healthy. Trusted IP HTTPS, customer OTP,
+  evidence, deterministic decision, safe action, persisted receipt verification,
+  staff queue, Autopsy and Foresight passed live. All internal ports were closed
+  from the public Internet.
+- A compressed PostgreSQL backup was created and validated. Restarting the API
+  preserved both the receipt signing public key and the issued receipt. The
+  Certbot staging renewal and deploy hook succeeded.
 
 ## Open issues / next step
 
-Build and deploy the immutable images, issue trusted IP HTTPS, run live journeys,
-then verify CD and rollback before beginning WA01.
+Land on `main`, exercise CD and its no-rebuild rollback, then begin WA01.
