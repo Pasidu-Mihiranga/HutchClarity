@@ -75,8 +75,10 @@ from clarity.modules.governance.public import (
     StoredPolicyChangeRepository,
 )
 from clarity.modules.iam.public import (
+    AuditGrants,
     AuthorizationPolicy,
     CompositeTokenVerifier,
+    GrantAwareAuthorizationPolicy,
     KeycloakTokenVerifier,
     OpaAuthorizationPolicy,
     OtpService,
@@ -555,6 +557,7 @@ class Clarity:
         settings: Settings | None = None,
         audit: AuditLedger | None = None,
         audit_checkpoints: Checkpointer | None = None,
+        audit_grants: AuditGrants | None = None,
     ) -> None:
         # The only place this process reads its environment (B07, I20). Tests
         # pass a Settings instance instead of setting variables.
@@ -625,7 +628,9 @@ class Clarity:
                     timeout_seconds=self.settings.auth_timeout_seconds,
                 ),
             )
-        self.authorization: AuthorizationPolicy = (
+        # Whichever driver decides, grants and the audit-duty money rule hold
+        # under it: the OPA driver sees roles only (audit assurance Phase 3).
+        self.authorization: AuthorizationPolicy = GrantAwareAuthorizationPolicy(
             OpaAuthorizationPolicy(
                 self.settings.opa_url,
                 timeout_seconds=self.settings.auth_timeout_seconds,
@@ -680,6 +685,9 @@ class Clarity:
         # Signed checkpoints (ADR-0035), with their own key. Carried across a
         # reset with the trail: a new key would fail every earlier checkpoint.
         self.audit_checkpoints = audit_checkpoints or self._new_checkpointer(clock)
+        # Audit duties by grant (Phase 3). They live beside the trail, so a
+        # demo reset carries them with it, as it carries identity.
+        self.audit_grants = audit_grants or self._new_audit_grants(clock)
         self._open_audit_trail()
         self.switches = SwitchBoard(audit_sink=self.audit)
         # Messaging: the bus, the relay that drains the outbox onto it, and the
@@ -936,6 +944,22 @@ class Clarity:
         self.audit.after_append(lambda _record: checkpointer.maybe_checkpoint())
         return checkpointer
 
+    def _new_audit_grants(self, clock: datetime | None) -> AuditGrants:
+        def now() -> datetime:
+            return clock or datetime.now(tz=UTC)
+
+        def duration(key: str) -> timedelta:
+            return _DURATION.validate_python(str(self.policies.resolve(key, as_of=now())))
+
+        return AuditGrants(
+            self.audit.open_unit,
+            audit=self.audit,
+            max_duration=lambda: duration("audit.grant.max_duration"),
+            review_interval=lambda: duration("audit.grant.review_interval"),
+            break_glass_duration=lambda: duration("audit.grant.break_glass_duration"),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+
     def _open_audit_trail(self) -> None:
         """Verify the trail before serving, and record that this process opened it.
 
@@ -1134,6 +1158,7 @@ class Clarity:
                 otp=self.otp,
                 audit=self.audit,
                 audit_checkpoints=self.audit_checkpoints,
+                audit_grants=self.audit_grants,
             )
         return Clarity(
             rules_dir=self._rules_dir,
@@ -1149,4 +1174,5 @@ class Clarity:
             otp=self.otp,
             audit=self.audit,
             audit_checkpoints=self.audit_checkpoints,
+            audit_grants=self.audit_grants,
         )

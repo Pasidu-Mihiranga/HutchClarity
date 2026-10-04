@@ -84,6 +84,79 @@
         "title": "ApproveRequest",
         "type": "object"
       },
+      "AuditGrantRequest": {
+        "additionalProperties": false,
+        "description": "Ask for an audit duty for someone else. A second person approves it.",
+        "properties": {
+          "duration": {
+            "description": "ISO 8601 duration, e.g. P30D. At most the policy maximum.",
+            "title": "Duration",
+            "type": "string"
+          },
+          "permission": {
+            "description": "audit:read | audit:export | alert:dispose",
+            "title": "Permission",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "subject_kind": {
+            "description": "user | role",
+            "title": "Subject Kind",
+            "type": "string"
+          },
+          "subject_ref": {
+            "description": "A staff user_ref, or a role name.",
+            "title": "Subject Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_kind",
+          "subject_ref",
+          "permission",
+          "reason",
+          "duration"
+        ],
+        "title": "AuditGrantRequest",
+        "type": "object"
+      },
+      "AuditGrantRevoke": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "AuditGrantRevoke",
+        "type": "object"
+      },
+      "BreakGlassRequest": {
+        "additionalProperties": false,
+        "description": "An admin's immediate, short, self-granted audit duty. Always recorded.",
+        "properties": {
+          "permission": {
+            "title": "Permission",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permission",
+          "reason"
+        ],
+        "title": "BreakGlassRequest",
+        "type": "object"
+      },
       "CaseSummary": {
         "additionalProperties": false,
         "properties": {
@@ -2117,6 +2190,492 @@
         "summary": "Ai Usage",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/audit": {
+      "get": {
+        "description": "Read the trail: hashes and masked detail only, never a payload.\n\n**The read is itself recorded** (rule 5): who looked, with which\nfilters, and how many records they saw. Who watched the watchers is\npart of what is watched.",
+        "operationId": "read_audit_trail_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "actor_ref",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Ref"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Audit Trail V1 Audit Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Audit Trail",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/break-glass": {
+      "post": {
+        "description": "An admin's immediate audit duty for an incident: short, and always recorded.",
+        "operationId": "break_glass_v1_audit_break_glass_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreakGlassRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Break Glass V1 Audit Break Glass Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Break Glass",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants": {
+      "get": {
+        "description": "Every audit grant, active or not, for review and recertification.",
+        "operationId": "list_audit_grants_v1_audit_grants_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Audit Grants V1 Audit Grants Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit Grants",
+        "tags": [
+          "audit"
+        ]
+      },
+      "post": {
+        "description": "Ask for an audit duty for a named person or a role. Someone else approves.",
+        "operationId": "request_audit_grant_v1_audit_grants_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Request Audit Grant V1 Audit Grants Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/approve": {
+      "post": {
+        "description": "The second pair of eyes. The requester cannot approve their own request.",
+        "operationId": "approve_audit_grant_v1_audit_grants__grant_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Audit Grant V1 Audit Grants  Grant Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/recertify": {
+      "post": {
+        "description": "Keep a grant alive one more review interval. Unreviewed grants lapse.",
+        "operationId": "recertify_audit_grant_v1_audit_grants__grant_id__recertify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Recertify Audit Grant V1 Audit Grants  Grant Id  Recertify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recertify Audit Grant",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/v1/audit/grants/{grant_id}/revoke": {
+      "post": {
+        "operationId": "revoke_audit_grant_v1_audit_grants__grant_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditGrantRevoke"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revoke Audit Grant V1 Audit Grants  Grant Id  Revoke Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Audit Grant",
+        "tags": [
+          "audit"
         ]
       }
     },

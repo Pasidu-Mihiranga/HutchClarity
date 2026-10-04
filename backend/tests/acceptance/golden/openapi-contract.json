@@ -46,6 +46,27 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/audit": {
+      "parameters": [
+        "header:authorization?",
+        "query:actor_ref?",
+        "query:after_seq?",
+        "query:case_id?",
+        "query:event_type?",
+        "query:limit?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/audit/grants": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/auth/me": {
       "parameters": [
         "header:authorization?"
@@ -280,6 +301,49 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/audit/break-glass": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "BreakGlassRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/audit/grants": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "AuditGrantRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/audit/grants/{grant_id}/approve": {
+      "parameters": [
+        "header:authorization?",
+        "path:grant_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/audit/grants/{grant_id}/recertify": {
+      "parameters": [
+        "header:authorization?",
+        "path:grant_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/audit/grants/{grant_id}/revoke": {
+      "parameters": [
+        "header:authorization?",
+        "path:grant_id"
+      ],
+      "request": "AuditGrantRevoke",
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/auth/otp/request": {
       "parameters": [],
       "request": "OtpRequest",
@@ -480,6 +544,40 @@
       "required": [
         "plan_id",
         "role"
+      ]
+    },
+    "AuditGrantRequest": {
+      "fields": [
+        "duration",
+        "permission",
+        "reason",
+        "subject_kind",
+        "subject_ref"
+      ],
+      "required": [
+        "duration",
+        "permission",
+        "reason",
+        "subject_kind",
+        "subject_ref"
+      ]
+    },
+    "AuditGrantRevoke": {
+      "fields": [
+        "reason"
+      ],
+      "required": [
+        "reason"
+      ]
+    },
+    "BreakGlassRequest": {
+      "fields": [
+        "permission",
+        "reason"
+      ],
+      "required": [
+        "permission",
+        "reason"
       ]
     },
     "CaseSummary": {

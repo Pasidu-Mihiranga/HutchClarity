@@ -4,6 +4,34 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (audit assurance Phase 3, ADR-0036)
+
+- **New `/v1` routes**, all signed-in: `GET /v1/audit` (paged trail, hashes
+  and masked detail only, with checkpoint verification; every read recorded),
+  `GET` and `POST /v1/audit/grants`, `POST /v1/audit/grants/{grant_id}/approve`,
+  `.../revoke`, `.../recertify`, and `POST /v1/audit/break-glass`. OpenAPI
+  snapshot regenerated on purpose (seven routes added, nothing changed); SDK
+  types regenerated.
+- Permissions `audit:export`, `audit:assign` (step-up), `alert:dispose`.
+  `security_admin` gains `audit:assign`; `compliance` gains `audit:export` and
+  `alert:dispose`. `config/opa/data.json` and the rego policy updated to match.
+- `clarity.modules.iam.public`: `AuditGrants`, `AuditGrant`, `GrantState`,
+  `SubjectKind`, `GrantRefused`, `GrantNotFound`,
+  `GrantAwareAuthorizationPolicy`, `is_subject`, `GRANTS`.
+- `Principal.granted`; `permissions_for(roles, granted=...)`;
+  `AUDIT_DUTIES`, `GRANTABLE_PERMISSIONS`.
+- Policy keys `audit.grant.max_duration`, `audit.grant.review_interval`,
+  `audit.grant.break_glass_duration`. Audit event types `grant.requested`,
+  `grant.approved`, `grant.revoked`, `grant.recertified`, `grant.break_glass`,
+  `audit.read`.
+
+### Changed (audit assurance Phase 3)
+
+- **Holding any audit duty now removes money permissions**, by role or grant
+  (separation of duties). No existing role held both, so no current role loses
+  anything; it applies to stacked roles and to grants.
+- `Clarity.authorization` is wrapped in `GrantAwareAuthorizationPolicy`.
+
 ### Added (audit assurance Phase 2, ADR-0035)
 
 - **Signed audit checkpoints.** `clarity.platform.audit.checkpoints`:

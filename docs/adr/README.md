@@ -40,6 +40,7 @@ reversed.
 | [0033](0033-audit-record-hash-covers-the-whole-record.md) | The audit record hash covers the whole record | Accepted |
 | [0034](0034-one-persisted-audit-trail.md) | One persisted audit trail for every process | Accepted |
 | [0035](0035-signed-audit-checkpoints-with-a-separate-key.md) | Signed audit checkpoints with a separate key, and a public witness | Accepted |
+| [0036](0036-audit-access-as-grants-under-separation-of-duties.md) | Audit access as time-boxed grants under separation of duties | Accepted |
 
 ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 

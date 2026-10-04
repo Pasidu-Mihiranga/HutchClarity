@@ -106,6 +106,18 @@ class AuditEventType(StrEnum):
     ACCESS_DENIED = "access.denied"
     """A signed-in caller was refused (403): who, what route, and why."""
 
+    # -- audit access (audit assurance plan Phase 3) ---------------------- #
+
+    GRANT_REQUESTED = "grant.requested"
+    GRANT_APPROVED = "grant.approved"
+    GRANT_REVOKED = "grant.revoked"
+    GRANT_RECERTIFIED = "grant.recertified"
+    BREAK_GLASS_USED = "grant.break_glass"
+    """An admin self-granted an audit duty for an incident. Always a signal."""
+
+    AUDIT_READ = "audit.read"
+    """Someone read the trail: who watched the watchers (rule 5)."""
+
     CHECKPOINT_ISSUED = "checkpoint.issued"
     """The head was signed with the checkpoint key (Phase 2, ADR-0035)."""
 

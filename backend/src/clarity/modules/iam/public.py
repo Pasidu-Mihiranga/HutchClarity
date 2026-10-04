@@ -12,6 +12,17 @@ from clarity.modules.iam.authorization import (
     OpaAuthorizationPolicy,
     PythonAuthorizationPolicy,
 )
+from clarity.modules.iam.grants import (
+    GRANTS,
+    AuditGrant,
+    AuditGrants,
+    GrantAwareAuthorizationPolicy,
+    GrantNotFound,
+    GrantRefused,
+    GrantState,
+    SubjectKind,
+    is_subject,
+)
 from clarity.modules.iam.keycloak import CompositeTokenVerifier, KeycloakTokenVerifier
 from clarity.modules.iam.otp import (
     OTP_CHALLENGES,
@@ -30,12 +41,19 @@ from clarity.modules.iam.tokens import (
 )
 
 __all__ = [
+    "GRANTS",
     "OTP_CHALLENGES",
     "OTP_REQUESTS",
     "REFRESH_TOKENS",
     "SESSIONS",
+    "AuditGrant",
+    "AuditGrants",
     "AuthorizationPolicy",
     "CompositeTokenVerifier",
+    "GrantAwareAuthorizationPolicy",
+    "GrantNotFound",
+    "GrantRefused",
+    "GrantState",
     "IssuedToken",
     "KeycloakTokenVerifier",
     "OpaAuthorizationPolicy",
@@ -43,7 +61,9 @@ __all__ = [
     "OtpService",
     "PythonAuthorizationPolicy",
     "SimulatedInbox",
+    "SubjectKind",
     "TokenInvalid",
     "TokenIssuer",
     "TokenVerifier",
+    "is_subject",
 ]

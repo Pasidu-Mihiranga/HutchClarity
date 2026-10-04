@@ -68,6 +68,12 @@ class Permission(StrEnum):
     MERCHANT_SUSPEND = "merchant:suspend"
     REGULATOR_PACK_EXPORT = "regulator_pack:export"
     AUDIT_READ = "audit:read"
+    AUDIT_EXPORT = "audit:export"
+    """Export a verifiable bundle of the trail (audit assurance plan, Phase 7)."""
+    AUDIT_ASSIGN = "audit:assign"
+    """Grant, approve, revoke and recertify audit duties for other people."""
+    ALERT_DISPOSE = "alert:dispose"
+    """Close an assurance alert with a disposition (Phase 4)."""
     KILL_SWITCH = "flags:kill_switch"
     ADMIN_MANAGE = "admin:manage"
     SELF_READ = "self:read"
@@ -89,6 +95,24 @@ MONEY_PERMISSIONS: frozenset[Permission] = frozenset(
     }
 )
 
+#: Duties that watch the trail. Holding any of them removes money permissions,
+#: however it was obtained: a monitor must not be able to approve the refunds
+#: they are watching (audit assurance plan 5.6, rule 1).
+AUDIT_DUTIES: frozenset[Permission] = frozenset(
+    {
+        Permission.AUDIT_READ,
+        Permission.AUDIT_EXPORT,
+        Permission.AUDIT_ASSIGN,
+        Permission.ALERT_DISPOSE,
+    }
+)
+
+#: What a grant may carry. Money is never grantable, and neither is the
+#: authority to grant: ``AUDIT_ASSIGN`` comes from a role only.
+GRANTABLE_PERMISSIONS: frozenset[Permission] = frozenset(
+    {Permission.AUDIT_READ, Permission.AUDIT_EXPORT, Permission.ALERT_DISPOSE}
+)
+
 #: Permissions that need recent MFA, not just a valid session.
 STEP_UP_PERMISSIONS: frozenset[Permission] = frozenset(
     {
@@ -97,6 +121,7 @@ STEP_UP_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.CONFIG_APPROVE,
         Permission.MERCHANT_SUSPEND,
         Permission.ADMIN_MANAGE,
+        Permission.AUDIT_ASSIGN,
     }
 )
 
@@ -187,6 +212,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.MERCHANT_SUSPEND,
             Permission.REGULATOR_PACK_EXPORT,
             Permission.AUDIT_READ,
+            Permission.AUDIT_EXPORT,
+            Permission.ALERT_DISPOSE,
         }
     ),
     Role.AUDITOR: frozenset(
@@ -209,25 +236,33 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.ADMIN_MANAGE,
             Permission.AUDIT_READ,
+            Permission.AUDIT_ASSIGN,
         }
     ),
 }
 
 
-def permissions_for(roles: set[Role]) -> frozenset[Permission]:
-    """What a set of roles grants, with separation of duties applied.
+def permissions_for(
+    roles: set[Role], granted: frozenset[Permission] = frozenset()
+) -> frozenset[Permission]:
+    """What a set of roles and active grants allow, with separation of duties applied.
 
     An admin who is also given an operational role still cannot approve money:
-    the exclusion is applied after the union, so it cannot be escaped by
-    stacking roles.
+    the exclusions are applied after the union, so they cannot be escaped by
+    stacking roles, or by adding a grant. A grant can only carry a permission
+    in ``GRANTABLE_PERMISSIONS``; anything else in ``granted`` is ignored.
     """
-    granted: set[Permission] = set()
+    allowed: set[Permission] = set()
     for role in roles:
-        granted |= ROLE_PERMISSIONS.get(role, frozenset())
+        allowed |= ROLE_PERMISSIONS.get(role, frozenset())
+    allowed |= granted & GRANTABLE_PERMISSIONS
 
     if any(role.is_admin for role in roles):
-        granted -= MONEY_PERMISSIONS
-    return frozenset(granted)
+        allowed -= MONEY_PERMISSIONS
+    if allowed & AUDIT_DUTIES:
+        # Rule 1: whoever watches the trail cannot move the money in it.
+        allowed -= MONEY_PERMISSIONS
+    return frozenset(allowed)
 
 
 class Assurance(StrEnum):
@@ -266,10 +301,12 @@ class Principal:
     channel: str | None = None
     delegations: frozenset[str] = field(default_factory=frozenset)
     """Other subscriber_refs this principal may act for (guardian)."""
+    granted: frozenset[Permission] = field(default_factory=frozenset)
+    """Audit duties held by an active grant rather than a role (Phase 3)."""
 
     @property
     def permissions(self) -> frozenset[Permission]:
-        return permissions_for(set(self.roles))
+        return permissions_for(set(self.roles), self.granted)
 
     @property
     def is_customer(self) -> bool:

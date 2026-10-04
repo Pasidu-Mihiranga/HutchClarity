@@ -54,6 +54,15 @@ PUBLIC = {
 }
 
 SIGNED_IN = {
+    # The audit trail and audit duties (audit assurance Phase 3): reading needs
+    # audit:read, granting needs audit:assign, break-glass needs admin:manage.
+    ("GET", "/v1/audit"),
+    ("GET", "/v1/audit/grants"),
+    ("POST", "/v1/audit/grants"),
+    ("POST", "/v1/audit/grants/{grant_id}/approve"),
+    ("POST", "/v1/audit/grants/{grant_id}/revoke"),
+    ("POST", "/v1/audit/grants/{grant_id}/recertify"),
+    ("POST", "/v1/audit/break-glass"),
     ("GET", "/v1/auth/me"),
     ("POST", "/v1/cases"),
     ("GET", "/v1/cases/{case_id}"),

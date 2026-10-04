@@ -18,7 +18,13 @@ from clarity.modules.case.public import CASE_SEQUENCE, CASES
 from clarity.modules.conversation.public import CONVERSATION_STATES
 from clarity.modules.deskops.public import BATCHES
 from clarity.modules.governance.public import CHANGES
-from clarity.modules.iam.public import OTP_CHALLENGES, OTP_REQUESTS, REFRESH_TOKENS, SESSIONS
+from clarity.modules.iam.public import (
+    GRANTS,
+    OTP_CHALLENGES,
+    OTP_REQUESTS,
+    REFRESH_TOKENS,
+    SESSIONS,
+)
 from clarity.modules.insights.public import PROJECTIONS
 from clarity.modules.knowledge.public import CHUNKS, SOURCES
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
@@ -61,6 +67,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     OTP_REQUESTS,
     SESSIONS,
     REFRESH_TOKENS,
+    GRANTS,
     # notifications
     NOTIFICATIONS,
     PREFERENCES,

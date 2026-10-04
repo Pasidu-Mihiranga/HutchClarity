@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phase 0 (first two ADRs), Phase 1 and the core of Phase 2 landed 2026-10-04; Phase 3 is next. **Created:** 2026-10-04. **Revision:** 5.
+> **Status:** In progress. Phases 1 and 3, and the core of Phase 2, landed 2026-10-04; Phase 4 is next. **Created:** 2026-10-04. **Revision:** 6.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -303,7 +303,7 @@ Updated as work proceeds. Checkbox states are the source of truth.
 - [x] ADR: audit record hash version 2 covers the whole record ([ADR-0033](adr/0033-audit-record-hash-covers-the-whole-record.md))
 - [x] ADR: one trail through the outbox; state changes fail closed without an audit record ([ADR-0034](adr/0034-one-persisted-audit-trail.md))
 - [x] ADR: signed checkpoints with a dedicated key; anchoring by witness, no WORM storage ([ADR-0035](adr/0035-signed-audit-checkpoints-with-a-separate-key.md))
-- [ ] ADR: audit access as time-boxed grants under separation of duties
+- [x] ADR: audit access as time-boxed grants under separation of duties ([ADR-0036](adr/0036-audit-access-as-grants-under-separation-of-duties.md))
 - [ ] ADR: retention, archival, legal hold and erasure for the audit trail
 - [ ] Record RPO, RTO and retention, or mark them **REQUIRES HUTCH CONFIRMATION** with a stated interim value
 - [ ] Add the new module to `docs/modules.md`, `ARCHITECTURE.md` and plan 21 §11.2 once its ADR is accepted
@@ -349,9 +349,10 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 3: Access and accountability
 
-- [ ] Grants in the authorization layer, time-boxed, with the five separation-of-duties rules
-- [ ] `GET /v1/audit` paged and filtered; hashes and masked detail only; reads audited
-- [ ] Recertification schedule; break-glass
+- [x] Grants in the authorization layer, time-boxed, with the five separation-of-duties rules (`modules/iam/grants.py`; resolved into `Principal.granted` at token verification; any driver wrapped so they hold under OPA)
+- [x] `GET /v1/audit` paged and filtered by actor, type and case; hashes and masked detail only, never a payload; every read recorded as `audit.read`; the response carries the checkpoint verification
+- [x] Recertification (unreviewed grants lapse after `audit.grant.review_interval`); break-glass for admins, PT4H, recorded as `grant.break_glass`
+- [ ] Record a grant's expiry or lapse as an event at the moment it happens (needs a scheduler; today it is visible from the grant's stored times)
 
 | # | Given | When | Then |
 |---|---|---|---|

@@ -20,6 +20,8 @@ these routes exactly as plan §19 describes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -28,6 +30,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response as RawResponse
+from pydantic import TypeAdapter
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from clarity.app.container import Clarity, Profile
@@ -52,6 +55,9 @@ from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
     ActionView,
     ApproveRequest,
+    AuditGrantRequest,
+    AuditGrantRevoke,
+    BreakGlassRequest,
     CaseSummary,
     CauseView,
     ConfirmRequest,
@@ -90,7 +96,15 @@ from clarity.kernel.ids import new_id
 from clarity.modules.actions.public import ToolLayerError
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
-from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
+from clarity.modules.iam.public import (
+    AuditGrant,
+    GrantNotFound,
+    GrantRefused,
+    OtpRefused,
+    SimulatedInbox,
+    SubjectKind,
+    TokenInvalid,
+)
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
 from clarity.platform.audit.checkpoints import checkpoint_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType
@@ -113,6 +127,9 @@ _STATUS_FOR_CODE = {
     "PLAN_NOT_PENDING": 409,
     "EXECUTION_FAILED": 502,
 }
+
+#: ISO 8601 durations in request bodies, such as ``P30D``.
+_DURATION_ADAPTER: TypeAdapter[timedelta] = TypeAdapter(timedelta)
 
 _app_state: dict[str, Clarity] = {}
 
@@ -231,6 +248,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
     core = clarity or get_clarity()
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
+    app.state.audit_grants = core.audit_grants
     _register_handlers(app)
     _register_routes(app)
     return app
@@ -558,6 +576,172 @@ def _register_routes(app: FastAPI) -> None:
         if latest is None:
             raise HTTPException(status_code=404, detail="no audit checkpoint has been issued yet")
         return checkpoint_document(latest, clarity.audit_checkpoints.public_keys())
+
+    # ------------------------------------------------------------------ #
+    # Audit trail and audit duties (audit assurance plan Phase 3)
+    # ------------------------------------------------------------------ #
+
+    @app.get("/v1/audit", tags=["audit"])
+    def read_audit_trail(
+        request: Request,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_READ))],
+        actor_ref: str | None = None,
+        event_type: str | None = None,
+        case_id: str | None = None,
+        after_seq: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read the trail: hashes and masked detail only, never a payload.
+
+        **The read is itself recorded** (rule 5): who looked, with which
+        filters, and how many records they saw. Who watched the watchers is
+        part of what is watched.
+        """
+        if limit < 1 or limit > 200:
+            raise HTTPException(status_code=422, detail="limit is between 1 and 200")
+        matching = [
+            record
+            for record in clarity.audit.records
+            if record.seq > after_seq
+            and (actor_ref is None or record.actor_ref == actor_ref)
+            and (event_type is None or str(record.event_type) == event_type)
+            and (case_id is None or record.case_id == case_id)
+        ]
+        page = matching[:limit]
+        verification = clarity.audit_checkpoints.verify()
+        filters = {
+            "actor_ref": actor_ref,
+            "event_type": event_type,
+            "case_id": case_id,
+            "after_seq": after_seq,
+            "limit": limit,
+        }
+        trail.record(
+            clarity,
+            AuditEventType.AUDIT_READ,
+            actor_ref=principal.ref,
+            actor_kind=trail.actor_kind_of(principal),
+            session_ref=trail.session_ref_for(trail.bearer_token(request)),
+            object_ref="GET /v1/audit",
+            detail={"filters": filters, "returned": len(page)},
+            case_id=case_id,
+        )
+        return {
+            "records": [record.model_dump(mode="json") for record in page],
+            "next_after_seq": page[-1].seq if len(matching) > limit else None,
+            "verification": {
+                "intact": verification.intact,
+                "length": verification.length,
+                "checkpoints": verification.checkpoints,
+                "last_checkpoint_seq": verification.last_checkpoint_seq,
+                "broken_at": verification.broken_at,
+                "reason": verification.reason,
+                "lost_from": verification.lost_from,
+                "lost_to": verification.lost_to,
+            },
+        }
+
+    def _grant_call(call: Callable[[], AuditGrant]) -> dict[str, Any]:
+        """Run one grant operation and map its refusals onto HTTP.
+
+        Separation-of-duties refusals are 403s, so the refusal handler records
+        them in the trail as ``access.denied`` with the rule that refused them.
+        """
+        try:
+            return call().model_dump(mode="json")
+        except GrantNotFound as error:
+            raise HTTPException(status_code=404, detail="no such grant") from error
+        except GrantRefused as error:
+            status = {
+                "NOT_PERMITTED": 403,
+                "SELF_GRANT": 403,
+                "FOUR_EYES": 403,
+                "NOT_PENDING": 409,
+                "NOT_ACTIVE": 409,
+            }.get(error.code, 422)
+            raise HTTPException(status_code=status, detail=f"{error.code}: {error}") from error
+
+    def _permission(value: str) -> Permission:
+        try:
+            return Permission(value)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=f"unknown permission {value!r}") from error
+
+    @app.get("/v1/audit/grants", tags=["audit"])
+    def list_audit_grants(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Every audit grant, active or not, for review and recertification."""
+        return {"grants": [grant.model_dump(mode="json") for grant in clarity.audit_grants.all()]}
+
+    @app.post("/v1/audit/grants", tags=["audit"], status_code=201)
+    def request_audit_grant(
+        body: AuditGrantRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Ask for an audit duty for a named person or a role. Someone else approves."""
+        try:
+            kind = SubjectKind(body.subject_kind)
+            duration = _DURATION_ADAPTER.validate_python(body.duration)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        permission = _permission(body.permission)
+        return _grant_call(
+            lambda: clarity.audit_grants.request(
+                principal,
+                subject_kind=kind,
+                subject_ref=body.subject_ref,
+                permission=permission,
+                reason=body.reason,
+                duration=duration,
+            )
+        )
+
+    @app.post("/v1/audit/grants/{grant_id}/approve", tags=["audit"])
+    def approve_audit_grant(
+        grant_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """The second pair of eyes. The requester cannot approve their own request."""
+        return _grant_call(lambda: clarity.audit_grants.approve(principal, grant_id))
+
+    @app.post("/v1/audit/grants/{grant_id}/revoke", tags=["audit"])
+    def revoke_audit_grant(
+        grant_id: str,
+        body: AuditGrantRevoke,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        return _grant_call(
+            lambda: clarity.audit_grants.revoke(principal, grant_id, reason=body.reason)
+        )
+
+    @app.post("/v1/audit/grants/{grant_id}/recertify", tags=["audit"])
+    def recertify_audit_grant(
+        grant_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.AUDIT_ASSIGN))],
+    ) -> dict[str, Any]:
+        """Keep a grant alive one more review interval. Unreviewed grants lapse."""
+        return _grant_call(lambda: clarity.audit_grants.recertify(principal, grant_id))
+
+    @app.post("/v1/audit/break-glass", tags=["audit"], status_code=201)
+    def break_glass(
+        body: BreakGlassRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ADMIN_MANAGE))],
+    ) -> dict[str, Any]:
+        """An admin's immediate audit duty for an incident: short, and always recorded."""
+        permission = _permission(body.permission)
+        return _grant_call(
+            lambda: clarity.audit_grants.break_glass(
+                principal, permission=permission, reason=body.reason
+            )
+        )
 
     @app.post("/v1/demo/reset", tags=["demo"], dependencies=[Depends(demo_only)])
     def demo_reset() -> dict[str, Any]:

@@ -20,3 +20,30 @@ keys:
     values:
       - value: PT15M
         version: 1
+
+  - key: audit.grant.max_duration
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Longest an audit duty may be granted for. Standing access is the exception.
+    values:
+      - value: P90D
+        version: 1
+
+  - key: audit.grant.review_interval
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: An active grant nobody recertifies within this interval lapses.
+    values:
+      - value: P30D
+        version: 1
+
+  - key: audit.grant.break_glass_duration
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: How long a break-glass audit duty lasts before it expires on its own.
+    values:
+      - value: PT4H
+        version: 1
