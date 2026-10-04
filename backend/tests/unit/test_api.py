@@ -533,11 +533,14 @@ def test_only_the_composition_root_reads_the_profile():
 
     root = pathlib.Path(__import__("clarity").__file__).parent
     composition_root = {"app/settings.py", "app/container.py"}
+    # `as_posix`, not `str`: on Windows the latter separates with a backslash,
+    # so every path missed the forward-slash allowlist and the composition root
+    # reported itself as the offender.
     offenders = [
-        str(path.relative_to(root))
+        path.relative_to(root).as_posix()
         for path in root.rglob("*.py")
         if "CLARITY_PROFILE" in path.read_text(encoding="utf-8")
-        and str(path.relative_to(root)) not in composition_root
+        and path.relative_to(root).as_posix() not in composition_root
     ]
 
     assert offenders == [], f"CLARITY_PROFILE read outside the composition root: {offenders}"
