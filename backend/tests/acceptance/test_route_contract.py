@@ -27,6 +27,13 @@ PUBLIC = {
     # Exchanges a refresh token for a new access token (M-IAM). Public like
     # sign-in: the refresh token is the credential, so there is no session yet.
     ("POST", "/v1/auth/refresh"),
+    # Staff SSO (B1). Public by necessity: nobody is signed in when a sign-in
+    # starts, and the callback arrives from the provider's redirect, not from
+    # an authenticated caller. What protects them is the single-use `state`,
+    # PKCE, and the nonce check on the id token.
+    ("GET", "/v1/auth/staff/oidc/start"),
+    ("GET", "/v1/auth/staff/oidc/callback"),
+    ("POST", "/v1/auth/logout"),
     # The page routes that used to sit here are gone: FE01 retired the static
     # UI, so this app serves `/v1`, the schema and the key endpoints only, and
     # the three Next.js apps are the UI.
@@ -55,6 +62,9 @@ PUBLIC = {
 }
 
 SIGNED_IN = {
+    # Beginning a step-up needs a session: it re-authenticates somebody who is
+    # already here (B2).
+    ("POST", "/v1/auth/staff/step-up"),
     # The audit trail and audit duties (audit assurance Phase 3): reading needs
     # audit:read, granting needs audit:assign, break-glass needs admin:manage.
     ("GET", "/v1/audit"),
@@ -157,6 +167,33 @@ def _routes(client: TestClient) -> set[tuple[str, str]]:
         for method in route.methods
         if method in {"GET", "POST", "PUT", "PATCH", "DELETE"}
     }
+
+
+def test_no_route_hides_inside_an_included_router():
+    """Every route must be registered on the app, not through a router.
+
+    This classification walks `app.routes`, and FastAPI wraps anything added
+    with `include_router` in an opaque `_IncludedRouter` object that carries no
+    `path` and no `methods`. Such a route is invisible here, so it would be
+    exempt from declaring who may call it and the I9 guard would pass without
+    ever having seen it. Found while adding staff SSO, which was written as a
+    router first.
+
+    If a router ever becomes worth having, this test is the thing to change:
+    descend into it and classify what is inside. Until then the rule is that
+    routes are declared where the classifier can see them.
+    """
+    app = _app().app
+    hidden = [
+        type(route).__name__
+        for route in app.routes  # type: ignore[attr-defined]
+        if type(route).__name__ == "_IncludedRouter"
+    ]
+
+    assert hidden == [], (
+        "a route was added with include_router, so it is invisible to the "
+        "classification below and would skip the I9 check entirely"
+    )
 
 
 def _call(client: TestClient, method: str, path: str) -> int:

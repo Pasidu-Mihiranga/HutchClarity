@@ -101,6 +101,50 @@ class Settings(BaseSettings):
     keycloak_issuer: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_ISSUER")
     keycloak_audience: str = Field(default="clarity-api", alias="CLARITY_KEYCLOAK_AUDIENCE")
     keycloak_jwks_url: str | None = Field(default=None, alias="CLARITY_KEYCLOAK_JWKS_URL")
+    oidc_client_id: str = Field(
+        default="clarity-console",
+        alias="CLARITY_OIDC_CLIENT_ID",
+        description="The confidential client the API uses for staff sign-in (B1).",
+    )
+    oidc_client_secret: str | None = Field(
+        default=None,
+        alias="CLARITY_OIDC_CLIENT_SECRET",
+        description=(
+            "Its secret. Staff SSO is off until this is set, because a "
+            "confidential client with no secret is a public client nobody "
+            "decided to make public."
+        ),
+    )
+    oidc_redirect_uri: str | None = Field(
+        default=None,
+        alias="CLARITY_OIDC_REDIRECT_URI",
+        description=(
+            "Where the provider sends the browser back. Must be this API's own "
+            "callback and must match a redirect URI registered on the client."
+        ),
+    )
+    allowed_origins: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3101,http://127.0.0.1:3101,http://localhost:3102,http://127.0.0.1:3102,http://localhost:3100,http://127.0.0.1:3100",
+        alias="CLARITY_ALLOWED_ORIGINS",
+        description=(
+            "Comma-separated browser origins allowed to call this API with "
+            "credentials. The wildcard is not an option: CORS forbids it with "
+            "credentials, and the staff console signs in with a cookie."
+        ),
+    )
+    console_base_url: str = Field(
+        default="http://127.0.0.1:3101",
+        alias="CLARITY_CONSOLE_BASE_URL",
+        description="Where a completed sign-in returns the browser to.",
+    )
+    cookie_secure: bool = Field(
+        default=False,
+        alias="CLARITY_COOKIE_SECURE",
+        description=(
+            "Whether the staff session cookie carries Secure. False only for "
+            "local http development; any deployment sets it."
+        ),
+    )
     staff_directory: str | None = Field(
         default=None,
         alias="CLARITY_STAFF_DIRECTORY",

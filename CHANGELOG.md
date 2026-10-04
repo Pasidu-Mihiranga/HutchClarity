@@ -6,6 +6,8 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **Staff single sign-on through the provider** (B1). `GET /v1/auth/staff/oidc/start` and `/callback` run the authorization code flow with PKCE; the API is the confidential client, so the browser never holds a provider token and carries an `HttpOnly` `SameSite=Lax` cookie instead. `POST /v1/auth/logout` revokes the session and ends it at the provider. All three are 404 unless an issuer, a client secret and a callback are configured. The realm gains a `clarity-console` client, nine synthetic staff accounts and a TOTP policy.
+- **Step-up re-authentication** (B2). `POST /v1/auth/staff/step-up` returns a provider URL carrying `acr_values=mfa`, `prompt=login` and `max_age=0`, against a realm whose `acr.loa.map` and conditional OTP flow make the level mean something. `TokenIssuer.step_up` is no longer the only path, and `Assurance.MFA_RECENT` now comes from a real authentication rather than a request-body boolean.
 - **Request rate limiting** on the anonymous, expensive routes (`/v1/conversation/turn` and its stream, `/v1/conversation/suggestions`, `/v1/knowledge/search`, `/v1/clarity/route`). Keyed on the verified subscriber when signed in and the client address otherwise, with a lower whole-surface ceiling for callers with no session. Limits come from `config/policy/throttle.yaml` and are resolved per request (I10); a refusal is RFC 7807 with `Retry-After`. Nothing in the backend limited a request rate before this.
 - **`POST /v1/conversation/turn/stream`** returns the same turn as Server-Sent Events, with a `stage` event per completed pipeline step (`masked`, `understood`, `checked`, `composed`, `verified`) and one `turn` event carrying the identical payload the JSON route returns. Stage events carry a code and nothing else, so no customer-visible text leaves the server without passing the verifier. The chat used to animate a `setTimeout` with a hardcoded English label. OpenAPI snapshot regenerated on purpose.
 - **`GET /v1/cases/{case_id}/transcript`** returns what was said on a case, oldest first, masked, with `case:read` and the same subject binding as every other case route. Backed by the new append-only `conversation.transcripts` collection, 90-day retention (ASSUMPTION), written by the orchestrator after the reply is composed and verified. Nothing in the turn pipeline reads it back, which is what makes it a record rather than memory (ADR-0040, amending plan 22 section 9). OpenAPI snapshot regenerated on purpose.
@@ -16,6 +18,12 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 - `FlowToolAdapter` serves all nine tools the flow files name. Five (`get_case_timeline`, `get_cause_assessment`, `explain_rule`, `get_customer_safeguards`, `request_handoff`) raised `ToolUnavailable`; the gap was invisible because they are only reachable through the bounded agent step, which has never run without a configured planner. `tests/unit/test_flow_tool_adapter.py` reads the tool names out of the shipped flow files, so a flow declaring a tool the adapter does not serve now fails the build.
 - The anonymous stateless turn path applies the same input checks as the stateful one: length cap, forbidden-content refusal, injection guard and reply verifier, from one shared definition. It also filters the request body's `facts` through `_client_context`, so a caller can no longer have a figure they supplied quoted back as a finding.
+
+### Changed
+
+- CORS is pinned to the origins a deployment serves (`CLARITY_ALLOWED_ORIGINS`) and allows credentials. `allow_origins=["*"]` was not merely loose: the CORS specification forbids the wildcard with credentials, so cookie-borne sign-in could not have worked under it.
+- `principal_from` accepts the staff session cookie as well as the `Authorization` header, header first.
+- `get_clarity` and `ClarityDep` moved to `interfaces/http/deps.py` so more than one module can register routes without importing `main`.
 
 ### Fixed
 

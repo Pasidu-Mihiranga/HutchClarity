@@ -23,6 +23,7 @@ from clarity.modules.iam.public import (
     GRANTS,
     OTP_CHALLENGES,
     OTP_REQUESTS,
+    PENDING_LOGINS,
     REFRESH_TOKENS,
     SESSIONS,
 )
@@ -66,6 +67,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     # governance
     CHANGES,
     # iam
+    PENDING_LOGINS,
     OTP_CHALLENGES,
     OTP_REQUESTS,
     SESSIONS,

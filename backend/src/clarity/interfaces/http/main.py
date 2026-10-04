@@ -43,7 +43,7 @@ from clarity.contracts.case import CaseState
 from clarity.contracts.decision import Outcome, PlanStatus
 from clarity.contracts.timeline import EventType
 from clarity.integration.drivers.mock.world import CATALOGUE, ref_for
-from clarity.interfaces.http import trail
+from clarity.interfaces.http import staff_sso, trail
 from clarity.interfaces.http.auth import (
     ANONYMOUS,
     CurrentPrincipal,
@@ -56,6 +56,7 @@ from clarity.interfaces.http.auth import (
     public,
     requires,
 )
+from clarity.interfaces.http.deps import ClarityDep, get_clarity, set_clarity
 from clarity.interfaces.http.headers import security_headers
 from clarity.interfaces.http.schemas import (
     ActionView,
@@ -156,17 +157,8 @@ _log = logging.getLogger("clarity.audit.grants")
 _throttle_log = logging.getLogger("clarity.http.throttle")
 _stream_log = logging.getLogger("clarity.conversation.stream")
 
-_app_state: dict[str, Clarity] = {}
-
-
-def get_clarity() -> Clarity:
-    """The single assembled core this process serves."""
-    if "clarity" not in _app_state:
-        _app_state["clarity"] = Clarity()
-    return _app_state["clarity"]
-
-
-ClarityDep = Annotated[Clarity, Depends(get_clarity)]
+# `get_clarity` and `ClarityDep` live in `deps` so the sign-in router can ask
+# for the core without importing this module, which imports it.
 
 
 #: The header a caller may send to join its own trace, and the one every
@@ -328,7 +320,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app(clarity: Clarity | None = None) -> FastAPI:
     if clarity is not None:
-        _app_state["clarity"] = clarity
+        set_clarity(clarity)
 
     app = FastAPI(
         lifespan=_lifespan,
@@ -339,9 +331,15 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             "PROTOTYPE: all HUTCH systems are mocked and all data is synthetic."
         ),
     )
+    # Pinned to the origins this deployment actually serves, and credentials
+    # are allowed, because the staff console now authenticates with a cookie
+    # (B1). `allow_origins=["*"]` cannot carry credentials at all under the
+    # CORS spec, so the wildcard was not merely loose, it would have silently
+    # broken cookie-borne sign-in. A deployment sets CLARITY_ALLOWED_ORIGINS.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # prototype only; production restricts to HUTCH origins
+        allow_origins=_allowed_origins(clarity or get_clarity()),
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -549,6 +547,23 @@ def _decision_view(record: CaseRecord, clarity: Clarity | None = None) -> Decisi
         requires_confirmation=decision.requires_customer_confirmation,
         requires_approval=decision.requires_staff_approval,
     )
+
+
+def _allowed_origins(clarity: Clarity) -> list[str]:
+    """Which browser origins may call this API with credentials.
+
+    The console and the customer app are separate origins from the API, so
+    there has to be a list. It is configuration rather than a constant because
+    the three apps move between ports in development and hosts in deployment,
+    and a hardcoded origin is how a deployment ends up adding the wildcard
+    back.
+    """
+    configured = clarity.settings.allowed_origins
+    origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
+    console = clarity.settings.console_base_url.rstrip("/")
+    if console and console not in origins:
+        origins.append(console)
+    return origins
 
 
 def demo_only(clarity: ClarityDep) -> None:
@@ -1109,12 +1124,17 @@ def _register_routes(app: FastAPI) -> None:
         second run would start from the first run's state. Prototype only: there
         is no such thing in production.
         """
-        _app_state["clarity"] = get_clarity().reset()
+        set_clarity(get_clarity().reset())
         return {"status": "reset", "detail": "synthetic world and all cases rebuilt"}
 
     # ------------------------------------------------------------------ #
     # Sign in
     # ------------------------------------------------------------------ #
+
+    # Staff sign-in through the provider (B1, B2, B3). Its own module: the
+    # flow is four routes and a cookie, and it has nothing to do with the rest
+    # of this file.
+    staff_sso.register(app)
 
     @app.post("/v1/auth/otp/request", tags=["auth"])
     def request_otp(body: OtpRequest, clarity: ClarityDep) -> dict[str, Any]:

@@ -21,6 +21,7 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
 
+from clarity.interfaces.http.cookies import STAFF_COOKIE
 from clarity.modules.iam.public import (
     AuthorizationPolicy,
     PythonAuthorizationPolicy,
@@ -52,8 +53,30 @@ def _forbidden(detail: str) -> HTTPException:
 
 
 def principal_from(request: Request, authorization: str | None) -> Principal:
-    """Build the principal from the bearer token, or stay anonymous."""
-    if not authorization or not authorization.lower().startswith("bearer "):
+    """Build the principal from the bearer token or the staff cookie.
+
+    **Two carriers, one token.** The header is what the MCP server, the channel
+    gateway and the customer app send. The cookie is what the staff console
+    sends after signing in through the provider (B1): the value is the same
+    Clarity staff token, kept somewhere JavaScript cannot read it, because the
+    console is the surface that approves refunds.
+
+    The header wins when both are present. A caller who went to the trouble of
+    sending one is being explicit, and a stale cookie silently overriding it
+    would be the harder bug to find.
+
+    **Why a cookie does not open a CSRF hole here.** It is `SameSite=Lax`, so
+    another origin cannot drive a state-changing request with it, and the API
+    pins CORS to the console's own origin rather than echoing any. The one
+    thing Lax still permits from elsewhere is a top-level GET, and no GET on
+    this API changes anything.
+    """
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    else:
+        token = (request.cookies.get(STAFF_COOKIE) or "").strip()
+    if not token:
         return ANONYMOUS
 
     verifier: TokenVerifier | None = getattr(request.app.state, "token_verifier", None)
@@ -61,7 +84,7 @@ def principal_from(request: Request, authorization: str | None) -> Principal:
         return ANONYMOUS
 
     try:
-        principal = verifier.verify(authorization.split(" ", 1)[1].strip())
+        principal = verifier.verify(token)
     except TokenInvalid as error:
         raise _unauthenticated() from error
     # Audit duties held by grant (Phase 3). Applied here, once, so every check

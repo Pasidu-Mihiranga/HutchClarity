@@ -112,6 +112,12 @@ class AuditEventType(StrEnum):
     """A wrong, expired or reused code. The raw material of brute force."""
 
     STAFF_SESSION_STARTED = "staff.session_started"
+    STAFF_SESSION_ENDED = "staff.session_ended"
+    """A staff member signed out, or their session was revoked (B3)."""
+    STAFF_STEP_UP_REQUESTED = "staff.step_up_requested"
+    """A re-authentication was asked for before an approval (B2). Recorded
+    on the ask, not only on the result, so a request that was never
+    completed is still visible."""
     """A staff session began, with the roles and step-up it asserted."""
 
     TOKEN_REFRESHED = "token.refreshed"

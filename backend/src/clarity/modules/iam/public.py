@@ -31,6 +31,19 @@ from clarity.modules.iam.grants import (
     is_subject,
 )
 from clarity.modules.iam.keycloak import CompositeTokenVerifier, KeycloakTokenVerifier
+from clarity.modules.iam.oidc import (
+    LOA_MFA,
+    LOA_PASSWORD,
+    LOGIN_TTL,
+    PENDING_LOGINS,
+    OidcError,
+    OidcLogin,
+    OidcSettings,
+    PendingLogin,
+    ProviderTokens,
+    code_challenge_for,
+    nonce_matches,
+)
 from clarity.modules.iam.otp import (
     OTP_CHALLENGES,
     OTP_REQUESTS,
@@ -49,8 +62,12 @@ from clarity.modules.iam.tokens import (
 
 __all__ = [
     "GRANTS",
+    "LOA_MFA",
+    "LOA_PASSWORD",
+    "LOGIN_TTL",
     "OTP_CHALLENGES",
     "OTP_REQUESTS",
+    "PENDING_LOGINS",
     "REFRESH_TOKENS",
     "SESSIONS",
     "AuditGrant",
@@ -64,9 +81,14 @@ __all__ = [
     "IssuedToken",
     "KeycloakTokenVerifier",
     "LoginRefused",
+    "OidcError",
+    "OidcLogin",
+    "OidcSettings",
     "OpaAuthorizationPolicy",
     "OtpRefused",
     "OtpService",
+    "PendingLogin",
+    "ProviderTokens",
     "PythonAuthorizationPolicy",
     "SimulatedInbox",
     "StaffDirectory",
@@ -76,6 +98,8 @@ __all__ = [
     "TokenInvalid",
     "TokenIssuer",
     "TokenVerifier",
+    "code_challenge_for",
     "hash_secret",
     "is_subject",
+    "nonce_matches",
 ]

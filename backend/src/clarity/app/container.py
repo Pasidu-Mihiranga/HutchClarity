@@ -83,6 +83,8 @@ from clarity.modules.iam.public import (
     CompositeTokenVerifier,
     GrantAwareAuthorizationPolicy,
     KeycloakTokenVerifier,
+    OidcLogin,
+    OidcSettings,
     OpaAuthorizationPolicy,
     OtpService,
     PythonAuthorizationPolicy,
@@ -711,6 +713,27 @@ class Clarity:
                     timeout_seconds=self.settings.auth_timeout_seconds,
                 ),
             )
+        # Staff sign-in through the provider (B1). Off unless a confidential
+        # client secret and a callback are configured: a half-configured SSO
+        # that silently falls back to the development role picker is how a
+        # deployment ends up believing it has SSO when it has not.
+        self.oidc: OidcLogin | None = None
+        if (
+            self.settings.keycloak_issuer
+            and self.settings.oidc_client_secret
+            and self.settings.oidc_redirect_uri
+        ):
+            self.oidc = OidcLogin(
+                OidcSettings(
+                    issuer=self.settings.keycloak_issuer,
+                    client_id=self.settings.oidc_client_id,
+                    client_secret=self.settings.oidc_client_secret,
+                    redirect_uri=self.settings.oidc_redirect_uri,
+                ),
+                timeout_seconds=self.settings.auth_timeout_seconds,
+                open_unit=self.open_unit,
+            )
+
         # Whichever driver decides, grants and the audit-duty money rule hold
         # under it: the OPA driver sees roles only (audit assurance Phase 3).
         self.authorization: AuthorizationPolicy = GrantAwareAuthorizationPolicy(
