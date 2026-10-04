@@ -50,6 +50,12 @@ can start. The existing `full.yml` remains development-only.
   preserved both the receipt signing public key and the issued receipt. The
   Certbot staging renewal and deploy hook succeeded.
 
+## CI follow-up (agent: Claude Code, Claude Opus 5.5)
+
+- PR #60 CI failed twice in `deployment artefacts`. First, the VPS validation wrote a root-owned 0600 env file the runner could not read; it is now 0600 and owned by the runner. Second, Helm pods crashed: `SIGNING_KEY_PATH` defaulted to `.keys/signing.pem`, and the read-only root filesystem refused the `mkdir`. The setting is now optional: set (as on the VPS) it persists the key, unset it stays in memory. Regression test added.
+- `rollback.sh` no longer pulls: the previous release's images are on the host, the job's registry login has expired by then, and host-built releases have no registry copy. CD logs the server out of GHCR after each deploy.
+- GitHub Environment `demo-vps` created (deployments from `main` only) with `HETZNER_HOST`, `HETZNER_USER`, `HETZNER_SSH_PRIVATE_KEY` and `HETZNER_KNOWN_HOSTS`; the deploy key logs in as `clarity-deploy` against the pinned host key.
+
 ## Open issues / next step
 
 Land on `main`, exercise CD and its no-rebuild rollback, then begin WA01.

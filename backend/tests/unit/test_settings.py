@@ -85,3 +85,20 @@ def test_configured_signing_key_survives_a_restart(tmp_path) -> None:
 
     assert key_path.stat().st_mode & 0o777 == 0o600
     assert second.signing.public_keys() == first_public_keys
+
+
+def test_unset_signing_key_path_writes_nothing(tmp_path, monkeypatch) -> None:
+    """Helm runs the image with a read-only root filesystem.
+
+    Defaulting the key path to `.keys/signing.pem` made every pod crash on
+    `mkdir` (CI run 37180558291). Unset, the signer keeps its key in memory and
+    the working directory stays untouched.
+    """
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(_env_file=None)
+
+    clarity = Clarity(settings=settings)
+
+    assert settings.signing_key_path is None
+    assert clarity.signing.public_keys()
+    assert list(tmp_path.iterdir()) == []
