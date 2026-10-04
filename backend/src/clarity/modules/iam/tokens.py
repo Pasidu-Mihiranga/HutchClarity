@@ -20,10 +20,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import secrets
+import tempfile
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import jwt
@@ -104,12 +107,51 @@ class SessionRecord:
     revoked: bool = False
 
 
+def _load_or_create_key(key_path: Path | None) -> Ed25519PrivateKey:
+    """The issuer key: in memory, or loaded from ``key_path``, created once.
+
+    Several processes (API, MCP, channel gateway) may start together on one
+    shared key directory. Each writes a complete key to its own temporary file
+    and publishes it with ``os.link``, which is atomic and fails if the key
+    already exists. A reader therefore sees no key or a whole one, never a
+    half-written file, and every process ends up with the same key.
+    """
+    if key_path is None:
+        return Ed25519PrivateKey.generate()
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    if not key_path.exists():
+        candidate = Ed25519PrivateKey.generate()
+        fd, tmp = tempfile.mkstemp(dir=key_path.parent, prefix=".iam-issuer-")
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(
+                    candidate.private_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PrivateFormat.PKCS8,
+                        encryption_algorithm=serialization.NoEncryption(),
+                    )
+                )
+            os.chmod(tmp, 0o600)
+            try:
+                os.link(tmp, key_path)
+                return candidate
+            except FileExistsError:
+                pass  # another process published first: use its key
+        finally:
+            os.unlink(tmp)
+    loaded = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+    if not isinstance(loaded, Ed25519PrivateKey):
+        raise TypeError(f"{key_path} does not hold an Ed25519 private key")
+    return loaded
+
+
 class TokenIssuer:
     """Mints and validates Clarity tokens.
 
-    **Prototype note.** The key is generated in memory. Production uses the
-    KMS/HSM-backed signer and publishes the public key for validators, exactly
-    as receipt signing does.
+    **Prototype note.** The key is generated in memory, or, with ``key_path``,
+    kept in a file so sessions survive a restart or a redeploy. Production uses
+    the KMS/HSM-backed signer and publishes the public key for validators,
+    exactly as receipt signing does.
     """
 
     def __init__(
@@ -118,8 +160,9 @@ class TokenIssuer:
         audience: str = "clarity-api",
         kid: str = "clarity-iam-dev",
         open_unit: UnitOfWorkFactory | None = None,
+        key_path: Path | None = None,
     ) -> None:
-        self._private = Ed25519PrivateKey.generate()
+        self._private = _load_or_create_key(key_path)
         self._public = self._private.public_key()
         self._audience = audience
         self._kid = kid

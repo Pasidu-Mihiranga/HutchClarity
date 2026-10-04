@@ -571,7 +571,12 @@ class Clarity:
         self.audit = AuditLedger()
         # Identity is not demo data: a reset of the synthetic world must not
         # sign everyone out mid-demonstration, so these carry over.
-        self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
+        self.tokens = tokens or TokenIssuer(
+            open_unit=self.open_unit,
+            key_path=(
+                self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
+            ),
+        )
         self.otp = otp or OtpService(open_unit=self.open_unit)
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
+import { expireSession, readToken } from "@/lib/session";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
 import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
 import {
@@ -157,18 +158,28 @@ export default function ClarityPage() {
   // is a larger change than this issue, and it is now fed real data instead of
   // an empty literal, which is what made it wrong in practice.
   const [app, setApp] = useState<AppState>({});
+  // A question asked before the account has loaded used to be answered from
+  // an empty account: a customer under a fair-use cap was told they were not
+  // capped. `ask` waits on this promise and reads the account from the ref,
+  // which a render-time closure would leave stale.
+  const appRef = useRef<AppState>({});
+  const appReady = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    appReady.current = (async () => {
       try {
-        const token = window.sessionStorage.getItem("clarity_token");
-        if (!token) return;
+        // The chat is for a signed-in customer: without a session every turn
+        // is refused, so go and get one instead of failing turn by turn.
+        const token = readToken();
+        if (!token) return expireSession();
         const res = await fetch(`${BASE}/v1/me/app`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401) return expireSession();
         if (!res.ok) return;
         const data = (await res.json()) as AppState;
+        appRef.current = data;
         if (!cancelled) setApp(data);
       } catch {
         // No account state means the heuristic below stays conservative, which
@@ -256,7 +267,9 @@ export default function ClarityPage() {
       // `cs.caseId` at the top level is what puts this turn on the stateful
       // pipeline. Passing it only inside `facts`, as this did until C05, left
       // every turn stateless and no flow ever ran (C05 devlog).
-      const turn = await fetchTurn(typed, lang, intentOverride, facts, app, cs.caseId);
+      await appReady.current;
+      const account = appRef.current;
+      const turn = await fetchTurn(typed, lang, intentOverride, facts, account, cs.caseId);
 
       let clientIntent = turn?.client_intent ?? turn?.intake?.client_intent ?? intentForQuestion(questionKey, typed);
       const route = turn?.route ?? turn?.intake?.route ?? "account";
@@ -303,7 +316,7 @@ export default function ClarityPage() {
         return;
       }
 
-      const can = accountIntents(app);
+      const can = accountIntents(account);
       if (!can[clientIntent]) {
         setCs((s) => {
           const msgs = s.messages.filter((m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")));
@@ -322,7 +335,7 @@ export default function ClarityPage() {
         return { ...s, ...update1, messages: [...msgs, { role: "clarity", kind: "progress" as ResultKind }], progressStep: 0 };
       });
 
-      const chargeRef = chargeForIntent(clientIntent, app.activity ?? []);
+      const chargeRef = chargeForIntent(clientIntent, account.activity ?? []);
       await runEvaluate(clientIntent, chargeRef, false, update1);
     } catch (err) {
       console.error(err);
@@ -342,7 +355,7 @@ export default function ClarityPage() {
   ) {
     // step 1 - open case
     setCs((s) => ({ ...s, progressStep: 1 }));
-    const opened = await openCase(app.msisdn ?? "0781234567", lang, chargeRef, wantsHuman);
+    const opened = await openCase(appRef.current.msisdn ?? "0781234567", lang, chargeRef, wantsHuman);
     const caseId = opened.case_id;
 
     // step 2+3 - evaluate + timeline

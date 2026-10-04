@@ -15,8 +15,8 @@ import { customerToken, signedIn } from "./session";
 
 const SPOKEN = "Why was LKR 49 deducted from my balance?";
 
-async function fakeSpeech(page: Page, transcript: string | null): Promise<void> {
-  await page.addInitScript((said) => {
+async function fakeSpeech(page: Page, transcript: string | null, failWith?: string): Promise<void> {
+  await page.addInitScript(([said, fail]) => {
     const w = window as unknown as Record<string, unknown>;
     if (said === null) {
       delete w.SpeechRecognition;
@@ -32,6 +32,10 @@ async function fakeSpeech(page: Page, transcript: string | null): Promise<void> 
       onend: (() => void) | null = null;
       start() {
         (window as unknown as { __speechLang?: string }).__speechLang = this.lang;
+        if (fail) {
+          setTimeout(() => { this.onerror?.({ error: fail }); this.onend?.(); }, 100);
+          return;
+        }
         setTimeout(() => {
           this.onresult?.({ resultIndex: 0, results: { length: 1, 0: { isFinal: true, length: 1, 0: { transcript: said } } } });
           this.onend?.();
@@ -42,11 +46,11 @@ async function fakeSpeech(page: Page, transcript: string | null): Promise<void> 
     }
     w.SpeechRecognition = FakeRecognition;
     w.webkitSpeechRecognition = FakeRecognition;
-  }, transcript);
+  }, [transcript, failWith ?? null] as const);
 }
 
 test.describe("voice input", () => {
-  test("Speak opens an opt-in sheet that says where the audio goes", async ({ page, request }) => {
+  test("Speak starts listening at once and says where the audio goes", async ({ page, request }) => {
     await signedIn(page, await customerToken(request));
     await fakeSpeech(page, SPOKEN);
     await page.goto("/clarity");
@@ -54,9 +58,10 @@ test.describe("voice input", () => {
     await page.getByRole("button", { name: "Speak" }).click();
     const sheet = page.getByRole("dialog", { name: "Speak to Clarity" });
     await expect(sheet).toBeVisible();
+    // The tap on Speak is the opt-in: no second tap, and the notice is there
+    // while it listens.
     await expect(sheet.getByText(/goes to Google or Apple/)).toBeVisible();
-    // Nothing listens until the customer asks it to.
-    await expect(sheet.getByRole("button", { name: "Start speaking" })).toBeFocused();
+    await expect(sheet.getByTestId("voice-transcript")).toHaveText(SPOKEN);
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -76,7 +81,6 @@ test.describe("voice input", () => {
 
     await page.getByRole("button", { name: "Speak" }).click();
     const sheet = page.getByRole("dialog");
-    await sheet.getByRole("button", { name: "Start speaking" }).click();
 
     await expect(sheet.getByTestId("voice-transcript")).toHaveText(SPOKEN);
     await expect(sheet.getByRole("status")).toHaveText("Is this what you said?");
@@ -93,7 +97,6 @@ test.describe("voice input", () => {
     await page.goto("/clarity");
 
     await page.getByRole("button", { name: "Speak" }).click();
-    await page.getByRole("button", { name: "Start speaking" }).click();
     await page.getByRole("button", { name: "Edit" }).click();
 
     const box = page.getByRole("textbox", { name: /ask clarity/i });
@@ -108,9 +111,19 @@ test.describe("voice input", () => {
     await page.getByRole("group", { name: "Language" }).getByRole("button").nth(1).click();
 
     await page.getByRole("button", { name: "කතා කරන්න" }).click();
-    await page.getByRole("button", { name: "කතා කිරීම අරඹන්න" }).click();
     await expect(page.getByTestId("voice-transcript")).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { __speechLang?: string }).__speechLang)).toBe("si-LK");
+  });
+
+  test("a blocked microphone says so and offers Try again", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+    await fakeSpeech(page, SPOKEN, "not-allowed");
+    await page.goto("/clarity");
+
+    await page.getByRole("button", { name: "Speak" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByRole("status")).toContainText("Microphone access is blocked");
+    await expect(sheet.getByRole("button", { name: "Try again" })).toBeFocused();
   });
 
   test("without speech recognition the Speak button is not offered", async ({ page, request }) => {
