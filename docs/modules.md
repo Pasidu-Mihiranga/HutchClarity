@@ -13,6 +13,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | integration (ports, mock and HTTP drivers) | L1 | `backend/src/clarity/integration/` | - | migrated (simulated); DATA01 adds a fixed-seed, 18-family synthetic complaint/evidence corpus and aggregate-only Foresight derivative | HUTCH sandbox mappings require confirmation |
 | integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team | Persistent hutch-sim deployment wiring (X03) |
 | hutch-sim (SIMULATED HUTCH systems over HTTP) | service | `services/hutch-sim/` | - | built | Deployment image and Compose wiring (X03) |
+| clarity-whatsapp (Baileys transport) | service | `services/whatsapp-baileys/` | [README.md](../services/whatsapp-baileys/README.md) | built, disabled by default | Operator pairing and live synthetic journey (WA01) |
 | resolution | L4 | `backend/src/clarity/modules/resolution/` | case, timeline, detection, decision, actions, receipts | built | Orchestration split out of `case` (M-CASE #34). The only module allowed to import `actions.capability`. |
 | platform: config, audit, messaging, persistence, observability, content, security | L2 | `backend/src/clarity/platform/` | - | built | Persistence port with in-memory and PostgreSQL drivers, schema and role per module, row-level security (B02, B05); event bus port with in-process and Kafka drivers (B03); transactional outbox, relay and consumer framework (B04); traces and masked structured logs (B08). OPA with R2. |
 | ai (gateway, providers, PII, verifier) | L3 | `backend/src/clarity/ai/` | - | built (no model) | Model roles, cassettes (R4) |
@@ -44,7 +45,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 | clarity-mcp (MCP SDK, Streamable HTTP, OAuth 2.1) | service | `services/mcp/` | R4 |
 | clarity-signer | service | `services/signer/` | R4 |
 | clarity-ai-gateway | service | `services/ai-gateway/` | R4 |
-| clarity-channel-gateway (WhatsApp, SMS/USSD) | service | `services/channel-gateway/` | R4 (N02 built: signature-verified webhooks, 24-hour window, SMS/USSD simulator; sandbox, no real provider) |
+| clarity-channel-gateway (SMS/USSD) | service | `services/channel-gateway/` | R4 (N02 built; Baileys WhatsApp transport moved to built units in WA01) |
 | knowledge / RAG | module | `backend/src/clarity/modules/knowledge/` | R6 (K01-K03 built: registry, ingestion, lexical retrieval, grounded answers with a citation verifier; semantic retrieval blocked on an embedding model) |
 | insights | module | `backend/src/clarity/modules/insights/` | R6 (I01 built: event-fed read models, replay-deterministic; console UI pending) |
 | assurance (risk rules, alerts, chain-break playbook) | module | `backend/src/clarity/modules/assurance/` | R6 (audit assurance Phase 4 built, and the six deferred scenarios since: 14 counted rules over the audit trail, alert lifecycle, liveness, outbox lag, playbook; detection runs in each API process until a worker exists) |

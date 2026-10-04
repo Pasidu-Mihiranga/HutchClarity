@@ -15,9 +15,10 @@ from __future__ import annotations
 import hmac
 import secrets
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from clarity.kernel.common import normalise_msisdn, utc_now
 from clarity.platform.persistence import (
@@ -87,6 +88,51 @@ class SimulatedInbox:
             if message["to"] == normalised:
                 return message
         return None
+
+
+OtpChannel = Literal["sms", "inbox", "none"]
+
+
+class RoutedOtpDelivery:
+    """Choose, per number, where a code goes.
+
+    - A linked phone (a real phone the operator tied to a synthetic customer)
+      gets a real SMS, when an SMS driver is configured.
+    - Any other synthetic customer's number gets the labelled inbox, shown on
+      the sign-in page: those numbers belong to strangers in the real world,
+      so they are never texted.
+    - An unknown number gets nothing. The request still issues a challenge, so
+      the answer is the same (no enumeration), and nobody can make the server
+      text an arbitrary number (no SMS pumping).
+    """
+
+    def __init__(
+        self,
+        *,
+        inbox: SimulatedInbox,
+        sms: OtpDelivery | None,
+        sms_numbers: frozenset[str],
+        known: Callable[[str], bool],
+    ) -> None:
+        self.inbox = inbox
+        self._sms = sms
+        self._sms_numbers = frozenset(normalise_msisdn(n) for n in sms_numbers)
+        self._known = known
+
+    def channel_for(self, msisdn: str) -> OtpChannel:
+        normalised = normalise_msisdn(msisdn)
+        if self._sms is not None and normalised in self._sms_numbers:
+            return "sms"
+        if self._known(normalised):
+            return "inbox"
+        return "none"
+
+    def send(self, msisdn: str, code: str) -> None:
+        channel = self.channel_for(msisdn)
+        if channel == "sms" and self._sms is not None:
+            self._sms.send(normalise_msisdn(msisdn), code)
+        elif channel == "inbox":
+            self.inbox.send(msisdn, code)
 
 
 @dataclass

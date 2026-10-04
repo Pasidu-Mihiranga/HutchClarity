@@ -61,6 +61,10 @@ model-written wording would be checked against these facts before she saw it.
 Click **මෙම නිවැරදි කිරීම තහවුරු කරන්න** (Confirm this fix). Three things happen
 in one tap: refund, subscription off, merchant blocked.
 
+The browser journey was re-verified on 2026-10-04 with a follow-up turn before
+confirmation. The displayed flow plan remains attached to its original case,
+and the receipt is verified after execution.
+
 ## 2:15–3:00 - The proof
 
 The Trust Receipt appears. Point out:

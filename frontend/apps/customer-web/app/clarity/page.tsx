@@ -344,19 +344,40 @@ export default function ClarityPage() {
         return;
       }
 
-      // No client-side eligibility gate (A2). `accountIntents` used to read
-      // `used_pct >= 80`, duplicate payment amounts and consent flags here and
-      // decide whether the rule engine was asked at all. That is I1 inverted:
-      // rules decide, and a heuristic in React deciding there is nothing to
-      // find is a decision. It also failed closed in the worst direction - a
-      // customer whose evidence the browser had not loaded was told nothing was
-      // wrong while the backend had a cause waiting (FE01, #28).
-      //
-      // The question now always reaches detection. When no rule matches,
-      // `decision/policy.py` answers HANDOFF with `NO_CAUSE_FOUND`, which
-      // `pickResultKind` renders as the handoff card: a person, not a guess
-      // (I2). That is the same conclusion the gate was reaching for, reached by
-      // the component the invariant puts in charge of it.
+      // A stateful flow can evaluate the existing case and create its pending
+      // plan during this turn. Opening another case below would separate the
+      // displayed plan from cs.caseId, so Confirm would submit a valid plan to
+      // the wrong case and be refused. Keep the existing case and render the
+      // flow-owned confirmation artefact.
+      if (turn?.proposal_id && cs.caseId) {
+        setCs((s) => {
+          const msgs = s.messages.filter(
+            (m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")),
+          );
+          return {
+            ...s,
+            ...update1,
+            caseId: cs.caseId,
+            mode: "result",
+            messages: [...msgs, { role: "clarity", kind: "confirm" as ResultKind }],
+          };
+        });
+        setBusy(false);
+        return;
+      }
+
+      const can = accountIntents(account);
+      if (!can[clientIntent]) {
+        setCs((s) => {
+          const msgs = s.messages.filter((m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")));
+          return {
+            ...s, ...update1, mode: "miss", intent: clientIntent,
+            messages: [...msgs, { role: "clarity", kind: "miss" as ResultKind }],
+          };
+        });
+        setBusy(false);
+        return;
+      }
 
       // progress steps
       setCs((s) => {
@@ -448,14 +469,19 @@ export default function ClarityPage() {
     setBusy(true);
     setPendingConfirm(null);
     try {
-      const proposal = await createProposal(cs.caseId);
-      const done = await applyFix(cs.caseId, proposal.plan_id, pendingConfirm.outcome);
+      // A server-driven conversation flow already created the plan shown in
+      // ConfirmCard. Creating another plan here can make the visible button
+      // execute a different proposal, or fail while the original remains
+      // pending. Only legacy result cards need a proposal created on tap.
+      const planId = cs.planId ?? (await createProposal(cs.caseId)).plan_id;
+      const done = await applyFix(cs.caseId, planId, pendingConfirm.outcome);
       const [verified, full] = await Promise.all([
         verifyReceipt(done.receipt_id),
         fetchReceipt(done.receipt_id),
       ]);
       setCs((s) => ({
         ...s,
+        planId: null,
         receiptDoc: full,
         receiptCheck: verified,
         mode: "resolved",
@@ -469,7 +495,13 @@ export default function ClarityPage() {
           { role: "clarity", kind: "receipt" as ResultKind },
         ],
       }));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setCs((s) => ({
+        ...s,
+        messages: [...s.messages, { role: "clarity", kind: "miss" as ResultKind }],
+      }));
+    }
     setBusy(false);
   }
 
