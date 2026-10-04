@@ -13,6 +13,7 @@ if [[ -s $root/previous-release ]]; then
   # would need a registry login that expired with the deploy job, and a
   # release built on the host has no registry copy at all.
   "${compose[@]}" up -d --wait --pull missing
+  "${compose[@]}" exec -T reverse-proxy nginx -s reload
   "$root/deploy/scripts/healthcheck.sh"
   printf '%s\n' "$previous" > "$root/current-release"
   echo "rolled back Clarity to $previous"
