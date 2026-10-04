@@ -6,9 +6,11 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
-- **Request rate limiting** on the anonymous, expensive routes (`/v1/conversation/turn` and its stream, `/v1/conversation/suggestions`, `/v1/knowledge/search`, `/v1/clarity/route`). Keyed on the verified subscriber when signed in and the client address otherwise, with a lower whole-surface ceiling for callers with no session. Limits come from `config/policy/throttle.yaml` and are resolved per request (I10); a refusal is RFC 7807 with `Retry-After`. Nothing in the backend limited a request rate before this.
-- **`POST /v1/conversation/turn/stream`** returns the same turn as Server-Sent Events, with a `stage` event per completed pipeline step (`masked`, `understood`, `checked`, `composed`, `verified`) and one `turn` event carrying the identical payload the JSON route returns. Stage events carry a code and nothing else, so no customer-visible text leaves the server without passing the verifier. The chat used to animate a `setTimeout` with a hardcoded English label. OpenAPI snapshot regenerated on purpose.
-- **`GET /v1/cases/{case_id}/transcript`** returns what was said on a case, oldest first, masked, with `case:read` and the same subject binding as every other case route. Backed by the new append-only `conversation.transcripts` collection, 90-day retention (ASSUMPTION), written by the orchestrator after the reply is composed and verified. Nothing in the turn pipeline reads it back, which is what makes it a record rather than memory (ADR-0040, amending plan 22 section 9). OpenAPI snapshot regenerated on purpose.
+- An opt-in Baileys WhatsApp transport forwards signed one-to-one messages to
+  the existing channel gateway and sends its exact reply. Auth state is kept
+  outside the image, pairing is operator-only, and provider noise is refused.
+- httpSMS can deliver single-use customer sign-in codes through the existing
+  OTP port when its primary user key and registered Android sender are set.
 - `POST /v1/auth/staff/login` checks a staff directory and assigns that account's role. When `CLARITY_STAFF_DIRECTORY` or `CLARITY_STAFF_DIRECTORY_FILE` is set, `POST /v1/auth/staff/session` returns 404. Both routes stay 404 in `prod`. OpenAPI snapshot and SDK regenerated on purpose.
 - Vertex AI is a text-role provider (`config/ai/models.yaml`). It runs when `CLARITY_VERTEX_PROJECT` is set and `AI_PREFER_TEMPLATES=false`. The model id is `CLARITY_MODEL_NAME`. Credentials are Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`), not a key in the repo. Speech roles stay on Groq, then a local refusal.
 
