@@ -254,6 +254,50 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
+  e2e:
+    name: browser journeys and accessibility (Playwright + axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: |
+          pip install -e "backend[dev]"
+          cd frontend && npm ci
+
+      - name: Install the browser
+        run: cd frontend && npx playwright install --with-deps chromium
+
+      - name: Run the suite
+        # Playwright starts both servers itself: the API in the lite profile
+        # and the Next.js app. The journey crosses them, so a suite that mocked
+        # the API would pass with the flow disconnected, which is the bug C05
+        # fixed.
+        #
+        # This job exists because the suite was written for C05 and never run.
+        # It was committed, compiled, and failed 7 of 8 tests the first time it
+        # was executed, having hidden four product defects in the meantime.
+        run: cd frontend && npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
   dast:
     name: DAST (OWASP ZAP baseline)
     runs-on: ubuntu-latest
