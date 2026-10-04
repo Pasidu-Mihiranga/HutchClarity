@@ -2454,6 +2454,36 @@ def _register_routes(app: FastAPI) -> None:
         return suggest_for_snapshot(snapshot, language=language, limit=min(max(limit, 1), 10))
 
     @app.get(
+        "/v1/insights/dashboards",
+        tags=["insights"],
+        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
+    )
+    def insights_dashboards(clarity: ClarityDep) -> dict[str, Any]:
+        """Console dashboards, folded from the event log (D2).
+
+        The projection has existed since I01 and had no surface of its own:
+        the only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,
+        which is not where an operations dashboard belongs. The numbers are
+        the same; what changes is that the console is no longer reading a
+        demonstration endpoint to run a desk.
+
+        Folded from the log rather than read from live objects, which is the
+        property that matters: a restart does not lose the numbers, two
+        replicas agree, and a replay of the log rebuilds them exactly. Money
+        stays `Decimal` and serialises as a string, because a figure a desk
+        acts on has to be the figure the ledger holds (I3).
+        """
+        boards = clarity.insights.dashboards()
+        return {
+            **boards,
+            "note": (
+                "Folded from the event log, not read from live objects. A replay "
+                "of the log rebuilds these numbers exactly; `events_folded` counts "
+                "the events this projection used."
+            ),
+        }
+
+    @app.get(
         "/v1/demo/ops",
         tags=["demo"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],

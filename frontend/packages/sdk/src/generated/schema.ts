@@ -1475,6 +1475,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/insights/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insights Dashboards
+         * @description Console dashboards, folded from the event log (D2).
+         *
+         *     The projection has existed since I01 and had no surface of its own:
+         *     the only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,
+         *     which is not where an operations dashboard belongs. The numbers are
+         *     the same; what changes is that the console is no longer reading a
+         *     demonstration endpoint to run a desk.
+         *
+         *     Folded from the log rather than read from live objects, which is the
+         *     property that matters: a restart does not lose the numbers, two
+         *     replicas agree, and a replay of the log rebuilds them exactly. Money
+         *     stays `Decimal` and serialises as a string, because a figure a desk
+         *     acts on has to be the figure the ledger holds (I3).
+         */
+        get: operations["insights_dashboards_v1_insights_dashboards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/knowledge/search": {
         parameters: {
             query?: never;
@@ -4812,6 +4844,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insights_dashboards_v1_insights_dashboards_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

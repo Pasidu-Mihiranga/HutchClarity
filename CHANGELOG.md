@@ -29,6 +29,8 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **`GET /v1/insights/dashboards`** (D2). The projection has existed since I01 and its only surface was `GET /v1/demo/ops`, so a console running a shift was reading a route tagged `demo`. The numbers are unchanged, which a test asserts against the old route so it can be retired without anybody wondering what moved.
+
 - **The Complaint Autopsy reviewer workspace** (D1). `GET /v1/autopsy/clusters` plus `POST .../review`, `.../supersede` and `.../rule-candidate`. Autopsy had the whole domain, a repository, an event consumer and a review service with `record` and `supersede`, reachable only through a read-only demo route: a cluster could be looked at and never judged. Reading is `desk:queue:read`, ruling is the new `autopsy:review`, and proposing a policy change needs `rule:draft` as well, because reviewing and drafting a rule are different judgements. A proposal creates a draft `PolicyChange` and nothing else: activation goes through the governance lifecycle, approved by somebody else (AU02). The console page carries the actions instead of only rendering clusters.
 
 - **The staff console signs in through the provider** (B1, B2). `GET /v1/auth/sign-in-methods` reports which paths a deployment offers, so the console shows what the API will actually accept rather than what it was built expecting; where a provider is configured it offers "Sign in with HUTCH SSO", and a signed-in session that is not stepped up offers "Re-authenticate", which is the first caller the step-up route has ever had. Signing out now tells the API and follows the provider's logout, rather than only clearing what the page can see.
