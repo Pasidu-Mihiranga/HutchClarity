@@ -12,7 +12,7 @@
 - Modelled responses (cases, decisions, timeline, plans, executions, session, receipts verdict, queue, demo subscribers) now return the generated schema types. The `[key: string]: unknown` escape hatches are gone.
 - Routes the backend answers with an open dictionary keep a hand-written shape, now in one file (`types.ts`), each citing its handler. `declared` refuses a route whose response the schema already types, so a hand type disappears when the backend publishes a model.
 - New methods for routes that existed and were never called: `myApp`, `myHome`, `myCases`, `myReceipts`, `reload`, `purchasePackage`, `cancelSubscription`, `setSafeguard`, `addFamilyMember`, `savePreferences`, `confirmCase`, `refreshSession`, `logout`, `stepUp`, `signInMethods`, `listSessions`, `endOtherSessions`, `oidcStartUrl`.
-- `npm run typecheck` now runs `tsc --noEmit` in every workspace (sdk, ui, customer-web, console, verify), not only the SDK.
+- `npm run typecheck` now runs `tsc --noEmit` in every workspace that defines the script (sdk, customer-web, console, verify; ui via the design-system branch), not only the SDK.
 - Console `StaffSessionProvider` uses the client instead of four raw `fetch` calls.
 - `check-sdk.mjs` works on Windows (shell for npx, CRLF-insensitive compare).
 - Vitest tests for the SDK: URL and body building, server-default fill-in, CSRF and bearer headers, error mapping, and a test that every route in `client.ts` exists in `contracts/openapi.json`.
@@ -32,7 +32,7 @@ A call to a method that did not exist shipped because the client imported neithe
 - [x] This devlog
 
 ## Tests
-- `npm run typecheck`: clean in all five workspaces.
+- `npm run typecheck`: clean in sdk, customer-web, console and verify (the ui package joins once the design-system branch is merged).
 - `npm test -w @clarity/sdk`: 12 passed. `npm run sdk:check`: schema types current.
 - `npm run build`: all three apps compile.
 - Not run: Playwright (`make e2e`).
