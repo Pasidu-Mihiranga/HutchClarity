@@ -67,6 +67,40 @@ export type TranscriptPayload = {
   retention_days: number;
 };
 
+export type PolicyApproval = {
+  approver_ref: string;
+  role: string;
+  at: string;
+  mfa_step_up: boolean;
+};
+
+export type PolicyImpact = {
+  cases_evaluated: number;
+  changed: number;
+  /** A string, not a number: money is Decimal on the wire (I3). */
+  money_delta_lkr: string;
+  candidate_summary: string;
+};
+
+export type PolicyChangeView = {
+  change_id: string;
+  key: string;
+  candidate: Record<string, unknown>;
+  change_class: string;
+  maker_ref: string;
+  /** draft | in_review | approved | scheduled | active | superseded | rejected */
+  state: string;
+  reason: string;
+  approvals_needed: number;
+  approvals: PolicyApproval[];
+  impact: PolicyImpact | null;
+  scheduled_for: string | null;
+  activated_at: string | null;
+  /** The change this one replaces, and the only thing a reversal can restore. */
+  supersedes: string | null;
+  [key: string]: unknown;
+};
+
 export type AutopsyCluster = {
   cluster_id: string;
   label: string;
@@ -570,6 +604,86 @@ export class ClarityClient {
   /** Operations dashboards, folded from the event log (D2). */
   insightsDashboards(): Promise<Record<string, unknown>> {
     return this.request("/v1/insights/dashboards");
+  }
+
+  // --- Policy Studio (D3) --------------------------------------------------
+  //
+  // These routes have existed since M-GOV and had no caller: the Studio page
+  // wrote drafts to `sessionStorage` and downloaded a JSON blob, so nothing a
+  // policy author did there ever reached the governance lifecycle.
+
+  /** Every change and where it is in its lifecycle. */
+  policyChanges(): Promise<PolicyChangeView[]> {
+    return this.request("/v1/admin/policy/changes");
+  }
+
+  /** Open a change. The class comes from the artefact's tags, not from here. */
+  draftPolicyChange(body: {
+    key: string;
+    value: unknown;
+    reason: string;
+    scope?: Record<string, string>;
+    version?: number;
+    effective_from?: string | null;
+  }): Promise<PolicyChangeView> {
+    return this.request("/v1/admin/policy/changes", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Attach the replay that says what this change would have done. */
+  reviewPolicyChange(
+    changeId: string,
+    body: { cases_evaluated: number; candidate_summary?: string },
+  ): Promise<PolicyChangeView> {
+    return this.request(
+      `/v1/admin/policy/changes/${encodeURIComponent(changeId)}/review`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
+  /** Approve. The maker cannot be an approver, and the API enforces it. */
+  approvePolicyChange(changeId: string): Promise<PolicyChangeView> {
+    return this.request(
+      `/v1/admin/policy/changes/${encodeURIComponent(changeId)}/approve`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+  }
+
+  schedulePolicyChange(
+    changeId: string,
+    body: { effective_from: string },
+  ): Promise<PolicyChangeView> {
+    return this.request(
+      `/v1/admin/policy/changes/${encodeURIComponent(changeId)}/schedule`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
+  activatePolicyChange(changeId: string): Promise<PolicyChangeView> {
+    return this.request(
+      `/v1/admin/policy/changes/${encodeURIComponent(changeId)}/activate`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+  }
+
+  /**
+   * Draft a governed reversal.
+   *
+   * This does not undo anything by itself: it opens a *new* change that
+   * restores the version the named one replaced, and that change goes through
+   * the same review and approval path as any other. A change that supersedes
+   * nothing has nothing to restore, and the API refuses it.
+   */
+  rollbackPolicyChange(
+    changeId: string,
+    body: { reason: string },
+  ): Promise<PolicyChangeView> {
+    return this.request(
+      `/v1/admin/policy/changes/${encodeURIComponent(changeId)}/rollback`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
   }
 
   demoAutopsy(): Promise<Record<string, unknown>> {
