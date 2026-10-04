@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from clarity.ai.providers import VertexAIProvider
 from clarity.app.container import Clarity, Profile
 from clarity.app.settings import Settings, SettingsInvalid
 
@@ -72,6 +73,22 @@ def test_settings_are_passed_in_rather_than_read_from_the_process() -> None:
 
     assert clarity.settings.verify_base == "https://verify.example/v"
     assert clarity._verify_base == "https://verify.example/v"
+
+
+def test_vertex_settings_select_the_vertex_provider_without_authenticating() -> None:
+    settings = Settings(
+        CLARITY_VERTEX_PROJECT="synthetic-project",
+        CLARITY_VERTEX_LOCATION="global",
+        CLARITY_MODEL_NAME="gemini-test",
+        AI_PREFER_TEMPLATES=False,
+        _env_file=None,
+    )
+
+    clarity = Clarity(settings=settings)
+
+    assert isinstance(clarity._provider, VertexAIProvider)
+    assert "vertex" in clarity.roles.configured
+    assert "gemini" not in clarity.roles.configured
 
 
 def test_configured_signing_key_survives_a_restart(tmp_path) -> None:

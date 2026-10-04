@@ -27,6 +27,7 @@ from clarity.ai.gateway import (
 )
 from clarity.ai.guard import Guard
 from clarity.ai.local import LOCAL_IMPLEMENTATIONS
+from clarity.ai.providers import ProviderConfig, VertexAIProvider, provider_for
 from clarity.ai.roles import LOCAL_PROVIDERS, ModelCatalogue, ModelRole
 from clarity.ai.routing import RoleRouter
 from clarity.app.desk import ServiceCaseFixer, ServiceDeskCases
@@ -294,7 +295,8 @@ def _ai_providers(configured: ModelProvider | None, settings: Settings) -> dict[
     library = CassetteLibrary(settings.cassette_dir, recording=settings.record_cassettes)
     # One configured provider stands behind every remote name: the prototype
     # has a single endpoint, and the catalogue decides which role reaches it.
-    for remote in ("groq", "gemini"):
+    remote_names = ("vertex",) if isinstance(configured, VertexAIProvider) else ("groq", "gemini")
+    for remote in remote_names:
         providers[remote] = RecordedProvider(
             configured,
             library=library,
@@ -541,7 +543,24 @@ class Clarity:
         )
         self._verify_base = configured_verify_base
         self._daily_refund_limit_lkr = daily_refund_limit_lkr
-        self._provider = provider
+        configured_provider = provider
+        if configured_provider is None and self.settings.vertex_project:
+            configured_provider = VertexAIProvider(
+                project=self.settings.vertex_project,
+                location=self.settings.vertex_location,
+                model=self.settings.model_name,
+                timeout_seconds=self.settings.model_timeout_seconds,
+            )
+        if configured_provider is None:
+            configured_provider = provider_for(
+                ProviderConfig.of(
+                    base_url=self.settings.model_base_url,
+                    model=self.settings.model_name,
+                    api_key=self.settings.model_api_key,
+                    timeout_seconds=self.settings.model_timeout_seconds,
+                )
+            )
+        self._provider = configured_provider
         self.world, persist = _world_for_profile(self.profile, world, clock, self.settings)
         # Every module's state lives behind this seam (B02). The profile chooses
         # the driver; nothing in a module knows which one it got.
@@ -620,14 +639,17 @@ class Clarity:
         )
         # No model is configured by default: the gateway answers from
         # approved templates, which is the deck's "works without the LLM" path.
-        self.ai = AIGateway(provider=provider, prefer_templates=provider is None)
+        self.ai = AIGateway(
+            provider=self._provider,
+            prefer_templates=self.settings.prefer_templates or self._provider is None,
+        )
         # Roles, not models (A01, I12). The catalogue is the only place a model
         # ID appears; code asks for a role and this walks the chain it declares.
         self.models = ModelCatalogue.from_file(default_models_file(self.settings.models_file))
         self.ai_quotas = TokenBuckets()
         self.roles = RoleRouter(
             self.models,
-            providers=_ai_providers(provider, self.settings),
+            providers=_ai_providers(self._provider, self.settings),
             buckets=self.ai_quotas,
         )
         # Heuristics always; the guard role assists when a provider is set. It

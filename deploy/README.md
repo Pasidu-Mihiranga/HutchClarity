@@ -35,6 +35,15 @@ Application secrets remain in `/opt/hutch-clarity/.env.production` and CD never
 replaces that file. `SIGNING_KEY_PATH` points at a persistent volume. This is a
 development Ed25519 signer for synthetic receipts, not a KMS or HSM.
 
+Vertex AI is optional. Store its ADC file at
+`/opt/hutch-clarity/private/google-service-account.json` with mode `0600`; it is
+mounted read-only and is never uploaded by CD. Set `CLARITY_VERTEX_PROJECT`,
+`CLARITY_VERTEX_LOCATION`, `CLARITY_MODEL_NAME`,
+`GOOGLE_APPLICATION_CREDENTIALS=/run/clarity-private/google-service-account.json`
+and `AI_PREFER_TEMPLATES=false` in `.env.production`. Only masked synthetic
+content may be sent. For production, replace the key file with a federated or
+attached workload identity and least-privilege Vertex permissions.
+
 ## HTTPS
 
 After the stack answers with the temporary certificate, run

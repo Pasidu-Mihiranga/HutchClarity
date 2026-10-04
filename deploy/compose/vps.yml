@@ -116,7 +116,9 @@ services:
       keycloak: {condition: service_healthy}
       opa: {condition: service_healthy}
       hutch-sim: {condition: service_healthy}
-    volumes: [/opt/hutch-clarity/private/signing:/run/clarity-keys]
+    volumes:
+      - /opt/hutch-clarity/private/signing:/run/clarity-keys
+      - /opt/hutch-clarity/private/google-service-account.json:/run/clarity-private/google-service-account.json:ro
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
@@ -127,7 +129,9 @@ services:
     <<: *backend
     command: [uvicorn, clarity.entrypoints.mcp_asgi:app, --host, 0.0.0.0, --port, "8099"]
     depends_on: {clarity-api: {condition: service_healthy}}
-    volumes: [/opt/hutch-clarity/private/signing:/run/clarity-keys]
+    volumes:
+      - /opt/hutch-clarity/private/signing:/run/clarity-keys
+      - /opt/hutch-clarity/private/google-service-account.json:/run/clarity-private/google-service-account.json:ro
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8099/health', timeout=3)"]
       interval: 10s
@@ -138,7 +142,9 @@ services:
     <<: *backend
     command: [uvicorn, --app-dir, services/channel-gateway/src, main:app, --host, 0.0.0.0, --port, "8102"]
     depends_on: {clarity-api: {condition: service_healthy}}
-    volumes: [/opt/hutch-clarity/private/signing:/run/clarity-keys]
+    volumes:
+      - /opt/hutch-clarity/private/signing:/run/clarity-keys
+      - /opt/hutch-clarity/private/google-service-account.json:/run/clarity-private/google-service-account.json:ro
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/health', timeout=3)"]
       interval: 10s

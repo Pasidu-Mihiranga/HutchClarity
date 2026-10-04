@@ -1,11 +1,11 @@
 # Model roles → providers. Code requests roles; never hard-code model IDs.
-# Prototype: Groq for fast/extract/STT/TTS; Gemini for reason/judge/guard; local BGE for embed.
+# Prototype: Vertex AI for text roles; local deterministic fallbacks remain available.
 
 roles:
   fast-text:
     primary:
-      provider: groq
-      model: llama-3.3-70b-versatile
+      provider: vertex
+      model: gemini-2.5-flash
     fallback:
       - provider: gemini
         model: gemini-2.0-flash-lite
@@ -14,8 +14,8 @@ roles:
 
   extract:
     primary:
-      provider: groq
-      model: llama-3.3-70b-versatile
+      provider: vertex
+      model: gemini-2.5-flash
     fallback:
       - provider: gemini
         model: gemini-2.0-flash-lite
@@ -26,8 +26,8 @@ roles:
 
   reason:
     primary:
-      provider: gemini
-      model: gemini-2.0-flash
+      provider: vertex
+      model: gemini-2.5-flash
     fallback:
       - provider: groq
         model: openai/gpt-oss-120b
@@ -40,8 +40,8 @@ roles:
 
   judge:
     primary:
-      provider: gemini
-      model: gemini-2.0-flash
+      provider: vertex
+      model: gemini-2.5-flash
     fallback:
       - provider: groq
         model: openai/gpt-oss-120b
@@ -53,8 +53,8 @@ roles:
 
   guard:
     primary:
-      provider: gemini
-      model: gemini-2.0-flash-lite
+      provider: vertex
+      model: gemini-2.5-flash
     fallback:
       - provider: template
         model: local-guard-rules

@@ -60,6 +60,7 @@ flowchart LR
 | [A03](issues/A03-safety-pii-masking-coverage-per-language-and-the.md) | Safety: PII masking coverage per language and the guard role | `ai` | P0 | A01 |
 | [A04](issues/A04-mcp-server-over-the-network-sdk-streamable-http.md) | MCP server over the network: SDK, Streamable HTTP, OAuth 2.1 resource server, new tools | `interfaces.mcp` | P0 | M-IAM |
 | [A05](issues/A05-evaluation-harness-per-language-golden-sets-metr.md) | Evaluation harness: per-language golden sets, metrics and release gates | `ai` | P1 | A02 |
+| [VAI01](issues/VAI01-vertex-ai-provider.md) | Vertex AI provider with safe fallback | `ai` | P1 | A01, A02, A03 |
 
 ## W3 Knowledge, RAG and agentic assistant
 

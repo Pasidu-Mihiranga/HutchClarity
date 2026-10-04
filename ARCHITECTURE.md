@@ -102,7 +102,7 @@ Registry with status and next migration step: [docs/modules.md](docs/modules.md)
 | Signing key | `clarity-signer` with OpenBao/KMS | OpenBao Transit driver in full; rotatable dev key in lite; isolated render job | Service extraction remains R4 |
 | Front end | Next.js apps + shared packages (plan 19) | Next.js 14 apps in `frontend/` are the only UI; the FastAPI static UI is retired (FE01) | Next.js 16 once it passes the browser suite (ADR-0031) |
 | Demo deployment | Containers for the core, private infrastructure, HTTPS edges | One-VPS Compose deployment of the `full` profile: public customer, Desk and verifier origins; API, MCP, channel gateway, hutch-sim, PostgreSQL, Kafka, Keycloak and OPA remain internal | Hackathon topology only; HUTCH production platform remains unconfirmed |
-| Model | Roles with fallback chains; templates by default | Template tier only | R4 (ADR-0009 keeps templates as the default) |
+| Model | Roles with fallback chains; templates by default | Vertex AI is available for masked text roles through ADC; deterministic local fallbacks remain and templates are still the unconfigured default | R4 (ADR-0009 keeps templates as the default) |
 | Channels | Web, app, WhatsApp, SMS/USSD | Web plus template-only notification routing and a simulated dispatch driver; external channel gateway remains | N02 |
 | Proactive care | Stream detectors open zero-contact cases from system facts | Duplicate reload, FUP threshold and pack-end detectors publish `risk.detected`; duplicate reloads enter the existing resolution flow | Complete (P01); source interfaces require HUTCH confirmation |
 | Rules | 16 candidates | 10 | Remaining candidates need product/CX confirmation |

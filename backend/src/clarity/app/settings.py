@@ -148,6 +148,8 @@ class Settings(BaseSettings):
     model_name: str = Field(default="local-model", alias="CLARITY_MODEL_NAME")
     model_api_key: str | None = Field(default=None, alias="CLARITY_MODEL_API_KEY")
     model_timeout_seconds: float = Field(default=20.0, alias="CLARITY_MODEL_TIMEOUT", gt=0)
+    vertex_project: str | None = Field(default=None, alias="CLARITY_VERTEX_PROJECT")
+    vertex_location: str = Field(default="global", alias="CLARITY_VERTEX_LOCATION")
     prefer_templates: bool = Field(default=True, alias="AI_PREFER_TEMPLATES")
     cassette_dir: Path = Field(default=Path("cassettes"), alias="AI_CASSETTE_DIR")
     record_cassettes: bool = Field(

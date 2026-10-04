@@ -371,7 +371,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo install -d -m 0700 /opt/hutch-clarity/private/signing
-          sudo install -m 0600 /dev/null /opt/hutch-clarity/.env.production
+          sudo install -m 0644 /dev/null /opt/hutch-clarity/.env.production
           sudo tee /opt/hutch-clarity/.env.production >/dev/null <<'EOF'
           REGISTRY=ghcr.io/pasidu-mihiranga
           IMAGE_TAG=0123456789abcdef0123456789abcdef01234567

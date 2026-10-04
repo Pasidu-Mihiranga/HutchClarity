@@ -4,6 +4,11 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (VAI01, #61)
+
+- Added an ADC-authenticated Vertex AI provider for masked text roles with
+  measured token usage and deterministic fallback when it is not configured.
+
 ### Added (DEP01, CD01, #57, #58)
 
 - Added a private-network, single-VPS Compose deployment with persistent demo
