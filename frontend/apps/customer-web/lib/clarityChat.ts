@@ -24,7 +24,23 @@ export type ResultKind =
 
 export type ChatMessage =
   | { role: "user"; text: string }
-  | { role: "clarity"; kind: ResultKind };
+  /**
+   * `reply` is the server's composed answer for this turn.
+   *
+   * It was declared on `TurnResponse` and then dropped on the floor: the
+   * message carried only `kind`, so the card was all the customer ever saw.
+   * Everything the backend spends the orchestrator, K03 and both verifiers
+   * establishing about *what is said* - approved templates (I15), grounded
+   * quotes rendered verbatim, the verifier's substituted wording, the refusal
+   * text - applied to a string the browser threw away. The WhatsApp gateway
+   * returned it; the web app did not, so the same question answered in two
+   * channels gave the customer different things.
+   *
+   * It is per message, not on the shared state, because a transcript has to
+   * keep what was said two turns ago. Optional: a card pushed by a local
+   * action (a receipt, a success) has no turn behind it and no reply.
+   */
+  | { role: "clarity"; kind: ResultKind; reply?: string };
 
 export type Decision = {
   outcome: "AUTO_FIX" | "ONE_TAP_FIX" | "STAFF_APPROVAL" | "EXPLAIN_ONLY" | "HANDOFF";
@@ -450,24 +466,6 @@ export function chargeForIntent(intent: string, activity: ActivityRow[]): string
   if (intent === "twice" || intent === "missing") return pick((r) => r.type === "payment_captured");
   if (intent === "slow") return pick((r) => r.type === "fup_cap_reached" || r.type === "throttle_applied" || r.bucket === "usage");
   return pick((r) => ["charges", "reloads", "refunds"].includes(r.bucket ?? ""));
-}
-
-export function accountIntents(app: AppState): Record<string, boolean> {
-  const rows = app.activity || [];
-  const subs = app.subscriptions || [];
-  const pack = app.pack;
-  const payments = rows.filter((r) => r.type === "payment_captured");
-  const credits = rows.filter((r) => r.type === "balance_credited" && r.detail !== "clarity_refund");
-  const counts: Record<string, number> = {};
-  for (const p of payments) {
-    const k = String(p.amount_lkr ?? "");
-    counts[k] = (counts[k] ?? 0) + 1;
-  }
-  const twice = Object.values(counts).some((c) => c >= 2);
-  const missing = payments.some((p) => !credits.some((c) => String(c.amount_lkr) === String(p.amount_lkr)));
-  const sub = subs.some((s) => s.active && !s.consent) || rows.some((r) => r.type === "vas_charge");
-  const slow = (pack?.used_pct != null && pack.used_pct >= 80) || rows.some((r) => r.type === "fup_cap_reached" || r.type === "throttle_applied");
-  return { sub, twice, missing, slow, balance: true, knowledge: true };
 }
 
 export function pickResultKind(state: ClarityState): ResultKind {

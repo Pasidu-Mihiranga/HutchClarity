@@ -32,7 +32,6 @@ import {
   verifyReceipt,
   intentForQuestion,
   chargeForIntent,
-  accountIntents,
   pickResultKind,
   saveThread,
   loadThreads,
@@ -144,19 +143,10 @@ export default function ClarityPage() {
   const [cs, setCs] = useState<ClarityState>(makeInitialState);
   // The signed-in customer's own account, from `GET /v1/me/app`.
   //
-  // This used to be a hardcoded literal with `activity: []`, and it was never
-  // fetched: `const [app] = useState(...)` has no setter. `accountIntents(app)`
-  // reads exactly these fields to decide whether a question is worth
-  // evaluating, so with an empty activity list it answered `false` for
-  // `twice`, `slow`, `sub` and `missing` for every customer, forever. Only
-  // `balance` and `knowledge`, which are hardcoded `true`, ever got through.
-  // Three of the four demo journeys reached "Could not confirm" in the browser
-  // while the backend had a decision waiting (FE01, #28).
-  //
-  // The gate itself is still a client-side heuristic and still the wrong place
-  // for this: I1 says rules decide. It is kept here only because removing it
-  // is a larger change than this issue, and it is now fed real data instead of
-  // an empty literal, which is what made it wrong in practice.
+  // It feeds the turn's `snapshot` and the suggestion chips. It no longer
+  // decides anything: the eligibility heuristic that used to read these fields
+  // and gate the rule engine was removed in A2, so a stale or empty account can
+  // no longer suppress a decision the backend would have made.
   const [app, setApp] = useState<AppState>({});
   // A question asked before the account has loaded used to be answered from
   // an empty account: a customer under a fair-use cap was told they were not
@@ -271,6 +261,10 @@ export default function ClarityPage() {
       const account = appRef.current;
       const turn = await fetchTurn(typed, lang, intentOverride, facts, account, cs.caseId);
 
+      // The composed answer. Approved template or grounded quote, already
+      // through the verifier, and until now discarded (A1).
+      const reply = turn?.reply?.trim() || undefined;
+
       let clientIntent = turn?.client_intent ?? turn?.intake?.client_intent ?? intentForQuestion(questionKey, typed);
       const route = turn?.route ?? turn?.intake?.route ?? "account";
       const followUps: FollowUp[] = turn?.follow_ups ?? [];
@@ -302,7 +296,7 @@ export default function ClarityPage() {
           const msgs = s.messages.filter((m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")));
           return {
             ...s, ...update1, articles: arts, mode: "knowledge", intent: "knowledge",
-            messages: [...msgs, { role: "clarity", kind: "knowledge" as ResultKind }],
+            messages: [...msgs, { role: "clarity", kind: "knowledge" as ResultKind, reply }],
           };
         });
         setBusy(false);
@@ -311,7 +305,7 @@ export default function ClarityPage() {
 
       // handoff route
       if (route === "handoff" || clientIntent === "human") {
-        await runEvaluate("human", null, true, update1);
+        await runEvaluate("human", null, true, update1, reply);
         setBusy(false);
         return;
       }
@@ -358,7 +352,7 @@ export default function ClarityPage() {
       });
 
       const chargeRef = chargeForIntent(clientIntent, account.activity ?? []);
-      await runEvaluate(clientIntent, chargeRef, false, update1);
+      await runEvaluate(clientIntent, chargeRef, false, update1, reply);
     } catch (err) {
       console.error(err);
       setCs((s) => {
@@ -373,7 +367,8 @@ export default function ClarityPage() {
     clientIntent: string,
     chargeRef: string | null,
     wantsHuman: boolean,
-    patch: Partial<ClarityState>
+    patch: Partial<ClarityState>,
+    reply?: string
   ) {
     // step 1 - open case
     setCs((s) => ({ ...s, progressStep: 1 }));
@@ -396,9 +391,10 @@ export default function ClarityPage() {
     setCs((s) => {
       const kind = pickResultKind({ ...s, ...newState } as ClarityState);
       const msgs = s.messages.filter((m) => !(m.role === "clarity" && (m.kind === "thinking" || m.kind === "progress")));
-      const saved = saveThread({ ...s, ...newState, messages: [...msgs, { role: "clarity", kind }] });
+      const answered: ClarityState["messages"] = [...msgs, { role: "clarity", kind, reply }];
+      const saved = saveThread({ ...s, ...newState, messages: answered });
       void saved;
-      return { ...s, ...newState, messages: [...msgs, { role: "clarity", kind }] };
+      return { ...s, ...newState, messages: answered };
     });
   }
 
@@ -749,6 +745,26 @@ export default function ClarityPage() {
                           down the whole transcript, and a screen reader would
                           read it once per turn. */}
                       {isLast && cs.flow ? <FlowProgress flow={cs.flow} copy={flowCopy} /> : null}
+                      {/* What Clarity actually said. Kept on the message, so
+                          scrolling back still shows the answer rather than
+                          just the card it came with. */}
+                      {msg.reply ? (
+                        <div
+                          data-testid="clarity-reply"
+                          style={{
+                            background: "#fff",
+                            border: "1px solid var(--line)",
+                            borderRadius: "18px 18px 18px 4px",
+                            padding: "10px 16px",
+                            fontSize: 15,
+                            lineHeight: 1.5,
+                            color: "var(--ink)",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {msg.reply}
+                        </div>
+                      ) : null}
                       <ClarityMessageCard kind={msg.kind} state={cs} actions={cardActions} />
                       {isLast && cs.citations.length > 0 ? (
                         <Citations citations={cs.citations} copy={flowCopy} />
