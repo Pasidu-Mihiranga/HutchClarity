@@ -15,6 +15,9 @@
 - `e2e/session-expiry.spec.ts`: the refused-session test plants a bogus
   **cookie** instead of a `sessionStorage` key, and no longer asserts the app
   clears it.
+- `components/ConsoleNav.tsx`: the Foresight link is gated on `foresight:read`
+  and the Studio link on `config:draft`/`config:approve`, matching the pages.
+- `e2e/session.ts`: added the `CX` and `VAS Ops` logins, which did not exist.
 
 ## Why
 
@@ -24,15 +27,17 @@ later work deliberately removed, not regressions.
 
 **Foresight.** C4 gave foresight its own permissions and scoped
 `foresight:read` to `PRODUCT` and `CX_ENGINEER`. The spec signed in as
-Supervisor, who no longer holds it, and `ConsoleNav` gates the link on the same
-permission, so the link was not there to click. The spec also asserted a
-"Statistical baseline vs persona swarm" table that `GET /v1/demo/foresight`
-used to compose per request; D4 retired that route and the page now reads
-stored runs and reports.
+Supervisor, who no longer holds it, so the page answered "access denied" and
+the heading it waited for never appeared. The spec also asserted a "Statistical
+baseline vs persona swarm" table that `GET /v1/demo/foresight` used to compose
+per request; D4 retired that route and the page now reads stored runs and
+reports.
 
-`frontend/e2e/session.ts` already carried a `CX` login with a comment saying
-CX is the only synthetic account that can reach Foresight and Policy Studio.
-The helper had been updated and this spec had not.
+`config/staff/synthetic-directory.json` has a `cx` account with role
+`cx_engineer`, but `frontend/e2e/session.ts` had no label for it, so there was
+no way to sign in as the only role that can reach the page. Added, with the
+password verified against `POST /v1/auth/staff/login` rather than assumed from
+the naming convention.
 
 **Session expiry.** B4 moved the customer session into an `HttpOnly` cookie.
 The test planted `sessionStorage.clarity_token` and asserted the app cleared
@@ -57,9 +62,16 @@ with two.
   test pass by changing the permission model, which is the wrong direction.
   C4 separated these jobs on purpose: a supervisor approves money, rehearsing
   a change is product's work.
-- **Added the negative case.** A supervisor seeing a link that lands on a
-  refusal is a real defect, so the absence of the link is now asserted rather
-  than assumed.
+- **Added the negative case, and it found a real defect.** `ConsoleNav` gated
+  the Foresight link on `desk:queue:read` while the page requires
+  `foresight:read`, so every agent and supervisor was offered a link that lands
+  on "access denied". That is a gap D4 opened: the page's gate was changed and
+  the nav's was not. The Studio link had the same shape from D3, listing
+  `rule:publish`, which compliance holds while holding neither config
+  permission. Both now name exactly what their page checks.
+
+  This is why the assertion was worth adding rather than assuming: the first
+  version of this fix asserted the link was absent, and CI proved it was not.
 
 ## Docs updated
 
@@ -70,6 +82,12 @@ with two.
 ## Tests
 
 - `tsc --noEmit` on both spec files: clean.
+- `npm run build --workspace=apps/console`: clean.
+- `cx` and `vasops` sign-in verified against a local API on a spare port,
+  returning roles `cx_engineer` and `vas_ops`.
+- First CI run of this change: session-expiry fixed (41 passed, up from 40),
+  and the two foresight tests failed on the two facts above, both of which
+  were assumptions rather than things checked. Corrected here.
 - **The suite was not run locally.** `playwright.config.ts` starts the API on
   `127.0.0.1:8100`, and this machine's Windows reserved ranges cover
   8001-8100 and 8101-8200 (`netsh interface ipv4 show excludedportrange

@@ -16,11 +16,17 @@ const links = [
     anyOf: ["desk:queue:read"],
   },
   { href: "/autopsy", label: "Complaint Autopsy", anyOf: ["desk:queue:read"] },
-  { href: "/foresight", label: "Foresight", anyOf: ["desk:queue:read"] },
+  // `foresight:read`, which the page itself requires (C4). Gating the link on
+  // the desk's permission instead offered every agent and supervisor a link
+  // that lands on "access denied": the nav must promise what the page keeps.
+  { href: "/foresight", label: "Foresight", anyOf: ["foresight:read"] },
   {
+    // The same two the Policy Studio page and the governance routes check
+    // (D3). `rule:publish` was in here and is held by compliance, who holds
+    // neither config permission, so they were shown a link to a refusal.
     href: "/studio",
     label: "Studio",
-    anyOf: ["rule:draft", "rule:publish", "config:draft", "config:approve"],
+    anyOf: ["config:draft", "config:approve"],
   },
   {
     href: "/audit",

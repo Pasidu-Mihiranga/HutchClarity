@@ -54,10 +54,16 @@ test.describe("synthetic intelligence workspaces", () => {
     await expect(page.getByRole("heading", { name: "Rehearse a scenario" })).toBeVisible();
   });
 
-  test("a supervisor cannot reach Foresight", async ({ page }) => {
-    // The companion to the above: `foresight:read` is not the desk's
-    // permission, and the nav must not offer a link that lands on a refusal.
+  test("a supervisor is not offered Foresight", async ({ page }) => {
+    // The companion to the above, and it caught a real defect: `ConsoleNav`
+    // gated this link on `desk:queue:read` while the page requires
+    // `foresight:read`, so every agent and supervisor was offered a link that
+    // lands on "access denied". The nav must promise what the page keeps.
+    //
+    // The label is still rendered, greyed and unclickable, so this asserts
+    // there is no *link*.
     await expect(page.getByRole("link", { name: "Foresight", exact: true })).toHaveCount(0);
+    await expect(page.getByTitle("Your current role cannot access this").first()).toBeVisible();
   });
 
   test("a role without desk permission cannot use either workspace", async ({ page }) => {
