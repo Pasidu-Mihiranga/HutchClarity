@@ -209,8 +209,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install
+        # Into `.venv`, because Playwright starts the API through
+        # `make dev-e2e` and the Makefile runs `.venv/bin/uvicorn`. Installing
+        # into the runner's Python instead left that path missing and the
+        # web server failed to start with exit 127.
         run: |
-          pip install -e "backend[dev]"
+          make setup
           cd frontend && npm ci
       - name: The committed OpenAPI schema matches what the app serves
         run: cd backend && python scripts/export_openapi.py --check
@@ -271,8 +275,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
+        # Into `.venv`, because Playwright starts the API through
+        # `make dev-e2e` and the Makefile runs `.venv/bin/uvicorn`. Installing
+        # into the runner's Python instead left that path missing and the
+        # web server failed to start with exit 127.
         run: |
-          pip install -e "backend[dev]"
+          make setup
           cd frontend && npm ci
 
       - name: Install the browser
