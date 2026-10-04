@@ -377,7 +377,7 @@ export default function DeskPage() {
                       <ul className="mt-1 max-h-40 space-y-1 overflow-auto text-sm">
                         {timeline.events.slice(0, 12).map((ev, i) => (
                           <li key={`${ev.event_type}-${i}`} className="flex gap-2">
-                            <span className="font-mono text-xs text-fg-subtle">
+                            <span className="font-mono text-xs text-fg-muted">
                               {ev.source.replace(/_/g, " ")}
                             </span>
                             <span>

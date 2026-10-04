@@ -93,7 +93,7 @@ export function ConsoleNav() {
                   {link.label}
                 </Link>
               ) : (
-                <span className="block cursor-not-allowed rounded-full px-3 py-1.5 text-sm text-fg-subtle">
+                <span className="block cursor-not-allowed rounded-full px-3 py-1.5 text-sm text-fg-muted">
                   {link.label}
                   <span className="sr-only"> (not available for your role)</span>
                 </span>
@@ -102,7 +102,7 @@ export function ConsoleNav() {
           );
         })}
       </ul>
-      <p className="ml-auto hidden text-[11px] font-medium uppercase tracking-[0.14em] text-fg-subtle sm:block">
+      <p className="ml-auto hidden text-[11px] font-medium uppercase tracking-[0.14em] text-fg-muted sm:block">
         Synthetic records
       </p>
     </nav>

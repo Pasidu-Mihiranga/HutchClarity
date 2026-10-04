@@ -142,7 +142,7 @@ export function RoleSwitcherBar() {
                     onChange={(e) => setStepUpCode(e.target.value)}
                     className={fieldClass}
                   />
-                  <span id="staff-step-up-hint" className="mt-1 text-[11px] text-fg-subtle">
+                  <span id="staff-step-up-hint" className="mt-1 text-[11px] text-fg-muted">
                     Needed to approve above the cap
                   </span>
                 </div>

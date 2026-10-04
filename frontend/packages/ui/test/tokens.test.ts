@@ -32,6 +32,11 @@ function contrast(a: [number, number, number], b: [number, number, number]): num
 const themes = { light: palette(":root {"), dark: palette(':root[data-theme="dark"]') };
 
 // Every text-on-surface pairing the components use must clear WCAG AA (4.5:1).
+//
+// `fg-subtle` is deliberately absent: at 3.99:1 on white it is a token for
+// decoration (an `aria-hidden` glyph, a placeholder, a disabled icon) and not
+// for text. E2 used it for three small labels in the console and the axe run
+// in CI caught all three, which is the pairing this list is here to prevent.
 const pairs: Array<[string, string]> = [
   ["fg", "bg"],
   ["fg", "surface"],
