@@ -79,7 +79,7 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
   # One runner per image, in parallel: the release waits for the slowest image
-  # rather than the sum of all four. Each image keeps its own cache scope so
+  # rather than the sum of all five. Each image keeps its own cache scope so
   # the builds do not evict one another's layers.
   build:
     needs: release
@@ -101,6 +101,9 @@ jobs:
           - image: verify
             dockerfile: deploy/docker/Dockerfile.frontend
             app: verify
+          - image: whatsapp
+            dockerfile: deploy/docker/Dockerfile.whatsapp
+            app: ""
     steps:
       - uses: actions/checkout@v4
         with:

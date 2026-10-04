@@ -26,6 +26,11 @@ for url in (
     urllib.request.urlopen(url, timeout=5)
 PY
 
+if grep -q '^WHATSAPP_ENABLED=true$' "$root/.env.production"; then
+  "${compose[@]}" --profile whatsapp exec -T clarity-whatsapp node -e \
+    "fetch('http://127.0.0.1:8104/health').then(async r => { const body = await r.json(); if (!r.ok || !body.paired || !body.connected) process.exit(1) })"
+fi
+
 curl_flags=(--fail --silent --show-error --max-time 15)
 if [[ ${CLARITY_BOOTSTRAP_TLS:-0} == 1 ]]; then
   curl_flags+=(--insecure)
@@ -35,7 +40,7 @@ curl "${curl_flags[@]}" https://116.203.101.73/health | grep -q '"status":"ok"'
 curl "${curl_flags[@]}" https://116.203.101.73:8443/ >/dev/null
 curl "${curl_flags[@]}" https://116.203.101.73:9443/ >/dev/null
 
-for port in 5432 9092 8081 8181 8200 8000 8099 8102 8103 3000 3001 3002; do
+for port in 5432 9092 8081 8181 8200 8000 8099 8102 8103 8104 3000 3001 3002; do
   if ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$port$"; then
     echo "internal port $port is publicly bound" >&2
     exit 1

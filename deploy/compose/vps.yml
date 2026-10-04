@@ -171,6 +171,30 @@ services:
       timeout: 5s
       retries: 20
 
+  clarity-whatsapp:
+    image: ${REGISTRY}/hutch-clarity-whatsapp:${IMAGE_TAG}
+    profiles: [whatsapp]
+    env_file: /opt/hutch-clarity/.env.production
+    environment:
+      WHATSAPP_AUTH_DIR: /var/lib/clarity-whatsapp/auth
+      WHATSAPP_GATEWAY_URL: http://clarity-channel-gateway:8102/webhooks/whatsapp
+      WHATSAPP_HEALTH_PORT: "8104"
+    restart: unless-stopped
+    depends_on: {clarity-channel-gateway: {condition: service_healthy}}
+    volumes: [whatsapp_auth:/var/lib/clarity-whatsapp]
+    networks: [clarity-private]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 384m
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8104/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      start_period: 30s
+      start_interval: 2s
+      timeout: 5s
+      retries: 20
+
   customer-web:
     <<: *frontend
     image: ${REGISTRY}/hutch-clarity-customer:${IMAGE_TAG}
@@ -212,3 +236,4 @@ volumes:
   postgres_data:
   kafka_data:
   keycloak_data:
+  whatsapp_auth:
