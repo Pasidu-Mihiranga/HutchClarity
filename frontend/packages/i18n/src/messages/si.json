@@ -45,5 +45,9 @@
   "refused.body": "එයට ආරක්ෂිතව පිළිතුරු දිය නොහැකි විය, එබැවින් මම අනුමාන කළේ නැත. නිලධාරියෙකු උදව් කළ හැකිය.",
   "receipt.cta": "රිසිට්පත බලන්න",
   "flow.step": "පියවර {position} / {total}",
-  "chat.transcript": "Clarity සමඟ සංවාදය"
+  "chat.transcript": "Clarity සමඟ සංවාදය",
+  "wait.thinking": "සිතමින්",
+  "wait.searching": "සොයමින්",
+  "wait.analyzing": "විශ්ලේෂණය කරමින්",
+  "wait.composing": "පිළිතුර සකසමින්"
 }

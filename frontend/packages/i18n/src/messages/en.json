@@ -45,5 +45,9 @@
   "refused.body": "I could not answer that safely, so I have not guessed. A person can help.",
   "receipt.cta": "See the receipt",
   "flow.step": "Step {position} of {total}",
-  "chat.transcript": "Conversation with Clarity"
+  "chat.transcript": "Conversation with Clarity",
+  "wait.thinking": "Thinking",
+  "wait.searching": "Searching",
+  "wait.analyzing": "Analyzing",
+  "wait.composing": "Composing"
 }

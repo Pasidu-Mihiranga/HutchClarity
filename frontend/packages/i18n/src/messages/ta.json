@@ -45,5 +45,9 @@
   "refused.body": "அதற்குப் பாதுகாப்பாகப் பதிலளிக்க முடியவில்லை, எனவே ஊகிக்கவில்லை. ஒருவர் உதவ முடியும்.",
   "receipt.cta": "பற்றுச்சீட்டைப் பார்",
   "flow.step": "படி {position} / {total}",
-  "chat.transcript": "Clarity உடனான உரையாடல்"
+  "chat.transcript": "Clarity உடனான உரையாடல்",
+  "wait.thinking": "யோசிக்கிறது",
+  "wait.searching": "தேடுகிறது",
+  "wait.analyzing": "பகுப்பாய்வு செய்கிறது",
+  "wait.composing": "பதில் தயாராகிறது"
 }

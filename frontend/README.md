@@ -66,6 +66,7 @@ npm run dev -w @clarity/customer-web
 - `/case/[id]` - case detail
 - `/receipt/[id]` - receipt view
 - `app/manifest.ts` - PWA basics
+- `/clarity` waiting state - `components/ui/thinking-orb.tsx`: dotted canvas orb with rotating, localised status labels while a turn is pending, and the real check steps during account checks (`e2e/thinking-orb.spec.ts`)
 
 **console**
 

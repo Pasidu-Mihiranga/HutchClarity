@@ -513,9 +513,6 @@ export default function ClarityPage() {
 
   return (
     <>
-      {/* bouncing dots keyframe */}
-      <style>{`@keyframes ccBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
-
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: "#fafafa" }}>
 
         {/* ── Header ── */}
