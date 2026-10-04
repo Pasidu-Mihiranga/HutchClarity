@@ -39,17 +39,27 @@ test.describe("sign in", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/login/);
     expect(
-      await page.evaluate(() => window.sessionStorage.getItem("clarity_token")),
-      "a refused sign-in stored a session anyway",
-    ).toBeFalsy();
+      (await page.context().cookies()).find((c) => c.name === "clarity_customer_session"),
+      "a refused sign-in set a session cookie anyway",
+    ).toBeUndefined();
 
     // The real code, on the same challenge, signs in.
     await page.getByLabel("6-digit code").fill(code);
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL(/\/(account|clarity|cases)?$/);
-    const token = await page.evaluate(() => window.sessionStorage.getItem("clarity_token"));
-    expect(token, "no session was stored").toBeTruthy();
-    expect(token).not.toBe("demo-token");
+    // B4 moved the session to an `HttpOnly` cookie. This used to assert the
+    // token was in `sessionStorage`, which is now exactly the thing that must
+    // not be true: a token any script on the page can read is the credential
+    // that opens a dispute and confirms a refund.
+    const session = (await page.context().cookies()).find(
+      (c) => c.name === "clarity_customer_session",
+    );
+    expect(session, "no session cookie was set").toBeTruthy();
+    expect(session?.httpOnly, "the session cookie must not be readable by a script").toBe(true);
+    expect(
+      await page.evaluate(() => window.sessionStorage.getItem("clarity_token")),
+      "the token must not also be left where a script can read it",
+    ).toBeNull();
   });
 });

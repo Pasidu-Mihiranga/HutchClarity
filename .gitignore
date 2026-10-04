@@ -28,6 +28,9 @@ backend/.eval/
 
 # Deterministic DATA01 exports; regenerate with `make synthetic-data`.
 .generated/
+# The browser suite's policy copy, built by `make dev-e2e` from the committed
+# one. Generated, so it is never reviewed and never drifts from its source.
+backend/.e2e-policy/
 
 # ZAP scan output. `.zap/rules.tsv` is source and is committed; the report and
 # the generated plan are artefacts of a run.
