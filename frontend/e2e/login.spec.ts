@@ -82,8 +82,14 @@ test.describe("sign in", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL(/\/(account|clarity|cases)?$/);
-    const token = await page.evaluate(() => window.sessionStorage.getItem("clarity_token"));
-    expect(token, "no session was stored").toBeTruthy();
-    expect(token).not.toBe("demo-token");
+    const session = (await page.context().cookies()).find(
+      (cookie) => cookie.name === "clarity_customer_session",
+    );
+    expect(session, "no customer session cookie was stored").toBeTruthy();
+    expect(session?.httpOnly, "the customer session must not be readable by page scripts").toBe(
+      true,
+    );
+    const exposed = await page.evaluate(() => window.sessionStorage.getItem("clarity_token"));
+    expect(exposed, "the session token was exposed to page scripts").toBeNull();
   });
 });

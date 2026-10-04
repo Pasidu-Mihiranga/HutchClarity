@@ -16,15 +16,20 @@ test.describe("session expiry", () => {
     await expect(page).toHaveURL(/\/login\?next=%2Fclarity$/);
   });
 
-  test("a refused token is cleared and the customer is sent to sign in", async ({ page }) => {
-    // Set once, not with `signedIn`: its init script would put the token back
-    // on every navigation, including the one to /login.
-    await page.goto("/login");
-    await page.evaluate(() => window.sessionStorage.setItem("clarity_token", "not-a-token-this-server-issued"));
+  test("a refused session sends the customer to sign in", async ({ page }) => {
+    await page.context().addCookies([
+      {
+        name: "clarity_customer_session",
+        value: "not-a-token-this-server-issued",
+        domain: "127.0.0.1",
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+    ]);
     await page.goto("/clarity");
 
     await expect(page).toHaveURL(/\/login\?next=%2Fclarity$/);
-    expect(await page.evaluate(() => window.sessionStorage.getItem("clarity_token"))).toBeNull();
   });
 
   test("a valid session stays on the chat", async ({ page, request }) => {

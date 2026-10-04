@@ -33,6 +33,7 @@ export const E2E_CSRF = "e2e-csrf-token";
 
 
 const cached = new Map<string, string>();
+const staffTokens = new Map<string, string>();
 
 /**
  * Mint a customer token through the API, once per subscriber per worker.
@@ -152,6 +153,10 @@ export async function staffToken(
   roles: string[],
   stepUp = false,
 ): Promise<string> {
+  const cacheKey = `${userRef}:${stepUp ? "mfa" : "single"}`;
+  const hit = staffTokens.get(cacheKey);
+  if (hit) return hit;
+
   const account = LOGIN_BY_REF[userRef];
   if (!account) {
     throw new Error(`no synthetic login for ${userRef}`);
@@ -168,6 +173,7 @@ export async function staffToken(
   }
   const body = (await session.json()) as { token: string; roles: string[] };
   expect(body.roles).toEqual(expect.arrayContaining(roles));
+  staffTokens.set(cacheKey, body.token);
   return body.token;
 }
 
@@ -177,6 +183,24 @@ export async function signInOnDesk(
   roleLabel: string,
   stepUp = true,
 ): Promise<void> {
+  const cacheKey = `${roleLabel}:${stepUp ? "mfa" : "single"}`;
+  const cachedToken = staffTokens.get(cacheKey);
+  if (cachedToken) {
+    await page.evaluate(
+      ({ key, token }) => window.sessionStorage.setItem(key, token),
+      { key: "clarity_console_staff_v2", token: cachedToken },
+    );
+    await page.reload();
+    if (await page.getByRole("button", { name: "Sign out" }).isVisible({ timeout: 2_000 }).catch(() => false)) {
+      return;
+    }
+    // Sessions can be revoked or rotated by an earlier journey. A cached
+    // credential is only an optimisation; fall back to the real form when the
+    // API no longer accepts it rather than turning that lifecycle into a
+    // browser-suite failure.
+    staffTokens.delete(cacheKey);
+  }
+
   const account = LOGIN_BY_LABEL[roleLabel];
   if (!account) {
     throw new Error(`no synthetic login for ${roleLabel}`);
@@ -197,6 +221,11 @@ export async function signInOnDesk(
   // next call could look for "Sign out" before the sign-in had landed, skip
   // signing out, and then wait for a login form that is no longer there.
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  const token = await page.evaluate(() =>
+    window.sessionStorage.getItem("clarity_console_staff_v2"),
+  );
+  if (!token) throw new Error(`staff login for ${roleLabel} did not persist a session`);
+  staffTokens.set(cacheKey, token);
 }
 
 type OpenedCase = { caseId: string; outcome: string };
