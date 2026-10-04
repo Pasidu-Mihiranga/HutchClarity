@@ -106,6 +106,9 @@ class AuditEventType(StrEnum):
     ACCESS_DENIED = "access.denied"
     """A signed-in caller was refused (403): who, what route, and why."""
 
+    CHECKPOINT_ISSUED = "checkpoint.issued"
+    """The head was signed with the checkpoint key (Phase 2, ADR-0035)."""
+
     REQUEST_PERFORMED = "request.performed"
     """A state-changing request reached its route: who made it, with which
     session, on which route and case, and the status it got. Domain events say
@@ -245,6 +248,7 @@ class AuditLedger:
     ) -> None:
         self._open_unit = open_unit or _private_store()
         self._clock = clock or utc_now
+        self._after_append: list[Callable[[AuditRecord], object]] = []
         # Serialises appends inside one process, so the common case never
         # needs the retry. Across processes the head pointer does that job.
         self._lock = threading.Lock()
@@ -262,27 +266,47 @@ class AuditLedger:
         actor_kind: ActorKind = ActorKind.SYSTEM,
         session_ref: str | None = None,
     ) -> AuditRecord:
-        """Add a record. The payload is hashed, not stored in the clear."""
+        """Add a record. The payload is hashed, not stored in the clear.
+
+        Hooks run after the lock is released, so a hook may append (a
+        checkpoint records itself) without deadlocking.
+        """
         detail = hashable(detail or {})
         payload_hash = hash_payload(hashable(payload))
         detail_hash = hash_payload(detail)
         occurred_at = now or self._clock()
 
+        record = self._append_with_retry(
+            event_type=event_type,
+            actor_ref=actor_ref,
+            actor_kind=actor_kind,
+            session_ref=session_ref,
+            object_ref=object_ref,
+            case_id=case_id,
+            payload_hash=payload_hash,
+            detail=detail,
+            detail_hash=detail_hash,
+            occurred_at=occurred_at,
+        )
+        for hook in list(self._after_append):
+            hook(record)
+        return record
+
+    def after_append(self, hook: Callable[[AuditRecord], object]) -> None:
+        """Run ``hook`` after every append, such as a checkpoint schedule."""
+        self._after_append.append(hook)
+
+    @property
+    def open_unit(self) -> UnitOfWorkFactory:
+        """The store the trail lives in, for state that must live beside it."""
+        return self._open_unit
+
+    def _append_with_retry(self, **fields: Any) -> AuditRecord:
+        event_type: AuditEventType = fields["event_type"]
         with self._lock:
             for _ in range(_APPEND_ATTEMPTS):
                 try:
-                    return self._append_once(
-                        event_type=event_type,
-                        actor_ref=actor_ref,
-                        actor_kind=actor_kind,
-                        session_ref=session_ref,
-                        object_ref=object_ref,
-                        case_id=case_id,
-                        payload_hash=payload_hash,
-                        detail=detail,
-                        detail_hash=detail_hash,
-                        occurred_at=occurred_at,
-                    )
+                    return self._append_once(**fields)
                 except ConcurrentUpdate:
                     # Another process took this sequence number. Read the new
                     # head and try again; the chain stays one line.

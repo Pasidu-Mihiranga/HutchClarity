@@ -1,0 +1,22 @@
+# Audit assurance parameters (docs/audit-assurance-plan.md, ADR-0035).
+# ASSUMPTION - REQUIRES HUTCH VALIDATION: the values trade one signature per
+# checkpoint against how many records an undetected truncation could remove.
+
+keys:
+  - key: audit.checkpoint.every_records
+    kind: number
+    owner_role: compliance
+    tags: [operational]
+    description: Audit records between signed checkpoints.
+    values:
+      - value: "50"
+        version: 1
+
+  - key: audit.checkpoint.max_age
+    kind: duration
+    owner_role: compliance
+    tags: [operational]
+    description: Longest time new audit records may go without a signed checkpoint.
+    values:
+      - value: PT15M
+        version: 1

@@ -4,6 +4,27 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added (audit assurance Phase 2, ADR-0035)
+
+- **Signed audit checkpoints.** `clarity.platform.audit.checkpoints`:
+  `Checkpointer`, `Checkpoint`, `CheckpointVerification`, `statement_hash`,
+  `signature_valid`, `checkpoint_document`. Signed with a key separate from the
+  receipt key. Verification reports a trail cut below a checkpoint with the
+  exact `seq` range lost.
+- **New public route** `GET /.well-known/clarity-audit-checkpoint.json`: the
+  latest checkpoint with its public key, for anyone to keep as a witness. OpenAPI
+  snapshot regenerated on purpose; SDK types regenerated.
+- Policy keys `audit.checkpoint.every_records` and `audit.checkpoint.max_age`
+  (`config/policy/audit.yaml`). Audit event type `checkpoint.issued`.
+- Setting `CLARITY_AUDIT_SIGNER_KEY_NAME`. `Clarity(audit_checkpoints=...)`;
+  `reset()` carries the checkpointer with the trail.
+- `AuditLedger.after_append(hook)` and `AuditLedger.open_unit`.
+
+### Changed (audit assurance Phase 2)
+
+- Startup verification checks the trail against its signed checkpoints, not
+  only its chain, and `ledger.opened` records the result.
+
 ### Added (audit assurance W2)
 
 - Identity and access events in the audit trail: `otp.requested` (with its

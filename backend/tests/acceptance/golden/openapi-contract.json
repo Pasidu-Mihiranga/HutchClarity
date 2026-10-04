@@ -1,5 +1,11 @@
 {
   "operations": {
+    "GET /.well-known/clarity-audit-checkpoint.json": {
+      "parameters": [],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /.well-known/clarity-keys.json": {
       "parameters": [],
       "request": null,

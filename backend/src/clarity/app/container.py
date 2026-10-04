@@ -8,12 +8,13 @@ graph with a different world or a frozen clock.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from pydantic import TypeAdapter
 from sqlalchemy import create_engine
 
 from clarity.ai.buckets import TokenBuckets
@@ -116,6 +117,7 @@ from clarity.modules.receipts.public import (
 from clarity.modules.reconciliation.public import ReconciliationService
 from clarity.modules.resolution.public import ResolutionService
 from clarity.modules.timeline.public import TimelineBuilder
+from clarity.platform.audit.checkpoints import Checkpointer, CheckpointSigner
 from clarity.platform.audit.ledger import (
     ActorKind,
     AuditEventType,
@@ -525,6 +527,9 @@ AUDIT_TYPE_FOR_EVENT: dict[EventType, AuditEventType] = {
     EventType.RULE_PUBLISHED: AuditEventType.RULE_PUBLISHED,
 }
 
+#: ISO 8601 durations from the policy store, such as ``PT15M``.
+_DURATION: TypeAdapter[timedelta] = TypeAdapter(timedelta)
+
 #: Keys in an event's data that name the object it is about, most specific first.
 _OBJECT_KEYS = ("receipt_id", "plan_id", "decision_id", "action_id", "case_id", "rule_id")
 
@@ -549,6 +554,7 @@ class Clarity:
         otp: OtpService | None = None,
         settings: Settings | None = None,
         audit: AuditLedger | None = None,
+        audit_checkpoints: Checkpointer | None = None,
     ) -> None:
         # The only place this process reads its environment (B07, I20). Tests
         # pass a Settings instance instead of setting variables.
@@ -604,7 +610,6 @@ class Clarity:
             self.open_unit,
             clock=(lambda: clock) if clock is not None else None,
         )
-        self._open_audit_trail()
         # Identity is not demo data: a reset of the synthetic world must not
         # sign everyone out mid-demonstration, so these carry over.
         self.tokens = tokens or TokenIssuer(open_unit=self.open_unit)
@@ -672,6 +677,10 @@ class Clarity:
         self.policies = PolicyResolver.from_directory(
             policy_dir or default_policy_dir(self.settings.policy_dir)
         )
+        # Signed checkpoints (ADR-0035), with their own key. Carried across a
+        # reset with the trail: a new key would fail every earlier checkpoint.
+        self.audit_checkpoints = audit_checkpoints or self._new_checkpointer(clock)
+        self._open_audit_trail()
         self.switches = SwitchBoard(audit_sink=self.audit)
         # Messaging: the bus, the relay that drains the outbox onto it, and the
         # consumer framework that wraps each handler in deduplication, backoff
@@ -884,6 +893,49 @@ class Clarity:
         if payload.corpus_version:
             self.answers.on_knowledge_published(payload.corpus_version)
 
+    def _audit_signer(self) -> CheckpointSigner:
+        """The checkpoint key: OpenBao when configured, else a local key.
+
+        A separate key from the receipts' (ADR-0035). In ``full`` without
+        OpenBao the key lives in ``KEYS_DIR`` so checkpoints still verify after
+        a restart; in ``demo`` the trail itself is in memory, so the key is too.
+        """
+        if self.settings.signer_url:
+            return OpenBaoSigningService(
+                self.settings.signer_url,
+                key_name=self.settings.audit_signer_key_name,
+                token=self.settings.signer_token or "",
+                mount=self.settings.signer_mount,
+                namespace=self.settings.signer_namespace,
+                timeout_seconds=self.settings.signer_timeout_seconds,
+            )
+        key_path = (
+            self.settings.keys_dir / "audit-checkpoint-ed25519.pem"
+            if self.profile is Profile.FULL
+            else None
+        )
+        return DevSigningService(kid="clarity-audit-dev-2027-01", key_path=key_path)
+
+    def _new_checkpointer(self, clock: datetime | None) -> Checkpointer:
+        def now() -> datetime:
+            return clock or datetime.now(tz=UTC)
+
+        checkpointer = Checkpointer(
+            self.audit,
+            self._audit_signer(),
+            self.audit.open_unit,
+            # Resolved when they apply, from the policy store (I10).
+            every_records=lambda: int(
+                self.policies.resolve("audit.checkpoint.every_records", as_of=now())
+            ),
+            max_age=lambda: _DURATION.validate_python(
+                str(self.policies.resolve("audit.checkpoint.max_age", as_of=now()))
+            ),
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        self.audit.after_append(lambda _record: checkpointer.maybe_checkpoint())
+        return checkpointer
+
     def _open_audit_trail(self) -> None:
         """Verify the trail before serving, and record that this process opened it.
 
@@ -891,7 +943,7 @@ class Clarity:
         Signed checkpoints, which also catch a rewound head, come in Phase 2 of
         the audit assurance plan.
         """
-        result = self.audit.verify()
+        result = self.audit_checkpoints.verify()
         break_glass = self.settings.audit_break_glass
         if not result.intact and not break_glass:
             raise AuditChainBroken(
@@ -909,6 +961,9 @@ class Clarity:
                 "length": result.length,
                 "broken_at": result.broken_at,
                 "reason": result.reason,
+                "checkpoints": result.checkpoints,
+                "lost_from": result.lost_from,
+                "lost_to": result.lost_to,
                 "break_glass": break_glass and not result.intact,
             },
         )
@@ -1078,6 +1133,7 @@ class Clarity:
                 tokens=self.tokens,
                 otp=self.otp,
                 audit=self.audit,
+                audit_checkpoints=self.audit_checkpoints,
             )
         return Clarity(
             rules_dir=self._rules_dir,
@@ -1092,4 +1148,5 @@ class Clarity:
             tokens=self.tokens,
             otp=self.otp,
             audit=self.audit,
+            audit_checkpoints=self.audit_checkpoints,
         )

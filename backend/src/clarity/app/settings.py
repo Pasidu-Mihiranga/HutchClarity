@@ -118,6 +118,14 @@ class Settings(BaseSettings):
     signer_url: str | None = Field(default=None, alias="CLARITY_SIGNER_URL")
     signer_token: str | None = Field(default=None, alias="CLARITY_SIGNER_TOKEN")
     signer_key_name: str = Field(default="clarity-receipts", alias="CLARITY_SIGNER_KEY_NAME")
+    audit_signer_key_name: str = Field(
+        default="clarity-audit-checkpoints",
+        alias="CLARITY_AUDIT_SIGNER_KEY_NAME",
+        description=(
+            "OpenBao Transit key that signs audit checkpoints (ADR-0035). Separate "
+            "from the receipt key, so a compromise of one cannot forge the other."
+        ),
+    )
     signer_mount: str = Field(default="transit", alias="CLARITY_SIGNER_MOUNT")
     signer_namespace: str | None = Field(default=None, alias="CLARITY_SIGNER_NAMESPACE")
     signer_timeout_seconds: float = Field(default=3.0, alias="CLARITY_SIGNER_TIMEOUT", gt=0)

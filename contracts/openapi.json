@@ -1383,6 +1383,30 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/.well-known/clarity-audit-checkpoint.json": {
+      "get": {
+        "description": "The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).\n\nPublic on purpose. A copy held outside the database is what catches an\ninsider who rewrites the trail *and* deletes the stored checkpoints:\ntheir trail will no longer reach this ``seq`` with this head. It holds\na sequence number, two hashes, a time and a signature, nothing personal.",
+        "operationId": "audit_checkpoint__well_known_clarity_audit_checkpoint_json_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Checkpoint  Well Known Clarity Audit Checkpoint Json Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Audit Checkpoint",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/.well-known/clarity-keys.json": {
       "get": {
         "description": "Public keys anyone can verify a receipt with (plan \u00a715.2).",

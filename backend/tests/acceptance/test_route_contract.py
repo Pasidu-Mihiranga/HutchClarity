@@ -36,6 +36,9 @@ PUBLIC = {
     ("GET", "/openapi.json"),
     ("GET", "/health"),
     ("GET", "/.well-known/clarity-keys.json"),
+    # The latest signed audit checkpoint: hashes and a signature, for anyone
+    # to keep as a witness (ADR-0035).
+    ("GET", "/.well-known/clarity-audit-checkpoint.json"),
     ("GET", "/.well-known/jwks.json"),
     ("POST", "/v1/auth/otp/request"),
     ("POST", "/v1/auth/otp/verify"),

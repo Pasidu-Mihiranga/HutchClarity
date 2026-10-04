@@ -2,7 +2,7 @@
 
 > **Audience:** contributors (human and AI agents). Read [AGENTS.md](../AGENTS.md) first; this plan does not relax any invariant in AGENTS.md §3.
 >
-> **Status:** In progress. Phase 0 (first two ADRs) and Phase 1 (W0, W1, W2) landed 2026-10-04; Phase 2 is next. **Created:** 2026-10-04. **Revision:** 4.
+> **Status:** In progress. Phase 0 (first two ADRs), Phase 1 and the core of Phase 2 landed 2026-10-04; Phase 3 is next. **Created:** 2026-10-04. **Revision:** 5.
 >
 > **Constraint set by the maintainer:** enterprise-grade recoverability, accountability and security, **with no new infrastructure**. Everything here runs in the `lite` profile (Python only, ADR-0027) and uses only what the `full` profile already has (PostgreSQL with a schema and role per module, OpenBao). Audit access is governed by Clarity's own authorization layer and can be granted to named staff or to roles.
 
@@ -302,7 +302,7 @@ Updated as work proceeds. Checkbox states are the source of truth.
 
 - [x] ADR: audit record hash version 2 covers the whole record ([ADR-0033](adr/0033-audit-record-hash-covers-the-whole-record.md))
 - [x] ADR: one trail through the outbox; state changes fail closed without an audit record ([ADR-0034](adr/0034-one-persisted-audit-trail.md))
-- [ ] ADR: signed checkpoints with a dedicated key; anchoring by cross-anchor and witness, no WORM storage
+- [x] ADR: signed checkpoints with a dedicated key; anchoring by witness, no WORM storage ([ADR-0035](adr/0035-signed-audit-checkpoints-with-a-separate-key.md))
 - [ ] ADR: audit access as time-boxed grants under separation of duties
 - [ ] ADR: retention, archival, legal hold and erasure for the audit trail
 - [ ] Record RPO, RTO and retention, or mark them **REQUIRES HUTCH CONFIRMATION** with a stated interim value
@@ -333,12 +333,13 @@ ADR numbers are assigned when each is written. Check `docs/adr/` first: `plan.md
 
 ### Phase 2: Tamper resistance
 
-- [ ] Dedicated checkpoint key; `kid` rotation; retired public keys stay published
-- [ ] Signed checkpoints every N records or T minutes (policy store)
-- [ ] Cross-anchor the head into the receipt chain
-- [ ] Public endpoint for the latest checkpoint
-- [ ] Incremental verification from the last checkpoint; scheduled full verification; verification runs audited
-- [ ] Keyed payload hashes; test rejecting raw MSISDN patterns in payloads
+- [x] Dedicated checkpoint key (`CLARITY_AUDIT_SIGNER_KEY_NAME`, or a local key in `KEYS_DIR`); `kid` rotation; retired public keys stay valid
+- [x] Signed checkpoints every N records or T minutes (`config/policy/audit.yaml`: 50, PT15M); each recorded as `checkpoint.issued`; startup verifies against them
+- [ ] Cross-anchor the head into the receipt chain. **Deferred** (ADR-0035): it changes the signed receipt payload, a receipt contract change with its own review; the public witness gives an external copy meanwhile
+- [x] Public endpoint for the latest checkpoint: `GET /.well-known/clarity-audit-checkpoint.json`; `verify(witness=...)` uses a saved copy
+- [ ] Incremental verification from the last checkpoint; scheduled full verification. **Deferred**: verification still walks the whole chain (correct, slower at volume). Startup verification is recorded in `ledger.opened`
+- [ ] Keyed payload hashes. **Deferred** pending where the HMAC key lives and how it rotates
+- [x] A test that no form of a customer's number reaches the trail (W2, `test_no_raw_phone_number_reaches_the_trail`)
 
 | # | Given | When | Then |
 |---|---|---|---|

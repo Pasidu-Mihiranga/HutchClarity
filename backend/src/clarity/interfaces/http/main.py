@@ -92,6 +92,7 @@ from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
 from clarity.modules.iam.public import OtpRefused, SimulatedInbox, TokenInvalid
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
+from clarity.platform.audit.checkpoints import checkpoint_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType
 from clarity.platform.config.artefacts import PolicyValue, Scope
 from clarity.platform.config.switches import Switch
@@ -543,6 +544,20 @@ def _register_routes(app: FastAPI) -> None:
     def public_keys(clarity: ClarityDep) -> dict[str, Any]:
         """Public keys anyone can verify a receipt with (plan §15.2)."""
         return {"keys": clarity.signing.public_keys(), "alg": "Ed25519"}
+
+    @app.get("/.well-known/clarity-audit-checkpoint.json", tags=["audit"])
+    def audit_checkpoint(clarity: ClarityDep) -> dict[str, Any]:
+        """The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).
+
+        Public on purpose. A copy held outside the database is what catches an
+        insider who rewrites the trail *and* deletes the stored checkpoints:
+        their trail will no longer reach this ``seq`` with this head. It holds
+        a sequence number, two hashes, a time and a signature, nothing personal.
+        """
+        latest = clarity.audit_checkpoints.latest()
+        if latest is None:
+            raise HTTPException(status_code=404, detail="no audit checkpoint has been issued yet")
+        return checkpoint_document(latest, clarity.audit_checkpoints.public_keys())
 
     @app.post("/v1/demo/reset", tags=["demo"], dependencies=[Depends(demo_only)])
     def demo_reset() -> dict[str, Any]:

@@ -4,6 +4,31 @@
  */
 
 export interface paths {
+    "/.well-known/clarity-audit-checkpoint.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Checkpoint
+         * @description The latest signed audit checkpoint, for anyone to fetch and keep (ADR-0035).
+         *
+         *     Public on purpose. A copy held outside the database is what catches an
+         *     insider who rewrites the trail *and* deletes the stored checkpoints:
+         *     their trail will no longer reach this ``seq`` with this head. It holds
+         *     a sequence number, two hashes, a time and a signature, nothing personal.
+         */
+        get: operations["audit_checkpoint__well_known_clarity_audit_checkpoint_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/clarity-keys.json": {
         parameters: {
             query?: never;
@@ -1632,6 +1657,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_checkpoint__well_known_clarity_audit_checkpoint_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     public_keys__well_known_clarity_keys_json_get: {
         parameters: {
             query?: never;
