@@ -47,8 +47,8 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 | 6 | Sign in as `security` / `security-clarity` | Admin | GET switches | Can read switches; flip returns 403 (no `flags:kill_switch`) |
 | 7 | Sign in as `vasops` / `vasops-clarity` with step-up → Suspend GameZone | Desk card | `POST /v1/admin/merchants/suspend` | Simulated block on Dilani |
 | 8 | Sign in as `cx` / `cx-clarity` or `compliance` / `compliance-clarity` | Studio | local draft / export stub | Draft saves in sessionStorage; export downloads labelled JSON |
-| 9 | As **supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/demo/autopsy` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
-| 10 | Open **Foresight** | Foresight | `GET /v1/demo/foresight` | SCENARIO, NOT CERTAINTY; baseline-vs-swarm bands; not calibrated warning |
+| 9 | As **supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/autopsy` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
+| 10 | Open **Foresight** | Foresight | `GET /v1/foresight` | SCENARIO, NOT CERTAINTY; baseline-vs-swarm bands; not calibrated warning |
 
 ## 4. Under the hood
 

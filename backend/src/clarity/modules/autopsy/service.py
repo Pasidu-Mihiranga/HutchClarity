@@ -242,7 +242,7 @@ class AutopsyService:
                     **view,
                     "representative_masked_complaints": [item.masked_text for item in members[:3]],
                     "synthetic_demo_trend": dict(sorted(daily.items())),
-                    "trend_label": "Synthetic demo trend",
+                    "trend_label": "Synthetic trend",
                     "mapping_label": (
                         "Suggested mapping is a hypothesis until reviewed"
                         if view["suggested_rule_id"]

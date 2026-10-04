@@ -16,7 +16,7 @@ hackathon submission asks and link it from the submission pack.
 make dev           # API on :8000
 make web-install   # once
 make web           # the three apps: :3000 customer, :3001 console, :3002 verify
-# optional: curl -X POST localhost:8000/v1/demo/reset
+# optional: curl -X POST localhost:8000/v1/synthetic/reset
 ```
 
 4. Browser tabs pre-opened (do not show passwords):

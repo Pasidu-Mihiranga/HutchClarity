@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
-import { expireSession, readToken } from "@/lib/session";
+import { authFetch } from "@/lib/session";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
 import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
 import {
@@ -133,7 +133,6 @@ function tl(lang: Lang, key: string): string {
 }
 
 const LANG_LABELS: Record<Lang, string> = { en: "EN", si: "සිං", ta: "த" };
-const DEMO_NAME = "Dilani Perera";
 
 // ─── component ─────────────────────────────────────────────────────────────────
 
@@ -171,12 +170,7 @@ export default function ClarityPage() {
       try {
         // The chat is for a signed-in customer: without a session every turn
         // is refused, so go and get one instead of failing turn by turn.
-        const token = readToken();
-        if (!token) return expireSession();
-        const res = await fetch(`${BASE}/v1/me/app`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401) return expireSession();
+        const res = await authFetch("/v1/me/app");
         if (!res.ok) return;
         const data = (await res.json()) as AppState;
         appRef.current = data;
@@ -355,7 +349,12 @@ export default function ClarityPage() {
   ) {
     // step 1 - open case
     setCs((s) => ({ ...s, progressStep: 1 }));
-    const opened = await openCase(appRef.current.msisdn ?? "0781234567", lang, chargeRef, wantsHuman);
+    // The case is opened for the signed-in customer's own number. There is no
+    // fallback number: opening a case for anyone else is exactly what the
+    // server refuses, and a guess here would only hide a missing account.
+    const msisdn = appRef.current.msisdn;
+    if (!msisdn) throw new Error("account not loaded");
+    const opened = await openCase(msisdn, lang, chargeRef, wantsHuman);
     const caseId = opened.case_id;
 
     // step 2+3 - evaluate + timeline
@@ -600,7 +599,7 @@ export default function ClarityPage() {
                   </svg>
                 </div>
                 <h1 style={{ fontSize: "clamp(24px,6vw,30px)", fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px", color: "var(--ink)" }}>
-                  {tl(lang, "chatHi").replace("{name}", app.name ?? DEMO_NAME)}
+                  {app.name ? tl(lang, "chatHi").replace("{name}", app.name) : tl(lang, "chatHi").replace(/\s*\{name\}/, "")}
                 </h1>
                 <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "#3f3f46" }}>{tl(lang, "howHelpToday")}</p>
                 <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 24px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>

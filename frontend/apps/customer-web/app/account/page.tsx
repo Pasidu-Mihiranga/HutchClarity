@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/LanguageProvider";
 import { supportedLangs, type Lang } from "@clarity/i18n";
+import { authFetch, clearSession } from "@/lib/session";
 
 const LANG_LABELS: Record<Lang, string> = {
   en: "English",
@@ -10,19 +12,36 @@ const LANG_LABELS: Record<Lang, string> = {
   ta: "தமிழ்",
 };
 
+// Every row goes somewhere real. The old rows were buttons without a handler,
+// and "Network status" claimed "No outages in your area" without checking.
 const MENU_ROWS = [
-  { label: "Notifications", sub: "All alerts" },
-  { label: "Network status", sub: "No outages in your area" },
-  { label: "Terms",          sub: null },
-  { label: "Privacy",        sub: null },
+  { label: "My cases", sub: "Charges Clarity has looked into", href: "/cases" },
+  { label: "Network status", sub: "Ask Clarity about your area", href: "/clarity" },
 ];
+
+type Profile = { name: string; masked: string; notify: string };
+
+const NOTIFY_LABELS: Record<string, string> = {
+  all: "All alerts",
+  important: "Important alerts only",
+  none: "No alerts",
+};
 
 export default function AccountPage() {
   const { lang, setLang } = useLanguage();
   const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    void authFetch("/v1/me/home")
+      .then(async (res) => {
+        if (res.ok) setProfile((await res.json()) as Profile);
+      })
+      .catch(() => undefined);
+  }, []);
 
   function signOut() {
-    try { window.sessionStorage.removeItem("clarity_token"); } catch {}
+    clearSession();
     router.push("/login");
   }
 
@@ -34,8 +53,13 @@ export default function AccountPage() {
         <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--muted)", margin: "0 0 4px" }}>
           Account
         </p>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: 18, letterSpacing: "-.02em" }}>07X XXXX XX89</p>
-        <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>Demo customer</p>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 18, letterSpacing: "-.02em" }}>{profile?.name ?? "..."}</p>
+        <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)", fontFamily: "monospace" }}>{profile?.masked ?? ""}</p>
+        {profile ? (
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--muted)" }}>
+            Notifications: {NOTIFY_LABELS[profile.notify] ?? profile.notify}
+          </p>
+        ) : null}
       </div>
 
       {/* Language */}
@@ -66,9 +90,11 @@ export default function AccountPage() {
 
       {/* Menu rows */}
       <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
-        {MENU_ROWS.map(({ label, sub }) => (
+        {MENU_ROWS.map(({ label, sub, href }) => (
           <button
             key={label}
+            type="button"
+            onClick={() => router.push(href)}
             style={{
               width: "100%",
               textAlign: "left",
@@ -102,7 +128,7 @@ export default function AccountPage() {
         Sign out
       </button>
 
-      {/* Simulated notice - I16 */}
+      {/* The data is synthetic, and the page says so once (I16). */}
       <div
         style={{
           border: "1px solid #fdd5c0",
@@ -113,7 +139,7 @@ export default function AccountPage() {
           color: "var(--orange-ink)",
         }}
       >
-        <strong>SIMULATED</strong> - This is a demo session. No real HUTCH account is connected.
+        Synthetic data: no real HUTCH account is connected.
       </div>
     </main>
   );

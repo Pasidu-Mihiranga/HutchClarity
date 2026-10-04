@@ -40,7 +40,7 @@ one arriving changes the answer for all of them.
 ## 3. Used by
 `clarity.app.container`, which constructs `AutopsyService` and registers it as
 the `autopsy` consumer group for `complaint.created`; and
-`clarity.interfaces.http` for `GET /v1/demo/autopsy`, which shows a reviewer
+`clarity.interfaces.http` for `GET /v1/autopsy`, which shows a reviewer
 the current clusters.
 
 ## 3a. Invariants

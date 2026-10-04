@@ -436,45 +436,6 @@
         "title": "DecisionView",
         "type": "object"
       },
-      "DemoSubscriber": {
-        "additionalProperties": false,
-        "description": "Prototype only: the synthetic customers the demo ships with.",
-        "properties": {
-          "balance_lkr": {
-            "title": "Balance Lkr",
-            "type": "string"
-          },
-          "language": {
-            "$ref": "#/components/schemas/Language"
-          },
-          "masked": {
-            "title": "Masked",
-            "type": "string"
-          },
-          "msisdn": {
-            "title": "Msisdn",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "scenario": {
-            "title": "Scenario",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "msisdn",
-          "masked",
-          "language",
-          "balance_lkr",
-          "scenario"
-        ],
-        "title": "DemoSubscriber",
-        "type": "object"
-      },
       "EventSource": {
         "description": "The eight log sources joined into one case file (deck S7, plan \u00a79.2).",
         "enum": [
@@ -588,7 +549,7 @@
       },
       "MerchantSuspendRequest": {
         "additionalProperties": false,
-        "description": "Demo merchant block for VAS ops / compliance. Simulated world only.",
+        "description": "Merchant block for VAS ops and compliance. Simulated HUTCH world only.",
         "properties": {
           "merchant_id": {
             "title": "Merchant Id",
@@ -1256,6 +1217,45 @@
         "title": "SwitchFlipRequest",
         "type": "object"
       },
+      "SyntheticSubscriber": {
+        "additionalProperties": false,
+        "description": "A synthetic customer in the simulated HUTCH world.",
+        "properties": {
+          "balance_lkr": {
+            "title": "Balance Lkr",
+            "type": "string"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "string"
+          },
+          "msisdn": {
+            "title": "Msisdn",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "msisdn",
+          "masked",
+          "language",
+          "balance_lkr",
+          "scenario"
+        ],
+        "title": "SyntheticSubscriber",
+        "type": "object"
+      },
       "TimelineEventView": {
         "additionalProperties": false,
         "properties": {
@@ -1629,7 +1629,7 @@
     },
     "/v1/admin/merchants/suspend": {
       "post": {
-        "description": "Block a merchant on a demo subscriber (simulated). Needs step-up.",
+        "description": "Block a merchant for a synthetic subscriber (simulated HUTCH). Needs step-up.",
         "operationId": "suspend_merchant_v1_admin_merchants_suspend_post",
         "parameters": [
           {
@@ -3291,6 +3291,51 @@
         ]
       }
     },
+    "/v1/auth/otp/inbox": {
+      "get": {
+        "description": "The simulated SMS inbox. Prototype only, and labelled everywhere.",
+        "operationId": "demo_inbox_v1_auth_otp_inbox_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "msisdn",
+            "required": true,
+            "schema": {
+              "title": "Msisdn",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Demo Inbox V1 Auth Otp Inbox Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Inbox",
+        "tags": [
+          "synthetic"
+        ]
+      }
+    },
     "/v1/auth/otp/request": {
       "post": {
         "description": "Start customer sign-in. The code goes to the delivery port only.\n\nIn the demo that port is a labelled simulated inbox, so the UI can show\nthe code. It is never returned from this endpoint, because possession\nof the phone is what proves identity.",
@@ -3500,6 +3545,58 @@
         "summary": "Staff Session",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/v1/autopsy": {
+      "get": {
+        "description": "Complaint Autopsy's current clusters, as a reviewer may be shown them.\n\nServed by the autopsy service since AU01 (#13), where it used to build\na throwaway report per request. The service is fed by\n`complaint.created` and keeps its clusters and their reviews, so a\nverdict given here survives the request that gave it.\n\nEvery cluster goes through `staff_view`, which is the only sanctioned\nway to put one in front of a person: it always carries `hypothesis` and\na `status_label`, so an unreviewed cluster cannot reach a screen\nwithout saying that nobody has checked it (AU01 acceptance 1, I16).\n\nThe seeded demo complaints are accepted on first call when the store is\nempty, so the demo path still shows something without a channel having\npublished any events yet.",
+        "operationId": "demo_autopsy_v1_autopsy_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Demo Autopsy V1 Autopsy Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Autopsy",
+        "tags": [
+          "autopsy"
         ]
       }
     },
@@ -4291,257 +4388,6 @@
         ]
       }
     },
-    "/v1/demo/autopsy": {
-      "get": {
-        "description": "Complaint Autopsy's current clusters, as a reviewer may be shown them.\n\nServed by the autopsy service since AU01 (#13), where it used to build\na throwaway report per request. The service is fed by\n`complaint.created` and keeps its clusters and their reviews, so a\nverdict given here survives the request that gave it.\n\nEvery cluster goes through `staff_view`, which is the only sanctioned\nway to put one in front of a person: it always carries `hypothesis` and\na `status_label`, so an unreviewed cluster cannot reach a screen\nwithout saying that nobody has checked it (AU01 acceptance 1, I16).\n\nThe seeded demo complaints are accepted on first call when the store is\nempty, so the demo path still shows something without a channel having\npublished any events yet.",
-        "operationId": "demo_autopsy_v1_demo_autopsy_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Autopsy V1 Demo Autopsy Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Autopsy",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/foresight": {
-      "get": {
-        "description": "Rehearse retiring a pack. Scenarios, not certainties.",
-        "operationId": "demo_foresight_v1_demo_foresight_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Foresight V1 Demo Foresight Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Foresight",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/inbox": {
-      "get": {
-        "description": "The simulated SMS inbox. Prototype only, and labelled everywhere.",
-        "operationId": "demo_inbox_v1_demo_inbox_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "msisdn",
-            "required": true,
-            "schema": {
-              "title": "Msisdn",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Inbox V1 Demo Inbox Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Inbox",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/ops": {
-      "get": {
-        "description": "Console dashboards, folded from the event log (I01, #30).\n\nThis route used to read live objects, which is the context issue #30\nstarts from: the numbers were whatever happened to be in this process,\nso a restart lost them and a second replica disagreed with the first.\nIt now reads the stored projection, which survives a restart and which\na replay of the log rebuilds exactly.\n\nIt also summed money with `money += float(stake)`. I3 allows no float\nanywhere on a money path, and a dashboard is on one: a figure a desk\nacts on has to be the figure the ledger holds. The projection keeps\n`Decimal` and serialises as a string.\n\nStill a `tags=[\"demo\"]` route behind `DESK_QUEUE_READ`. The console's\nown surface is the gap recorded in the I01 devlog.",
-        "operationId": "demo_ops_v1_demo_ops_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Ops V1 Demo Ops Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Ops",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/reset": {
-      "post": {
-        "description": "Rebuild the synthetic world so the demo can be run again cleanly.\n\nRunning a journey refunds balances and switches subscriptions off, so a\nsecond run would start from the first run's state. Prototype only: there\nis no such thing in production.",
-        "operationId": "demo_reset_v1_demo_reset_post",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Reset V1 Demo Reset Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Demo Reset",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/subscribers": {
-      "get": {
-        "description": "Prototype only: the synthetic customers shipped with the demo.",
-        "operationId": "demo_subscribers_v1_demo_subscribers_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/DemoSubscriber"
-                  },
-                  "title": "Response Demo Subscribers V1 Demo Subscribers Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Demo Subscribers",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
     "/v1/desk/queue": {
       "get": {
         "description": "Cases needing a person, biggest money at stake first (deck S9).",
@@ -4648,6 +4494,58 @@
         "summary": "Reconciliation Queue",
         "tags": [
           "finance"
+        ]
+      }
+    },
+    "/v1/foresight": {
+      "get": {
+        "description": "Rehearse retiring a pack. Scenarios, not certainties.",
+        "operationId": "demo_foresight_v1_foresight_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Demo Foresight V1 Foresight Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Foresight",
+        "tags": [
+          "foresight"
         ]
       }
     },
@@ -5321,6 +5219,58 @@
         ]
       }
     },
+    "/v1/ops/summary": {
+      "get": {
+        "description": "Console dashboards, folded from the event log (I01, #30).\n\nThis route used to read live objects, which is the context issue #30\nstarts from: the numbers were whatever happened to be in this process,\nso a restart lost them and a second replica disagreed with the first.\nIt now reads the stored projection, which survives a restart and which\na replay of the log rebuilds exactly.\n\nIt also summed money with `money += float(stake)`. I3 allows no float\nanywhere on a money path, and a dashboard is on one: a figure a desk\nacts on has to be the figure the ledger holds. The projection keeps\n`Decimal` and serialises as a string.\n\nStill a `tags=[\"synthetic\"]` route behind `DESK_QUEUE_READ`. The console's\nown surface is the gap recorded in the I01 devlog.",
+        "operationId": "demo_ops_v1_ops_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Demo Ops V1 Ops Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Ops",
+        "tags": [
+          "insights"
+        ]
+      }
+    },
     "/v1/receipts/{receipt_id}": {
       "get": {
         "description": "The full signed document. The public page shows the masked view.",
@@ -5538,6 +5488,56 @@
         "summary": "Verify Receipt",
         "tags": [
           "receipts"
+        ]
+      }
+    },
+    "/v1/synthetic/reset": {
+      "post": {
+        "description": "Rebuild the synthetic world so the demo can be run again cleanly.\n\nRunning a journey refunds balances and switches subscriptions off, so a\nsecond run would start from the first run's state. Prototype only: there\nis no such thing in production.",
+        "operationId": "demo_reset_v1_synthetic_reset_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Demo Reset V1 Synthetic Reset Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Demo Reset",
+        "tags": [
+          "synthetic"
+        ]
+      }
+    },
+    "/v1/synthetic/subscribers": {
+      "get": {
+        "description": "The synthetic customers in the simulated HUTCH world (synthetic profiles only).",
+        "operationId": "demo_subscribers_v1_synthetic_subscribers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyntheticSubscriber"
+                  },
+                  "title": "Response Demo Subscribers V1 Synthetic Subscribers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Demo Subscribers",
+        "tags": [
+          "synthetic"
         ]
       }
     }

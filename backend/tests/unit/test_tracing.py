@@ -57,7 +57,7 @@ def _signed_in_client(clarity: Clarity) -> TestClient:
     client = TestClient(create_app(clarity))
     started = client.post("/v1/auth/otp/request", json={"msisdn": DILANI})
     assert started.status_code == 200, started.text
-    code = client.get("/v1/demo/inbox", params={"msisdn": DILANI}).json()["code"]
+    code = client.get("/v1/auth/otp/inbox", params={"msisdn": DILANI}).json()["code"]
     session = client.post(
         "/v1/auth/otp/verify",
         json={"challenge_id": started.json()["challenge_id"], "code": code},

@@ -16,7 +16,7 @@ import { KUMAR, NIMAL, customerTokenFor, signedIn } from "./session";
  * a case today: the `/cases` page is not wired to the backend (there is no
  * `GET /v1/cases`) and renders two hardcoded demo rows.
  */
-test.describe("the remaining demo journeys", () => {
+test.describe("the remaining journeys", () => {
   test("a duplicate reload is already refunded, with nobody in the loop", async ({
     page,
     request,

@@ -12,7 +12,7 @@ export default function AutopsyPage() {
   const allowed = hasPermission("desk:queue:read");
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (allowed) void client.demoAutopsy().then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : "Autopsy failed")); }, [allowed, client, generation]);
+  useEffect(() => { if (allowed) void client.autopsy().then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : "Autopsy failed")); }, [allowed, client, generation]);
   if (!session || !allowed) return <AccessDenied need="desk:queue:read" />;
   const clusters = (data?.clusters || []) as Cluster[];
   return <div className="space-y-5">

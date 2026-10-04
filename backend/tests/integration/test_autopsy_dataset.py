@@ -19,7 +19,7 @@ def test_data01_ingests_through_mask_first_service_with_honest_diagnostics():
     assert workspace["clustering_method"] == "TrigramSimilarity"
     assert "not semantic embedding" in workspace["clustering_disclosure"]
     assert all(item["hypothesis"] for item in workspace["clusters"])
-    assert all(item["trend_label"] == "Synthetic demo trend" for item in workspace["clusters"])
+    assert all(item["trend_label"] == "Synthetic trend" for item in workspace["clusters"])
     assert all(item["representative_masked_complaints"] for item in workspace["clusters"])
 
 

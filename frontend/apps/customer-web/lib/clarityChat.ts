@@ -1,7 +1,9 @@
 // Clarity chat state machine and API calls.
 // All API calls target the hutch-sim backend at NEXT_PUBLIC_API_BASE (default :8000).
 
-import { expireSession, readToken } from "@/lib/session";
+import { BASE, authFetch } from "@/lib/session";
+
+export { BASE };
 
 export type Lang = "en" | "si" | "ta";
 
@@ -190,10 +192,6 @@ export type Thread = {
 
 // ─── config ───────────────────────────────────────────────────────────────────
 
-export const BASE =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000")
-    : "http://localhost:8000";
 
 const HISTORY_KEY = "clarity_chat_threads_v1";
 
@@ -278,12 +276,11 @@ export function makeInitialState(): ClarityState {
 // ─── API ───────────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-  const token = typeof window !== "undefined" ? (readToken() ?? "") : "";
-  if (token) (opts.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, opts);
-  if (res.status === 401 && typeof window !== "undefined") expireSession();
+  // authFetch renews an expired session once and otherwise goes to sign-in.
+  const res = await authFetch(path, {
+    method,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
   if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}`);
   return res.json() as Promise<T>;
 }

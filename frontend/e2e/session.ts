@@ -49,9 +49,9 @@ export async function customerTokenFor(
   // The code is generated per challenge. There is no "any six digits" path:
   // the backend answers 401 to anything else.
   const inbox = await request.get(
-    `${API}/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`,
+    `${API}/v1/auth/otp/inbox?msisdn=${encodeURIComponent(msisdn)}`,
   );
-  expect(inbox.ok(), `demo inbox failed: ${inbox.status()}`).toBeTruthy();
+  expect(inbox.ok(), `otp inbox failed: ${inbox.status()}`).toBeTruthy();
   const { code } = (await inbox.json()) as { code: string };
 
   const verified = await request.post(`${API}/v1/auth/otp/verify`, {

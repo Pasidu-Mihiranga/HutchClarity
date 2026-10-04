@@ -78,7 +78,7 @@ function signIn(msisdn) {
   );
   if (started.status !== 200) throw new Error(`otp request for ${msisdn}: ${started.status}`);
 
-  const inbox = http.get(`${BASE_URL}/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`);
+  const inbox = http.get(`${BASE_URL}/v1/auth/otp/inbox?msisdn=${encodeURIComponent(msisdn)}`);
   if (inbox.status !== 200) throw new Error(`inbox for ${msisdn}: ${inbox.status}`);
 
   const verified = http.post(

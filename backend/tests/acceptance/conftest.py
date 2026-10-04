@@ -32,7 +32,7 @@ def customer_token(api: TestClient, msisdn: str) -> str:
     """Sign in the way the customer page does: OTP through the simulated inbox."""
     started = api.post("/v1/auth/otp/request", json={"msisdn": msisdn})
     assert started.status_code == 200, started.text
-    code = api.get("/v1/demo/inbox", params={"msisdn": msisdn}).json()["code"]
+    code = api.get("/v1/auth/otp/inbox", params={"msisdn": msisdn}).json()["code"]
     verified = api.post(
         "/v1/auth/otp/verify",
         json={"challenge_id": started.json()["challenge_id"], "code": code},

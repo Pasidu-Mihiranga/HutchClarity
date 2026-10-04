@@ -33,4 +33,23 @@ test.describe("session expiry", () => {
     await expect(page.getByRole("textbox", { name: /ask clarity/i })).toBeVisible();
     await expect(page).toHaveURL(/\/clarity$/);
   });
+
+  test("an expired access token is renewed with the refresh token, without sign-in", async ({ page }) => {
+    // Sign in through the page, so both tokens are stored the way a customer
+    // gets them; then replace the access token with one the API refuses.
+    await page.goto("/login");
+    await page.getByLabel("Hutch number").fill("+94783334444");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByTestId("otp-code").waitFor();
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+    await page.evaluate(() => window.sessionStorage.setItem("clarity_token", "an-expired-access-token-value"));
+
+    await page.goto("/cases");
+
+    await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible();
+    await expect(page).toHaveURL(/\/cases$/);
+    const token = await page.evaluate(() => window.sessionStorage.getItem("clarity_token"));
+    expect(token).not.toBe("an-expired-access-token-value");
+  });
 });

@@ -31,7 +31,7 @@ def sign_in_customer(client: TestClient, msisdn: str) -> str:
     """Complete the OTP flow and return a bearer token."""
     started = client.post("/v1/auth/otp/request", json={"msisdn": msisdn})
     assert started.status_code == 200, started.text
-    code = client.get("/v1/demo/inbox", params={"msisdn": msisdn}).json()["code"]
+    code = client.get("/v1/auth/otp/inbox", params={"msisdn": msisdn}).json()["code"]
     session = client.post(
         "/v1/auth/otp/verify",
         json={"challenge_id": started.json()["challenge_id"], "code": code},
@@ -416,14 +416,18 @@ def test_reset_restores_the_synthetic_world(client: TestClient):
     client.post(f"/v1/cases/{case_id}/confirm", json={"plan_id": plan["plan_id"]})
 
     balance_after_refund = next(
-        p["balance_lkr"] for p in client.get("/v1/demo/subscribers").json() if p["msisdn"] == DILANI
+        p["balance_lkr"]
+        for p in client.get("/v1/synthetic/subscribers").json()
+        if p["msisdn"] == DILANI
     )
     assert balance_after_refund == "500.00"
 
-    assert client.post("/v1/demo/reset").status_code == 200
+    assert client.post("/v1/synthetic/reset").status_code == 200
 
     restored = next(
-        p["balance_lkr"] for p in client.get("/v1/demo/subscribers").json() if p["msisdn"] == DILANI
+        p["balance_lkr"]
+        for p in client.get("/v1/synthetic/subscribers").json()
+        if p["msisdn"] == DILANI
     )
     assert restored == "451.00", "balances are back to their starting values"
 

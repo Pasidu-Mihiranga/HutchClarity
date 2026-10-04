@@ -97,7 +97,7 @@ export interface paths {
         put?: never;
         /**
          * Suspend Merchant
-         * @description Block a merchant on a demo subscriber (simulated). Needs step-up.
+         * @description Block a merchant for a synthetic subscriber (simulated HUTCH). Needs step-up.
          */
         post: operations["suspend_merchant_v1_admin_merchants_suspend_post"];
         delete?: never;
@@ -592,6 +592,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/otp/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Inbox
+         * @description The simulated SMS inbox. Prototype only, and labelled everywhere.
+         */
+        get: operations["demo_inbox_v1_auth_otp_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/otp/request": {
         parameters: {
             query?: never;
@@ -698,6 +718,40 @@ export interface paths {
          *     cannot choose a role.
          */
         post: operations["staff_session_v1_auth_staff_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/autopsy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Autopsy
+         * @description Complaint Autopsy's current clusters, as a reviewer may be shown them.
+         *
+         *     Served by the autopsy service since AU01 (#13), where it used to build
+         *     a throwaway report per request. The service is fed by
+         *     `complaint.created` and keeps its clusters and their reviews, so a
+         *     verdict given here survives the request that gave it.
+         *
+         *     Every cluster goes through `staff_view`, which is the only sanctioned
+         *     way to put one in front of a person: it always carries `hypothesis` and
+         *     a `status_label`, so an unreviewed cluster cannot reach a screen
+         *     without saying that nobody has checked it (AU01 acceptance 1, I16).
+         *
+         *     The seeded demo complaints are accepted on first call when the store is
+         *     empty, so the demo path still shows something without a channel having
+         *     published any events yet.
+         */
+        get: operations["demo_autopsy_v1_autopsy_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -945,158 +999,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/demo/autopsy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Autopsy
-         * @description Complaint Autopsy's current clusters, as a reviewer may be shown them.
-         *
-         *     Served by the autopsy service since AU01 (#13), where it used to build
-         *     a throwaway report per request. The service is fed by
-         *     `complaint.created` and keeps its clusters and their reviews, so a
-         *     verdict given here survives the request that gave it.
-         *
-         *     Every cluster goes through `staff_view`, which is the only sanctioned
-         *     way to put one in front of a person: it always carries `hypothesis` and
-         *     a `status_label`, so an unreviewed cluster cannot reach a screen
-         *     without saying that nobody has checked it (AU01 acceptance 1, I16).
-         *
-         *     The seeded demo complaints are accepted on first call when the store is
-         *     empty, so the demo path still shows something without a channel having
-         *     published any events yet.
-         */
-        get: operations["demo_autopsy_v1_demo_autopsy_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/foresight": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Foresight
-         * @description Rehearse retiring a pack. Scenarios, not certainties.
-         */
-        get: operations["demo_foresight_v1_demo_foresight_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/inbox": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Inbox
-         * @description The simulated SMS inbox. Prototype only, and labelled everywhere.
-         */
-        get: operations["demo_inbox_v1_demo_inbox_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/ops": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Ops
-         * @description Console dashboards, folded from the event log (I01, #30).
-         *
-         *     This route used to read live objects, which is the context issue #30
-         *     starts from: the numbers were whatever happened to be in this process,
-         *     so a restart lost them and a second replica disagreed with the first.
-         *     It now reads the stored projection, which survives a restart and which
-         *     a replay of the log rebuilds exactly.
-         *
-         *     It also summed money with `money += float(stake)`. I3 allows no float
-         *     anywhere on a money path, and a dashboard is on one: a figure a desk
-         *     acts on has to be the figure the ledger holds. The projection keeps
-         *     `Decimal` and serialises as a string.
-         *
-         *     Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
-         *     own surface is the gap recorded in the I01 devlog.
-         */
-        get: operations["demo_ops_v1_demo_ops_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Demo Reset
-         * @description Rebuild the synthetic world so the demo can be run again cleanly.
-         *
-         *     Running a journey refunds balances and switches subscriptions off, so a
-         *     second run would start from the first run's state. Prototype only: there
-         *     is no such thing in production.
-         */
-        post: operations["demo_reset_v1_demo_reset_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/demo/subscribers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Subscribers
-         * @description Prototype only: the synthetic customers shipped with the demo.
-         */
-        get: operations["demo_subscribers_v1_demo_subscribers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/desk/queue": {
         parameters: {
             query?: never;
@@ -1129,6 +1031,26 @@ export interface paths {
          * @description Persisted T+1 mismatches for finance investigation.
          */
         get: operations["reconciliation_queue_v1_finance_reconciliation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/foresight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Foresight
+         * @description Rehearse retiring a pack. Scenarios, not certainties.
+         */
+        get: operations["demo_foresight_v1_foresight_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1373,6 +1295,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ops/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Ops
+         * @description Console dashboards, folded from the event log (I01, #30).
+         *
+         *     This route used to read live objects, which is the context issue #30
+         *     starts from: the numbers were whatever happened to be in this process,
+         *     so a restart lost them and a second replica disagreed with the first.
+         *     It now reads the stored projection, which survives a restart and which
+         *     a replay of the log rebuilds exactly.
+         *
+         *     It also summed money with `money += float(stake)`. I3 allows no float
+         *     anywhere on a money path, and a dashboard is on one: a figure a desk
+         *     acts on has to be the figure the ledger holds. The projection keeps
+         *     `Decimal` and serialises as a string.
+         *
+         *     Still a `tags=["synthetic"]` route behind `DESK_QUEUE_READ`. The console's
+         *     own surface is the gap recorded in the I01 devlog.
+         */
+        get: operations["demo_ops_v1_ops_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/receipts/{receipt_id}": {
         parameters: {
             query?: never;
@@ -1453,6 +1409,50 @@ export interface paths {
          * @description What the QR code resolves to. Public, and safe to be public.
          */
         post: operations["verify_receipt_v1_receipts__receipt_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synthetic/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demo Reset
+         * @description Rebuild the synthetic world so the demo can be run again cleanly.
+         *
+         *     Running a journey refunds balances and switches subscriptions off, so a
+         *     second run would start from the first run's state. Prototype only: there
+         *     is no such thing in production.
+         */
+        post: operations["demo_reset_v1_synthetic_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synthetic/subscribers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Subscribers
+         * @description The synthetic customers in the simulated HUTCH world (synthetic profiles only).
+         */
+        get: operations["demo_subscribers_v1_synthetic_subscribers_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1661,23 +1661,6 @@ export interface components {
             unknown?: components["schemas"]["RuledOutView"][];
         };
         /**
-         * DemoSubscriber
-         * @description Prototype only: the synthetic customers the demo ships with.
-         */
-        DemoSubscriber: {
-            /** Balance Lkr */
-            balance_lkr: string;
-            language: components["schemas"]["Language"];
-            /** Masked */
-            masked: string;
-            /** Msisdn */
-            msisdn: string;
-            /** Name */
-            name: string;
-            /** Scenario */
-            scenario: string;
-        };
-        /**
          * EventSource
          * @description The eight log sources joined into one case file (deck S7, plan §9.2).
          * @enum {string}
@@ -1718,7 +1701,7 @@ export interface components {
         Language: "si" | "ta" | "en";
         /**
          * MerchantSuspendRequest
-         * @description Demo merchant block for VAS ops / compliance. Simulated world only.
+         * @description Merchant block for VAS ops and compliance. Simulated HUTCH world only.
          */
         MerchantSuspendRequest: {
             /** Merchant Id */
@@ -1979,6 +1962,23 @@ export interface components {
             key: string;
             /** Reason */
             reason: string;
+        };
+        /**
+         * SyntheticSubscriber
+         * @description A synthetic customer in the simulated HUTCH world.
+         */
+        SyntheticSubscriber: {
+            /** Balance Lkr */
+            balance_lkr: string;
+            language: components["schemas"]["Language"];
+            /** Masked */
+            masked: string;
+            /** Msisdn */
+            msisdn: string;
+            /** Name */
+            name: string;
+            /** Scenario */
+            scenario: string;
         };
         /** TimelineEventView */
         TimelineEventView: {
@@ -3122,6 +3122,39 @@ export interface operations {
             };
         };
     };
+    demo_inbox_v1_auth_otp_inbox_get: {
+        parameters: {
+            query: {
+                msisdn: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     request_otp_v1_auth_otp_request_post: {
         parameters: {
             query?: never;
@@ -3276,6 +3309,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_autopsy_v1_autopsy_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -3753,180 +3819,6 @@ export interface operations {
             };
         };
     };
-    demo_autopsy_v1_demo_autopsy_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_foresight_v1_demo_foresight_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_inbox_v1_demo_inbox_get: {
-        parameters: {
-            query: {
-                msisdn: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_ops_v1_demo_ops_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_reset_v1_demo_reset_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    demo_subscribers_v1_demo_subscribers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DemoSubscriber"][];
-                };
-            };
-        };
-    };
     desk_queue_v1_desk_queue_get: {
         parameters: {
             query?: never;
@@ -3978,6 +3870,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_foresight_v1_foresight_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -4407,6 +4332,39 @@ export interface operations {
             };
         };
     };
+    demo_ops_v1_ops_summary_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_receipt_v1_receipts__receipt_id__get: {
         parameters: {
             query?: never;
@@ -4534,6 +4492,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_reset_v1_synthetic_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    demo_subscribers_v1_synthetic_subscribers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyntheticSubscriber"][];
                 };
             };
         };

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClarityClient } from "@clarity/sdk";
 import { t } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
-import { safeNext } from "@/lib/session";
+import { clearSession, safeNext, storeSession } from "@/lib/session";
 
 const client = new ClarityClient();
 
@@ -20,7 +20,7 @@ export default function LoginPage() {
   // The code from the simulated inbox. There is no "any six digits" path: the
   // backend generates a code per challenge and refuses anything else, so the
   // panel below has to show the real one or nobody can sign in.
-  const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [shownCode, setShownCode] = useState<string | null>(null);
   // `verifyOtp` needs the challenge this code belongs to, not the number.
   const [challengeId, setChallengeId] = useState<string | null>(null);
 
@@ -39,13 +39,13 @@ export default function LoginPage() {
       // the route 404s in prod, so a failure here is not an error worth
       // showing, it just means there is no inbox to read.
       try {
-        const message = await client.demoInbox(msisdn);
+        const message = await client.otpInbox(msisdn);
         if (message.code) {
-          setDemoCode(message.code);
+          setShownCode(message.code);
           setCode(message.code);
         }
       } catch {
-        setDemoCode(null);
+        setShownCode(null);
       }
     } catch (err) {
       setStatus({
@@ -61,7 +61,7 @@ export default function LoginPage() {
     try {
       if (!challengeId) throw new Error("Request a code first.");
       const result = await client.verifyOtp(challengeId, code);
-      try { window.sessionStorage.setItem("clarity_token", result.token); } catch {}
+      storeSession(result.token, result.refresh_token);
       client.setToken(result.token);
       setStatus({ text: "Signed in - redirecting...", tone: "ok" });
       // Back to where an expired session sent us from (lib/session.ts).
@@ -73,7 +73,7 @@ export default function LoginPage() {
       // refuses, so the customer saw errors everywhere except at the point
       // where something actually went wrong. Deny by default (I9) applies to
       // the UI too, so a refusal clears the session rather than inventing one.
-      try { window.sessionStorage.removeItem("clarity_token"); } catch {}
+      clearSession();
       client.setToken(undefined);
       setStatus({
         text: err instanceof Error ? err.message : "Verify failed",
@@ -227,7 +227,9 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Simulated OTP inbox */}
+      {/* Until SMS delivery is connected, the code the server sent is shown
+          here instead of on the phone. The route behind it does not exist in
+          the prod profile (I9). */}
       <div
         style={{
           marginTop: 16,
@@ -248,19 +250,19 @@ export default function LoginPage() {
             padding: "5px 10px",
           }}
         >
-          Simulated SMS inbox
+          Your sign-in code
         </div>
         <p style={{ margin: 0, padding: 12, fontSize: 14, color: "var(--ink)" }}>
-          {demoCode ? (
+          {shownCode ? (
             <>
               Your code is{" "}
-              <strong data-testid="demo-otp-code" style={{ letterSpacing: ".1em" }}>
-                {demoCode}
+              <strong data-testid="otp-code" style={{ letterSpacing: ".1em" }}>
+                {shownCode}
               </strong>
               . It has been filled in for you.
             </>
           ) : (
-            "Enter your Hutch number to receive a simulated code here."
+            "Enter your Hutch number. SMS delivery is not connected yet, so your code appears here."
           )}
         </p>
       </div>

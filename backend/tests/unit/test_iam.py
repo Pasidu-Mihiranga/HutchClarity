@@ -382,7 +382,7 @@ def client() -> TestClient:
 
 def customer_token(client: TestClient, msisdn: str) -> str:
     started = client.post("/v1/auth/otp/request", json={"msisdn": msisdn}).json()
-    code = client.get("/v1/demo/inbox", params={"msisdn": msisdn}).json()["code"]
+    code = client.get("/v1/auth/otp/inbox", params={"msisdn": msisdn}).json()["code"]
     return client.post(
         "/v1/auth/otp/verify",
         json={"challenge_id": started["challenge_id"], "code": code},
@@ -693,15 +693,15 @@ def test_the_otp_inbox_is_a_demo_only_route():
 
     clarity = Clarity(world=build_demo_world())
     client = TestClient(create_app(clarity))
-    assert client.get("/v1/demo/subscribers").status_code == 200
+    assert client.get("/v1/synthetic/subscribers").status_code == 200
 
-    # PROD is the profile with real subscribers. Note that `/v1/demo/reset`
+    # PROD is the profile with real subscribers. Note that `/v1/synthetic/reset`
     # would swap the container out, so it is not called here.
     clarity.profile = Profile.PROD
 
-    assert client.get("/v1/demo/subscribers").status_code == 404
-    assert client.get("/v1/demo/inbox", params={"msisdn": DILANI}).status_code == 404
-    assert client.post("/v1/demo/reset").status_code == 404
+    assert client.get("/v1/synthetic/subscribers").status_code == 404
+    assert client.get("/v1/auth/otp/inbox", params={"msisdn": DILANI}).status_code == 404
+    assert client.post("/v1/synthetic/reset").status_code == 404
     # The gate is on the demo routes only; the rest still answer as themselves.
     assert client.get("/v1/desk/queue").status_code == 401
 
