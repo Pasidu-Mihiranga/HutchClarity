@@ -14,7 +14,8 @@ credentials are intentionally unsuitable for an Internet host.
 | `https://116.203.101.73:9443/` | Trust Receipt verifier and same-origin `/v1` API |
 
 PostgreSQL, Kafka, Keycloak, OPA, the API, MCP, channel gateway, `hutch-sim`,
-and all Next.js origin ports stay on the private Compose network. Only SSH,
+the opt-in Baileys transport and all Next.js origin ports stay on the private
+Compose network. Only SSH,
 HTTP for ACME and redirects, and the three HTTPS listeners are allowed through
 the host firewall.
 
@@ -38,6 +39,33 @@ Vertex credentials and the staff directory are files under
 `/opt/hutch-clarity/private/` (mode 0600), mounted read-only. CD does not
 upload them. `GOOGLE_APPLICATION_CREDENTIALS` inside the container is
 `/run/clarity-private/google-service-account.json`.
+
+Customer OTP delivery can use the hosted httpSMS API. Set `HTTPSMS_API_KEY` to
+the primary user API key and `HTTPSMS_SENDER` to the E.164 number of the
+registered Android gateway phone. A `pk_` phone-scoped key cannot call
+`/v1/messages/send`. Both settings are required together and remain only in
+`.env.production`.
+
+WhatsApp is disabled by default. To enable the Baileys transport, set
+`COMPOSE_PROFILES=whatsapp` and `WHATSAPP_ENABLED=true` only after operator
+pairing. Its auth volume contains long-lived Signal keys and must be protected
+like an SSH private key. Pairing has no web route:
+
+```bash
+docker compose --env-file /opt/hutch-clarity/.env.production \
+  -f /opt/hutch-clarity/deploy/compose/vps.yml --profile whatsapp run --rm \
+  -e WHATSAPP_PAIRING_PHONE=<country-code-digits> clarity-whatsapp npm run pair
+```
+
+If WhatsApp refuses phone-number linking, use QR pairing from the same private
+operator terminal by replacing the phone environment option with
+`-e WHATSAPP_PAIRING_MODE=qr`. The QR and auth state must not be copied into
+logs, tickets or the repository.
+
+Baileys is an unofficial WhatsApp Web client and is not affiliated with Meta
+or HUTCH. The transport is limited to direct customer messages and must be
+operated in accordance with WhatsApp terms. The service ignores own messages,
+groups, status, broadcasts, newsletters and unsupported system messages.
 
 ## HTTPS
 
@@ -104,8 +132,8 @@ dispatch for a CI-approved main SHA. The `demo-vps` environment contains:
 - `HETZNER_SSH_PRIVATE_KEY`
 - `HETZNER_KNOWN_HOSTS`
 
-SSH host verification is pinned. The workflow builds backend and three
-frontend images in GHCR, tags all of them with the same immutable SHA, uploads
+SSH host verification is pinned. The workflow builds backend, WhatsApp and
+three frontend images in GHCR, tags all of them with the same immutable SHA, uploads
 only versioned manifests/scripts, backs up, deploys, and passes only after
 health checks. Manual `rollback` reuses the recorded previous images and does
 not rebuild. Repository settings should require every existing `ci` check on

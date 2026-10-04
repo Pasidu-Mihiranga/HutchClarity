@@ -112,6 +112,7 @@ from clarity.modules.iam.public import (
     AuditGrant,
     GrantNotFound,
     GrantRefused,
+    HttpSmsDeliveryFailed,
     LoginRefused,
     OtpRefused,
     SimulatedInbox,
@@ -1132,16 +1133,24 @@ def _register_routes(app: FastAPI) -> None:
         # still records which it was, because the trail is not the attacker.
         try:
             challenge_id = clarity.otp.request(msisdn)
+        except HttpSmsDeliveryFailed as error:
+            requested("delivery_failed")
+            raise HTTPException(status_code=502, detail=str(error)) from error
         except OtpRefused as error:
             requested("refused")
             raise HTTPException(status_code=429, detail=str(error)) from error
 
         requested("sent" if account is not None else "unknown_number", challenge_id)
+        simulated = isinstance(clarity.otp.delivery, SimulatedInbox)
         return {
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
-            "simulated": True,
-            "detail": "A simulated SMS was written to the demo inbox.",
+            "simulated": simulated,
+            "detail": (
+                "A simulated SMS was written to the development inbox."
+                if simulated
+                else "A sign-in code was sent by SMS."
+            ),
         }
 
     @app.get("/v1/demo/inbox", tags=["demo"], dependencies=[Depends(demo_only)])

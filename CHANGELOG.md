@@ -6,6 +6,11 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- An opt-in Baileys WhatsApp transport forwards signed one-to-one messages to
+  the existing channel gateway and sends its exact reply. Auth state is kept
+  outside the image, pairing is operator-only, and provider noise is refused.
+- httpSMS can deliver single-use customer sign-in codes through the existing
+  OTP port when its primary user key and registered Android sender are set.
 - `POST /v1/auth/staff/login` checks a staff directory and assigns that account's role. When `CLARITY_STAFF_DIRECTORY` or `CLARITY_STAFF_DIRECTORY_FILE` is set, `POST /v1/auth/staff/session` returns 404. Both routes stay 404 in `prod`. OpenAPI snapshot and SDK regenerated on purpose.
 - Vertex AI is a text-role provider (`config/ai/models.yaml`). It runs when `CLARITY_VERTEX_PROJECT` is set and `AI_PREFER_TEMPLATES=false`. The model id is `CLARITY_MODEL_NAME`. Credentials are Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`), not a key in the repo. Speech roles stay on Groq, then a local refusal.
 
