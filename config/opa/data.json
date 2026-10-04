@@ -86,6 +86,8 @@
         "case:read:any",
         "config:draft",
         "desk:queue:read",
+        "foresight:outcome:record",
+        "foresight:read",
         "receipt:read",
         "receipt:read:any",
         "rule:draft"
@@ -121,6 +123,13 @@
         "admin:manage",
         "audit:assign",
         "audit:read"
+      ],
+      "product": [
+        "config:draft",
+        "desk:queue:read",
+        "foresight:read",
+        "foresight:run",
+        "foresight:scenario:draft"
       ]
     }
   }

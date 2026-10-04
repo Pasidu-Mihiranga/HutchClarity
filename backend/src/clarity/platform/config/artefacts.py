@@ -16,7 +16,7 @@ Adopted from the alternative design's chapter 19 and ADR-0011.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Any, Self
 
@@ -132,18 +132,51 @@ class Scope(ClarityModel):
 
 
 class Guardrail(ClarityModel):
-    """A ceiling no override may exceed, approved separately and more strictly."""
+    """A ceiling no override may exceed, approved separately and more strictly.
+
+    **A numeric value written as a string is still checked** (C6). Policy YAML
+    quotes its numbers so they load as exact decimals rather than binary floats,
+    which meant every value arriving here was a `str` and `permits` returned
+    `True` for all of them: every guardrail in the repository was declared and
+    none of them bit. A key whose ceiling is advisory is a ceiling nobody is
+    held to, and `foresight.calibration.min_real_launches` is the one key where
+    that matters most, because lowering it is how a synthetic backtest would be
+    made to look like evidence.
+
+    A string that is not a number still passes. Some keys are genuinely
+    textual (`proactive.fup.warning_thresholds` is `"80,95"`), and a bound on
+    those means nothing.
+    """
 
     min: Decimal | None = None
     max: Decimal | None = None
 
     def permits(self, value: Any) -> bool:
-        if not isinstance(value, Decimal | int):
+        number = self._as_number(value)
+        if number is None:
             return True
-        number = Decimal(str(value))
         if self.min is not None and number < self.min:
             return False
         return not (self.max is not None and number > self.max)
+
+    @staticmethod
+    def _as_number(value: Any) -> Decimal | None:
+        """The value as a decimal, or ``None`` when it is not a number at all.
+
+        ``bool`` is excluded deliberately: it is an ``int`` in Python, and
+        treating ``True`` as ``1`` would let a bounded key silently accept a
+        switch.
+        """
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, Decimal | int):
+            return Decimal(str(value))
+        if isinstance(value, str):
+            try:
+                return Decimal(value.strip())
+            except InvalidOperation:
+                return None
+        return None
 
 
 class PolicyValue(ClarityModel):

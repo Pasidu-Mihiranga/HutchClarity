@@ -29,7 +29,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,6 +66,7 @@ from clarity.interfaces.http.schemas import (
     AuditGrantRequest,
     AuditGrantRevoke,
     BreakGlassRequest,
+    CandidateConfirmRequest,
     CaseSummary,
     CauseView,
     ConfirmRequest,
@@ -73,10 +74,13 @@ from clarity.interfaces.http.schemas import (
     DemoSubscriber,
     ExecutionView,
     FamilyRequest,
+    ForesightRunRequest,
+    LaunchRecordRequest,
     MerchantSuspendRequest,
     OpenCaseRequest,
     OtpRequest,
     OtpVerify,
+    OutcomeRecordRequest,
     PendingApprovalView,
     PlanView,
     PolicyDraftRequest,
@@ -90,6 +94,8 @@ from clarity.interfaces.http.schemas import (
     ReloadRequest,
     RuledOutView,
     SafeguardRequest,
+    ScenarioDraftRequest,
+    ScenarioReviseRequest,
     SessionView,
     SourceStatusView,
     StaffLogin,
@@ -116,6 +122,25 @@ from clarity.modules.assurance.public import (
     Disposition,
 )
 from clarity.modules.case.public import CaseNotFound, CaseNotReady, CaseRecord
+from clarity.modules.foresight.public import (
+    AlreadyConfirmed,
+    CatalogueInvalid,
+    ChangeType,
+    DetectedSpike,
+    ForesightReport,
+    OutcomeCandidate,
+    PostLaunchComparison,
+    Provenance,
+    RealLaunchNotPermitted,
+    RunAlreadyFinished,
+    Scenario,
+    ScenarioRun,
+    ScenarioVersion,
+    StoredCalibration,
+    StoredLaunch,
+    UnknownScenario,
+    VolumeBand,
+)
 from clarity.modules.governance.public import ChangeRefused, ImpactReport, PolicyChange
 from clarity.modules.iam.public import (
     AuditGrant,
@@ -2483,6 +2508,313 @@ def _register_routes(app: FastAPI) -> None:
             ),
         }
 
+    # ----------------------------------------------------------------- #
+    # Foresight (C4, F06)
+    #
+    # `/v1/foresight`, not `/v1/simulation`. Plan 10 section 250 says the
+    # latter and everything else, including the module, says foresight; plan 10
+    # is a chapter 01-17 document and therefore lowest precedence, so the plan
+    # is what changes (AGENTS.md section 1).
+    #
+    # Four permissions, and the separation between them is the point.
+    # `foresight:scenario:draft` and `foresight:run` belong to product;
+    # `foresight:outcome:record` deliberately does not, because the person who
+    # wants the calibration gate open must not be the one recording the evidence
+    # that opens it.
+    # ----------------------------------------------------------------- #
+
+    @app.post("/v1/foresight/scenarios", tags=["foresight"], status_code=201)
+    def draft_scenario(
+        body: ScenarioDraftRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_SCENARIO_DRAFT))],
+    ) -> dict[str, Any]:
+        """Draft a scenario. Drafting predicts nothing on its own."""
+        version = clarity.foresight_service.draft(_scenario_from(body), by=principal.ref)
+        return _scenario_view(version)
+
+    @app.post("/v1/foresight/scenarios/{scenario_id}/versions", tags=["foresight"], status_code=201)
+    def revise_scenario(
+        scenario_id: str,
+        body: ScenarioReviseRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_SCENARIO_DRAFT))],
+    ) -> dict[str, Any]:
+        """Add a version. The previous one stays readable, so a stored run
+        still cites what it actually rehearsed."""
+        try:
+            version = clarity.foresight_service.revise(
+                _scenario_from(body, scenario_id=scenario_id), by=principal.ref
+            )
+        except UnknownScenario as missing:
+            raise HTTPException(status_code=404, detail="no such scenario") from missing
+        return _scenario_view(version)
+
+    @app.get("/v1/foresight/scenarios", tags=["foresight"])
+    def list_scenarios(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """The latest version of every scenario family, newest first."""
+        return {"scenarios": [_scenario_view(v) for v in clarity.foresight_service.scenarios()]}
+
+    @app.get("/v1/foresight/scenarios/{scenario_id}", tags=["foresight"])
+    def read_scenario(
+        scenario_id: str,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """Every version of one family, oldest first."""
+        versions = clarity.foresight_service.versions_of(scenario_id)
+        if not versions:
+            raise HTTPException(status_code=404, detail="no such scenario")
+        return {
+            "scenario_id": scenario_id,
+            "versions": [_scenario_view(version) for version in versions],
+        }
+
+    @app.post("/v1/foresight/runs", tags=["foresight"], status_code=202)
+    def request_foresight_run(
+        body: ForesightRunRequest,
+        response: Response,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_RUN))],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    ) -> dict[str, Any]:
+        """Ask for a rehearsal. Answers 202 with a poll URL.
+
+        `Idempotency-Key` is required, not optional (I8). Foresight moves no
+        money, so the risk is not a double charge; it is a double finding. Two
+        runs of one scenario, reported twice, is how a rehearsal gets counted as
+        two pieces of evidence.
+        """
+        try:
+            run, is_new = clarity.foresight_service.request_run(
+                body.scenario_version_id, by=principal.ref, idempotency_key=idempotency_key
+            )
+        except UnknownScenario as missing:
+            raise HTTPException(status_code=404, detail="no such scenario version") from missing
+
+        if is_new:
+            # The rehearsal runs inline: it is milliseconds of arithmetic, and a
+            # queue the prototype has no worker for would leave every run
+            # queued forever. The 202 and the poll URL are the contract a
+            # serverless batch job keeps when plan 21 moves it (R6/R7), so a
+            # caller written today does not change.
+            try:
+                clarity.foresight_service.execute(run.run_id)
+            except RunAlreadyFinished:  # pragma: no cover - just claimed it
+                pass
+            except CatalogueInvalid as broken:
+                raise HTTPException(
+                    status_code=503, detail=f"foresight is misconfigured: {broken}"
+                ) from broken
+            run = clarity.foresight_service.run(run.run_id) or run
+
+        response.headers["Location"] = f"/v1/foresight/runs/{run.run_id}"
+        return _run_view(clarity, run, replayed=not is_new)
+
+    @app.get("/v1/foresight/runs", tags=["foresight"])
+    def list_foresight_runs(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        return {"runs": [_run_view(clarity, run) for run in clarity.foresight_service.runs()]}
+
+    @app.get("/v1/foresight/runs/{run_id}", tags=["foresight"])
+    def read_foresight_run(
+        run_id: str,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """The run, and its report once it succeeded. The poll URL."""
+        run = clarity.foresight_service.run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="no such run")
+        return _run_view(clarity, run, with_report=True)
+
+    @app.post("/v1/foresight/launches", tags=["foresight"], status_code=201)
+    def record_launch(
+        body: LaunchRecordRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_OUTCOME_RECORD))],
+    ) -> dict[str, Any]:
+        """Record that a rehearsed change shipped.
+
+        A real launch is refused with 403 until C6 lands the capability and the
+        evidence check. The refusal is deliberate: an ungated way to write the
+        evidence is worth more to somebody wanting a green gate than the gate is
+        worth to anybody else.
+        """
+        try:
+            provenance = Provenance(body.provenance)
+        except ValueError as bad:
+            raise HTTPException(status_code=422, detail="unknown provenance") from bad
+        try:
+            launch = clarity.foresight_service.record_launch(
+                scenario_version_id=body.scenario_version_id,
+                provenance=provenance,
+                by=principal.ref,
+                evidence_ref=body.evidence_ref,
+                note=body.note,
+            )
+        except RealLaunchNotPermitted as refused:
+            raise HTTPException(status_code=403, detail=str(refused)) from refused
+        except UnknownScenario as missing:
+            raise HTTPException(status_code=404, detail="no such scenario version") from missing
+        return _launch_view(launch)
+
+    @app.get("/v1/foresight/launches", tags=["foresight"])
+    def list_launches(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        return {"launches": [_launch_view(item) for item in clarity.foresight_service.launches()]}
+
+    @app.post("/v1/foresight/launches/{launch_id}/outcomes", tags=["foresight"], status_code=201)
+    def record_outcome(
+        launch_id: str,
+        body: OutcomeRecordRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_OUTCOME_RECORD))],
+    ) -> dict[str, Any]:
+        """Record one observed theme-segment band. Append-only."""
+        try:
+            band = VolumeBand(body.band)
+        except ValueError as bad:
+            raise HTTPException(status_code=422, detail="unknown band") from bad
+        try:
+            outcome = clarity.foresight_service.record_outcome(
+                launch_id=launch_id,
+                theme=body.theme,
+                segment=body.segment,
+                band=band,
+                by=principal.ref,
+            )
+        except KeyError as missing:
+            raise HTTPException(status_code=404, detail="no such launch") from missing
+        return {
+            "outcome_id": outcome.outcome_id,
+            "launch_id": outcome.launch_id,
+            "theme": outcome.theme,
+            "segment": outcome.segment,
+            "band": outcome.band.value,
+            "recorded_at": outcome.recorded_at.isoformat(),
+            "recorded_by": outcome.recorded_by,
+        }
+
+    @app.get("/v1/foresight/candidates", tags=["foresight"])
+    def list_candidates(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """Cluster-derived suggestions, inert until a person confirms one (C7).
+
+        A candidate is not an outcome. A cluster says "these complaints look
+        like one cause"; it does not say which rehearsed theme that is or which
+        segment complained. Somebody decides that, under their own name.
+        """
+        return {
+            "candidates": [_candidate_view(item) for item in clarity.foresight_loop.candidates()]
+        }
+
+    @app.post("/v1/foresight/candidates/{cluster_id}/confirm", tags=["foresight"], status_code=201)
+    def confirm_candidate(
+        cluster_id: str,
+        body: CandidateConfirmRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_OUTCOME_RECORD))],
+    ) -> dict[str, Any]:
+        """Turn a candidate into a recorded outcome, under the caller's name.
+
+        The theme, segment and band come from the person, not from the cluster.
+        This is the only way a cluster becomes evidence the calibration gate
+        reads, and it needs `foresight:outcome:record`, which `PRODUCT` does not
+        hold.
+        """
+        try:
+            band = VolumeBand(body.band)
+        except ValueError as bad:
+            raise HTTPException(status_code=422, detail="unknown band") from bad
+        try:
+            outcome = clarity.foresight_service.confirm_candidate(
+                cluster_id=cluster_id,
+                launch_id=body.launch_id,
+                theme=body.theme,
+                segment=body.segment,
+                band=band,
+                by=principal.ref,
+            )
+        except AlreadyConfirmed as twice:
+            raise HTTPException(
+                status_code=409, detail="this candidate is already recorded as an outcome"
+            ) from twice
+        except KeyError as missing:
+            raise HTTPException(status_code=404, detail="no such candidate or launch") from missing
+        return {
+            "outcome_id": outcome.outcome_id,
+            "launch_id": outcome.launch_id,
+            "theme": outcome.theme,
+            "segment": outcome.segment,
+            "band": outcome.band.value,
+            "recorded_by": outcome.recorded_by,
+            "cluster_id": cluster_id,
+        }
+
+    @app.get("/v1/foresight/launches/{launch_id}/comparison", tags=["foresight"])
+    def launch_comparison(
+        launch_id: str,
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """What the rehearsal said, beside what the launch produced (C7/F10)."""
+        comparison = clarity.foresight_service.comparison(launch_id)
+        if comparison is None:
+            raise HTTPException(status_code=404, detail="no such launch")
+        return _comparison_view(comparison)
+
+    @app.post("/v1/foresight/backtests", tags=["foresight"], status_code=201)
+    def run_backtest(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.FORESIGHT_RUN))],
+    ) -> dict[str, Any]:
+        """Replay every stored launch through the baseline and keep the result."""
+        return _calibration_view(clarity.foresight_service.backtest(by=principal.ref))
+
+    @app.get("/v1/foresight/backtests", tags=["foresight"])
+    def list_backtests(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        return {
+            "backtests": [
+                _calibration_view(item) for item in clarity.foresight_service.calibrations()
+            ]
+        }
+
+    @app.get("/v1/foresight/calibration", tags=["foresight"])
+    def read_calibration(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """The calibration a report would rest on today.
+
+        404 when no backtest has run, rather than a cheerful "not calibrated":
+        the two are different, and only one of them has been measured.
+        """
+        latest = clarity.foresight_service.latest_calibration()
+        if latest is None:
+            raise HTTPException(status_code=404, detail="no backtest has been run")
+        return _calibration_view(latest)
+
+    @app.get("/v1/foresight/spikes", tags=["foresight"])
+    def list_spikes(
+        clarity: ClarityDep,
+        _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
+    ) -> dict[str, Any]:
+        """Early-warning spikes. C5 supplies the detector that fills this."""
+        return {"spikes": [_spike_view(item) for item in clarity.foresight_service.spikes()]}
+
     @app.get(
         "/v1/demo/foresight",
         tags=["demo"],
@@ -2494,7 +2826,6 @@ def _register_routes(app: FastAPI) -> None:
             DEMO_LAUNCHES,
             ChangeType,
             Scenario,
-            ScenarioRehearsal,
         )
 
         scenario = Scenario(
@@ -2504,8 +2835,8 @@ def _register_routes(app: FastAPI) -> None:
             effective_date=date(2027, 10, 1),
         )
         calibration = clarity.foresight_backtest.run(DEMO_LAUNCHES)
+        rehearsed = clarity.foresight_rehearsal.run(scenario, seed=42)
         report = clarity.foresight.run(scenario, calibration=calibration)
-        swarm = ScenarioRehearsal(clarity.foresight_catalogue).run(scenario, seed=42)
         return {
             "run_id": report.run_id,
             "scenario": report.scenario,
@@ -2522,20 +2853,26 @@ def _register_routes(app: FastAPI) -> None:
                 for item in report.predictions
                 if item.band.value != "low"
             ],
+            # The headline is always the statistical baseline; the second column
+            # is another method's view and never sets a band (I1, C3).
             "baseline_vs_swarm": [
                 {
                     "theme": item.theme,
                     "segment": item.segment,
-                    "baseline": item.baseline.value,
-                    "swarm": item.swarm.value,
+                    "baseline": item.headline.value,
+                    "swarm": item.comparison.value if item.comparison else None,
                     "agrees": item.agrees,
                 }
-                for item in swarm.comparison
+                for item in rehearsed.comparison
             ],
             "simulation": {
-                "seed": swarm.seed,
-                "version": swarm.simulator_version,
-                "provenance": swarm.provenance,
+                "seed": rehearsed.seed,
+                "version": rehearsed.headline_simulator,
+                "comparison_version": rehearsed.comparison_simulator,
+                "agreement_rate": (
+                    str(rehearsed.agreement_rate) if rehearsed.agreement_rate is not None else None
+                ),
+                "provenance": rehearsed.provenance,
             },
             "calibration_status": calibration.status.value,
             "note": (
@@ -2543,6 +2880,231 @@ def _register_routes(app: FastAPI) -> None:
                 "Synthetic aggregate personas only; this cannot change a customer."
             ),
         }
+
+
+# --------------------------------------------------------------------------- #
+# Foresight views (C4)
+#
+# Every one of these is a rendering of a stored record. None of them computes
+# anything: a view that did arithmetic would be a second place a band could be
+# decided, and banding belongs to the module under policy thresholds (ADR-0043).
+# --------------------------------------------------------------------------- #
+
+
+def _scenario_from(body: Any, *, scenario_id: str | None = None) -> Scenario:
+    """A request body as a domain scenario.
+
+    An unknown change type is a 422 rather than a silent fall-through to an
+    empty report: "no themes configured" and "you named a type that does not
+    exist" look identical on screen and are not the same problem.
+    """
+    try:
+        change_type = ChangeType(body.change_type)
+    except ValueError as bad:
+        raise HTTPException(status_code=422, detail="unknown change type") from bad
+    fields: dict[str, Any] = {
+        "name": body.name,
+        "change_type": change_type,
+        "effective_date": body.effective_date,
+        "affected_share": body.affected_share,
+        "severity": body.severity,
+        "affected_products": tuple(body.affected_products),
+        "business_context": body.business_context,
+    }
+    if scenario_id is not None:
+        fields["scenario_id"] = scenario_id
+    return Scenario(**fields)
+
+
+def _scenario_view(version: ScenarioVersion) -> dict[str, Any]:
+    scenario = version.scenario
+    return {
+        "scenario_id": version.scenario_id,
+        "version_id": version.version_id,
+        "version": version.version,
+        "supersedes": version.supersedes,
+        "created_at": version.created_at.isoformat(),
+        "created_by": version.created_by,
+        "name": scenario.name,
+        "change_type": scenario.change_type.value,
+        "effective_date": scenario.effective_date.isoformat(),
+        "affected_share": str(scenario.affected_share),
+        "severity": str(scenario.severity),
+        "affected_products": list(scenario.affected_products),
+        "business_context": scenario.business_context,
+    }
+
+
+def _run_view(
+    clarity: Clarity,
+    run: ScenarioRun,
+    *,
+    with_report: bool = False,
+    replayed: bool = False,
+) -> dict[str, Any]:
+    view: dict[str, Any] = {
+        "run_id": run.run_id,
+        "scenario_version_id": run.scenario_version_id,
+        "status": run.status.value,
+        "requested_at": run.requested_at.isoformat(),
+        "requested_by": run.requested_by,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "report_id": run.report_id,
+        "failure": run.failure,
+        "poll_url": f"/v1/foresight/runs/{run.run_id}",
+    }
+    if replayed:
+        # Says plainly that the caller's key matched an earlier request, so a
+        # repeat is not mistaken for a second rehearsal (I8).
+        view["replayed"] = True
+    if with_report:
+        stored = clarity.foresight_service.report_of_run(run.run_id)
+        view["report"] = _foresight_report_view(stored.report) if stored else None
+    return view
+
+
+def _foresight_report_view(report: ForesightReport) -> dict[str, Any]:
+    return {
+        "report_id": report.run_id,
+        "scenario": report.scenario,
+        "scenario_id": report.scenario_id,
+        "effective_date": report.effective_date.isoformat() if report.effective_date else None,
+        "generated_at": report.generated_at.isoformat() if report.generated_at else None,
+        "basis": report.basis,
+        "caveats": list(report.caveats),
+        "backtested": report.backtested,
+        "decision_ready": report.is_decision_ready,
+        "predictions": [
+            {
+                "theme": item.theme,
+                "segment": item.segment,
+                "band": item.band.value,
+                "relative_score": str(item.relative_score),
+                "mitigation": item.suggested_mitigation,
+            }
+            for item in report.predictions
+        ],
+    }
+
+
+def _launch_view(launch: StoredLaunch) -> dict[str, Any]:
+    return {
+        "launch_id": launch.launch_id,
+        "scenario_version_id": launch.scenario_version_id,
+        "provenance": launch.provenance.value,
+        "is_real": launch.is_real,
+        "evidence_ref": launch.evidence_ref,
+        "authority": launch.authority,
+        "note": launch.note,
+        "recorded_at": launch.recorded_at.isoformat(),
+        "recorded_by": launch.recorded_by,
+    }
+
+
+def _calibration_view(stored: StoredCalibration) -> dict[str, Any]:
+    report = stored.report
+    return {
+        "calibration_id": stored.calibration_id,
+        "computed_at": stored.computed_at.isoformat(),
+        "computed_by": stored.computed_by,
+        "launch_ids": list(stored.launch_ids),
+        "status": report.status.value,
+        "calibrated": report.is_calibrated,
+        "launches": report.launches,
+        "real_launches": report.real_launches,
+        "compared": report.compared,
+        # `None` rather than a number, everywhere, when nothing was comparable.
+        # A 0.000 would read as a flawless model.
+        "mean_absolute_band_error": _opt_str(report.mean_absolute_band_error),
+        "signed_band_error": _opt_str(report.signed_band_error),
+        "exact_band_rate": _opt_str(report.exact_band_rate),
+        "top_theme_hit_rate": _opt_str(report.top_theme_hit_rate),
+        # Plan 08 section 12.9's two. Recall is the one that catches the
+        # dangerous direction: without it the band error improves as the model
+        # predicts less, because what it never predicted is excluded from it.
+        "theme_recall": _opt_str(report.theme_recall),
+        "segment_rank_correlation": _opt_str(report.segment_rank_correlation),
+        "unpredicted": [
+            {"theme": o.theme, "segment": o.segment, "band": o.band.value}
+            for o in report.unpredicted
+        ],
+        "unobserved": [{"theme": t, "segment": g} for t, g in report.unobserved],
+        "basis": report.basis,
+        "caveats": list(report.caveats),
+        "summary": report.summary(),
+    }
+
+
+def _spike_view(spike: DetectedSpike) -> dict[str, Any]:
+    return {
+        "spike_id": spike.spike_id,
+        "scope": spike.scope.value,
+        # A code, never a name: `_FORBIDDEN_SEGMENTS` rejects a `name` field on
+        # the event this becomes, and the view keeps the same discipline.
+        "scope_ref": spike.scope_ref,
+        "window_start": spike.window_start.isoformat(),
+        "window_end": spike.window_end.isoformat(),
+        "observed": spike.observed,
+        "baseline": str(spike.baseline),
+        "ratio": _opt_str(spike.ratio),
+        "detected_at": spike.detected_at.isoformat(),
+        "basis": spike.basis,
+        "caveats": list(spike.caveats),
+    }
+
+
+def _candidate_view(candidate: OutcomeCandidate) -> dict[str, Any]:
+    return {
+        "candidate_id": candidate.candidate_id,
+        "cluster_id": candidate.cluster_id,
+        "status": candidate.status,
+        "size": candidate.size,
+        "rule_id": candidate.rule_id,
+        "reviewed_by": candidate.reviewed_by,
+        "noticed_at": candidate.noticed_at.isoformat(),
+        "confirmed": candidate.is_confirmed,
+        "confirmed_by": candidate.confirmed_by,
+        "confirmed_at": (candidate.confirmed_at.isoformat() if candidate.confirmed_at else None),
+        "outcome_id": candidate.outcome_id,
+    }
+
+
+def _comparison_view(comparison: PostLaunchComparison) -> dict[str, Any]:
+    return {
+        "launch_id": comparison.launch_id,
+        "scenario_version_id": comparison.scenario_version_id,
+        "provenance": comparison.provenance,
+        "compared": comparison.compared,
+        "agreement_rate": _opt_str(comparison.agreement_rate),
+        "pairs": [
+            {
+                "theme": pair.theme,
+                "segment": pair.segment,
+                "predicted": pair.predicted.value,
+                # `null`, never "low": absence of a record is absence of a
+                # record, and the backtest refuses to average it in either.
+                "observed": pair.observed.value if pair.observed else None,
+                "agrees": pair.agrees,
+            }
+            for pair in comparison.pairs
+        ],
+        "unpredicted": [{"theme": t, "segment": g} for t, g in comparison.unpredicted],
+        "cluster_rates": [
+            {
+                "cluster_id": rate.cluster_id,
+                "size": rate.size,
+                "status": rate.status,
+                "rule_id": rate.rule_id,
+            }
+            for rate in comparison.cluster_rates
+        ],
+        "caveats": list(comparison.caveats),
+    }
+
+
+def _opt_str(value: Any) -> str | None:
+    return None if value is None else str(value)
 
 
 def _verification_view(clarity: Clarity, receipt_id: str) -> VerificationView:

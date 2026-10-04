@@ -7,7 +7,8 @@ internal plumbing like policy input hashes or adapter references.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -395,3 +396,79 @@ class AlertDisposal(ApiModel):
 
     disposition: str = Field(description="confirmed | false_positive | accepted_risk")
     reason: str
+
+
+# --------------------------------------------------------------------------- #
+# Foresight (C4, F06)
+# --------------------------------------------------------------------------- #
+
+
+class ScenarioDraftRequest(ApiModel):
+    """A change to rehearse.
+
+    ``effective_date`` is required because the whole run resolves policy as of
+    it: a rehearsal is about a change that lands on a day, so the parameters it
+    uses are the ones in force on that day (C1).
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    change_type: str = Field(description="One of the ChangeType values, e.g. pack_retired.")
+    effective_date: date
+    affected_share: Decimal = Field(default=Decimal("1.0"), ge=0, le=1)
+    severity: Decimal = Field(default=Decimal("1.0"), gt=0, le=10)
+    affected_products: list[str] = Field(default_factory=list, max_length=50)
+    business_context: str = Field(default="", max_length=2000)
+
+
+class ScenarioReviseRequest(ScenarioDraftRequest):
+    """The next version of an existing scenario family.
+
+    The whole scenario, not a patch: a version is a complete statement of what
+    is being rehearsed, and a partial update would leave a reader of version 2
+    reconstructing it from version 1.
+    """
+
+
+class ForesightRunRequest(ApiModel):
+    """Ask for a rehearsal of one scenario version."""
+
+    scenario_version_id: str = Field(min_length=1)
+    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+
+
+class LaunchRecordRequest(ApiModel):
+    """Record that a rehearsed change shipped."""
+
+    scenario_version_id: str = Field(min_length=1)
+    provenance: str = Field(
+        default="synthetic",
+        description=(
+            "synthetic or real. Recording a real launch is refused until the "
+            "capability and evidence checks land (C6)."
+        ),
+    )
+    evidence_ref: str | None = Field(default=None, max_length=200)
+    note: str = Field(default="", max_length=2000)
+
+
+class OutcomeRecordRequest(ApiModel):
+    """One observed theme-segment band for a launch."""
+
+    theme: str = Field(min_length=1, max_length=200)
+    segment: str = Field(min_length=1, max_length=200)
+    band: str = Field(description="low, medium or high.")
+
+
+class CandidateConfirmRequest(ApiModel):
+    """What a person decides a cluster means (C7).
+
+    The theme, the segment and the band all come from the caller. A cluster
+    says complaints look like one cause; it does not say which rehearsed theme
+    that is, and the system filling these in would be deciding what its own
+    evidence means.
+    """
+
+    launch_id: str = Field(min_length=1)
+    theme: str = Field(min_length=1, max_length=200)
+    segment: str = Field(min_length=1, max_length=200)
+    band: str = Field(description="low, medium or high.")

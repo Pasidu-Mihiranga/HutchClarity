@@ -32,6 +32,15 @@ class Role(StrEnum):
     AUDITOR = "auditor"
     PLATFORM_ADMIN = "platform_admin"
     SECURITY_ADMIN = "security_admin"
+    PRODUCT = "product"
+    """Owns what the product does: rehearses a change before it ships (C4).
+
+    Added with the foresight API, but the name was already in use:
+    ``config/policy/proactive.yaml`` and ``config/policy/foresight.yaml`` both
+    write ``owner_role: product``, and until now no ``Role`` member matched it.
+    A policy key owned by a role that does not exist is a key nobody can be held
+    to.
+    """
 
     @property
     def is_staff(self) -> bool:
@@ -100,6 +109,22 @@ class Permission(StrEnum):
     SELF_TRANSACT = "self:transact"
     """Simulated HUTCH self-care that moves money or changes a service on your own
     account: reload, buy a pack, cancel a subscription. Not a Clarity remedy."""
+    FORESIGHT_READ = "foresight:read"
+    """Read scenarios, runs, reports, backtests and spikes."""
+    FORESIGHT_SCENARIO_DRAFT = "foresight:scenario:draft"
+    """Draft and revise a scenario. Drafting predicts nothing on its own."""
+    FORESIGHT_RUN = "foresight:run"
+    """Ask for a rehearsal, and ask for a backtest to be recomputed."""
+    FORESIGHT_OUTCOME_RECORD = "foresight:outcome:record"
+    """Record what a launch actually produced.
+
+    Deliberately **not** held by :attr:`Role.PRODUCT`. The person who wants the
+    calibration gate open must not be the person who records the evidence that
+    opens it: recorded outcomes are the only thing that can move a backtest to
+    ``CALIBRATED``, and they are append-only precisely because somebody would
+    otherwise be tempted. This is the same separation as a maker and a checker
+    on the money path, applied to evidence instead of to a refund.
+    """
 
 
 #: Permissions that move money or change a paid service. Admins never hold
@@ -111,6 +136,11 @@ MONEY_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.ACTION_CONFIRM_OWN,
     }
 )
+
+#: Recording what a launch did is evidence about the system's own accuracy, so
+#: it sits beside the audit duties in spirit: the person who benefits from a
+#: favourable record must not be the person writing it (C4, plan 02 section 3.4).
+FORESIGHT_EVIDENCE: frozenset[Permission] = frozenset({Permission.FORESIGHT_OUTCOME_RECORD})
 
 #: Duties that watch the trail. Holding any of them removes money permissions,
 #: however it was obtained: a monitor must not be able to approve the refunds
@@ -221,6 +251,19 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.AUTOPSY_REVIEW,
             Permission.RULE_DRAFT,
             Permission.CONFIG_DRAFT,
+            # CX writes the migration cards and scripts a rehearsal asks for, and
+            # is the one who observes what a launch actually produced.
+            Permission.FORESIGHT_READ,
+            Permission.FORESIGHT_OUTCOME_RECORD,
+        }
+    ),
+    Role.PRODUCT: frozenset(
+        {
+            Permission.FORESIGHT_READ,
+            Permission.FORESIGHT_SCENARIO_DRAFT,
+            Permission.FORESIGHT_RUN,
+            Permission.CONFIG_DRAFT,
+            Permission.DESK_QUEUE_READ,
         }
     ),
     Role.COMPLIANCE: frozenset(

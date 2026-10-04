@@ -21,9 +21,89 @@ from clarity.modules.foresight.catalogue import (
     CatalogueInvalid,
     ChangeType,
     ForesightCatalogue,
+    PersonaRounds,
+    RadarSettings,
     Segment,
     ThemeCatalogue,
     ThemeWeight,
+)
+from clarity.modules.foresight.loop import (
+    CANDIDATES as FORESIGHT_CANDIDATES,
+)
+from clarity.modules.foresight.loop import (
+    AutopsyLoop,
+    ClusterRate,
+    ClusterRateSource,
+    OutcomeCandidate,
+    PairOutcome,
+    PostLaunchComparison,
+)
+from clarity.modules.foresight.personas import (
+    LlmPersonaSimulator,
+    PersonaInvoke,
+    PersonaRouter,
+    PersonaRun,
+    PersonaSimulator,
+    Propensity,
+    RoleRouterPersonas,
+    RoundBasedPersonaSimulator,
+    StatisticalBaseline,
+)
+from clarity.modules.foresight.radar import (
+    OBSERVATIONS as FORESIGHT_OBSERVATIONS,
+)
+from clarity.modules.foresight.radar import (
+    ComplaintObservation,
+    ComplaintRadar,
+)
+from clarity.modules.foresight.records import (
+    DetectedSpike,
+    RecordedOutcome,
+    RunStatus,
+    ScenarioRun,
+    ScenarioVersion,
+    SpikeScope,
+    StoredCalibration,
+    StoredLaunch,
+    StoredReport,
+)
+from clarity.modules.foresight.rehearsal import (
+    PairComparison,
+    PersonaRehearsal,
+    RehearsalReport,
+)
+from clarity.modules.foresight.repository import (
+    CALIBRATIONS as FORESIGHT_CALIBRATIONS,
+)
+from clarity.modules.foresight.repository import (
+    LAUNCHES as FORESIGHT_LAUNCHES,
+)
+from clarity.modules.foresight.repository import (
+    OUTCOMES as FORESIGHT_OUTCOMES,
+)
+from clarity.modules.foresight.repository import (
+    REPORTS as FORESIGHT_REPORTS,
+)
+from clarity.modules.foresight.repository import (
+    RUNS as FORESIGHT_RUNS,
+)
+from clarity.modules.foresight.repository import (
+    SCENARIOS as FORESIGHT_SCENARIOS,
+)
+from clarity.modules.foresight.repository import (
+    SPIKES as FORESIGHT_SPIKES,
+)
+from clarity.modules.foresight.repository import (
+    ForesightRepository,
+    StoredForesightRepository,
+)
+from clarity.modules.foresight.service import (
+    AlreadyConfirmed,
+    ForesightService,
+    RealLaunchNotPermitted,
+    RunAlreadyFinished,
+    UnknownRun,
+    UnknownScenario,
 )
 from clarity.modules.foresight.simulation import (
     Foresight,
@@ -32,39 +112,77 @@ from clarity.modules.foresight.simulation import (
     Scenario,
     VolumeBand,
     as_of_for,
-)
-from clarity.modules.foresight.swarm import (
-    Comparison,
-    PersonaSimulator,
-    ScenarioRehearsal,
-    SeededPersonaSimulator,
-    SwarmReport,
+    score_of,
 )
 
 __all__ = [
     "DEMO_LAUNCHES",
+    "FORESIGHT_CALIBRATIONS",
+    "FORESIGHT_CANDIDATES",
+    "FORESIGHT_LAUNCHES",
+    "FORESIGHT_OBSERVATIONS",
+    "FORESIGHT_OUTCOMES",
+    "FORESIGHT_REPORTS",
+    "FORESIGHT_RUNS",
+    "FORESIGHT_SCENARIOS",
+    "FORESIGHT_SPIKES",
+    "AlreadyConfirmed",
+    "AutopsyLoop",
     "Backtest",
     "Bands",
     "CalibrationReport",
     "CalibrationStatus",
     "CatalogueInvalid",
     "ChangeType",
-    "Comparison",
+    "ClusterRate",
+    "ClusterRateSource",
+    "ComplaintObservation",
+    "ComplaintRadar",
+    "DetectedSpike",
     "Foresight",
     "ForesightCatalogue",
     "ForesightReport",
+    "ForesightRepository",
+    "ForesightService",
     "HistoricLaunch",
+    "LlmPersonaSimulator",
     "ObservedOutcome",
+    "OutcomeCandidate",
+    "PairComparison",
+    "PairOutcome",
+    "PersonaInvoke",
+    "PersonaRehearsal",
+    "PersonaRounds",
+    "PersonaRouter",
+    "PersonaRun",
     "PersonaSimulator",
+    "PostLaunchComparison",
     "Prediction",
+    "Propensity",
     "Provenance",
+    "RadarSettings",
+    "RealLaunchNotPermitted",
+    "RecordedOutcome",
+    "RehearsalReport",
+    "RoleRouterPersonas",
+    "RoundBasedPersonaSimulator",
+    "RunAlreadyFinished",
+    "RunStatus",
     "Scenario",
-    "ScenarioRehearsal",
-    "SeededPersonaSimulator",
+    "ScenarioRun",
+    "ScenarioVersion",
     "Segment",
-    "SwarmReport",
+    "SpikeScope",
+    "StatisticalBaseline",
+    "StoredCalibration",
+    "StoredForesightRepository",
+    "StoredLaunch",
+    "StoredReport",
     "ThemeCatalogue",
     "ThemeWeight",
+    "UnknownRun",
+    "UnknownScenario",
     "VolumeBand",
     "as_of_for",
+    "score_of",
 ]

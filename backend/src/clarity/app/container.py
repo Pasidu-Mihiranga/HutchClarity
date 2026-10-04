@@ -74,7 +74,20 @@ from clarity.modules.conversation.public import (
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
-from clarity.modules.foresight.public import Backtest, Foresight, ForesightCatalogue
+from clarity.modules.foresight.public import (
+    AutopsyLoop,
+    Backtest,
+    ClusterRate,
+    ComplaintRadar,
+    Foresight,
+    ForesightCatalogue,
+    ForesightService,
+    LlmPersonaSimulator,
+    PersonaRehearsal,
+    PersonaSimulator,
+    RoleRouterPersonas,
+    RoundBasedPersonaSimulator,
+)
 from clarity.modules.governance.public import (
     CHANGES,
     PolicyGovernance,
@@ -417,6 +430,37 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
 INSIGHT_EVENTS: tuple[EventType, ...] = tuple(payload.event_type for payload in PROJECTED)
 
 
+class _AutopsyClusterRates:
+    """Foresight's `ClusterRateSource`, over autopsy's public surface (C7/F10).
+
+    Here rather than inside foresight, so foresight neither imports `autopsy`
+    nor reads its tables (I6). The composition root is the one place that knows
+    both modules exist, which is why the port is wired rather than imported:
+    a synchronous L4-to-L4 dependency would have to be declared in the
+    dependency map, plan 21 section 11.2, `docs/modules.md`, `ARCHITECTURE.md`
+    and both `MODULE.md` files, and it would stop foresight running as the batch
+    job plan 21 moves it to.
+
+    **Codes and counts only.** The cluster's label is derived from what
+    customers wrote, so it does not cross this boundary; a reader who needs it
+    asks autopsy.
+    """
+
+    def __init__(self, autopsy: AutopsyService) -> None:
+        self._autopsy = autopsy
+
+    def rates(self) -> tuple[ClusterRate, ...]:
+        return tuple(
+            ClusterRate(
+                cluster_id=held.cluster.cluster_id,
+                size=held.cluster.size,
+                status=held.cluster.status.value,
+                rule_id=held.cluster.suggested_rule_id,
+            )
+            for held in self._autopsy.clusters()
+        )
+
+
 def _complaint_source() -> ComplaintSource | None:
     """Where autopsy reads complaint text from (AU01).
 
@@ -537,6 +581,48 @@ class _RolePlanner:
             model_role=ModelRole.REASON.value,
             model=answer.model,
         )
+
+
+def _persona_comparison(
+    router: RoleRouter, catalogue: ModelCatalogue, foresight: ForesightCatalogue
+) -> PersonaSimulator:
+    """Which second method sits beside the baseline (C3/F11).
+
+    The LLM driver when a remote `reason` model is configured, the round-based
+    one otherwise. Mirrors `_planner`'s test deliberately: a template cannot
+    estimate a propensity, so wiring one would mean a wasted call and an empty
+    column on every rehearsal.
+
+    Either way this is the **comparison** argument. `PersonaRehearsal` builds the
+    statistical baseline itself, so nothing here can put a model in charge of a
+    reported band (I1).
+    """
+    chain = catalogue.routing(ModelRole.REASON).chain
+    for step in chain:
+        if not step.is_local and step.provider in router.configured:
+            return LlmPersonaSimulator(foresight, router=RoleRouterPersonas(_PersonaInvoke(router)))
+    return RoundBasedPersonaSimulator(foresight)
+
+
+class _PersonaInvoke:
+    """Asks the `reason` role and hands back text, or nothing.
+
+    A refusal or a template answer becomes `None` rather than text: a template
+    has no view on how a segment reacts, and parsing its wording for numbers
+    would be inventing a second opinion out of a first one's absence.
+    """
+
+    def __init__(self, router: RoleRouter) -> None:
+        self._router = router
+
+    def __call__(self, system: str, facts: dict[str, object], user: str) -> str | None:
+        answer = self._router.invoke(
+            ModelRole.REASON,
+            Prompt(system=system, facts=facts, user_masked=user, language=Language.EN),
+        )
+        if answer.is_refusal or answer.provider in LOCAL_PROVIDERS:
+            return None
+        return answer.text
 
 
 class _RoleProvider:
@@ -1093,6 +1179,55 @@ class Clarity:
         self.foresight_catalogue = ForesightCatalogue(self.policies)
         self.foresight = Foresight(self.foresight_catalogue, clock=self.now)
         self.foresight_backtest = Backtest(self.foresight_catalogue, clock=self.now)
+        # What a rehearsal said, and what the change actually did (C2/F05).
+        # Six of its seven collections are append-only; `foresight.runs` is the
+        # exception because a caller polls it.
+        # The autopsy loop (C7/F10): clusters in, predicted-versus-actual out.
+        # Foresight stays a leaf; the driver lives here.
+        self.foresight_loop = AutopsyLoop(
+            open_unit=self.open_unit,
+            clusters=_AutopsyClusterRates(self.autopsy),
+            clock=self.now,
+        )
+        self.consumers.register(
+            EventType.CLUSTER_UPDATED,
+            group="foresight-loop",
+            handler=self.foresight_loop.on_cluster_updated,
+        )
+        self.foresight_service = ForesightService(
+            open_unit=self.open_unit,
+            catalogue=self.foresight_catalogue,
+            clock=self.now,
+            # No profile wires a real-launch capability (C6, lock 3). The
+            # prototype has no record of a HUTCH launch and its complaint
+            # outcomes to point at (REQUIRES HUTCH CONFIRMATION), so there is
+            # nothing to permit. A deployment that has such records supplies one
+            # here, which is the single place that decision is made, and the
+            # calibration gate stays shut until it does.
+            real_launches=None,
+            loop=self.foresight_loop,
+        )
+        # The baseline is the headline and a second method sits beside it
+        # (C3/F11). `PersonaRehearsal` constructs the baseline itself, so the
+        # only thing wired here is the comparison column.
+        self.foresight_rehearsal = PersonaRehearsal(
+            self.foresight_catalogue,
+            comparison=_persona_comparison(self.roles, self.models, self.foresight_catalogue),
+            clock=self.now,
+        )
+        # The early-warning radar (C5/F08). It consumes the same
+        # `complaint.created` autopsy does and shares nothing with it: autopsy
+        # reads what people said, the radar only counts.
+        self.foresight_radar = ComplaintRadar(
+            open_unit=self.open_unit,
+            catalogue=self.foresight_catalogue,
+            clock=self.now,
+        )
+        self.consumers.register(
+            EventType.COMPLAINT_CREATED,
+            group="foresight-radar",
+            handler=self.foresight_radar.on_complaint_created,
+        )
 
         # Insights read models, folded from the event log (I01, #30). The
         # dashboards used to read live objects, which meant whatever was in one

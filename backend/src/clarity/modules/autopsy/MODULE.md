@@ -81,6 +81,9 @@ a surprise, and the real workspace route must never import a mock driver.
 ## 5. Data owned
 In-memory structures in the `lite` profile. Target: one PostgreSQL schema `autopsy` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
+## 5a. Events produced
+`cluster.updated` on every recorded review (C7), in the same transaction as the verdict (I7). It carries **codes and counts only**: `cluster_id`, `status`, `size`, `suggested_rule_id` and who reviewed it. No label and no keywords, because a cluster's label is derived from what customers wrote and this module exists so that text stays in one place. `foresight` consumes it to notice that a shipped change produced something; a consumer that needs the label asks here for it.
+
 ## 6. Invariants
 - **Seeing a cluster and ruling on one are different permissions** (D1). Reading the workspace is `desk:queue:read`; recording a verdict is `autopsy:review`; proposing a policy change from a confirmed cluster is `rule:draft` on top. A reviewer who could do all three by holding one permission would have a confirmation already halfway to a published rule.
 - **The reviewer is the authenticated caller**, never a field in a request body. An anonymous verdict is not an audit record, and one attributed to whatever the caller typed is worse than none.
