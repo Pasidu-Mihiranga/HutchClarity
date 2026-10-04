@@ -57,9 +57,18 @@ jobs:
             sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)
           fi
           [[ $sha =~ ^[0-9a-f]{40}$ ]]
-          branch=$(gh api "repos/${GITHUB_REPOSITORY}/commits/$sha/branches-where-head" \
-            --jq 'map(select(.name == "main")) | length')
-          [[ $branch -eq 1 ]]
+          head=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)
+          # Two merges in quick succession start two CI runs. The older one's
+          # deploy must not land after the newer one, and failing it would
+          # report a broken pipeline that is not broken: skip it.
+          if [[ "${{ github.event_name }}" == workflow_run && $sha != "$head" ]]; then
+            echo "::notice::$sha is no longer the head of main ($head); its own run deploys the newer commit"
+            echo "operation=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A manual deploy may name an older commit, but only one on main.
+          on_main=$(gh api "repos/${GITHUB_REPOSITORY}/compare/$sha...main" --jq .status)
+          [[ $on_main == identical || $on_main == ahead ]]
           passed=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=$sha&status=success&per_page=1" \
             --jq '.total_count')
           [[ $passed -ge 1 ]]
@@ -100,6 +109,7 @@ jobs:
           done
 
       - name: Configure pinned SSH
+        if: steps.release.outputs.operation != 'skip'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
           KNOWN_HOSTS: ${{ secrets.HETZNER_KNOWN_HOSTS }}
