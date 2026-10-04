@@ -53,7 +53,7 @@ export default function HomePage() {
         borderTop: "3px solid var(--orange)",
         borderRadius: "var(--radius)",
         padding: "18px 20px",
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         boxShadow: "var(--shadow)",
         marginBottom: 14,
       }}>
@@ -66,7 +66,7 @@ export default function HomePage() {
           style={{
             marginTop: 14,
             background: "var(--orange)",
-            color: "#fff",
+            color: "rgb(var(--c-on-primary))",
             border: 0,
             borderRadius: 999,
             padding: "10px 24px",
@@ -85,7 +85,7 @@ export default function HomePage() {
         border: "1px solid var(--line)",
         borderRadius: "var(--radius)",
         padding: "16px 20px",
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         boxShadow: "var(--shadow)",
         marginBottom: 14,
       }}>
@@ -94,16 +94,16 @@ export default function HomePage() {
         <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
           Data remaining: {remaining} GB &nbsp;·&nbsp; Valid for {pack.days_left} days
         </p>
-        <div style={{ height: 6, borderRadius: 999, background: "#f4f4f5", overflow: "hidden" }}>
+        <div style={{ height: 6, borderRadius: 999, background: "rgb(var(--c-surface-2))", overflow: "hidden" }}>
           <div style={{
             height: "100%",
             width: `${usedPct}%`,
-            background: usedPct >= 80 ? "#f59e0b" : "var(--orange)",
+            background: usedPct >= 80 ? "rgb(var(--c-warning))" : "var(--orange)",
             borderRadius: 999,
           }} />
         </div>
         {usedPct >= 80 && (
-          <p style={{ fontSize: 12, color: "#f59e0b", margin: "6px 0 0", fontWeight: 600 }}>
+          <p style={{ fontSize: 12, color: "rgb(var(--c-warning))", margin: "6px 0 0", fontWeight: 600 }}>
             Fair use cap active - speed reduced
           </p>
         )}
@@ -122,8 +122,8 @@ export default function HomePage() {
             onClick={() => router.push(href)}
             style={{
               border: "1px solid var(--line)",
-              background: "#fff",
-              borderRadius: "var(--radius-sm)",
+              background: "rgb(var(--c-surface))",
+              borderRadius: "var(--radius-card-sm)",
               padding: "12px 6px",
               fontSize: 12,
               fontWeight: 600,
@@ -146,7 +146,7 @@ export default function HomePage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          border: "1.5px solid #fdd5c0",
+          border: "1.5px solid rgb(var(--c-primary) / 0.3)",
           borderRadius: "var(--radius)",
           background: "var(--orange-soft)",
           padding: "16px 18px",
@@ -183,8 +183,8 @@ export default function HomePage() {
                 alignItems: "center",
                 gap: 12,
                 border: "1px solid var(--line)",
-                borderRadius: "var(--radius-sm)",
-                background: "#fff",
+                borderRadius: "var(--radius-card-sm)",
+                background: "rgb(var(--c-surface))",
                 padding: "14px 16px",
                 cursor: "pointer",
                 fontFamily: "inherit",

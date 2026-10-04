@@ -1,0 +1,182 @@
+/*
+ * Hutch Clarity design tokens.
+ *
+ * Colours are stored as space-separated RGB channels so Tailwind can apply an
+ * alpha value (`bg-primary/10`). Every app imports this file once and loads
+ * `tailwind-preset.js`; no component carries a literal colour.
+ *
+ * Light is the default. Dark applies when `data-theme="dark"` is set on <html>
+ * (see ThemeProvider), or when the system prefers dark and no explicit theme
+ * was chosen.
+ *
+ * Contrast (WCAG AA, 4.5:1 for text) is checked in test/tokens.test.ts.
+ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --c-bg: 246 247 249;
+  --c-surface: 255 255 255;
+  --c-surface-2: 241 243 245;
+  --c-border: 225 229 233;
+  --c-border-strong: 190 197 205;
+
+  /* Text */
+  --c-fg: 23 26 31;
+  --c-fg-muted: 98 106 118;
+  --c-fg-subtle: 120 128 140;
+
+  /* Brand (Hutch orange). White text sits on --c-primary at 5.2:1. */
+  --c-primary: 194 65 12;
+  --c-primary-hover: 154 52 18;
+  --c-primary-soft: 255 241 235;
+  --c-on-primary: 255 255 255;
+  --c-brand: 242 98 38;
+
+  /* Status */
+  --c-success: 4 120 87;
+  --c-success-soft: 220 252 231;
+  --c-warning: 180 83 9;
+  --c-warning-soft: 254 243 199;
+  --c-danger: 185 28 28;
+  --c-danger-soft: 254 226 226;
+  --c-info: 3 105 161;
+  --c-info-soft: 224 242 254;
+
+  --c-focus: 194 65 12;
+  --c-overlay: 24 24 27;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --shadow-3: 0 12px 40px rgb(0 0 0 / 0.18);
+
+  /* Type */
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", var(--font-sans);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-bg: 15 17 21;
+  --c-surface: 24 27 33;
+  --c-surface-2: 33 37 45;
+  --c-border: 52 58 68;
+  --c-border-strong: 84 92 105;
+
+  --c-fg: 240 242 245;
+  --c-fg-muted: 160 168 180;
+  --c-fg-subtle: 130 138 150;
+
+  --c-primary: 255 122 61;
+  --c-primary-hover: 255 150 100;
+  --c-primary-soft: 58 32 20;
+  --c-on-primary: 23 14 8;
+  --c-brand: 255 122 61;
+
+  --c-success: 74 222 128;
+  --c-success-soft: 20 60 40;
+  --c-warning: 251 191 36;
+  --c-warning-soft: 66 48 10;
+  --c-danger: 252 129 129;
+  --c-danger-soft: 72 26 26;
+  --c-info: 125 200 250;
+  --c-info-soft: 16 48 70;
+
+  --c-focus: 255 150 100;
+  --c-overlay: 0 0 0;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-3: 0 12px 40px rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --c-bg: 15 17 21;
+    --c-surface: 24 27 33;
+    --c-surface-2: 33 37 45;
+    --c-border: 52 58 68;
+    --c-border-strong: 84 92 105;
+    --c-fg: 240 242 245;
+    --c-fg-muted: 160 168 180;
+    --c-fg-subtle: 130 138 150;
+    --c-primary: 255 122 61;
+    --c-primary-hover: 255 150 100;
+    --c-primary-soft: 58 32 20;
+    --c-on-primary: 23 14 8;
+    --c-brand: 255 122 61;
+    --c-success: 74 222 128;
+    --c-success-soft: 20 60 40;
+    --c-warning: 251 191 36;
+    --c-warning-soft: 66 48 10;
+    --c-danger: 252 129 129;
+    --c-danger-soft: 72 26 26;
+    --c-info: 125 200 250;
+    --c-info-soft: 16 48 70;
+    --c-focus: 255 150 100;
+    --c-overlay: 0 0 0;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+    --shadow-3: 0 12px 40px rgb(0 0 0 / 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+  }
+}
+
+/* Component keyframes (Dialog, Toast, Skeleton, Spinner). */
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-rise-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+@keyframes ui-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+.ui-anim-fade { animation: ui-fade-in var(--dur-base) var(--ease-out) both; }
+.ui-anim-rise { animation: ui-rise-in var(--dur-base) var(--ease-out) both; }
+.ui-anim-spin { animation: ui-spin 0.8s linear infinite; }
+.ui-anim-pulse { animation: ui-pulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-anim-fade, .ui-anim-rise, .ui-anim-pulse { animation: none; }
+  .ui-anim-spin { animation-duration: 2.4s; }
+}

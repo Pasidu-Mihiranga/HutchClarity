@@ -18,7 +18,7 @@ export function ChargeHero({
   return (
     <div
       style={{
-        background: "#fff",
+        background: "rgb(var(--c-surface))",
         border: "1px solid var(--line)",
         borderTop: `3px solid var(--orange)`,
         borderRadius: "var(--radius)",
@@ -37,8 +37,8 @@ export function ChargeHero({
             fontWeight: 700,
             letterSpacing: ".04em",
             textTransform: "uppercase",
-            background: isOpen ? "#fff1eb" : "#dcfce7",
-            color: isOpen ? "#c2410c" : "#14532d",
+            background: isOpen ? "rgb(var(--c-primary-soft))" : "rgb(var(--c-success-soft))",
+            color: isOpen ? "rgb(var(--c-primary))" : "rgb(var(--c-success))",
           }}
         >
           {state}
@@ -52,8 +52,8 @@ export function ChargeHero({
               borderRadius: 999,
               fontSize: 12,
               fontWeight: 700,
-              background: "#f4f4f5",
-              color: "#52525b",
+              background: "rgb(var(--c-surface-2))",
+              color: "rgb(var(--c-fg-muted))",
             }}
           >
             Placeholder
