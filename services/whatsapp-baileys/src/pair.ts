@@ -6,7 +6,11 @@ import makeWASocket, {
 import pino from "pino"
 import qrcode from "qrcode-terminal"
 import { loadConfig, pairingPhone } from "./config.js"
-import { shouldRequestPairingCode, shouldRestartPairedSession } from "./pairing.js"
+import {
+  createCredentialWriteQueue,
+  shouldRequestPairingCode,
+  shouldRestartPairedSession,
+} from "./pairing.js"
 
 process.umask(0o077)
 const config = loadConfig({ ...process.env, WHATSAPP_ENABLED: "false" })
@@ -23,9 +27,10 @@ async function connect(requestPhoneCode: boolean): Promise<"paired" | "restart">
     logger,
     markOnlineOnConnect: false,
   })
-  socket.ev.on("creds.update", saveCreds)
 
   return new Promise((resolve, reject) => {
+    const credentialWrites = createCredentialWriteQueue(saveCreds)
+    socket.ev.on("creds.update", () => void credentialWrites.enqueue().catch(reject))
     let requested = !requestPhoneCode
     const timer = setTimeout(() => reject(new Error("WhatsApp pairing timed out")), 120_000)
     socket.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
@@ -41,13 +46,15 @@ async function connect(requestPhoneCode: boolean): Promise<"paired" | "restart">
       }
       if (connection === "open") {
         clearTimeout(timer)
-        resolve("paired")
+        void credentialWrites.flush().then(() => resolve("paired"), reject)
       }
       if (connection === "close") {
         clearTimeout(timer)
         const error = lastDisconnect?.error
         const status = error instanceof Boom ? error.output.statusCode : undefined
-        if (shouldRestartPairedSession(status, state.creds.registered)) resolve("restart")
+        if (shouldRestartPairedSession(status, state.creds.registered)) {
+          void credentialWrites.flush().then(() => resolve("restart"), reject)
+        }
         else reject(error ?? new Error("pairing connection closed"))
       }
     })
