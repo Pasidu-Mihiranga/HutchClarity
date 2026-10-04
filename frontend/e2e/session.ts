@@ -25,14 +25,23 @@ export const DILANI = "+94771234567";
 
 const API = process.env.E2E_API_BASE ?? "http://127.0.0.1:8100";
 
-let cached: string | null = null;
+const cached = new Map<string, string>();
 
-/** Mint a customer token through the API, once per worker. */
-export async function customerToken(request: APIRequestContext): Promise<string> {
-  if (cached) return cached;
+/**
+ * Mint a customer token through the API, once per subscriber per worker.
+ *
+ * Cached per number, not globally: the four journeys belong to four different
+ * synthetic subscribers, and each one's challenge budget is its own.
+ */
+export async function customerTokenFor(
+  request: APIRequestContext,
+  msisdn: string,
+): Promise<string> {
+  const hit = cached.get(msisdn);
+  if (hit) return hit;
 
   const started = await request.post(`${API}/v1/auth/otp/request`, {
-    data: { msisdn: DILANI },
+    data: { msisdn },
   });
   expect(started.ok(), `otp request failed: ${started.status()}`).toBeTruthy();
   const { challenge_id } = (await started.json()) as { challenge_id: string };
@@ -40,7 +49,7 @@ export async function customerToken(request: APIRequestContext): Promise<string>
   // The code is generated per challenge. There is no "any six digits" path:
   // the backend answers 401 to anything else.
   const inbox = await request.get(
-    `${API}/v1/demo/inbox?msisdn=${encodeURIComponent(DILANI)}`,
+    `${API}/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`,
   );
   expect(inbox.ok(), `demo inbox failed: ${inbox.status()}`).toBeTruthy();
   const { code } = (await inbox.json()) as { code: string };
@@ -51,8 +60,13 @@ export async function customerToken(request: APIRequestContext): Promise<string>
   expect(verified.ok(), `otp verify failed: ${verified.status()}`).toBeTruthy();
   const { token } = (await verified.json()) as { token: string };
 
-  cached = token;
+  cached.set(msisdn, token);
   return token;
+}
+
+/** Dilani, whose journey most of the suite drives. */
+export async function customerToken(request: APIRequestContext): Promise<string> {
+  return customerTokenFor(request, DILANI);
 }
 
 /** Put the session in place before any page script runs. */
@@ -76,6 +90,7 @@ export const VERIFY = process.env.E2E_VERIFY_BASE ?? "http://127.0.0.1:3102";
 
 /** The other synthetic subscribers, by the outcome their case reaches. */
 export const NIMAL = "+94772223333"; // duplicate reload -> AUTO_FIX
+export const KUMAR = "+94773334444"; // disclosed fair-use cap -> EXPLAIN_ONLY
 export const PRIYA = "+94774445555"; // LKR 12,000 reload, SIM swap -> STAFF_APPROVAL
 
 /**

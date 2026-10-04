@@ -28,6 +28,17 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Fixed (FE01, #28)
 
+- **The customer chat never read the signed-in customer's account.** The page
+  held a hardcoded literal with `activity: []` and no setter, and
+  `accountIntents` reads exactly those fields to decide whether a question
+  reaches the rule engine. It answered `false` for `twice`, `slow`, `sub` and
+  `missing` for every customer, so three of the four demo journeys rendered
+  "Could not confirm" while the backend had a decision waiting: Nimal's
+  duplicate reload (`AUTO_FIX`, LKR 3,500.00) and Kumar's active fair-use cap
+  (`EXPLAIN_ONLY`) were both contradicted on screen. The page now fetches
+  `GET /v1/me/app`, and the greeting uses the customer's own name rather than
+  a constant.
+
 - **The public verify page no longer reports an unverified receipt as valid.**
   It fell back to a "placeholder" verdict whenever the API call failed, and
   that verdict was *valid* for any id not containing the string "bad", so an

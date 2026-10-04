@@ -25,7 +25,7 @@ Next.js 14 apps; build not verified on dev; static UI still served.
 
 | # | Given | When | Then | Where |
 |---|---|---|---|---|
-| 1 | the four journeys | driven in the Next.js apps | pass in Playwright | `frontend e2e` |
+| 1 | the four journeys | driven in the Next.js apps | pass in Playwright | `frontend e2e` (`dispute-charge`, `journeys`, `staff-desk`) |
 | 2 | each page | axe run | no serious violations | `frontend e2e` |
 | 3 | the Desk's queue and a four-eyes approval | driven in the console app | the case the agent raised is approved by a stepped-up supervisor and ends at a verified receipt | `frontend e2e` |
 | 4 | a receipt number that was never issued | opened on the public verify page | the page says so, and reports neither a valid nor an invalid chain | `frontend e2e` |
@@ -56,3 +56,17 @@ whose whole job is to prove a receipt is genuine. Fixed: three outcomes, and
 
 The si/ta strings were reviewed by a native speaker and the result was
 accepted (reported by the maintainer, 2026-10-04).
+
+Acceptance test 1 asks for **the four** journeys. Covering the last two
+(AUTO_FIX and EXPLAIN_ONLY) found that they could not be driven at all: the
+chat page held a hardcoded account literal with `activity: []`, and the
+client-side gate that reads it answered "nothing to investigate" for every
+customer, so the rule engine was never asked. Nimal's duplicate reload
+(`AUTO_FIX`, LKR 3,500.00) and Kumar's active fair-use cap (`EXPLAIN_ONLY`)
+were both contradicted on screen. The page now reads `GET /v1/me/app`, and all
+four journeys pass in the browser.
+
+Two follow-ups this issue does not close, both in the devlog:
+`accountIntents` is a client-side heuristic deciding eligibility, which is the
+wrong side of I1; and `GET /v1/cases` does not exist, so the customer's case
+list renders two fabricated rows.
