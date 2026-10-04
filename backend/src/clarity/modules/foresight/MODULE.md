@@ -7,13 +7,17 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `swarm.py` |
+| Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `personas.py`, `rehearsal.py` |
 
 ## 1. Purpose
 Foresight: scenario simulation over aggregates only, reported as relative bands, not counts, plus the backtest that measures how wrong the baseline was and refuses to call that a calibration.
 
 ## 2. Public surface (`public.py`)
-Other code imports only `public.py`, including the baseline and backtest names plus F02's `ScenarioRehearsal`, `PersonaSimulator`, `SeededPersonaSimulator`, `SwarmReport` and `Comparison`, and C1's `ForesightCatalogue`, `Bands`, `ThemeCatalogue`, `ThemeWeight` and `CatalogueInvalid`.
+Other code imports only `public.py`: the baseline and backtest names, C1's `ForesightCatalogue`, `Bands`, `ThemeCatalogue`, `ThemeWeight`, `PersonaRounds` and `CatalogueInvalid`, and C3's `PersonaSimulator`, `Propensity`, `PersonaRun`, the three drivers, `PersonaRehearsal`, `RehearsalReport` and `PairComparison`.
+
+`PersonaSimulator` is the port: `propensities(scenario, *, seed) -> PersonaRun`, returning a share of **one segment** in [0, 1] per theme-segment pair. Never a band, never a count. Three drivers implement it: `StatisticalBaseline` (the historic-rate method, which is also what `Foresight` reports), `RoundBasedPersonaSimulator` (seeded cohorts stepped through awareness, standard library only) and `LlmPersonaSimulator` (an in-house persona prompt over the `reason` role).
+
+`PersonaRehearsal(catalogue, comparison=None)` runs the baseline as the headline and optionally a second method beside it. It takes **no** headline argument; see ADR-0043.
 
 `ForesightCatalogue(policies)` reads the module's parameters from the policy store. It is the only thing `Foresight` and `Backtest` need wired, and the composition root builds one per container.
 
@@ -31,6 +35,12 @@ Other code imports only `public.py`, including the baseline and backtest names p
 | `Scenario.effective_date: str \| None` | `effective_date: date`, required | It is what the run resolves policy at; it was free text nothing read |
 | `Scenario.segments` defaults to `DEMO_SEGMENTS` | defaults to `None`, meaning the policy catalogue at `effective_date` | The segment mix is policy |
 | `MIN_REAL_LAUNCHES`, `DEMO_SEGMENTS` exported | removed | A constant beside a policy key is the one that gets read by mistake (D2) |
+
+### Changed in C3 (breaking)
+| Was | Is | Why |
+|---|---|---|
+| `swarm.py`, `ScenarioRehearsal`, `SeededPersonaSimulator`, `SwarmReport`, `Comparison` | removed; `personas.py` and `rehearsal.py` | The "swarm" hashed `seed:scenario:theme:segment`, took two hex digits modulo three minus one, shifted the baseline's band by that, and compared the result against a second run of the same baseline. It measured a hash. |
+| `PersonaSimulator.run(scenario, *, seed) -> tuple[Prediction, ...]` | `propensities(scenario, *, seed) -> PersonaRun` | Drivers return propensities so they are comparable and so banding stays in the module (ADR-0043) |
 
 ## 3. Used by
 `clarity.app.container` (builds the catalogue, engine and backtest) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf.
@@ -55,6 +65,9 @@ Its **parameters** are owned by the policy store, not by this module: `config/po
 - **A theme driver is an allowlist**, checked at parse time, so a typo cannot reach `getattr` and silently scale by 1.0, and no policy string can name an arbitrary attribute of `Segment`.
 - **Borrowed themes are declared in the report.** Seven of the twelve change types have no catalogue of their own; the report names the lender in its caveats instead of presenting another change type's themes as its own.
 - **A change type nobody characterised says so.** An empty prediction list carries an explicit caveat, because silence and "we expect no complaints" otherwise look identical.
+- **A propensity never sets a reported band** (ADR-0043, C3). The port returns a share of one segment in [0, 1]; banding happens once in the module against the policy thresholds; `PersonaRehearsal` constructs its own baseline and takes no headline argument, so no caller can put a model in charge of a band.
+- **An absent comparison is not a zero one.** A driver that could not answer reports `answered=False` and the column is `None`, because a column of zeros reads as the finding that no segment will complain.
+- **Agreement between methods proves nothing** and every rehearsal says so: both rest on the same segment catalogue and neither has been calibrated against a real launch.
 - Persona rehearsal is seeded and aggregate-only. It emits relative bands,
   records its simulator version and has no executing capability.
 - **Error is measured in band steps** (LOW=0, MEDIUM=1, HIGH=2), never in complaints, because bands are all the baseline emits.
@@ -68,7 +81,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 
 ## 8. Tests
 - `tests/unit/test_autopsy_foresight.py`
-- `tests/unit/test_foresight_swarm.py`
+- `tests/unit/test_foresight_personas.py` (C3: the parity suite over all three drivers, the round-based driver's determinism and policy inputs, the LLM driver's parsing and refusals, and the I1 boundary)
 - `tests/unit/test_foresight_catalogue.py` (C1: policy-driven parameters, `as_of` resolution, parse refusals, borrowing, the frozen scenario)
 
 ## 9. Change history
@@ -78,3 +91,4 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-F01-foresight-backtest-and-calibration.md` | Added `backtest.py`: calibration report, band-step error, the real-launch gate (F01, #27) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-F02-synthetic-scenario-rehearsal.md` | Added seeded aggregate personas and baseline-vs-swarm comparison |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-C1-foresight-policy-and-typed-scenario.md` | Moved every tunable to `config/policy/foresight.yaml` and the wording to `platform/content/foresight.py`; froze `Scenario` with a real id and a required typed `effective_date`; injected the clock (C1/F03) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C3-persona-simulator-port.md` | Replaced the hash-based swarm with a `PersonaSimulator` port returning propensities, three drivers, and the structural I1 boundary (C3/F04, F11; ADR-0043) |

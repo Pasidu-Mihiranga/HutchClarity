@@ -2541,7 +2541,6 @@ def _register_routes(app: FastAPI) -> None:
             DEMO_LAUNCHES,
             ChangeType,
             Scenario,
-            ScenarioRehearsal,
         )
 
         scenario = Scenario(
@@ -2551,8 +2550,8 @@ def _register_routes(app: FastAPI) -> None:
             effective_date=date(2027, 10, 1),
         )
         calibration = clarity.foresight_backtest.run(DEMO_LAUNCHES)
+        rehearsed = clarity.foresight_rehearsal.run(scenario, seed=42)
         report = clarity.foresight.run(scenario, calibration=calibration)
-        swarm = ScenarioRehearsal(clarity.foresight_catalogue).run(scenario, seed=42)
         return {
             "run_id": report.run_id,
             "scenario": report.scenario,
@@ -2569,20 +2568,26 @@ def _register_routes(app: FastAPI) -> None:
                 for item in report.predictions
                 if item.band.value != "low"
             ],
+            # The headline is always the statistical baseline; the second column
+            # is another method's view and never sets a band (I1, C3).
             "baseline_vs_swarm": [
                 {
                     "theme": item.theme,
                     "segment": item.segment,
-                    "baseline": item.baseline.value,
-                    "swarm": item.swarm.value,
+                    "baseline": item.headline.value,
+                    "swarm": item.comparison.value if item.comparison else None,
                     "agrees": item.agrees,
                 }
-                for item in swarm.comparison
+                for item in rehearsed.comparison
             ],
             "simulation": {
-                "seed": swarm.seed,
-                "version": swarm.simulator_version,
-                "provenance": swarm.provenance,
+                "seed": rehearsed.seed,
+                "version": rehearsed.headline_simulator,
+                "comparison_version": rehearsed.comparison_simulator,
+                "agreement_rate": (
+                    str(rehearsed.agreement_rate) if rehearsed.agreement_rate is not None else None
+                ),
+                "provenance": rehearsed.provenance,
             },
             "calibration_status": calibration.status.value,
             "note": (

@@ -21,9 +21,26 @@ from clarity.modules.foresight.catalogue import (
     CatalogueInvalid,
     ChangeType,
     ForesightCatalogue,
+    PersonaRounds,
     Segment,
     ThemeCatalogue,
     ThemeWeight,
+)
+from clarity.modules.foresight.personas import (
+    LlmPersonaSimulator,
+    PersonaInvoke,
+    PersonaRouter,
+    PersonaRun,
+    PersonaSimulator,
+    Propensity,
+    RoleRouterPersonas,
+    RoundBasedPersonaSimulator,
+    StatisticalBaseline,
+)
+from clarity.modules.foresight.rehearsal import (
+    PairComparison,
+    PersonaRehearsal,
+    RehearsalReport,
 )
 from clarity.modules.foresight.simulation import (
     Foresight,
@@ -32,13 +49,7 @@ from clarity.modules.foresight.simulation import (
     Scenario,
     VolumeBand,
     as_of_for,
-)
-from clarity.modules.foresight.swarm import (
-    Comparison,
-    PersonaSimulator,
-    ScenarioRehearsal,
-    SeededPersonaSimulator,
-    SwarmReport,
+    score_of,
 )
 
 __all__ = [
@@ -49,22 +60,31 @@ __all__ = [
     "CalibrationStatus",
     "CatalogueInvalid",
     "ChangeType",
-    "Comparison",
     "Foresight",
     "ForesightCatalogue",
     "ForesightReport",
     "HistoricLaunch",
+    "LlmPersonaSimulator",
     "ObservedOutcome",
+    "PairComparison",
+    "PersonaInvoke",
+    "PersonaRehearsal",
+    "PersonaRounds",
+    "PersonaRouter",
+    "PersonaRun",
     "PersonaSimulator",
     "Prediction",
+    "Propensity",
     "Provenance",
+    "RehearsalReport",
+    "RoleRouterPersonas",
+    "RoundBasedPersonaSimulator",
     "Scenario",
-    "ScenarioRehearsal",
-    "SeededPersonaSimulator",
     "Segment",
-    "SwarmReport",
+    "StatisticalBaseline",
     "ThemeCatalogue",
     "ThemeWeight",
     "VolumeBand",
     "as_of_for",
+    "score_of",
 ]
