@@ -256,9 +256,26 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/foresight/candidates": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/foresight/launches": {
       "parameters": [
         "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/launches/{launch_id}/comparison": {
+      "parameters": [
+        "header:authorization?",
+        "path:launch_id"
       ],
       "request": null,
       "response": "object",
@@ -684,6 +701,15 @@
       "response": "object",
       "status": "201"
     },
+    "POST /v1/foresight/candidates/{cluster_id}/confirm": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "CandidateConfirmRequest",
+      "response": "object",
+      "status": "201"
+    },
     "POST /v1/foresight/launches": {
       "parameters": [
         "header:authorization?"
@@ -858,6 +884,20 @@
       "required": [
         "permission",
         "reason"
+      ]
+    },
+    "CandidateConfirmRequest": {
+      "fields": [
+        "band",
+        "launch_id",
+        "segment",
+        "theme"
+      ],
+      "required": [
+        "band",
+        "launch_id",
+        "segment",
+        "theme"
       ]
     },
     "CaseSummary": {

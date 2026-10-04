@@ -457,3 +457,18 @@ class OutcomeRecordRequest(ApiModel):
     theme: str = Field(min_length=1, max_length=200)
     segment: str = Field(min_length=1, max_length=200)
     band: str = Field(description="low, medium or high.")
+
+
+class CandidateConfirmRequest(ApiModel):
+    """What a person decides a cluster means (C7).
+
+    The theme, the segment and the band all come from the caller. A cluster
+    says complaints look like one cause; it does not say which rehearsed theme
+    that is, and the system filling these in would be deciding what its own
+    evidence means.
+    """
+
+    launch_id: str = Field(min_length=1)
+    theme: str = Field(min_length=1, max_length=200)
+    segment: str = Field(min_length=1, max_length=200)
+    band: str = Field(description="low, medium or high.")

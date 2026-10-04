@@ -126,6 +126,13 @@ SIGNED_IN = {
     ("GET", "/v1/foresight/backtests"),
     ("GET", "/v1/foresight/calibration"),
     ("GET", "/v1/foresight/spikes"),
+    # The autopsy loop (C7). Reading candidates needs `foresight:read`;
+    # confirming one needs `foresight:outcome:record`, which `product` does not
+    # hold, because turning a cluster into evidence is the act the calibration
+    # gate rests on.
+    ("GET", "/v1/foresight/candidates"),
+    ("POST", "/v1/foresight/candidates/{cluster_id}/confirm"),
+    ("GET", "/v1/foresight/launches/{launch_id}/comparison"),
     ("GET", "/v1/desk/queue"),
     ("GET", "/v1/admin/switches"),
     ("POST", "/v1/admin/switches"),

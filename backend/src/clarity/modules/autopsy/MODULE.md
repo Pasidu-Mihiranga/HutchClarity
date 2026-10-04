@@ -76,6 +76,9 @@ the current clusters.
 ## 5. Data owned
 In-memory structures in the `lite` profile. Target: one PostgreSQL schema `autopsy` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
+## 5a. Events produced
+`cluster.updated` on every recorded review (C7), in the same transaction as the verdict (I7). It carries **codes and counts only**: `cluster_id`, `status`, `size`, `suggested_rule_id` and who reviewed it. No label and no keywords, because a cluster's label is derived from what customers wrote and this module exists so that text stays in one place. `foresight` consumes it to notice that a shipped change produced something; a consumer that needs the label asks here for it.
+
 ## 6. Invariants
 - No complaint text reaches a model unmasked; refused content is not stored.
 

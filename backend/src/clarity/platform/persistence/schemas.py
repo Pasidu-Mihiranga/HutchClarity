@@ -60,10 +60,12 @@ APPEND_ONLY: frozenset[str] = frozenset(
         # 3.4 calibration gate opens on, so they are exactly the rows somebody
         # would have to rewrite to make an uncalibrated engine look calibrated.
         #
-        # `foresight.runs` is deliberately absent. A run has a lifecycle a
-        # caller polls (queued, running, succeeded or failed), so its row moves
-        # by design, and an append-only job record is the same contradiction as
-        # an append-only pointer.
+        # `foresight.runs` and `foresight.candidates` are deliberately absent.
+        # A run has a lifecycle a caller polls (queued, running, succeeded or
+        # failed) and a candidate has one transition (unconfirmed to confirmed),
+        # so both rows move by design. An append-only job record is the same
+        # contradiction as an append-only pointer. What a confirmation produces
+        # is a `foresight.outcomes` row, and that one cannot be rewritten.
         "foresight.scenarios",
         "foresight.reports",
         "foresight.launches",

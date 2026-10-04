@@ -74,7 +74,9 @@ from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
 from clarity.modules.foresight.public import (
+    AutopsyLoop,
     Backtest,
+    ClusterRate,
     Foresight,
     ForesightCatalogue,
     ForesightService,
@@ -424,6 +426,37 @@ def _guard_assist(router: RoleRouter, catalogue: ModelCatalogue) -> object | Non
 #: projection disagree with a replay of the same history, which is the one
 #: thing acceptance 1 forbids.
 INSIGHT_EVENTS: tuple[EventType, ...] = tuple(payload.event_type for payload in PROJECTED)
+
+
+class _AutopsyClusterRates:
+    """Foresight's `ClusterRateSource`, over autopsy's public surface (C7/F10).
+
+    Here rather than inside foresight, so foresight neither imports `autopsy`
+    nor reads its tables (I6). The composition root is the one place that knows
+    both modules exist, which is why the port is wired rather than imported:
+    a synchronous L4-to-L4 dependency would have to be declared in the
+    dependency map, plan 21 section 11.2, `docs/modules.md`, `ARCHITECTURE.md`
+    and both `MODULE.md` files, and it would stop foresight running as the batch
+    job plan 21 moves it to.
+
+    **Codes and counts only.** The cluster's label is derived from what
+    customers wrote, so it does not cross this boundary; a reader who needs it
+    asks autopsy.
+    """
+
+    def __init__(self, autopsy: AutopsyService) -> None:
+        self._autopsy = autopsy
+
+    def rates(self) -> tuple[ClusterRate, ...]:
+        return tuple(
+            ClusterRate(
+                cluster_id=held.cluster.cluster_id,
+                size=held.cluster.size,
+                status=held.cluster.status.value,
+                rule_id=held.cluster.suggested_rule_id,
+            )
+            for held in self._autopsy.clusters()
+        )
 
 
 def _complaint_source() -> ComplaintSource | None:
@@ -1135,6 +1168,18 @@ class Clarity:
         # What a rehearsal said, and what the change actually did (C2/F05).
         # Six of its seven collections are append-only; `foresight.runs` is the
         # exception because a caller polls it.
+        # The autopsy loop (C7/F10): clusters in, predicted-versus-actual out.
+        # Foresight stays a leaf; the driver lives here.
+        self.foresight_loop = AutopsyLoop(
+            open_unit=self.open_unit,
+            clusters=_AutopsyClusterRates(self.autopsy),
+            clock=self.now,
+        )
+        self.consumers.register(
+            EventType.CLUSTER_UPDATED,
+            group="foresight-loop",
+            handler=self.foresight_loop.on_cluster_updated,
+        )
         self.foresight_service = ForesightService(
             open_unit=self.open_unit,
             catalogue=self.foresight_catalogue,
@@ -1146,6 +1191,7 @@ class Clarity:
             # here, which is the single place that decision is made, and the
             # calibration gate stays shut until it does.
             real_launches=None,
+            loop=self.foresight_loop,
         )
         # The baseline is the headline and a second method sits beside it
         # (C3/F11). `PersonaRehearsal` constructs the baseline itself, so the

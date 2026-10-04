@@ -178,6 +178,42 @@
         "title": "BreakGlassRequest",
         "type": "object"
       },
+      "CandidateConfirmRequest": {
+        "additionalProperties": false,
+        "description": "What a person decides a cluster means (C7).\n\nThe theme, the segment and the band all come from the caller. A cluster\nsays complaints look like one cause; it does not say which rehearsed theme\nthat is, and the system filling these in would be deciding what its own\nevidence means.",
+        "properties": {
+          "band": {
+            "description": "low, medium or high.",
+            "title": "Band",
+            "type": "string"
+          },
+          "launch_id": {
+            "minLength": 1,
+            "title": "Launch Id",
+            "type": "string"
+          },
+          "segment": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Segment",
+            "type": "string"
+          },
+          "theme": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "launch_id",
+          "theme",
+          "segment",
+          "band"
+        ],
+        "title": "CandidateConfirmRequest",
+        "type": "object"
+      },
       "CaseSummary": {
         "additionalProperties": false,
         "properties": {
@@ -5568,6 +5604,129 @@
         ]
       }
     },
+    "/v1/foresight/candidates": {
+      "get": {
+        "description": "Cluster-derived suggestions, inert until a person confirms one (C7).\n\nA candidate is not an outcome. A cluster says \"these complaints look\nlike one cause\"; it does not say which rehearsed theme that is or which\nsegment complained. Somebody decides that, under their own name.",
+        "operationId": "list_candidates_v1_foresight_candidates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Candidates V1 Foresight Candidates Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Candidates",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/candidates/{cluster_id}/confirm": {
+      "post": {
+        "description": "Turn a candidate into a recorded outcome, under the caller's name.\n\nThe theme, segment and band come from the person, not from the cluster.\nThis is the only way a cluster becomes evidence the calibration gate\nreads, and it needs `foresight:outcome:record`, which `PRODUCT` does not\nhold.",
+        "operationId": "confirm_candidate_v1_foresight_candidates__cluster_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Confirm Candidate V1 Foresight Candidates  Cluster Id  Confirm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Candidate",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
     "/v1/foresight/launches": {
       "get": {
         "operationId": "list_launches_v1_foresight_launches_get",
@@ -5674,6 +5833,67 @@
           }
         },
         "summary": "Record Launch",
+        "tags": [
+          "foresight"
+        ]
+      }
+    },
+    "/v1/foresight/launches/{launch_id}/comparison": {
+      "get": {
+        "description": "What the rehearsal said, beside what the launch produced (C7/F10).",
+        "operationId": "launch_comparison_v1_foresight_launches__launch_id__comparison_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "launch_id",
+            "required": true,
+            "schema": {
+              "title": "Launch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Launch Comparison V1 Foresight Launches  Launch Id  Comparison Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Comparison",
         "tags": [
           "foresight"
         ]
