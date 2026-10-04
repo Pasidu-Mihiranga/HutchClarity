@@ -82,6 +82,7 @@ from clarity.modules.iam.public import (
     AuthorizationPolicy,
     CompositeTokenVerifier,
     GrantAwareAuthorizationPolicy,
+    HttpSmsDelivery,
     KeycloakTokenVerifier,
     OpaAuthorizationPolicy,
     OtpService,
@@ -698,7 +699,17 @@ class Clarity:
                 self.settings.keys_dir / "iam-issuer.pem" if self.settings.keys_dir else None
             ),
         )
-        self.otp = otp or OtpService(open_unit=self.open_unit)
+        otp_delivery = (
+            HttpSmsDelivery(
+                api_key=self.settings.httpsms_api_key,
+                sender=self.settings.httpsms_sender,
+                base_url=self.settings.httpsms_base_url,
+                timeout_seconds=self.settings.httpsms_timeout_seconds,
+            )
+            if self.settings.httpsms_api_key and self.settings.httpsms_sender
+            else None
+        )
+        self.otp = otp or OtpService(otp_delivery, open_unit=self.open_unit)
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

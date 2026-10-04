@@ -39,6 +39,12 @@ Vertex credentials and the staff directory are files under
 upload them. `GOOGLE_APPLICATION_CREDENTIALS` inside the container is
 `/run/clarity-private/google-service-account.json`.
 
+Customer OTP delivery can use the hosted httpSMS API. Set `HTTPSMS_API_KEY` to
+the primary user API key and `HTTPSMS_SENDER` to the E.164 number of the
+registered Android gateway phone. A `pk_` phone-scoped key cannot call
+`/v1/messages/send`. Both settings are required together and remain only in
+`.env.production`.
+
 ## HTTPS
 
 After the stack answers with the temporary certificate, run
