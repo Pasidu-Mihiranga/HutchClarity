@@ -66,6 +66,15 @@ SIGNED_IN = {
     # Beginning a step-up needs a session: it re-authenticates somebody who is
     # already here (B2).
     ("POST", "/v1/auth/staff/step-up"),
+    # The Autopsy reviewer workspace (D1). Reading is the desk permission;
+    # ruling needs `autopsy:review`; proposing a policy change needs
+    # `rule:draft`, which is a different judgement from reviewing.
+    ("GET", "/v1/autopsy/clusters"),
+    # Operations dashboards, folded from the event log (D2).
+    ("GET", "/v1/insights/dashboards"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/review"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/supersede"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/rule-candidate"),
     # A person's own sessions (B3). Signed in only, and the subject comes from
     # the token, so there is nothing to enumerate.
     ("GET", "/v1/auth/sessions"),
@@ -107,6 +116,32 @@ SIGNED_IN = {
     ("POST", "/v1/cases/{case_id}/receipt"),
     ("GET", "/v1/receipts/{receipt_id}"),
     ("GET", "/v1/receipts/{receipt_id}/render"),
+    # Foresight (C4, F06). Four permissions, all staff: `foresight:read` to
+    # look, `foresight:scenario:draft` and `foresight:run` for product, and
+    # `foresight:outcome:record` for whoever observes a launch, deliberately not
+    # product. Nothing here is customer-facing and nothing is public: a
+    # rehearsal names changes HUTCH has not announced.
+    ("POST", "/v1/foresight/scenarios"),
+    ("GET", "/v1/foresight/scenarios"),
+    ("GET", "/v1/foresight/scenarios/{scenario_id}"),
+    ("POST", "/v1/foresight/scenarios/{scenario_id}/versions"),
+    ("POST", "/v1/foresight/runs"),
+    ("GET", "/v1/foresight/runs"),
+    ("GET", "/v1/foresight/runs/{run_id}"),
+    ("POST", "/v1/foresight/launches"),
+    ("GET", "/v1/foresight/launches"),
+    ("POST", "/v1/foresight/launches/{launch_id}/outcomes"),
+    ("POST", "/v1/foresight/backtests"),
+    ("GET", "/v1/foresight/backtests"),
+    ("GET", "/v1/foresight/calibration"),
+    ("GET", "/v1/foresight/spikes"),
+    # The autopsy loop (C7). Reading candidates needs `foresight:read`;
+    # confirming one needs `foresight:outcome:record`, which `product` does not
+    # hold, because turning a cluster into evidence is the act the calibration
+    # gate rests on.
+    ("GET", "/v1/foresight/candidates"),
+    ("POST", "/v1/foresight/candidates/{cluster_id}/confirm"),
+    ("GET", "/v1/foresight/launches/{launch_id}/comparison"),
     ("GET", "/v1/desk/queue"),
     ("GET", "/v1/admin/switches"),
     ("POST", "/v1/admin/switches"),
@@ -124,9 +159,6 @@ SIGNED_IN = {
     ("POST", "/v1/admin/policy/changes/{change_id}/schedule"),
     ("POST", "/v1/admin/policy/changes/{change_id}/activate"),
     ("POST", "/v1/admin/policy/changes/{change_id}/rollback"),
-    ("GET", "/v1/demo/ops"),
-    ("GET", "/v1/demo/autopsy"),
-    ("GET", "/v1/demo/foresight"),
     ("GET", "/v1/me/home"),
     ("GET", "/v1/me/app"),
     ("GET", "/v1/me/cases"),

@@ -19,9 +19,11 @@ const scratch = mkdtempSync(join(tmpdir(), "clarity-sdk-"));
 const fresh = join(scratch, "schema.ts");
 
 try {
+  // `npx` is `npx.cmd` on Windows and `execFileSync` does not resolve the
+  // PATHEXT extension, so without a shell this guard threw ENOENT on every
+  // Windows machine and never once compared anything.
   execFileSync("npx", ["openapi-typescript", SCHEMA, "-o", fresh], {
     stdio: ["ignore", "ignore", "inherit"],
-    // npx is npx.cmd on Windows, which execFile cannot start without a shell.
     shell: process.platform === "win32",
   });
 

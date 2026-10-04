@@ -24,6 +24,7 @@ OWNERS: dict[str, str] = {
     "conversation": "conversation",
     "knowledge": "knowledge",
     "autopsy": "autopsy",
+    "foresight": "foresight",
     "deskops": "deskops",
     "insights": "insights",
     "platform": "platform",
@@ -52,6 +53,29 @@ APPEND_ONLY: frozenset[str] = frozenset(
         # by expiry on read; an expired line is deleted, which is a removal of
         # the whole row and not a rewrite of one.
         "conversation.transcripts",
+        # What a rehearsal said, and what the change actually did (C2, F05).
+        # A scenario version, an engine output and a recorded launch outcome are
+        # all claims about the past that a later reader relies on. The launches
+        # and outcomes matter most: they are the evidence the plan 02 section
+        # 3.4 calibration gate opens on, so they are exactly the rows somebody
+        # would have to rewrite to make an uncalibrated engine look calibrated.
+        #
+        # `foresight.runs` and `foresight.candidates` are deliberately absent.
+        # A run has a lifecycle a caller polls (queued, running, succeeded or
+        # failed) and a candidate has one transition (unconfirmed to confirmed),
+        # so both rows move by design. An append-only job record is the same
+        # contradiction as an append-only pointer. What a confirmation produces
+        # is a `foresight.outcomes` row, and that one cannot be rewritten.
+        "foresight.scenarios",
+        "foresight.reports",
+        "foresight.launches",
+        "foresight.outcomes",
+        "foresight.calibrations",
+        "foresight.spikes",
+        # One complaint, counted, keyed by its event id (C5). Append-only
+        # because the only way to make a spike disappear would be to delete
+        # some of the observations that raised it.
+        "foresight.observations",
     }
 )
 
@@ -89,7 +113,7 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
     }
 )
 
-#: Four modules own data that is deliberately **not** customer-scoped, and the
+#: Five modules own data that is deliberately **not** customer-scoped, and the
 #: reason differs for each. Binding any of them to a subscriber would not be a
 #: stricter setting, it would hide the row from the only query that needs it.
 #:
@@ -102,6 +126,10 @@ CUSTOMER_SCOPED: frozenset[str] = frozenset(
 #: - ``autopsy.complaints`` holds masked complaint text and carries no
 #:   ``subscriber_ref`` to bind to: the autopsy is aggregate-facing by
 #:   construction (AU01), and the masking is what protects it.
+#: - ``foresight.*`` holds rehearsals of changes and the aggregate evidence
+#:   about them. Foresight reads segment statistics and never an individual
+#:   record (deck S8), so there is no subscriber to bind a row to, and inventing
+#:   one to satisfy the pattern would be the opposite of the invariant.
 
 
 #: The role the application runs its requests as.

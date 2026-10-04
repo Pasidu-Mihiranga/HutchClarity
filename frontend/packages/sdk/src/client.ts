@@ -11,13 +11,15 @@ import type {
 } from "./routes";
 import type {
   AlertQueue,
-  ApproveResult,
   AlertView,
+  ApproveResult,
   AuditGrantView,
   AuditHealth,
   AuditRecordVerdict,
   AuditRecovery,
   AuditTrailPage,
+  AutopsyCluster,
+  AutopsyWorkspace,
   CaseSummary,
   CustomerApp,
   CustomerHome,
@@ -25,15 +27,20 @@ import type {
   DecisionView,
   DemoSubscriber,
   ExecutionView,
+  ForesightCalibration,
+  ForesightRun,
+  ForesightSpike,
   LogoutResult,
   MyCaseRow,
   OpenCaseBody,
   OtpRequestResult,
   PlanView,
+  PolicyChangeView,
   PreferencesBody,
   ProposeBody,
   QueueItem,
   SafeguardKind,
+  ScenarioView,
   SessionRecord,
   SessionView,
   SignedReceipt,
@@ -112,11 +119,40 @@ function queryString(query?: Record<string, unknown>): string {
   return text ? `?${text}` : "";
 }
 
+/**
+ * Let a request body omit a field the backend gives a default.
+ *
+ * `openapi-typescript` marks any property carrying a `default` as
+ * non-optional. That is right for a response, where the server always sends
+ * the value, and wrong for a request body, where omitting it is exactly how
+ * the caller asks for the default. The OpenAPI document agrees with the
+ * backend here: `version`, `candidate_summary`, `note` and `seed` are all
+ * outside their schema's `required` array, so the call succeeds and only the
+ * generated type objects.
+ *
+ * Deliberately narrow. It never invents a value, it only lets an omitted one
+ * through. Writing the server's default into the client instead would pin it
+ * here and diverge silently the day the backend changed it.
+ */
+function omittingServerDefaults<T>(body: object): T {
+  return body as T;
+}
+
 /** What a caller may pass for one route. Every part is typed from the schema. */
 type CallOptions<P extends ApiPath, M extends HttpMethod> = {
   path?: PathParamsOf<P, M>;
   query?: QueryOf<P, M>;
   body?: BodyOf<P, M>;
+  /**
+   * Request headers this route needs beyond the ones every call sends.
+   *
+   * Deliberately a plain record rather than typed from the schema's `header`
+   * parameters: a required header is the route's business and the generated
+   * types model it inconsistently, so typing it here would reject calls the
+   * backend accepts. `POST /v1/foresight/runs` is the case that needs it, and
+   * it requires `Idempotency-Key` (I8).
+   */
+  headers?: Record<string, string>;
 };
 
 export class ClarityClient {
@@ -217,6 +253,7 @@ export class ClarityClient {
       {
         method: method.toUpperCase(),
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        headers: options.headers,
       },
     );
   }
@@ -474,16 +511,199 @@ export class ClarityClient {
     return this.declared("post", "/v1/demo/reset");
   }
 
-  demoOps(): Promise<Record<string, unknown>> {
-    return this.declared("get", "/v1/demo/ops");
+  /* ------------------------------------------------------------ insights */
+
+  /** Operations dashboards, folded from the event log (D2). */
+  insightsDashboards(): Promise<Record<string, unknown>> {
+    return this.declared("get", "/v1/insights/dashboards");
   }
 
-  demoAutopsy(): Promise<Record<string, unknown>> {
-    return this.declared("get", "/v1/demo/autopsy");
+  /* ------------------------------------------------------- policy studio */
+  //
+  // These routes existed since M-GOV with no caller: the Studio page wrote
+  // drafts to `sessionStorage`, so nothing a policy author did there reached
+  // the governance lifecycle (D3).
+
+  /** Every change and where it is in its lifecycle. */
+  policyChanges(): Promise<PolicyChangeView[]> {
+    return this.declared("get", "/v1/admin/policy/changes");
   }
 
-  demoForesight(): Promise<Record<string, unknown>> {
-    return this.declared("get", "/v1/demo/foresight");
+  /** Open a change. The class comes from the artefact's tags, not from here. */
+  draftPolicyChange(body: {
+    key: string;
+    value: unknown;
+    reason: string;
+    scope?: Record<string, string>;
+    version?: number;
+    effective_from?: string | null;
+  }): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes", {
+      body: omittingServerDefaults(body),
+    });
+  }
+
+  /** Attach the replay that says what this change would have done. */
+  reviewPolicyChange(
+    changeId: string,
+    body: { cases_evaluated: number; candidate_summary?: string },
+  ): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes/{change_id}/review", {
+      path: { change_id: changeId },
+      body: omittingServerDefaults(body),
+    });
+  }
+
+  /** Approve. The maker cannot be an approver, and the API enforces it. */
+  approvePolicyChange(changeId: string): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes/{change_id}/approve", {
+      path: { change_id: changeId },
+      body: {},
+    });
+  }
+
+  schedulePolicyChange(
+    changeId: string,
+    body: { effective_from: string },
+  ): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes/{change_id}/schedule", {
+      path: { change_id: changeId },
+      body,
+    });
+  }
+
+  activatePolicyChange(changeId: string): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes/{change_id}/activate", {
+      path: { change_id: changeId },
+      body: {},
+    });
+  }
+
+  /**
+   * Draft a governed reversal.
+   *
+   * This does not undo anything by itself: it opens a *new* change that
+   * restores the version the named one replaced, and that change goes through
+   * the same review and approval path as any other. A change that supersedes
+   * nothing has nothing to restore, and the API refuses it.
+   */
+  rollbackPolicyChange(
+    changeId: string,
+    body: { reason: string },
+  ): Promise<PolicyChangeView> {
+    return this.declared("post", "/v1/admin/policy/changes/{change_id}/rollback", {
+      path: { change_id: changeId },
+      body,
+    });
+  }
+
+  /* ------------------------------------------------------ complaint autopsy */
+
+  /** The reviewer workspace. `desk:queue:read`: seeing is not ruling. */
+  autopsyClusters(): Promise<AutopsyWorkspace> {
+    return this.declared("get", "/v1/autopsy/clusters");
+  }
+
+  /** Record a first verdict. The reviewer is the caller, never a field. */
+  reviewCluster(
+    clusterId: string,
+    body: { accept: boolean; note?: string },
+  ): Promise<AutopsyCluster> {
+    return this.declared("post", "/v1/autopsy/clusters/{cluster_id}/review", {
+      path: { cluster_id: clusterId },
+      body: omittingServerDefaults(body),
+    });
+  }
+
+  /** Change a verdict, keeping the one it replaces. The note is required. */
+  supersedeClusterReview(
+    clusterId: string,
+    body: { accept: boolean; note: string },
+  ): Promise<AutopsyCluster> {
+    return this.declared("post", "/v1/autopsy/clusters/{cluster_id}/supersede", {
+      path: { cluster_id: clusterId },
+      body,
+    });
+  }
+
+  /**
+   * Propose a policy change from a confirmed cluster (AU02).
+   *
+   * This publishes nothing. It creates a change in the draft state; approval,
+   * scheduling and activation happen through governance, by somebody else.
+   */
+  proposeRuleCandidate(
+    clusterId: string,
+    body: { key: string; value: string; rationale: string },
+  ): Promise<{ change_id: string; state: string; cluster_id: string; note: string }> {
+    return this.declared("post", "/v1/autopsy/clusters/{cluster_id}/rule-candidate", {
+      path: { cluster_id: clusterId },
+      body,
+    });
+  }
+
+  /* ----------------------------------------------------------- foresight */
+  //
+  // `GET /v1/demo/foresight` was the only address foresight had, and the
+  // console read it because Workstream C had not landed. C landed, so the
+  // demo route is gone and these replace it (C4, D4).
+
+  /** The latest version of every scenario family, newest first. */
+  foresightScenarios(): Promise<{ scenarios: ScenarioView[] }> {
+    return this.declared("get", "/v1/foresight/scenarios");
+  }
+
+  /** Every version of one family, oldest first. */
+  foresightScenario(scenarioId: string): Promise<{
+    scenario_id: string;
+    versions: ScenarioView[];
+  }> {
+    return this.declared("get", "/v1/foresight/scenarios/{scenario_id}", {
+      path: { scenario_id: scenarioId },
+    });
+  }
+
+  /** Every run, newest first. The report is only on the single-run read. */
+  foresightRuns(): Promise<{ runs: ForesightRun[] }> {
+    return this.declared("get", "/v1/foresight/runs");
+  }
+
+  /** One run and its report. This is the `poll_url` a request hands back. */
+  foresightRun(runId: string): Promise<ForesightRun> {
+    return this.declared("get", "/v1/foresight/runs/{run_id}", {
+      path: { run_id: runId },
+    });
+  }
+
+  /**
+   * Ask for a rehearsal. Answers 202 with a `poll_url`.
+   *
+   * `Idempotency-Key` is required by the route, not optional (I8). Foresight
+   * moves no money, so the risk is not a double charge but a double finding:
+   * two runs of one scenario, reported twice, is how a rehearsal gets counted
+   * as two pieces of evidence. A repeat returns the original run with
+   * `replayed: true` rather than starting a second one.
+   */
+  requestForesightRun(
+    scenarioVersionId: string,
+    idempotencyKey: string,
+  ): Promise<ForesightRun> {
+    return this.declared("post", "/v1/foresight/runs", {
+      // No `seed`: the service picks one and records it on the run, so a
+      // rehearsal stays reproducible without the caller inventing entropy.
+      body: omittingServerDefaults({ scenario_version_id: scenarioVersionId }),
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
+  }
+
+  /** The latest calibration, or 404 when no backtest has run. */
+  foresightCalibration(): Promise<ForesightCalibration> {
+    return this.declared("get", "/v1/foresight/calibration");
+  }
+
+  /** Early-warning spikes from the radar (C5). */
+  foresightSpikes(): Promise<{ spikes: ForesightSpike[] }> {
+    return this.declared("get", "/v1/foresight/spikes");
   }
 
   /** Seed one evaluated case per demo subscriber (Desk "Create demo cases"). */

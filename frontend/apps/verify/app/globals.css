@@ -4,7 +4,7 @@
 
 body {
   margin: 0;
-  background: #ffffff;
-  color: #0f172a;
-  font-family: system-ui, sans-serif;
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-fg));
+  font-family: var(--font-sans);
 }

@@ -32,7 +32,8 @@ the module and asserts it.
 
 `clarity.app.container`, which constructs the service and registers it as the
 `insights` consumer group; and `clarity.interfaces.http` for
-`GET /v1/demo/ops`.
+`GET /v1/insights/dashboards`. `GET /v1/demo/ops` served the same projection
+until D4 retired it.
 
 ## 4. Depends on
 
@@ -83,11 +84,13 @@ stays the authority and `rebuild_from` is how the cache is made to agree again.
 
 R6. The projections, the consumer and the persistence are in place.
 
-**Not yet:** the console does not render any of it, so `GET /v1/demo/ops` is
-the only surface and it is a demo route. The projection also has no offset of
-its own: the `seen` set grows with the log, which is the honest trade for a
-prototype, and B04's `processed_event` record is where a per-consumer offset
-belongs once insights is a deployable of its own.
+The console renders it from `GET /v1/insights/dashboards` (D2), and the demo
+route it used to read is gone (D4).
+
+**Not yet:** the projection has no offset of its own. The `seen` set grows with
+the log, which is the honest trade for a prototype, and B04's `processed_event`
+record is where a per-consumer offset belongs once insights is a deployable of
+its own.
 
 `ENDINGS` is a second copy of flow state names that `config/flows/*.yaml` owns.
 A renamed state silently turns every conversation through it into a drop-off.
@@ -115,3 +118,5 @@ something else depended on, which is the opposite of what it is for.
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-dev-merge.md` | Scaffold: `public.py` and `MODULE.md` stubs to satisfy the architecture tests |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-I01-insights-projections.md` | Event-fed read models, replay determinism, and `/v1/demo/ops` off live objects |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D2-insights-api.md` | `GET /v1/insights/dashboards`, an address of its own for the projection (D2) |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D4-retire-demo-routes.md` | `GET /v1/demo/ops` retired (D4) |

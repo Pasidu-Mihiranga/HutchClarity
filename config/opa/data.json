@@ -1,6 +1,9 @@
 {
   "clarity": {
-    "admin_roles": ["platform_admin", "security_admin"],
+    "admin_roles": [
+      "platform_admin",
+      "security_admin"
+    ],
     "audit_duty_permissions": [
       "alert:dispose",
       "audit:assign",
@@ -47,6 +50,7 @@
         "action:approve",
         "action:approve:high_value",
         "action:propose",
+        "autopsy:review",
         "case:evaluate",
         "case:read",
         "case:read:any",
@@ -76,11 +80,14 @@
         "receipt:read:any"
       ],
       "cx_engineer": [
+        "autopsy:review",
         "case:evaluate",
         "case:read",
         "case:read:any",
         "config:draft",
         "desk:queue:read",
+        "foresight:outcome:record",
+        "foresight:read",
         "receipt:read",
         "receipt:read:any",
         "rule:draft"
@@ -112,7 +119,18 @@
         "audit:restore",
         "flags:kill_switch"
       ],
-      "security_admin": ["admin:manage", "audit:assign", "audit:read"]
+      "security_admin": [
+        "admin:manage",
+        "audit:assign",
+        "audit:read"
+      ],
+      "product": [
+        "config:draft",
+        "desk:queue:read",
+        "foresight:read",
+        "foresight:run",
+        "foresight:scenario:draft"
+      ]
     }
   }
 }

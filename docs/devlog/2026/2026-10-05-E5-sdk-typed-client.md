@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Author(s) | Pasidu-Mihiranga |
+| Author(s) | Pasidu-Mihiranga; agent: Claude Code (the merge with main) |
 | Work package | Workstream E5 (enterprise UI plan) |
 | PR / commit | feat/sdk-typed-client |
 | Units touched | frontend/packages/sdk, frontend/apps/console, frontend/apps/customer-web, frontend/scripts |
@@ -37,5 +37,47 @@ A call to a method that did not exist shipped because the client imported neithe
 - `npm run build`: all three apps compile.
 - Not run: Playwright (`make e2e`).
 
+## Merged with main (2026-10-05)
+
+This branch predated D1-D4, E1 and Workstream C, all of which landed on `main`
+while it was open, and three of them added methods to the file this rewrite
+replaces. The merge re-added every one of them through `call` or `declared`:
+
+- `insightsDashboards` (D2).
+- `policyChanges`, `draftPolicyChange`, `reviewPolicyChange`,
+  `approvePolicyChange`, `schedulePolicyChange`, `activatePolicyChange`,
+  `rollbackPolicyChange` (D3).
+- `autopsyClusters`, `reviewCluster`, `supersedeClusterReview`,
+  `proposeRuleCandidate` (D1).
+- `foresightScenarios`, `foresightScenario`, `foresightRuns`, `foresightRun`,
+  `requestForesightRun`, `foresightCalibration`, `foresightSpikes` (C4).
+- `demoOps`, `demoAutopsy` and `demoForesight` dropped: D4 retired all three
+  routes, so the typed client would not compile against them anyway, which is
+  the point of typing it.
+- Their eleven types moved from `client.ts` into `types.ts`, where the
+  hand-declared shapes now live.
+
+Two changes to the machinery were needed:
+
+- **`CallOptions` gained `headers`.** There was no way to send one, and
+  `POST /v1/foresight/runs` requires `Idempotency-Key` (I8). Kept as a plain
+  record rather than typed from the schema's `header` parameters, which the
+  generator models inconsistently enough to reject calls the backend accepts.
+- **`omittingServerDefaults`.** The typed call caught four request bodies that
+  disagreed with the generated types: `version`, `candidate_summary`, `note`
+  and `seed`. The disagreement is the generator's: `openapi-typescript` marks
+  any property carrying a `default` as non-optional, which is correct for a
+  response and wrong for a request body, where omitting the field is how the
+  caller asks for the default. The OpenAPI document has all four outside their
+  `required` array. The helper lets an omitted field through and never invents
+  a value, because writing the server's default into the client would pin it
+  here and diverge the day the backend changed it.
+
+Also resolved: both branches had independently fixed `check-sdk.mjs` for
+Windows, so the merge kept one copy of the fix.
+
 ## Open issues / next step
-Branches that add SDK methods (the autopsy, insights and policy-studio branches) will conflict with this rewrite of `client.ts`; re-add their methods through `call` or `declared`. E4 uses the new `my*` methods.
+E4 uses the new `my*` methods. The backend routes that return `dict[str, Any]`
+still need response models; until they have them, `types.ts` carries the
+declared shapes and `declared` refuses any route the schema already types, so
+each hand-written type disappears on its own when the backend publishes one.

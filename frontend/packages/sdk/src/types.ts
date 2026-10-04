@@ -431,3 +431,166 @@ export type MyCaseRow = {
   opened_at: string;
   outcome: string | null;
 };
+
+/* ------------------------------------------------------------------------ *
+ * Policy governance (D3), Complaint Autopsy (D1) and Foresight (C4).
+ *
+ * The backend returns `dict[str, Any]` from these routes and publishes no
+ * response model, so the schema types them open and the SDK declares the shape
+ * here. When the backend publishes models, these come out and the generated
+ * types take over.
+ * ------------------------------------------------------------------------ */
+
+export type PolicyApproval = {
+  approver_ref: string;
+  role: string;
+  at: string;
+  mfa_step_up: boolean;
+};
+
+export type PolicyImpact = {
+  cases_evaluated: number;
+  changed: number;
+  /** A string, not a number: money is Decimal on the wire (I3). */
+  money_delta_lkr: string;
+  candidate_summary: string;
+};
+
+export type PolicyChangeView = {
+  change_id: string;
+  key: string;
+  candidate: Record<string, unknown>;
+  change_class: string;
+  maker_ref: string;
+  /** draft | in_review | approved | scheduled | active | superseded | rejected */
+  state: string;
+  reason: string;
+  approvals_needed: number;
+  approvals: PolicyApproval[];
+  impact: PolicyImpact | null;
+  scheduled_for: string | null;
+  activated_at: string | null;
+  /** The change this one replaces, and the only thing a reversal can restore. */
+  supersedes: string | null;
+  [key: string]: unknown;
+};
+
+export type ScenarioView = {
+  scenario_id: string;
+  version_id: string;
+  version: number;
+  supersedes: string | null;
+  created_at: string;
+  created_by: string;
+  name: string;
+  change_type: string;
+  effective_date: string;
+  /** Exact decimals on the wire, as strings. Never parse these to float. */
+  affected_share: string;
+  severity: string;
+  affected_products: string[];
+  business_context: string;
+};
+
+export type ForesightPrediction = {
+  theme: string;
+  segment: string;
+  band: string;
+  relative_score: string;
+  mitigation: string;
+};
+
+export type ForesightReport = {
+  report_id: string;
+  scenario: string;
+  scenario_id: string;
+  effective_date: string | null;
+  generated_at: string | null;
+  /** What the numbers rest on. Render it: an unbasised figure is a guess. */
+  basis: string;
+  caveats: string[];
+  backtested: boolean;
+  decision_ready: boolean;
+  predictions: ForesightPrediction[];
+};
+
+export type ForesightRun = {
+  run_id: string;
+  scenario_version_id: string;
+  status: string;
+  requested_at: string;
+  requested_by: string;
+  started_at: string | null;
+  finished_at: string | null;
+  report_id: string | null;
+  failure: string | null;
+  poll_url: string;
+  /** Present only when an Idempotency-Key matched an earlier request (I8). */
+  replayed?: boolean;
+  report?: ForesightReport | null;
+};
+
+export type ForesightCalibration = {
+  calibration_id: string;
+  computed_at: string;
+  computed_by: string;
+  launch_ids: string[];
+  status: string;
+  calibrated: boolean;
+  launches: number;
+  real_launches: number;
+  compared: number;
+  /** `null`, not 0, when nothing was comparable: a 0.000 reads as flawless. */
+  mean_absolute_band_error: string | null;
+  signed_band_error: string | null;
+  exact_band_rate: string | null;
+  top_theme_hit_rate: string | null;
+  theme_recall: string | null;
+  segment_rank_correlation: string | null;
+  unpredicted: { theme: string; segment: string; band: string }[];
+  unobserved: { theme: string; segment: string }[];
+  basis: string;
+  caveats: string[];
+  summary: string;
+};
+
+export type ForesightSpike = {
+  spike_id: string;
+  scope: string;
+  /** A code, never a name. The event this becomes forbids a `name` field. */
+  scope_ref: string;
+  window_start: string;
+  window_end: string;
+  observed: number;
+  baseline: string;
+  ratio: string | null;
+  detected_at: string;
+  basis: string;
+  caveats: string[];
+};
+
+export type AutopsyCluster = {
+  cluster_id: string;
+  label: string;
+  size: number;
+  status: string;
+  status_label: string;
+  mapping_label: string;
+  hypothesis: boolean;
+  suggested_rule_id: string | null;
+  languages: Record<string, number>;
+  representative_masked_complaints: string[];
+  synthetic_demo_trend: Record<string, number>;
+  reviews?: { reviewer: string; accepted: boolean; at: string; note: string }[];
+};
+
+export type AutopsyWorkspace = {
+  clusters: AutopsyCluster[];
+  complaint_count: number;
+  languages: Record<string, number>;
+  clustering_method: string;
+  clustering_disclosure: string;
+  hypothesis: boolean;
+  synthetic: boolean;
+  note: string;
+};

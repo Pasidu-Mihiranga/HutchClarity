@@ -56,6 +56,7 @@ from clarity.modules.foresight.catalogue import (
     Segment,
     ThemeCatalogue,
 )
+from clarity.modules.foresight.personas import Propensity, StatisticalBaseline
 from clarity.platform.content import foresight as wording
 
 if TYPE_CHECKING:  # the backtest imports this module, so only for typing
@@ -68,6 +69,18 @@ class VolumeBand(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+def score_of(propensity: Decimal, share_of_base: Decimal) -> Decimal:
+    """A per-segment propensity weighted by how big the segment is.
+
+    The number the volume bands are read against. Separating it from the
+    propensity is what lets two methods be compared: a cohort simulation and a
+    rate model both answer "what share of this segment complains", and how much
+    of the base that segment is belongs to the reporting step rather than to
+    either method (C3).
+    """
+    return propensity * share_of_base
 
 
 def as_of_for(effective_date: date) -> datetime:
@@ -176,20 +189,16 @@ class Foresight:
         segments = scenario.segments
         if segments is None:
             segments = self._catalogue.segments(as_of)
+        shares = {segment.name: segment.share_of_base for segment in segments}
 
+        # The baseline is reached through the same port the comparison drivers
+        # use (C3), so the reported numbers and the headline column of a
+        # comparison are provably the same arithmetic rather than two copies of
+        # it that can drift.
+        baseline = StatisticalBaseline(self._catalogue).propensities(scenario)
         predictions = [
-            Prediction(
-                theme=theme.theme,
-                segment=segment.name,
-                band=self._band(score, bands),
-                relative_score=money(score * 1000) / 1000,
-                suggested_mitigation=wording.mitigation_for(theme.theme),
-            )
-            for theme in catalogue.themes
-            for segment in segments
-            for score in (
-                self._score(theme.weight, theme.sensitivity_of(segment), segment, scenario),
-            )
+            self._prediction(propensity, shares[propensity.segment], bands)
+            for propensity in baseline.propensities
         ]
         predictions.sort(key=lambda p: p.relative_score, reverse=True)
 
@@ -206,19 +215,19 @@ class Foresight:
             calibration=calibration,
         )
 
-    # ----------------------------------------------------------------- #
-
-    def _score(
-        self, weight: Decimal, sensitivity: Decimal, segment: Segment, scenario: Scenario
-    ) -> Decimal:
-        return (
-            segment.share_of_base
-            * segment.monthly_complaint_rate
-            * weight
-            * sensitivity
-            * scenario.severity
-            * scenario.affected_share
+    def _prediction(
+        self, propensity: Propensity, share_of_base: Decimal, bands: Bands
+    ) -> Prediction:
+        score = score_of(propensity.value, share_of_base)
+        return Prediction(
+            theme=propensity.theme,
+            segment=propensity.segment,
+            band=self._band(score, bands),
+            relative_score=money(score * 1000) / 1000,
+            suggested_mitigation=wording.mitigation_for(propensity.theme),
         )
+
+    # ----------------------------------------------------------------- #
 
     def _caveats(
         self,
@@ -268,4 +277,5 @@ __all__ = [
     "Segment",
     "VolumeBand",
     "as_of_for",
+    "score_of",
 ]

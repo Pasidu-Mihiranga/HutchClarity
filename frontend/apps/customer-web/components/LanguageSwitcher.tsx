@@ -22,8 +22,8 @@ export function LanguageSwitcher() {
           className="rounded px-2 py-1 text-xs font-medium"
           style={
             lang === code
-              ? { background: "var(--orange)", color: "#fff" }
-              : { background: "#f4f4f5", color: "#52525b" }
+              ? { background: "var(--orange)", color: "rgb(var(--c-on-primary))" }
+              : { background: "rgb(var(--c-surface-2))", color: "rgb(var(--c-fg-muted))" }
           }
         >
           {labels[code]}

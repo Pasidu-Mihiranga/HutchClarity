@@ -150,6 +150,14 @@
       "response": null,
       "status": "200"
     },
+    "GET /v1/autopsy/clusters": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/cases/{case_id}": {
       "parameters": [
         "header:authorization?",
@@ -186,33 +194,9 @@
       "response": "object",
       "status": "200"
     },
-    "GET /v1/demo/autopsy": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/foresight": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "GET /v1/demo/inbox": {
       "parameters": [
         "query:msisdn"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/ops": {
-      "parameters": [
-        "header:authorization?"
       ],
       "request": null,
       "response": "object",
@@ -238,6 +222,97 @@
       ],
       "request": null,
       "response": "array[object]",
+      "status": "200"
+    },
+    "GET /v1/foresight/backtests": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/calibration": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/candidates": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/launches": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/launches/{launch_id}/comparison": {
+      "parameters": [
+        "header:authorization?",
+        "path:launch_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/runs": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/runs/{run_id}": {
+      "parameters": [
+        "header:authorization?",
+        "path:run_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/scenarios": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/scenarios/{scenario_id}": {
+      "parameters": [
+        "header:authorization?",
+        "path:scenario_id"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/foresight/spikes": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "GET /v1/insights/dashboards": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
       "status": "200"
     },
     "GET /v1/knowledge/search": {
@@ -513,6 +588,33 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/autopsy/clusters/{cluster_id}/review": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "ReviewRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/autopsy/clusters/{cluster_id}/rule-candidate": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "RuleCandidateRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/autopsy/clusters/{cluster_id}/supersede": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "SupersedeRequest",
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/cases": {
       "parameters": [
         "header:authorization?"
@@ -609,6 +711,66 @@
       "request": null,
       "response": "object",
       "status": "200"
+    },
+    "POST /v1/foresight/backtests": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/foresight/candidates/{cluster_id}/confirm": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "CandidateConfirmRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/foresight/launches": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "LaunchRecordRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/foresight/launches/{launch_id}/outcomes": {
+      "parameters": [
+        "header:authorization?",
+        "path:launch_id"
+      ],
+      "request": "OutcomeRecordRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/foresight/runs": {
+      "parameters": [
+        "header:Idempotency-Key",
+        "header:authorization?"
+      ],
+      "request": "ForesightRunRequest",
+      "response": "object",
+      "status": "202"
+    },
+    "POST /v1/foresight/scenarios": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "ScenarioDraftRequest",
+      "response": "object",
+      "status": "201"
+    },
+    "POST /v1/foresight/scenarios/{scenario_id}/versions": {
+      "parameters": [
+        "header:authorization?",
+        "path:scenario_id"
+      ],
+      "request": "ScenarioReviseRequest",
+      "response": "object",
+      "status": "201"
     },
     "POST /v1/me/family": {
       "parameters": [
@@ -743,6 +905,20 @@
         "reason"
       ]
     },
+    "CandidateConfirmRequest": {
+      "fields": [
+        "band",
+        "launch_id",
+        "segment",
+        "theme"
+      ],
+      "required": [
+        "band",
+        "launch_id",
+        "segment",
+        "theme"
+      ]
+    },
     "CaseSummary": {
       "fields": [
         "case_id",
@@ -870,6 +1046,15 @@
         "msisdn"
       ]
     },
+    "ForesightRunRequest": {
+      "fields": [
+        "scenario_version_id",
+        "seed"
+      ],
+      "required": [
+        "scenario_version_id"
+      ]
+    },
     "HTTPValidationError": {
       "fields": [
         "detail"
@@ -879,6 +1064,17 @@
     "Language": {
       "fields": [],
       "required": []
+    },
+    "LaunchRecordRequest": {
+      "fields": [
+        "evidence_ref",
+        "note",
+        "provenance",
+        "scenario_version_id"
+      ],
+      "required": [
+        "scenario_version_id"
+      ]
     },
     "MerchantSuspendRequest": {
       "fields": [
@@ -925,6 +1121,18 @@
     "Outcome": {
       "fields": [],
       "required": []
+    },
+    "OutcomeRecordRequest": {
+      "fields": [
+        "band",
+        "segment",
+        "theme"
+      ],
+      "required": [
+        "band",
+        "segment",
+        "theme"
+      ]
     },
     "PlanView": {
       "fields": [
@@ -1041,6 +1249,27 @@
         "amount_lkr"
       ]
     },
+    "ReviewRequest": {
+      "fields": [
+        "accept",
+        "note"
+      ],
+      "required": [
+        "accept"
+      ]
+    },
+    "RuleCandidateRequest": {
+      "fields": [
+        "key",
+        "rationale",
+        "value"
+      ],
+      "required": [
+        "key",
+        "rationale",
+        "value"
+      ]
+    },
     "RuledOutView": {
       "fields": [
         "reason",
@@ -1058,6 +1287,38 @@
       "required": [
         "kind",
         "value"
+      ]
+    },
+    "ScenarioDraftRequest": {
+      "fields": [
+        "affected_products",
+        "affected_share",
+        "business_context",
+        "change_type",
+        "effective_date",
+        "name",
+        "severity"
+      ],
+      "required": [
+        "change_type",
+        "effective_date",
+        "name"
+      ]
+    },
+    "ScenarioReviseRequest": {
+      "fields": [
+        "affected_products",
+        "affected_share",
+        "business_context",
+        "change_type",
+        "effective_date",
+        "name",
+        "severity"
+      ],
+      "required": [
+        "change_type",
+        "effective_date",
+        "name"
       ]
     },
     "SessionView": {
@@ -1109,6 +1370,16 @@
       "required": [
         "roles",
         "user_ref"
+      ]
+    },
+    "SupersedeRequest": {
+      "fields": [
+        "accept",
+        "note"
+      ],
+      "required": [
+        "accept",
+        "note"
       ]
     },
     "SwitchFlipRequest": {
