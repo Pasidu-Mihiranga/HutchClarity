@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input } from "@clarity/ui";
 import type { AutopsyCluster, AutopsyWorkspace } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
@@ -32,6 +32,15 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
 
 type Busy = { clusterId: string; action: string } | null;
 
+type StatusFilter = "all" | "hypothesis" | "confirmed" | "rejected";
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "hypothesis", label: "Hypothesis" },
+  { id: "confirmed", label: "Confirmed" },
+  { id: "rejected", label: "Rejected" },
+];
+
 export default function AutopsyPage() {
   const { client, session, generation, hasPermission } = useStaffSession();
   const canRead = hasPermission("desk:queue:read");
@@ -42,6 +51,8 @@ export default function AutopsyPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const load = useCallback(() => {
     if (!canRead) return;
@@ -76,6 +87,21 @@ export default function AutopsyPage() {
   if (!session || !canRead) return <AccessDenied need="desk:queue:read" />;
 
   const clusters = data?.clusters ?? [];
+  const visibleClusters = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return clusters.filter((cluster) => {
+      if (statusFilter === "hypothesis" && !cluster.hypothesis) return false;
+      if (statusFilter === "confirmed" && cluster.status !== "confirmed") return false;
+      if (statusFilter === "rejected" && cluster.status !== "rejected") return false;
+      if (!needle) return true;
+      const rule = cluster.suggested_rule_id ?? "";
+      return (
+        cluster.label.toLowerCase().includes(needle) ||
+        rule.toLowerCase().includes(needle) ||
+        cluster.status_label.toLowerCase().includes(needle)
+      );
+    });
+  }, [clusters, query, statusFilter]);
 
   return (
     <div className="space-y-5">
@@ -125,12 +151,60 @@ export default function AutopsyPage() {
         </Card>
       ) : null}
 
+      {clusters.length > 0 ? (
+        <section aria-labelledby="autopsy-filter">
+          <Card className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="autopsy-filter" className="font-medium">
+                Find a cluster
+              </h2>
+              <span className="text-sm text-fg-muted">
+                {visibleClusters.length} of {clusters.length}
+              </span>
+            </div>
+            <label htmlFor="autopsy-search" className="block">
+              <span className="sr-only">Search clusters</span>
+              <Input
+                id="autopsy-search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by cluster name or suggested rule"
+                className="w-full"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+              {STATUS_FILTERS.map((item) => {
+                const selected = statusFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setStatusFilter(item.id)}
+                    className={`rounded-full px-3 py-1.5 text-sm ${
+                      selected
+                        ? "bg-surface-2 font-medium text-fg"
+                        : "text-fg-muted hover:bg-surface-2"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </section>
+      ) : null}
+
       <section aria-labelledby="autopsy-clusters">
         <h2 id="autopsy-clusters" className="sr-only">
           Clusters awaiting a verdict
         </h2>
+        {clusters.length > 0 && visibleClusters.length === 0 ? (
+          <p className="text-sm text-fg-muted">No cluster matches this filter.</p>
+        ) : null}
         <ul className="space-y-3">
-          {clusters.map((cluster) => (
+          {visibleClusters.map((cluster) => (
             <li key={cluster.cluster_id}>
               <ClusterCard
                 cluster={cluster}
@@ -166,6 +240,42 @@ export default function AutopsyPage() {
   );
 }
 
+function Disclosure({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group rounded-lg border border-border">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">{title}</span>
+        <span className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-fg-muted">{hint}</span>
+          <svg
+            viewBox="0 0 20 20"
+            className="h-4 w-4 shrink-0 text-fg-muted transition-transform group-open:rotate-180"
+            aria-hidden="true"
+          >
+            <path
+              d="M5 8l5 5 5-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </summary>
+      <div className="border-t border-border px-3 py-3">{children}</div>
+    </details>
+  );
+}
+
 function ClusterCard({
   cluster,
   canReview,
@@ -192,21 +302,27 @@ function ClusterCard({
   const canSupersede = ruled && note.trim().length > 0;
   const headingId = `cluster-${cluster.cluster_id}`;
 
+  const complaints = cluster.representative_masked_complaints;
+  const languages = Object.entries(cluster.languages);
+  const trend = Object.entries(cluster.synthetic_demo_trend);
+
   return (
     <Card
       role="group"
       aria-labelledby={headingId}
-      className="space-y-2"
+      className="space-y-3"
       data-testid="autopsy-cluster"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 id={headingId} className="font-semibold">
-          {cluster.label}
-        </h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 id={headingId} className="font-semibold">
+            {cluster.label}
+          </h3>
+          <span className="mt-0.5 block text-sm text-fg-muted">{cluster.size} complaints</span>
+        </div>
         <Badge tone={cluster.hypothesis ? "warning" : "success"}>
           {cluster.hypothesis ? "HYPOTHESIS" : cluster.status.toUpperCase()}
         </Badge>
-        <span className="text-sm">{cluster.size} complaints</span>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -219,43 +335,38 @@ function ClusterCard({
         </div>
       </dl>
 
-      <div>
-        <h4 className="text-xs font-semibold uppercase text-fg-muted">Languages:</h4>
-        <ul className="mt-1 flex flex-wrap gap-1">
-          {Object.entries(cluster.languages).map(([language, count]) => (
-            <li
-              key={language}
-              className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink"
-            >
-              {language} {count}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <h4 className="text-xs font-semibold uppercase text-fg-muted">
-          Representative masked complaints
-        </h4>
-        <ul className="mt-1 space-y-1">
-          {cluster.representative_masked_complaints.map((text, i) => (
-            <li key={i}>
-              <blockquote className="border-l-2 border-border pl-2 text-sm">{text}</blockquote>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <h4 className="text-xs font-semibold uppercase text-fg-muted">Synthetic trend:</h4>
-        <ul className="mt-1 flex flex-wrap gap-1">
-          {Object.entries(cluster.synthetic_demo_trend).map(([day, count]) => (
-            <li key={day} className="rounded-lg bg-surface-2 px-2 py-1 text-xs">
-              <span className="block text-fg-subtle">{day}</span>
-              <span className="font-medium text-ink">{count}</span>
-            </li>
-          ))}
-        </ul>
+      <div className="space-y-2">
+        <Disclosure title="Representative masked complaints" hint={String(complaints.length)}>
+          <ul className="flex flex-col gap-2">
+            {complaints.map((text, i) => (
+              <li key={i}>
+                <blockquote className="border-l-2 border-border pl-2 text-sm">{text}</blockquote>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+        <Disclosure title="Languages:" hint={String(languages.length)}>
+          <ul className="flex flex-wrap gap-1.5">
+            {languages.map(([language, count]) => (
+              <li
+                key={language}
+                className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-ink"
+              >
+                {language} {count}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+        <Disclosure title="Synthetic trend:" hint={String(trend.length)}>
+          <ul className="flex flex-wrap gap-1.5">
+            {trend.map(([day, count]) => (
+              <li key={day} className="rounded-lg bg-surface-2 px-2.5 py-1.5 text-xs">
+                <span className="block text-fg-subtle">{day}</span>
+                <span className="font-medium text-ink">{count}</span>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
       </div>
 
       {cluster.reviews?.length ? (
