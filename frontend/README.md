@@ -68,7 +68,9 @@ npm run dev -w @clarity/customer-web
 - Bottom **role switcher** (agent … security_admin) + step-up MFA toggle
 - `/` - home with permission-aware section cards
 - `/desk` - live queue + cockpit + approve (via `@clarity/sdk`)
-- `/insights` - `/v1/demo/ops`, autopsy, foresight
+- `/insights` - `/v1/demo/ops` summary
+- `/autopsy` - DATA01-backed Complaint Autopsy reviewer workspace
+- `/foresight` - synthetic baseline-vs-swarm scenario rehearsal workspace
 - `/studio` - role-aware draft / publish stub / regulator export stub
 - `/admin` - kill switches (`/v1/admin/switches`)
 

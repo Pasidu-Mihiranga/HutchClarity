@@ -95,6 +95,12 @@ wrongly; the cap was shown at purchase. A receipt is still issued.
 days ago. Open the Desk on `:3001/desk`, show the queue sorted by money at
 stake, open the case, **Approve as supervisor**.
 
+If showing the intelligence loop, open `:3001/autopsy` and point out
+**SYNTHETIC DATA**, **HYPOTHESIS**, masked examples and the honest trigram
+diagnostic. Then open `:3001/foresight`: the seeded aggregate personas are
+compared with the statistical baseline using LOW/MEDIUM/HIGH bands, while the
+screen states **SCENARIO, NOT CERTAINTY** and **NOT CALIBRATED**.
+
 ## 4:30–5:15 - The boundary
 
 Open `/v1/mcp/tools`:

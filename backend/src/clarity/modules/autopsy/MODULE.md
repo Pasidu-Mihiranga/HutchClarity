@@ -6,7 +6,7 @@
 | Layer | L4 domain (`clarity.modules.autopsy`) |
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
-| Status | built (`lite` and `full`): pipeline from the team's work, event feed, persistence and review workflow AU01 (#13), 2026-10-04 |
+| Status | built (`lite` and `full`): AU01 review workflow plus AU02 DATA01 ingestion and reviewer workspace diagnostics, 2026-10-04 |
 | Files | `pipeline.py`, `review.py`, `repository.py`, `service.py`, `public.py` |
 
 ## 1. Purpose
@@ -15,7 +15,7 @@ Complaint Autopsy: mask PII first, dedupe, build canonical forms, cluster, map c
 ## 2. Public surface (`public.py`)
 Pipeline: `AutopsyReport`, `CleanComplaint`, `Cluster`, `ClusterStatus`, `Complaint`, `ComplaintAutopsy`, `Similarity`, `TrigramSimilarity`, `canonicalise`, `detect_language`.
 
-Service and review (AU01): `AutopsyService`, `ComplaintSource`, `Intake`, `ClusterReviews`, `ClusterReview`, `ReviewedCluster`, `ReviewRefused`, `staff_view`, `HYPOTHESIS_LABEL`, `CONFIRMED_LABEL`, `REJECTED_LABEL`, `AutopsyRepository`, `StoredAutopsyRepository`, `COMPLAINTS`, `CLUSTERS`.
+Service and review: `AutopsyService`, `BatchComplaint`, `ComplaintSource`, `Intake`, `ClusterReviews`, `ClusterReview`, `ReviewedCluster`, `ReviewRefused`, `staff_view`, `HYPOTHESIS_LABEL`, `CONFIRMED_LABEL`, `REJECTED_LABEL`, `AutopsyRepository`, `StoredAutopsyRepository`, `COMPLAINTS`, `CLUSTERS`.
 
 **Removed by AU01:** `ComplaintAutopsy.confirm`. It recorded a verdict by appending `(reviewed by X)` to the cluster's **label**, which put audit data in display text, appended twice if it ran twice, kept no time or note, and had nowhere to persist. `ClusterReviews.record` replaces it.
 
@@ -28,7 +28,9 @@ Event-fed, with the batch as the same code path:
 | `on_complaint_created` | Consumes `complaint.created`. The event carries **no text**, so the service fetches it by id through the `ComplaintSource` seam |
 | `accept` | Masks, dedupes by id, and stores the **masked** complaint. A complaint quoting a credential is dropped entirely |
 | `rerun` | Redraws clusters over everything kept. Unreviewed clusters are replaced; reviewed ones are never discarded |
+| `ingest` | Sends DATA01 or another approved dataset through the same mask-first `accept` path |
 | `for_staff` | Every cluster through `staff_view`, which always carries the hypothesis label |
+| `workspace` | Adds masked examples, language counts, synthetic trend and honest clustering-method diagnostics |
 | `review` / supersede | Records a verdict as its own immutable record |
 
 Clustering happens on a re-run and not per complaint, because one complaint is
@@ -62,6 +64,8 @@ the current clusters.
   so a redelivery overwrites rather than inflating a cluster's size, which is
   the number a reviewer decides on.
 - Time comes from the injected clock (I11).
+- The active default is disclosed as `TrigramSimilarity`, never semantic
+  embedding clustering. DATA01 trends are explicitly synthetic.
 
 ## 4. Depends on
 | Package | Through |
@@ -80,8 +84,10 @@ Batch logic in process. Runtime target: serverless batch job (ADR-0028).
 
 ## 8. Tests
 - `tests/unit/test_autopsy_foresight.py`
+- `tests/integration/test_autopsy_dataset.py`
 
 ## 9. Change history
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.autopsy` with a public surface (R1) |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-AU02-autopsy-dataset-hardening.md` | Replaced the tiny demo tuple with DATA01 ingestion and honest reviewer workspace metadata |

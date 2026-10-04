@@ -1546,23 +1546,30 @@ def _register_routes(app: FastAPI) -> None:
         published any events yet.
         """
         if not clarity.autopsy.clusters():
-            for index, text in enumerate(_DEMO_COMPLAINTS, start=1):
-                # The text is passed because this path has it in hand and no
-                # store to fetch it from. The event path never does.
-                clarity.autopsy.accept(f"demo-{index}", channel="whatsapp", text=text)
+            from clarity.integration.drivers.mock.synthetic_dataset import (
+                generate_synthetic_dataset,
+            )
+            from clarity.modules.autopsy.public import BatchComplaint
+
+            dataset = generate_synthetic_dataset()
+            clarity.autopsy.ingest(
+                BatchComplaint(row.complaint_id, row.text, row.channel)
+                for row in dataset.complaints
+            )
             clarity.autopsy.rerun()
 
-        views = clarity.autopsy.for_staff()
+        workspace = clarity.autopsy.workspace()
+        views = workspace["clusters"]
         return {
+            **workspace,
             "clusters": views,
             # Kept at the top level as well as on each cluster: a caller
             # reading only the envelope still learns that none of this is
             # established.
             "hypothesis": any(view["hypothesis"] for view in views),
             "note": (
-                "Hypotheses until a person reviews them. Clustering is character "
-                "overlap over a canonical form, not embeddings: there is no "
-                "embedding model in the system (AU01 devlog)."
+                "SYNTHETIC DATA. Hypotheses until a person reviews them. "
+                "Suggested mappings are guesses and never activate rules."
             ),
         }
 
@@ -1573,11 +1580,24 @@ def _register_routes(app: FastAPI) -> None:
     )
     def demo_foresight() -> dict[str, Any]:
         """Rehearse retiring a pack. Scenarios, not certainties."""
-        from clarity.modules.foresight.public import ChangeType, Foresight, Scenario
-
-        report = Foresight().run(
-            Scenario(name="Retire Unlimited Data", change_type=ChangeType.PACK_RETIRED)
+        from clarity.modules.foresight.public import (
+            DEMO_LAUNCHES,
+            Backtest,
+            ChangeType,
+            Foresight,
+            Scenario,
+            ScenarioRehearsal,
         )
+
+        scenario = Scenario(
+            name="Retire Unlimited Data",
+            change_type=ChangeType.PACK_RETIRED,
+            affected_products=("SYNTHETIC-UNLIMITED-30",),
+            effective_date="2027-10-01",
+        )
+        calibration = Backtest().run(DEMO_LAUNCHES)
+        report = Foresight().run(scenario, calibration=calibration)
+        swarm = ScenarioRehearsal().run(scenario, seed=42)
         return {
             "run_id": report.run_id,
             "scenario": report.scenario,
@@ -1594,7 +1614,26 @@ def _register_routes(app: FastAPI) -> None:
                 for item in report.predictions
                 if item.band.value != "low"
             ],
-            "note": "Scenarios, not certainties. This does not change any customer.",
+            "baseline_vs_swarm": [
+                {
+                    "theme": item.theme,
+                    "segment": item.segment,
+                    "baseline": item.baseline.value,
+                    "swarm": item.swarm.value,
+                    "agrees": item.agrees,
+                }
+                for item in swarm.comparison
+            ],
+            "simulation": {
+                "seed": swarm.seed,
+                "version": swarm.simulator_version,
+                "provenance": swarm.provenance,
+            },
+            "calibration_status": calibration.status.value,
+            "note": (
+                "SCENARIO, NOT CERTAINTY. NOT CALIBRATED ON REAL HUTCH LAUNCHES. "
+                "Synthetic aggregate personas only; this cannot change a customer."
+            ),
         }
 
 
@@ -1631,21 +1670,6 @@ _MONEY_TYPES = {
     EventType.BALANCE_ADJUSTED,
     EventType.SUBSCRIPTION_RENEWED,
 }
-
-_DEMO_COMPLAINTS = (
-    "VAS game subscription charged with no OTP",
-    "daily game subscription deducted again",
-    "reload taken twice from my bank",
-    "the same reload was captured two times",
-    "unlimited data became slow after the cap",
-    "fup speed dropped on my unlimited pack",
-    "balance disappeared after the pack ended",
-    "money gone from balance when the pack expired",
-    "wrong pack was activated",
-    "I bought a different pack and it was not activated",
-    "no reply from support after a week",
-    "still waiting, no response on WhatsApp",
-)
 
 
 def _customer_ref(principal: Principal) -> str:

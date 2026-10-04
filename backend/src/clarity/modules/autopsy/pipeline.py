@@ -243,6 +243,11 @@ class ComplaintAutopsy:
         # why the something better does not exist yet.
         self._measure = measure or TrigramSimilarity()
 
+    @property
+    def clustering_method(self) -> str:
+        """Honest diagnostic name for the active similarity implementation."""
+        return type(self._measure).__name__
+
     # -- step 1: clean and protect -------------------------------------- #
 
     def clean(self, complaints: list[Complaint]) -> tuple[list[CleanComplaint], int, int]:

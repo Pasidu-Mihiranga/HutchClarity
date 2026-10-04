@@ -10,7 +10,7 @@ Status values: `planned` → `built` (works in `lite`) → `migrated` (on the ta
 |---|---|---|---|---|---|
 | kernel | L0 | `backend/src/clarity/kernel/` | - | built | - |
 | contracts | L0 | `backend/src/clarity/contracts/` | - | built; **domain event payloads typed and versioned** (`events.py`, #10) | AsyncAPI generation (R2) |
-| integration (ports, mock and HTTP drivers) | L1 | `backend/src/clarity/integration/` | - | migrated (simulated) | HUTCH sandbox mappings require confirmation |
+| integration (ports, mock and HTTP drivers) | L1 | `backend/src/clarity/integration/` | - | migrated (simulated); DATA01 adds a fixed-seed, 18-family synthetic complaint/evidence corpus and aggregate-only Foresight derivative | HUTCH sandbox mappings require confirmation |
 | integration: mock store (simulated HUTCH estate in SQL) | L1 | `backend/src/clarity/integration/drivers/mock/store/` | - | built by the team | Persistent hutch-sim deployment wiring (X03) |
 | hutch-sim (SIMULATED HUTCH systems over HTTP) | service | `services/hutch-sim/` | - | built | Deployment image and Compose wiring (X03) |
 | resolution | L4 | `backend/src/clarity/modules/resolution/` | case, timeline, detection, decision, actions, receipts | built | Orchestration split out of `case` (M-CASE #34). The only module allowed to import `actions.capability`. |

@@ -11,7 +11,7 @@ COMPOSE := deploy/compose/full.yml
 # 5440, not 5432: a developer machine usually already runs PostgreSQL there.
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
-.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed eval \
+.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed synthetic-data eval \
 	load chaos \
         up-full down-full test-full dev-e2e e2e e2e-install channel-gateway \
         contracts contracts-check \
@@ -32,6 +32,7 @@ help:
 	@echo "make eval    - run the evaluation sets and apply the release gates"
 	@echo "make keys    - generate a local Ed25519 signing key into .keys/"
 	@echo "make seed    - load the synthetic world into DATABASE_URL (full profile)"
+	@echo "make synthetic-data - generate the deterministic DATA01 fixture"
 	@echo "make up-full - start the full profile's components (Kafka); needs Docker"
 	@echo "make down-full - stop them and remove their volumes"
 	@echo "make test-full - run the parity suites against the full profile"
@@ -99,6 +100,11 @@ keys:
 
 seed:
 	cd $(BACKEND) && $(PY)/python scripts/seed.py
+
+synthetic-data:
+	cd $(BACKEND) && $(PY)/python scripts/generate_synthetic_data.py \
+		--seed $${SYNTHETIC_SEED:-42} --size $${SYNTHETIC_SIZE:-1500} \
+		--output $${SYNTHETIC_OUTPUT:-../.generated/synthetic-data.json}
 
 # The `full` profile: real components instead of in-process drivers (ADR-0027).
 # Needs Docker. `lite` stays the default and needs none of this.

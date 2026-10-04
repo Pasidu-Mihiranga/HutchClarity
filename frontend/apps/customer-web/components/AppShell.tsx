@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isImmersive = pathname === "/clarity";
   const backRoute = Object.entries(BACK_ROUTES).find(([prefix]) => pathname.startsWith(prefix))?.[1];
 
-  // Clarity is fully immersive — it renders its own header + composer
+  // Clarity is fully immersive - it renders its own header + composer
   if (isImmersive) return <>{children}</>;
 
   return (
