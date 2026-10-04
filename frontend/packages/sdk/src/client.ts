@@ -5,10 +5,15 @@ export type ClarityClientOptions = {
 };
 
 export type OtpRequestResult = {
-  ok: boolean;
+  /** Required by `verifyOtp`: the challenge this code belongs to. */
+  challenge_id: string;
+  sent_to?: string;
+  simulated?: boolean;
+  detail?: string;
+  /** Older field names kept so a caller reading them still compiles. */
+  ok?: boolean;
   msisdn_masked?: string;
   message?: string;
-  demo_code?: string;
 };
 
 export type OtpVerifyResult = {
@@ -193,8 +198,27 @@ export class ClarityClient {
       const text = await res.text().catch(() => "");
       let detail = text || res.statusText;
       try {
-        const parsed = JSON.parse(text) as { detail?: string; title?: string };
-        detail = parsed.detail || parsed.title || detail;
+        const parsed = JSON.parse(text) as {
+          detail?: unknown;
+          title?: string;
+        };
+        // FastAPI reports a validation error as a *list* of field errors.
+        // Assigning that straight to a message rendered as
+        // "[object Object],[object Object]" in the UI, which told nobody
+        // anything. Flatten it to the field and the reason instead.
+        if (Array.isArray(parsed.detail)) {
+          detail = parsed.detail
+            .map((item) => {
+              const entry = item as { loc?: unknown[]; msg?: string };
+              const where = Array.isArray(entry.loc) ? entry.loc.join(".") : "";
+              return where ? `${where}: ${entry.msg ?? "invalid"}` : (entry.msg ?? "invalid");
+            })
+            .join("; ");
+        } else if (typeof parsed.detail === "string") {
+          detail = parsed.detail;
+        } else {
+          detail = parsed.title || detail;
+        }
       } catch {
         /* keep raw text */
       }
@@ -231,10 +255,18 @@ export class ClarityClient {
     return this.request(`/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`);
   }
 
-  verifyOtp(msisdn: string, code: string): Promise<OtpVerifyResult> {
+  /**
+   * Verify a code against the challenge that issued it.
+   *
+   * Takes the `challenge_id` from `requestOtp`, not the number. This used to
+   * send `{ msisdn, code }`, which `OtpVerify` rejects with a 422, so
+   * customer-web sign-in never worked: the login page caught the error and
+   * wrote a placeholder token, which hid it.
+   */
+  verifyOtp(challengeId: string, code: string): Promise<OtpVerifyResult> {
     return this.request("/v1/auth/otp/verify", {
       method: "POST",
-      body: JSON.stringify({ msisdn, code }),
+      body: JSON.stringify({ challenge_id: challengeId, code }),
     });
   }
 

@@ -75,9 +75,22 @@ const EN = {
   confirmBulletRefund: "Refunds the disputed amount to your balance",
   thisSubscription: "this subscription",
   cancel: "Cancel",
+  // Follow-up chip labels. These lived only in the chat page's catalogue, so
+  // `FollowUps` fell through to rendering the raw key and customers saw
+  // buttons labelled "fuSubs", "fuPrevent" and "fuSupport".
+  fuSubs: "Show other subscriptions",
+  fuPrevent: "Prevent this happening again",
+  fuSupport: "Talk to support",
+  fuFup: "Check my FUP",
+  fuUsage: "Show remaining data",
+  fuNetwork: "Check network status",
+  fuCompare: "Compare packages",
+  fuDisable: "Disable this service",
 };
 
 const SI: Partial<typeof EN> = {
+  fuPrevent: "නැවත සිදු නොවීමට",
+  fuSupport: "සහාය සමඟ කතා කරන්න",
   foundReason: "හේතුව හමු වුණා",
   whatIChecked: "මම පරීක්ෂා කළේ",
   talkSupport: "සහාය සමඟ කතා කරන්න",
@@ -91,6 +104,8 @@ const SI: Partial<typeof EN> = {
 };
 
 const TA: Partial<typeof EN> = {
+  fuPrevent: "மீண்டும் நடக்காமல் தடு",
+  fuSupport: "ஆதரவிடம் பேசு",
   foundReason: "காரணம் கிடைத்தது",
   whatIChecked: "நான் சரிபார்த்தவை",
   talkSupport: "ஆதரவிடம் பேசு",
@@ -110,6 +125,24 @@ function tl(lang: string, key: TranslationKey): string {
 }
 
 // ─── card sub-components ───────────────────────────────────────────────────────
+
+/**
+ * A label for a follow-up chip, never the raw key.
+ *
+ * This used to be `fu.i18n_key in EN ? tl(...) : fu.i18n_key`, and the
+ * follow-up keys were defined in the chat page's catalogue rather than this
+ * one, so three chips rendered as "fuSubs", "fuPrevent" and "fuSupport" in the
+ * customer's chat. The keys are now here, and the fallback humanises anything
+ * still missing instead of leaking an identifier (I15 in spirit: a customer
+ * sees approved wording, not internals).
+ */
+function followUpLabel(lang: string, fu: FollowUp): string {
+  if (fu.i18n_key in EN) return tl(lang, fu.i18n_key as TranslationKey);
+  return fu.i18n_key
+    .replace(/^fu/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+}
 
 function FollowUps({ items, lang, onFollow }: { items: FollowUp[]; lang: string; onFollow: (f: FollowUp) => void }) {
   if (!items.length) return null;
@@ -131,7 +164,7 @@ function FollowUps({ items, lang, onFollow }: { items: FollowUp[]; lang: string;
             fontFamily: "inherit",
           }}
         >
-          {fu.i18n_key in EN ? tl(lang, fu.i18n_key as TranslationKey) : fu.i18n_key}
+          {followUpLabel(lang, fu)}
         </button>
       ))}
     </div>

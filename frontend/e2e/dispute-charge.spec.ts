@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { customerToken, signedIn } from "./session";
 
 /**
  * C05 (#24) acceptance 1: the DISPUTE_CHARGE flow, driven in a browser, ends
@@ -17,34 +18,24 @@ import { expect, test, type Page } from "@playwright/test";
  * Nothing here asserts on an API response the user never sees.
  */
 
-const DILANI = "+94771234567";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Hutch number").fill(DILANI);
-  await page.getByRole("button", { name: "Continue" }).click();
 
-  // The code is generated per challenge and read back from the simulated
-  // inbox, which the login page now shows and prefills. There is no
-  // "any six digits" path: the backend refuses anything else with 401, and
-  // this helper used to assume otherwise, which is why every browser test
-  // failed the first time the suite was actually executed.
-  const shown = page.getByTestId("demo-otp-code");
-  await expect(shown).toBeVisible();
-  await page.getByLabel("6-digit code").fill((await shown.innerText()).trim());
-
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/(account|clarity|cases)/);
-}
 
 test.describe("DISPUTE_CHARGE in the browser", () => {
-  test("a customer disputing a charge reaches a verified receipt", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/clarity");
+  test("a customer disputing a charge reaches a verified receipt", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/clarity");
 
-    await page.getByRole("textbox", { name: /ask|message|type/i }).fill(
-      "Why was LKR 49 deducted from my balance?",
-    );
+    const box = page.getByRole("textbox", { name: /ask|message|type/i });
+    await box.fill("Why was LKR 49 deducted from my balance?");
+    await page.keyboard.press("Enter");
+
+    // The first turn is answered statelessly and opens the case: there is no
+    // case to attach state to until it exists, so `case_id` is null and the
+    // server keeps nothing. The flow runs from the next turn, which is why
+    // this drives a second message rather than asserting on the first.
+    await expect(page.getByRole("heading", { name: /found the reason/i })).toBeVisible();
+    await box.fill("Yes, please fix it");
     await page.keyboard.press("Enter");
 
     // 1. The journey is visible. This is the assertion that would have failed
@@ -69,9 +60,9 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await expect(receipt).toHaveAttribute("data-verified", "true");
   });
 
-  test("a knowledge question shows the source it was answered from", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/clarity");
+  test("a knowledge question shows the source it was answered from", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/clarity");
 
     await page.getByRole("textbox", { name: /ask|message|type/i }).fill(
       "What is the fair use policy?",
@@ -85,9 +76,9 @@ test.describe("DISPUTE_CHARGE in the browser", () => {
     await expect(sources.getByText(/@\d+/)).toBeVisible();
   });
 
-  test("a question with no source offers a person instead of guessing", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/clarity");
+  test("a question with no source offers a person instead of guessing", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/clarity");
 
     await page.getByRole("textbox", { name: /ask|message|type/i }).fill(
       "What is the capital of France?",

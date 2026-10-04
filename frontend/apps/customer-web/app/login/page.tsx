@@ -20,13 +20,19 @@ export default function LoginPage() {
   // backend generates a code per challenge and refuses anything else, so the
   // panel below has to show the real one or nobody can sign in.
   const [demoCode, setDemoCode] = useState<string | null>(null);
+  // `verifyOtp` needs the challenge this code belongs to, not the number.
+  const [challengeId, setChallengeId] = useState<string | null>(null);
 
   async function onRequest(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setStatus(null);
     try {
       const result = await client.requestOtp(msisdn);
-      setStatus({ text: result.message ?? "OTP sent to your number.", tone: "ok" });
+      setChallengeId(result.challenge_id);
+      setStatus({
+        text: result.detail ?? result.message ?? "OTP sent to your number.",
+        tone: "ok",
+      });
       setStep("verify");
       // Read the simulated SMS back and prefill it. Synthetic profiles only;
       // the route 404s in prod, so a failure here is not an error worth
@@ -52,19 +58,25 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setStatus(null);
     try {
-      const result = await client.verifyOtp(msisdn, code);
+      if (!challengeId) throw new Error("Request a code first.");
+      const result = await client.verifyOtp(challengeId, code);
       try { window.sessionStorage.setItem("clarity_token", result.token); } catch {}
       client.setToken(result.token);
       setStatus({ text: "Signed in - redirecting...", tone: "ok" });
       router.push("/");
     } catch (err) {
+      // A failed sign-in used to write `clarity_token = "demo-token"` and say
+      // "placeholder login accepted locally". That turned a rejected code into
+      // a half-signed-in state: every later call carried a token the backend
+      // refuses, so the customer saw errors everywhere except at the point
+      // where something actually went wrong. Deny by default (I9) applies to
+      // the UI too, so a refusal clears the session rather than inventing one.
+      try { window.sessionStorage.removeItem("clarity_token"); } catch {}
+      client.setToken(undefined);
       setStatus({
-        text: err instanceof Error
-          ? `${err.message} - placeholder login accepted locally`
-          : "Verify failed",
+        text: err instanceof Error ? err.message : "Verify failed",
         tone: "info",
       });
-      try { window.sessionStorage.setItem("clarity_token", "demo-token"); } catch {}
     } finally {
       setBusy(false);
     }

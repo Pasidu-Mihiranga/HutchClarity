@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { customerToken, signedIn } from "./session";
 
 /**
  * FE01 (#28) acceptance 2: every page passes an axe run with no serious
@@ -64,25 +65,8 @@ async function audit(page: Page, name: string): Promise<void> {
   ).toEqual([]);
 }
 
-const DILANI = "+94771234567";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Hutch number").fill(DILANI);
-  await page.getByRole("button", { name: "Continue" }).click();
 
-  // The code is generated per challenge and read back from the simulated
-  // inbox, which the login page now shows and prefills. There is no
-  // "any six digits" path: the backend refuses anything else with 401, and
-  // this helper used to assume otherwise, which is why every browser test
-  // failed the first time the suite was actually executed.
-  const shown = page.getByTestId("demo-otp-code");
-  await expect(shown).toBeVisible();
-  await page.getByLabel("6-digit code").fill((await shown.innerText()).trim());
-
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/(account|clarity|cases)/);
-}
 
 test.describe("accessibility", () => {
   test("the sign-in page has no serious violations", async ({ page }) => {
@@ -90,33 +74,36 @@ test.describe("accessibility", () => {
     await audit(page, "/login");
   });
 
-  test("the account page has no serious violations", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/account");
+  test("the account page has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/account");
     await audit(page, "/account");
   });
 
-  test("the clarity chat has no serious violations", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/clarity");
+  test("the clarity chat has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/clarity");
     await audit(page, "/clarity");
   });
 
-  test("the cases list has no serious violations", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/cases");
+  test("the cases list has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
+        await page.goto("/cases");
     await audit(page, "/cases");
   });
 
-  test("a chat in mid-journey has no serious violations", async ({ page }) => {
+  test("a chat in mid-journey has no serious violations", async ({ page, request }) => {
+    await signedIn(page, await customerToken(request));
     // The confirm card, the citation and the journey nav only exist once a
     // flow is running, and they are the parts a customer acts on. Auditing
     // only the empty page would miss exactly the controls that matter.
-    await signIn(page);
-    await page.goto("/clarity");
-    await page
-      .getByRole("textbox", { name: /ask|message|type/i })
-      .fill("Why was LKR 49 deducted from my balance?");
+        await page.goto("/clarity");
+    const box = page.getByRole("textbox", { name: /ask|message|type/i });
+    await box.fill("Why was LKR 49 deducted from my balance?");
+    await page.keyboard.press("Enter");
+    // The first turn opens the case; the flow runs from the second.
+    await expect(page.getByRole("heading", { name: /found the reason/i })).toBeVisible();
+    await box.fill("Yes, please fix it");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("navigation", { name: /charge|ගාස්තු|கட்டண/i })).toBeVisible();
 
