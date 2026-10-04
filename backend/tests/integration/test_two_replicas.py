@@ -61,8 +61,16 @@ while time.monotonic() < deadline:
 else:
     raise SystemExit(f"{worker}: the other replica never arrived at the barrier")
 
+# Opposite directions, so the two replicas meet in the middle whatever their
+# relative speed. Both walking 0..n-1 made contention a matter of timing: on a
+# two-core runner one replica finished the whole range before the other got
+# going, won all 500, and the test failed its own "both did work" guard while
+# every correctness assertion passed. The barrier above syncs the start; it
+# cannot sync the pace.
+order = range(plan_count) if worker == "replica-a" else range(plan_count - 1, -1, -1)
+
 won = []
-for index in range(plan_count):
+for index in order:
     plan_id = f"PLAN-{index:04d}"
     try:
         with store.unit() as unit:
@@ -127,8 +135,9 @@ def test_two_processes_each_plan_is_claimed_exactly_once(engine: Engine) -> None
     assert distinct == plan_count
 
     # Both replicas did real work, or the test proved nothing about contention.
-    # The workers wait at a barrier before claiming, so this is a real
-    # assertion about contention rather than a race on process start-up.
+    # They walk the range in opposite directions, so they collide around the
+    # midpoint however fast each one is: this is a structural guarantee, not a
+    # hope about scheduling.
     per_replica = {result["worker"]: len(result["won"]) for result in results}  # type: ignore[arg-type]
     assert all(count > 0 for count in per_replica.values()), (
         f"one replica claimed nothing, so there was no contention: {per_replica}"
