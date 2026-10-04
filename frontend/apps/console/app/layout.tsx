@@ -14,6 +14,26 @@ export const metadata: Metadata = {
   description: "Staff desk for synthetic cases: evidence, approval, and Trust Receipts.",
 };
 
+/**
+ * The console shell (E2).
+ *
+ * Three things here are accessibility structure rather than decoration.
+ *
+ * **The skip link is first in the DOM.** The header carries the whole
+ * navigation and the sign-in bar, so a keyboard user landing on a page would
+ * otherwise tab through every section link and three form fields before
+ * reaching the thing they came for. It is visually hidden until focused, which
+ * is the only way it stays useful without becoming clutter.
+ *
+ * **`<main>` is the skip target and takes focus.** `tabIndex={-1}` makes it
+ * focusable programmatically but keeps it out of the tab order, so following
+ * the skip link moves the actual focus ring rather than only scrolling: a
+ * screen reader then reads from the heading, not from wherever focus was left.
+ *
+ * **One landmark each.** `header` as a direct child of `body` is the `banner`
+ * landmark and `main` is `main`, so a screen reader's landmark list has the two
+ * entries it should and no nesting that would hide one inside the other.
+ */
 export default function RootLayout({
   children,
 }: {
@@ -23,11 +43,23 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <StaffSessionProvider>
-          <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+          <a
+            href="#console-main"
+            className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-bg"
+          >
+            Skip to main content
+          </a>
+          <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur">
             <ConsoleNav />
             <RoleSwitcherBar />
           </header>
-          <main className="mx-auto max-w-[1240px] px-4 py-8 sm:px-6">{children}</main>
+          <main
+            id="console-main"
+            tabIndex={-1}
+            className="mx-auto max-w-[1240px] px-4 py-8 focus:outline-none sm:px-6"
+          >
+            {children}
+          </main>
         </StaffSessionProvider>
       </body>
     </html>

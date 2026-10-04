@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Input } from "@clarity/ui";
+import { Alert, Badge, Button, Card, Dialog, EmptyState, Field, Input } from "@clarity/ui";
 import type { PolicyChangeView } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
@@ -29,6 +29,20 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
  * each person only the half they hold. `config:approve` is also a step-up
  * permission, which is why an approver on an ordinary session is asked to
  * re-authenticate before the buttons would do anything.
+ *
+ * ---
+ *
+ * E2 added two things.
+ *
+ * **Every button names its change.** A page with six open changes had six
+ * buttons called "Approve", which to a screen reader is six identical
+ * controls. Each now carries the policy key, so the one that is about to be
+ * approved is the one that was read out.
+ *
+ * **Activating and reversing ask first.** Both take effect on the live policy
+ * store for every customer, and both were a single click. They are now
+ * dialogs, which is also what gives the keyboard path a focus trap. Drafting
+ * and attaching a replay are not: neither changes what any customer sees.
  */
 
 type Busy = string | null;
@@ -44,6 +58,8 @@ const STATE_TONE: Record<string, "neutral" | "warning" | "success" | "danger"> =
   rejected: "danger",
 };
 
+type Confirming = { change: PolicyChangeView; action: "Activate" | "Reversal" } | null;
+
 export default function StudioPage() {
   const { client, session, hasPermission, stepUp, stepUpWithProvider } = useStaffSession();
   // Exactly the permissions the routes check. Gating on `rule:publish` too
@@ -57,6 +73,7 @@ export default function StudioPage() {
   const [status, setStatus] = useState<string>("");
   const [busy, setBusy] = useState<Busy>(null);
   const [form, setForm] = useState({ key: "", value: "", reason: "" });
+  const [confirming, setConfirming] = useState<Confirming>(null);
 
   const load = useCallback(() => {
     if (!allowed) return;
@@ -94,115 +111,187 @@ export default function StudioPage() {
     [load],
   );
 
+  const runConfirmed = useCallback(() => {
+    if (!confirming) return;
+    const { change, action } = confirming;
+    setConfirming(null);
+    if (action === "Activate") {
+      void act("Activate", () => client.activatePolicyChange(change.change_id));
+    } else {
+      void act("Reversal", () =>
+        client.rollbackPolicyChange(change.change_id, {
+          reason: `Reversal of ${change.change_id}, requested from Policy Studio`,
+        }),
+      );
+    }
+  }, [act, client, confirming]);
+
   if (!session || !allowed) {
     return <AccessDenied need="config:draft or config:approve" />;
   }
 
   return (
     <div className="space-y-5">
-      <header>
+      <div>
         <Badge tone="warning">SYNTHETIC POLICY</Badge>
         <h1 className="mt-2 text-2xl font-semibold">Policy Studio</h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-muted">
           A change is drafted, replayed, approved, scheduled and only then active. The
           change class comes from the artefact&apos;s own tags, and the number of approvals
           it needs follows from that.
         </p>
-      </header>
+      </div>
 
-      {error ? (
-        <Card className="border-rose-300 text-sm text-rose-900" role="alert">
-          {error}
-        </Card>
-      ) : null}
-      {status ? (
-        <Card className="border-emerald-300 text-sm text-emerald-900">{status}</Card>
-      ) : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {status ? <Alert tone="success">{status}</Alert> : null}
 
       {canApprove && !stepUp ? (
-        <Card className="space-y-2 border-amber-300">
-          <p className="text-sm text-amber-900">
+        <Alert tone="warning" title="This session is not stepped up">
+          <p>
             Approving, scheduling and activating need a recent re-authentication. Your
             session is valid but not stepped up, so the API will refuse those calls.
           </p>
-          <Button variant="secondary" onClick={() => void stepUpWithProvider()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            onClick={() => void stepUpWithProvider()}
+          >
             Re-authenticate
           </Button>
-        </Card>
+        </Alert>
       ) : null}
 
       {canDraft ? (
-        <Card className="space-y-3">
-          <h2 className="font-semibold">Open a change</h2>
-          <p className="text-xs text-slate-500">
-            The key must already exist as a policy artefact. Its tags decide the change
-            class, so a key invented here would route around the thing that sets how many
-            approvals are needed.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <label className="flex flex-col gap-1 text-xs text-slate-500">
-              Policy key
-              <Input
-                value={form.key}
-                onChange={(e) => setForm({ ...form, key: e.target.value })}
-                placeholder="refund.auto_cap_lkr"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-500">
-              Candidate value
-              <Input
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-500">
-              Reason (required)
-              <Input
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-              />
-            </label>
-          </div>
-          <Button
-            disabled={busy !== null || !form.key.trim() || !form.reason.trim()}
-            onClick={() =>
-              void act("Draft", async () => {
-                await client.draftPolicyChange({
-                  key: form.key.trim(),
-                  value: form.value,
-                  reason: form.reason.trim(),
-                });
-                setForm({ key: "", value: "", reason: "" });
-              })
-            }
-          >
-            Open change
-          </Button>
-        </Card>
+        <section aria-labelledby="studio-open">
+          <Card className="space-y-3">
+            <h2 id="studio-open" className="font-semibold">
+              Open a change
+            </h2>
+            <p className="text-xs text-fg-muted">
+              The key must already exist as a policy artefact. Its tags decide the change
+              class, so a key invented here would route around the thing that sets how many
+              approvals are needed.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Field label="Policy key">
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={form.key}
+                    onChange={(e) => setForm({ ...form, key: e.target.value })}
+                    placeholder="refund.auto_cap_lkr"
+                  />
+                )}
+              </Field>
+              <Field label="Candidate value">
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={form.value}
+                    onChange={(e) => setForm({ ...form, value: e.target.value })}
+                  />
+                )}
+              </Field>
+              <Field label="Reason (required)">
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={form.reason}
+                    onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                  />
+                )}
+              </Field>
+            </div>
+            <Button
+              disabled={busy !== null || !form.key.trim() || !form.reason.trim()}
+              onClick={() =>
+                void act("Draft", async () => {
+                  await client.draftPolicyChange({
+                    key: form.key.trim(),
+                    value: form.value,
+                    reason: form.reason.trim(),
+                  });
+                  setForm({ key: "", value: "", reason: "" });
+                })
+              }
+            >
+              Open change
+            </Button>
+          </Card>
+        </section>
       ) : null}
 
-      {changes === null ? (
-        <Card className="text-sm text-slate-600">Loading changes...</Card>
-      ) : changes.length === 0 ? (
-        <Card className="text-sm text-slate-600">
-          No policy changes yet. Opening one puts it in draft; nothing takes effect until
-          it has been approved, scheduled and activated.
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {changes.map((change) => (
-            <ChangeCard
-              key={change.change_id}
-              change={change}
-              canDraft={canDraft}
-              canApprove={canApprove}
-              busy={busy}
-              onAct={act}
-              client={client}
+      <section aria-labelledby="studio-changes">
+        <h2 id="studio-changes" className="sr-only">
+          Policy changes
+        </h2>
+        {changes === null ? (
+          <Card className="text-sm text-fg-muted">Loading changes...</Card>
+        ) : changes.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="No policy changes yet"
+              description="Opening one puts it in draft; nothing takes effect until it has been approved, scheduled and activated."
             />
-          ))}
-        </div>
-      )}
+          </Card>
+        ) : (
+          <ul className="space-y-3">
+            {changes.map((change) => (
+              <li key={change.change_id}>
+                <ChangeCard
+                  change={change}
+                  canDraft={canDraft}
+                  canApprove={canApprove}
+                  busy={busy}
+                  onAct={act}
+                  onConfirm={(action) => setConfirming({ change, action })}
+                  client={client}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Dialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={
+          confirming?.action === "Activate"
+            ? `Activate ${confirming.change.key}?`
+            : confirming
+              ? `Propose a reversal of ${confirming.change.key}?`
+              : "Confirm"
+        }
+        description="The policy store is what every decision resolves against, so this takes effect for cases evaluated from now on."
+        dismissOnBackdrop={false}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
+              Cancel
+            </Button>
+            <Button data-autofocus onClick={runConfirmed}>
+              {confirming?.action === "Activate" ? "Activate it" : "Propose the reversal"}
+            </Button>
+          </>
+        }
+      >
+        {confirming?.action === "Activate" ? (
+          <p>
+            {confirming.change.key} becomes{" "}
+            <code className="font-mono">{JSON.stringify(confirming.change.candidate.value)}</code>{" "}
+            for every case decided after it. Cases already decided keep the value that
+            was effective when they were decided, which is what makes a replay exact.
+          </p>
+        ) : confirming ? (
+          <p>
+            This restores the version {confirming.change.key} replaced. A reversal is
+            itself a change: it is drafted for somebody else to approve, and does not
+            take effect on this click.
+          </p>
+        ) : null}
+      </Dialog>
     </div>
   );
 }
@@ -213,6 +302,7 @@ function ChangeCard({
   canApprove,
   busy,
   onAct,
+  onConfirm,
   client,
 }: {
   change: PolicyChangeView;
@@ -220,45 +310,54 @@ function ChangeCard({
   canApprove: boolean;
   busy: Busy;
   onAct: (label: string, run: () => Promise<unknown>) => Promise<void>;
+  onConfirm: (action: "Activate" | "Reversal") => void;
   client: ReturnType<typeof useStaffSession>["client"];
 }) {
   const id = change.change_id;
   const working = busy !== null;
   const [effectiveFrom, setEffectiveFrom] = useState("");
+  const headingId = `change-${id}`;
 
   return (
-    <Card className="space-y-2" data-testid="policy-change">
+    <Card
+      role="group"
+      aria-labelledby={headingId}
+      className="space-y-2"
+      data-testid="policy-change"
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-mono text-sm font-semibold">{change.key}</h2>
+        <h3 id={headingId} className="font-mono text-sm font-semibold">
+          {change.key}
+        </h3>
         <Badge tone={STATE_TONE[change.state] ?? "neutral"}>
           {change.state.replace("_", " ").toUpperCase()}
         </Badge>
-        <span className="text-xs text-slate-500">class {change.change_class}</span>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-fg-muted">class {change.change_class}</span>
+        <span className="text-xs text-fg-muted">
           {change.approvals.length} of {change.approvals_needed} approvals
         </span>
       </div>
 
       <p className="text-sm">{change.reason}</p>
-      <p className="font-mono text-xs text-slate-500">
+      <p className="font-mono text-xs text-fg-muted">
         candidate: {JSON.stringify(change.candidate.value)}
       </p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fg-muted">
         Opened by {change.maker_ref} · {id}
       </p>
       {change.scheduled_for ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fg-muted">
           Scheduled for {new Date(change.scheduled_for).toLocaleString()}
         </p>
       ) : null}
       {change.activated_at ? (
-        <p className="text-xs text-emerald-800">
+        <p className="text-xs text-success">
           Active since {new Date(change.activated_at).toLocaleString()}
         </p>
       ) : null}
 
       {change.impact ? (
-        <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+        <p className="rounded-lg bg-surface-2 p-2 text-xs text-fg">
           Replay: {change.impact.cases_evaluated} cases evaluated, {change.impact.changed}{" "}
           would change, LKR {change.impact.money_delta_lkr} difference.{" "}
           {change.impact.candidate_summary}
@@ -266,7 +365,7 @@ function ChangeCard({
       ) : null}
 
       {change.approvals.length ? (
-        <ul className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+        <ul className="rounded-lg bg-surface-2 p-2 text-xs text-fg">
           {change.approvals.map((approval, i) => (
             <li key={i}>
               approved by {approval.approver_ref} ({approval.role})
@@ -281,11 +380,12 @@ function ChangeCard({
           API decides whether this change is in a state to take it. Hiding one
           it would accept, or showing one it would always refuse, means this
           page has grown its own idea of the lifecycle. */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
+      <div className="flex flex-wrap items-end gap-2 border-t border-border pt-2">
         {canDraft ? (
           <Button
             variant="secondary"
             disabled={working}
+            aria-label={`Attach replay to ${change.key}`}
             onClick={() =>
               void onAct("Replay", () =>
                 client.reviewPolicyChange(id, {
@@ -303,23 +403,25 @@ function ChangeCard({
           <>
             <Button
               disabled={working}
+              aria-label={`Approve ${change.key}`}
               onClick={() => void onAct("Approve", () => client.approvePolicyChange(id))}
             >
               Approve
             </Button>
-            <label className="flex items-center gap-1 text-xs text-slate-500">
-              from
-              <input
-                type="datetime-local"
-                value={effectiveFrom}
-                onChange={(e) => setEffectiveFrom(e.target.value)}
-                aria-label={`Effective from for ${change.key}`}
-                className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-              />
-            </label>
+            <Field label={`Effective from`} className="w-52">
+              {(control) => (
+                <Input
+                  {...control}
+                  type="datetime-local"
+                  value={effectiveFrom}
+                  onChange={(e) => setEffectiveFrom(e.target.value)}
+                />
+              )}
+            </Field>
             <Button
               variant="secondary"
               disabled={working || !effectiveFrom}
+              aria-label={`Schedule ${change.key}`}
               onClick={() =>
                 void onAct("Schedule", () =>
                   client.schedulePolicyChange(id, {
@@ -332,7 +434,8 @@ function ChangeCard({
             </Button>
             <Button
               disabled={working}
-              onClick={() => void onAct("Activate", () => client.activatePolicyChange(id))}
+              aria-label={`Activate ${change.key}`}
+              onClick={() => onConfirm("Activate")}
             >
               Activate
             </Button>
@@ -342,20 +445,15 @@ function ChangeCard({
               <Button
                 variant="secondary"
                 disabled={working}
-                onClick={() =>
-                  void onAct("Reversal", () =>
-                    client.rollbackPolicyChange(id, {
-                      reason: `Reversal of ${id}, requested from Policy Studio`,
-                    }),
-                  )
-                }
+                aria-label={`Propose a reversal of ${change.key}`}
+                onClick={() => onConfirm("Reversal")}
               >
                 Propose reversal
               </Button>
             ) : null}
           </>
         ) : (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-fg-muted">
             You can open and replay changes. Signing one off needs{" "}
             <code>config:approve</code>, and the person who opened a change may never
             approve it.

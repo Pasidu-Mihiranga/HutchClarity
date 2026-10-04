@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@clarity/ui";
 import { t, type Lang } from "@clarity/i18n";
 import { VoicePoweredOrb } from "@/components/ui/voice-powered-orb";
 
@@ -74,6 +75,11 @@ export function VoiceSheet({
   const recRef = useRef<Recognition | null>(null);
   const textRef = useRef("");
   const primaryRef = useRef<HTMLButtonElement>(null);
+  // Escape closes the sheet and Tab stays inside it (E6). The sheet already
+  // declared `role="dialog"` and `aria-modal`, which promises both; only a
+  // mouse click on the scrim actually delivered either.
+  const panel = useRef<HTMLDivElement>(null);
+  useFocusTrap(panel, true, onClose);
 
   const stopRecognition = useCallback(() => {
     recRef.current?.abort();
@@ -159,13 +165,21 @@ export function VoiceSheet({
     : t(lang, "voice.hint");
 
   return (
-    <div className="vo-backdrop" onClick={onClose}>
+    <div
+      className="vo-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        // The scrim dismisses; a click that bubbled out of the sheet does not.
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <div
+        ref={panel}
         className="vo-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="vo-title"
-        onClick={(e) => e.stopPropagation()}
+        tabIndex={-1}
       >
         <div className="vo-head">
           <h2 id="vo-title" className="vo-title">{t(lang, "voice.title")}</h2>

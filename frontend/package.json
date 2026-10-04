@@ -11,7 +11,7 @@
     "dev:verify": "npm run dev -w @clarity/verify",
     "dev:all": "npm run dev:customer & npm run dev:console & npm run dev:verify & wait",
     "build": "npm run build -w @clarity/customer-web -w @clarity/console -w @clarity/verify",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "eslint apps packages --ext .ts,.tsx,.mjs",
     "sdk:generate": "openapi-typescript ../contracts/openapi.json -o packages/sdk/src/generated/schema.ts",
     "sdk:check": "node scripts/check-sdk.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -25,6 +25,10 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.56.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "next": "^14.2.35",
     "openapi-typescript": "^7.13.0"
   }
 }

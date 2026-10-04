@@ -1,0 +1,36 @@
+{
+  // Shared by the three apps and the four packages. One config rather than one
+  // per app: they share every rule, and `next lint` per app meant three
+  // configs to drift (E6).
+  "root": true,
+  "extends": ["next/core-web-vitals", "plugin:jsx-a11y/recommended"],
+  "rules": {
+    // A label wrapping its control is as good as `htmlFor`, and both are used.
+    "jsx-a11y/label-has-associated-control": ["error", { "assert": "either" }],
+    // A scrollable region has to be reachable by keyboard (WCAG 2.1 SC 2.1.1),
+    // which means `tabIndex={0}` on it is the fix, not the defect. Without
+    // this the rule rejects the accessible version of the Table.
+    // Every app is App Router and none has a `pages/` directory, so this rule
+    // cannot resolve one and warns on every run about its own inapplicability.
+    "@next/next/no-html-link-for-pages": "off",
+    "jsx-a11y/no-noninteractive-tabindex": [
+      "error",
+      { "tags": [], "roles": ["region", "tabpanel"], "allowExpressionValues": true }
+    ]
+  },
+  "overrides": [
+    {
+      // The ARIA tabs pattern puts a roving `tabIndex` on the tabs and never
+      // makes the tablist a tab stop; its key handler is delegation for them.
+      // The rule cannot see that, and making the list focusable to satisfy it
+      // would add a tab stop that does nothing.
+      "files": ["packages/ui/src/components/data.tsx"],
+      "rules": { "jsx-a11y/interactive-supports-focus": "off" }
+    }
+  ],
+  "ignorePatterns": [
+    "**/.next/**",
+    "**/node_modules/**",
+    "packages/sdk/src/generated/**"
+  ]
+}

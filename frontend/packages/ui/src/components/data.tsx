@@ -159,6 +159,11 @@ export const TabList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
     return (
       <div
         ref={ref}
+        // jsx-a11y wants a focusable element for an interactive role with a key
+        // handler. Here the handler is delegation: the ARIA tabs pattern puts a
+        // roving `tabIndex` on the tabs and never makes the list itself a tab
+        // stop, so making this focusable would add a stop that does nothing.
+        // eslint-disable-next-line jsx-a11y/interactive-supports-focus
         role="tablist"
         aria-label={label}
         aria-orientation={orientation}

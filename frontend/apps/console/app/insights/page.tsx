@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Card } from "@clarity/ui";
+import { Alert, Badge, Card, EmptyState, Spinner } from "@clarity/ui";
 import type { AutopsyWorkspace, ForesightPrediction } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
+/**
+ * Insights, with the accessibility pass of E2.
+ *
+ * The three headline figures are a description list rather than three
+ * paragraphs: "Cases, 14" is a term and its value, and a screen reader reads
+ * the pair as one thing instead of two unrelated lines. Each panel below is a
+ * named section, and the two that load after the first paint announce
+ * themselves when they arrive rather than appearing in silence.
+ */
 export default function InsightsPage() {
   const { client, session, generation, hasPermission } = useStaffSession();
   const allowed = hasPermission("desk:queue:read");
@@ -69,7 +78,6 @@ export default function InsightsPage() {
   const byOutcome = (ops?.by_outcome || {}) as Record<string, number>;
   const clusters = autopsy?.clusters ?? [];
 
-
   return (
     <div className="space-y-6">
       <div>
@@ -83,80 +91,106 @@ export default function InsightsPage() {
         </p>
       </div>
 
-      {error ? (
-        <Card className="border-rose-200 bg-rose-50 text-sm text-rose-900">{error}</Card>
-      ) : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="space-y-2">
-          <p className="text-xs uppercase text-slate-500">Cases</p>
-          <p className="text-lg font-medium">{String(ops?.cases ?? " - ")}</p>
-          <Badge tone="neutral">Decided {String(ops?.decided ?? 0)}</Badge>
-        </Card>
-        <Card className="space-y-2">
-          <p className="text-xs uppercase text-slate-500">Money at stake</p>
-          <p className="text-lg font-medium">
-            LKR {String(ops?.money_at_stake_lkr ?? "0.00")}
-          </p>
-          <Badge tone="warning">Synthetic records</Badge>
-        </Card>
-        <Card className="space-y-2">
-          <p className="text-xs uppercase text-slate-500">Top autopsy cluster</p>
-          <p className="text-lg font-medium">
-            {clusters[0]?.label || " - pending seed"}
-          </p>
-          <Badge tone="warning">Hypothesis</Badge>
-        </Card>
-      </div>
+      <section aria-labelledby="insights-headline">
+        <h2 id="insights-headline" className="sr-only">
+          Headline figures
+        </h2>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          <Card className="space-y-2">
+            <dt className="text-xs uppercase text-fg-muted">Cases</dt>
+            <dd className="text-lg font-medium">{String(ops?.cases ?? " - ")}</dd>
+            <dd>
+              <Badge tone="neutral">Decided {String(ops?.decided ?? 0)}</Badge>
+            </dd>
+          </Card>
+          <Card className="space-y-2">
+            <dt className="text-xs uppercase text-fg-muted">Money at stake</dt>
+            <dd className="text-lg font-medium">
+              LKR {String(ops?.money_at_stake_lkr ?? "0.00")}
+            </dd>
+            <dd>
+              <Badge tone="warning">Synthetic records</Badge>
+            </dd>
+          </Card>
+          <Card className="space-y-2">
+            <dt className="text-xs uppercase text-fg-muted">Top autopsy cluster</dt>
+            <dd className="text-lg font-medium">{clusters[0]?.label || " - pending seed"}</dd>
+            <dd>
+              <Badge tone="warning">Hypothesis</Badge>
+            </dd>
+          </Card>
+        </dl>
+      </section>
 
-      <Card>
-        <h2 className="mb-2 font-medium">Outcomes</h2>
-        <ul className="space-y-1 text-sm text-slate-700">
-          {Object.keys(byOutcome).length
-            ? Object.entries(byOutcome).map(([k, v]) => (
+      <section aria-labelledby="insights-outcomes">
+        <Card>
+          <h2 id="insights-outcomes" className="mb-2 font-medium">
+            Outcomes
+          </h2>
+          <ul className="space-y-1 text-sm text-fg">
+            {Object.keys(byOutcome).length ? (
+              Object.entries(byOutcome).map(([k, v]) => (
                 <li key={k}>
                   {k} · {v}
                 </li>
               ))
-            : (
-              <li className="text-slate-500">None yet. Cases show up here after they are opened.</li>
+            ) : (
+              <li className="text-fg-muted">
+                None yet. Cases show up here after they are opened.
+              </li>
             )}
-        </ul>
-      </Card>
+          </ul>
+        </Card>
+      </section>
 
-      <Card>
-        <h2 className="mb-2 font-medium">Complaint Autopsy</h2>
-        <p className="mb-2 text-xs text-slate-500">{autopsy?.note ?? ""}</p>
-        <ul className="space-y-1 text-sm">
-          {clusters.map((c) => (
-            <li key={c.cluster_id}>
-              {c.label} · {c.size} · {c.status}
-              {c.suggested_rule_id ? ` · ${c.suggested_rule_id}` : ""}
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card>
-        <h2 className="mb-2 font-medium">Foresight</h2>
-        <p className="mb-2 text-xs text-slate-500">{foresightNote}</p>
-        {predictions === null ? (
-          <p className="text-sm text-slate-600">Loading the latest rehearsal...</p>
-        ) : predictions.length === 0 ? (
-          <p className="text-sm text-slate-600">
-            Nothing to show. A rehearsal is a scenario, never a forecast, and none has been
-            stored for this panel to read.
-          </p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {predictions.map((p, i) => (
-              <li key={i}>
-                <strong>{p.band}</strong> · {p.segment} · {p.theme} - {p.mitigation}
+      <section aria-labelledby="insights-autopsy">
+        <Card>
+          <h2 id="insights-autopsy" className="mb-2 font-medium">
+            Complaint Autopsy
+          </h2>
+          <p className="mb-2 text-xs text-fg-muted">{autopsy?.note ?? ""}</p>
+          <ul className="space-y-1 text-sm">
+            {clusters.map((c) => (
+              <li key={c.cluster_id}>
+                {c.label} · {c.size} · {c.status}
+                {c.suggested_rule_id ? ` · ${c.suggested_rule_id}` : ""}
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      </section>
+
+      <section aria-labelledby="insights-foresight">
+        <Card>
+          <h2 id="insights-foresight" className="mb-2 font-medium">
+            Foresight
+          </h2>
+          <p className="mb-2 text-xs text-fg-muted">{foresightNote}</p>
+          <div aria-live="polite">
+            {predictions === null ? (
+              <p className="flex items-center gap-2 text-sm text-fg-muted">
+                <Spinner size="sm" label="Loading the latest rehearsal" />
+                Loading the latest rehearsal...
+              </p>
+            ) : predictions.length === 0 ? (
+              <EmptyState
+                title="Nothing to show"
+                description="A rehearsal is a scenario, never a forecast, and none has been stored for this panel to read."
+              />
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {predictions.map((p, i) => (
+                  <li key={i}>
+                    <strong>{p.band}</strong> · {p.segment} · {p.theme} - {p.mitigation}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Card>
+      </section>
     </div>
   );
 }

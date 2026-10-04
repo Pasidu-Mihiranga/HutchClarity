@@ -20,10 +20,42 @@
  * real ones: a role without `audit:read` sees the access-denied page, and the
  * lifecycle buttons are hidden without `alert:dispose` rather than failing on
  * click.
+ *
+ * ---
+ *
+ * E2 added the accessibility structure this page did not have.
+ *
+ * **Each panel is a landmark with a name.** Eight cards of dense evidence were
+ * one undifferentiated region; they are now named sections, so a screen reader
+ * user can jump to Recovery without reading Chain health first.
+ *
+ * **The trail is a grid, navigable by arrow key.** Fifty records with a button
+ * each meant fifty tab stops. The table takes one, Up and Down move a row at a
+ * time, and Enter verifies the row that has focus (see `useRovingRows`).
+ *
+ * **Disposing of an alert is a dialog.** The reason is required and the API
+ * refuses without one, which the inline form expressed as a validation error
+ * after the click. Asking for it in a dialog puts the requirement where the
+ * decision is, and gives the keyboard path a focus trap and an Escape route.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Input } from "@clarity/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  Field,
+  Input,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@clarity/ui";
 import { ClarityApiError } from "@clarity/sdk";
 import type {
   AlertView,
@@ -36,6 +68,7 @@ import type {
 } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
+import { useRovingRows } from "@/lib/useRovingRows";
 
 const BAND_TONE: Record<string, "neutral" | "success" | "warning" | "danger"> = {
   low: "neutral",
@@ -76,10 +109,13 @@ export default function AuditPage() {
   const [trail, setTrail] = useState<AuditTrailPage | null>(null);
   const [verdicts, setVerdicts] = useState<Record<number, AuditRecordVerdict>>({});
   const [filters, setFilters] = useState({ actor_ref: "", event_type: "", case_id: "" });
-  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [disposing, setDisposing] = useState<AlertView | null>(null);
+  const [disposition, setDisposition] = useState("confirmed");
+  const [reason, setReason] = useState("");
 
   const [refused, setRefused] = useState<Record<string, boolean>>({});
 
@@ -144,31 +180,32 @@ export default function AuditPage() {
     }
   }
 
-  async function verifyRecord(seq: number) {
-    try {
-      const verdict = await client.verifyAuditRecord(seq);
-      setVerdicts((current) => ({ ...current, [seq]: verdict }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not verify that record");
-    }
-  }
+  const verifyRecord = useCallback(
+    async (seq: number) => {
+      try {
+        const verdict = await client.verifyAuditRecord(seq);
+        setVerdicts((current) => ({ ...current, [seq]: verdict }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not verify that record");
+      }
+    },
+    [client],
+  );
 
-  async function move(alertId: string, action: "acknowledge" | "investigate" | "dispose") {
+  const records = trail?.records ?? [];
+  // Enter on the focused row verifies that row, which is the one action the
+  // trail offers: the keyboard gets the same reach as the mouse.
+  const { rowProps } = useRovingRows(records.length, (index) => {
+    const record = records[index];
+    if (record) void verifyRecord(record.seq);
+  });
+
+  async function move(alertId: string, action: "acknowledge" | "investigate") {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      if (action === "dispose") {
-        const reason = reasons[alertId]?.trim();
-        if (!reason) {
-          setError("A disposition always needs a reason.");
-          return;
-        }
-        await client.disposeAlert(alertId, {
-          disposition: reasons[`${alertId}:disposition`] || "confirmed",
-          reason,
-        });
-      } else if (action === "acknowledge") {
+      if (action === "acknowledge") {
         await client.acknowledgeAlert(alertId);
       } else {
         await client.investigateAlert(alertId);
@@ -177,6 +214,29 @@ export default function AuditPage() {
       await loadStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Could not ${action} that alert`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dispose() {
+    const target = disposing;
+    if (!target || !reason.trim()) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await client.disposeAlert(target.alert_id, {
+        disposition,
+        reason: reason.trim(),
+      });
+      setMessage(`${target.alert_id}: disposed`);
+      setDisposing(null);
+      setReason("");
+      setDisposition("confirmed");
+      await loadStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not dispose of that alert");
     } finally {
       setBusy(false);
     }
@@ -197,494 +257,574 @@ export default function AuditPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Audit</h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-muted">
           Every panel shows the evidence, not a reassurance. Reading the trail is
           itself recorded, and so is this session.
         </p>
       </div>
 
-      {error ? (
-        <Card className="border-rose-200 bg-rose-50 text-sm text-rose-900">{error}</Card>
-      ) : null}
-      {message ? (
-        <Card className="border-emerald-200 bg-emerald-50 text-sm text-emerald-900">
-          {message}
-        </Card>
-      ) : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {message ? <Alert tone="success">{message}</Alert> : null}
 
       {/* 1. Chain health */}
-      <Card className="space-y-3" data-testid="chain-health">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">Chain health</h2>
-          {health ? (
-            <Badge tone={health.intact ? "success" : "danger"}>
-              {health.intact ? "intact" : "BROKEN"}
-            </Badge>
-          ) : (
-            <Badge>loading</Badge>
-          )}
-        </div>
-        {health ? (
-          <>
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Records</dt>
-                <dd className="font-mono" data-testid="chain-length">
-                  {health.length}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Checkpoints</dt>
-                <dd className="font-mono">{health.checkpoints}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Last checkpoint</dt>
-                <dd className="font-mono">{age(health.last_checkpoint_age_seconds)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Detection last ran</dt>
-                <dd className="font-mono">{when(health.detection_last_ran_at)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Writer lag</dt>
-                <dd className="font-mono" data-testid="writer-lag">
-                  {health.writer_lag_events} event(s) unpublished
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">Archived below</dt>
-                <dd className="font-mono">
-                  {health.archived_below_seq ? `seq ${health.archived_below_seq}` : "nothing"}
-                </dd>
-              </div>
-            </dl>
-            {!health.intact ? (
-              <p className="rounded bg-rose-50 p-2 text-sm text-rose-900">
-                Broken at seq {health.broken_at}: {health.reason}
-                {health.lost_from
-                  ? ` Records ${health.lost_from} to ${health.lost_to} are missing.`
-                  : ""}
-              </p>
-            ) : null}
-            <p className="text-xs text-slate-500">
-              This check recomputes from seq {health.verified_from} up, anchored on
-              the last signed checkpoint. It catches truncation and any tampering
-              since that checkpoint; it does not re-read the records below it,
-              which the full verification at startup does. Keep a copy of{" "}
-              <a className="underline" href={health.witness_url}>
-                the public checkpoint
-              </a>{" "}
-              somewhere this system cannot reach: without one, a restore cannot
-              tell you what it lost.
-            </p>
-          </>
-        ) : null}
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* 4. Alerts */}
-        <Card className="space-y-3" data-testid="alerts-panel">
+      <section aria-labelledby="audit-health">
+        <Card className="space-y-3" data-testid="chain-health">
           <div className="flex items-center justify-between">
-            <h2 className="font-medium">Alerts</h2>
-            <Badge tone={openAlerts.length ? "warning" : "success"}>
-              {openAlerts.length} open
-            </Badge>
-          </div>
-          <p className="text-xs text-slate-500">
-            Counted from the trail, never scored by a model. Detection last ran{" "}
-            {when(detectionRan)}.
-          </p>
-          {alerts.length === 0 ? (
-            <p className="text-sm text-slate-600" data-testid="no-alerts">
-              Nothing has fired. A quiet queue and a stopped detector are not the
-              same thing, which is why detection writes a heartbeat either way.
-            </p>
-          ) : null}
-          <ul className="space-y-3">
-            {alerts.slice(0, 8).map((alert) => (
-              <li
-                key={alert.alert_id}
-                className="space-y-2 rounded border border-slate-200 p-3 text-sm"
-                data-testid="alert-row"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-xs">{alert.rule_id}</span>
-                    <p className="text-slate-800">{alert.summary}</p>
-                  </div>
-                  <Badge tone={BAND_TONE[alert.band] || "neutral"}>{alert.band}</Badge>
-                </div>
-                <p className="text-xs text-slate-500">
-                  {alert.state}
-                  {alert.occurrences > 1 ? ` · seen ${alert.occurrences} times` : ""}
-                  {alert.acknowledged_by ? ` · acknowledged by ${alert.acknowledged_by}` : ""}
-                  {alert.escalated_at ? " · escalated" : ""}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Evidence:{" "}
-                  {alert.evidence.length ? (
-                    alert.evidence.map((seq: number) => (
-                      <button
-                        key={seq}
-                        type="button"
-                        className="mr-1 underline"
-                        onClick={() => {
-                          setFilters({ actor_ref: "", event_type: "", case_id: "" });
-                          void verifyRecord(seq);
-                        }}
-                      >
-                        #{seq}
-                      </button>
-                    ))
-                  ) : (
-                    <span>none cited</span>
-                  )}
-                </p>
-                {canDispose && alert.state !== "disposed" ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {alert.state === "open" ? (
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => void move(alert.alert_id, "acknowledge")}
-                      >
-                        Acknowledge
-                      </Button>
-                    ) : null}
-                    {alert.state === "acknowledged" ? (
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => void move(alert.alert_id, "investigate")}
-                      >
-                        Investigate
-                      </Button>
-                    ) : null}
-                    <select
-                      className="rounded border border-slate-300 px-2 py-1 text-xs"
-                      value={reasons[`${alert.alert_id}:disposition`] || "confirmed"}
-                      onChange={(event) =>
-                        setReasons((current) => ({
-                          ...current,
-                          [`${alert.alert_id}:disposition`]: event.target.value,
-                        }))
-                      }
-                    >
-                      {DISPOSITIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      className="w-40 text-xs"
-                      placeholder="Reason (required)"
-                      value={reasons[alert.alert_id] || ""}
-                      onChange={(event) =>
-                        setReasons((current) => ({
-                          ...current,
-                          [alert.alert_id]: event.target.value,
-                        }))
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => void move(alert.alert_id, "dispose")}
-                    >
-                      Dispose
-                    </Button>
-                  </div>
-                ) : null}
-                {alert.state === "disposed" ? (
-                  <p className="text-xs text-slate-600">
-                    {alert.disposition} by {alert.disposed_by}: {alert.disposition_reason}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-          {!canDispose ? (
-            <p className="text-xs text-slate-500">
-              Read-only: closing an alert needs alert:dispose, which costs its
-              holder every money permission.
-            </p>
-          ) : null}
-        </Card>
-
-        {/* 5. Monitors */}
-        <Card className="space-y-3" data-testid="monitors-panel">
-          <h2 className="font-medium">Monitors</h2>
-          <p className="text-xs text-slate-500">
-            Who is watching, and since when. A monitor is someone holding an audit
-            duty, which is a time-boxed grant rather than a permanent role, so this
-            list empties by itself when nobody recertifies.
-          </p>
-          {refused.grants ? (
-            <p className="text-sm text-slate-600" data-testid="monitors-refused">
-              Not for this role: the grant list needs audit:assign. Everything else
-              on this page is still live.
-            </p>
-          ) : monitors.length === 0 ? (
-            <p className="text-sm text-slate-600" data-testid="no-monitors">
-              Nobody currently holds an audit duty by grant.
-            </p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {monitors.map((grant) => (
-                <li key={grant.grant_id} className="flex justify-between gap-2">
-                  <span>
-                    <span className="font-mono text-xs">{grant.subject_ref}</span>{" "}
-                    <span className="text-slate-500">{grant.permission}</span>
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    since {when(grant.requested_at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <h3 className="pt-2 text-sm font-medium">Alerts someone owns</h3>
-          <ul className="space-y-1 text-xs text-slate-600">
-            {openAlerts.filter((alert) => alert.acknowledged_by).length ? (
-              openAlerts
-                .filter((alert) => alert.acknowledged_by)
-                .map((alert) => (
-                  <li key={alert.alert_id}>
-                    {alert.rule_id} · {alert.acknowledged_by} since{" "}
-                    {when(alert.acknowledged_at)}
-                  </li>
-                ))
-            ) : (
-              <li>No open alert has been picked up yet.</li>
-            )}
-          </ul>
-        </Card>
-
-        {/* 6. Access */}
-        <Card className="space-y-3" data-testid="access-panel">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium">Access</h2>
-            <Badge tone={breakGlass.length ? "warning" : "neutral"}>
-              {breakGlass.length} break-glass
-            </Badge>
-          </div>
-          <p className="text-xs text-slate-500">
-            Audit duties are granted, approved by a second person, time-boxed and
-            recertified. Holding one removes every money permission.
-          </p>
-          {refused.grants ? (
-            <p className="text-sm text-slate-600" data-testid="access-refused">
-              Not for this role: granting, approving and revoking audit duties needs
-              audit:assign, which is a role permission and never itself a grant.
-            </p>
-          ) : grants.length === 0 ? (
-            <p className="text-sm text-slate-600">No grants have been requested.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {grants.slice(0, 10).map((grant) => (
-                <li key={grant.grant_id} className="space-y-1">
-                  <div className="flex justify-between gap-2">
-                    <span className="font-mono text-xs">{grant.subject_ref}</span>
-                    <Badge
-                      tone={
-                        grant.state === "active"
-                          ? "success"
-                          : grant.state === "pending"
-                            ? "warning"
-                            : "neutral"
-                      }
-                    >
-                      {grant.state}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {grant.permission} · expires {when(grant.expires_at)} · review due{" "}
-                    {when(grant.review_due_at)}
-                    {grant.break_glass ? " · BREAK-GLASS" : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        {/* 7. Recovery */}
-        <Card className="space-y-3" data-testid="recovery-panel">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium">Recovery</h2>
-            {recovery ? (
-              <Badge tone={recovery.backups_configured ? "success" : "danger"}>
-                {recovery.backups_configured ? "key set" : "no backup key"}
+            <h2 id="audit-health" className="font-medium">
+              Chain health
+            </h2>
+            {health ? (
+              <Badge tone={health.intact ? "success" : "danger"}>
+                {health.intact ? "intact" : "BROKEN"}
               </Badge>
-            ) : null}
+            ) : (
+              <Badge>loading</Badge>
+            )}
           </div>
-          {recovery ? (
+          {health ? (
             <>
-              <dl className="space-y-2 text-sm">
+              <dl className="grid gap-3 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs uppercase text-slate-500">Last backup</dt>
-                  <dd className="font-mono text-xs" data-testid="last-backup">
-                    {recovery.last_backup
-                      ? `${when(String(recovery.last_backup.at))} · ${recovery.last_backup.records} records`
-                      : "never taken"}
+                  <dt className="text-xs uppercase text-fg-muted">Records</dt>
+                  <dd className="font-mono" data-testid="chain-length">
+                    {health.length}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase text-slate-500">Last restore</dt>
-                  <dd className="font-mono text-xs">
-                    {recovery.last_restore
-                      ? `${when(String(recovery.last_restore.at))} · lost ${recovery.last_restore.lost_count} record(s)`
-                      : "never restored"}
+                  <dt className="text-xs uppercase text-fg-muted">Checkpoints</dt>
+                  <dd className="font-mono">{health.checkpoints}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase text-fg-muted">Last checkpoint</dt>
+                  <dd className="font-mono">{age(health.last_checkpoint_age_seconds)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase text-fg-muted">Detection last ran</dt>
+                  <dd className="font-mono">{when(health.detection_last_ran_at)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase text-fg-muted">Writer lag</dt>
+                  <dd className="font-mono" data-testid="writer-lag">
+                    {health.writer_lag_events} event(s) unpublished
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase text-slate-500">Last segment sealed</dt>
-                  <dd className="font-mono text-xs">
-                    {recovery.last_segment_sealed
-                      ? `${when(String(recovery.last_segment_sealed.at))} · seq ${recovery.last_segment_sealed.from_seq} to ${recovery.last_segment_sealed.to_seq}`
-                      : "nothing archived"}
+                  <dt className="text-xs uppercase text-fg-muted">Archived below</dt>
+                  <dd className="font-mono">
+                    {health.archived_below_seq ? `seq ${health.archived_below_seq}` : "nothing"}
                   </dd>
                 </div>
               </dl>
-              {!recovery.backups_configured ? (
-                <p className="rounded bg-rose-50 p-2 text-xs text-rose-900">
-                  CLARITY_AUDIT_BACKUP_KEY is unset, so a backup is refused rather
-                  than written in the clear. Nothing is being backed up.
-                </p>
+              {!health.intact ? (
+                <Alert tone="danger">
+                  Broken at seq {health.broken_at}: {health.reason}
+                  {health.lost_from
+                    ? ` Records ${health.lost_from} to ${health.lost_to} are missing.`
+                    : ""}
+                </Alert>
               ) : null}
-              <p className="text-xs text-slate-500">
-                Backup and restore are operator actions with step-up, run from the
-                runbook (WT-14), not from this page.
+              <p className="text-xs text-fg-muted">
+                This check recomputes from seq {health.verified_from} up, anchored on
+                the last signed checkpoint. It catches truncation and any tampering
+                since that checkpoint; it does not re-read the records below it,
+                which the full verification at startup does. Keep a copy of{" "}
+                <a className="underline" href={health.witness_url}>
+                  the public checkpoint
+                </a>{" "}
+                somewhere this system cannot reach: without one, a restore cannot
+                tell you what it lost.
               </p>
             </>
           ) : null}
         </Card>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* 4. Alerts */}
+        <section aria-labelledby="audit-alerts">
+          <Card className="space-y-3" data-testid="alerts-panel">
+            <div className="flex items-center justify-between">
+              <h2 id="audit-alerts" className="font-medium">
+                Alerts
+              </h2>
+              <Badge tone={openAlerts.length ? "warning" : "success"}>
+                {openAlerts.length} open
+              </Badge>
+            </div>
+            <p className="text-xs text-fg-muted">
+              Counted from the trail, never scored by a model. Detection last ran{" "}
+              {when(detectionRan)}.
+            </p>
+            {alerts.length === 0 ? (
+              <p className="text-sm text-fg-muted" data-testid="no-alerts">
+                Nothing has fired. A quiet queue and a stopped detector are not the
+                same thing, which is why detection writes a heartbeat either way.
+              </p>
+            ) : null}
+            <ul className="space-y-3">
+              {alerts.slice(0, 8).map((alert) => (
+                <li
+                  key={alert.alert_id}
+                  className="space-y-2 rounded border border-border p-3 text-sm"
+                  data-testid="alert-row"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-xs">{alert.rule_id}</span>
+                      <p className="text-fg">{alert.summary}</p>
+                    </div>
+                    <Badge tone={BAND_TONE[alert.band] || "neutral"}>{alert.band}</Badge>
+                  </div>
+                  <p className="text-xs text-fg-muted">
+                    {alert.state}
+                    {alert.occurrences > 1 ? ` · seen ${alert.occurrences} times` : ""}
+                    {alert.acknowledged_by ? ` · acknowledged by ${alert.acknowledged_by}` : ""}
+                    {alert.escalated_at ? " · escalated" : ""}
+                  </p>
+                  <p className="text-xs text-fg-muted">
+                    Evidence:{" "}
+                    {alert.evidence.length ? (
+                      alert.evidence.map((seq: number) => (
+                        <button
+                          key={seq}
+                          type="button"
+                          className="mr-1 underline"
+                          aria-label={`Verify record ${seq}, cited by ${alert.rule_id}`}
+                          onClick={() => {
+                            setFilters({ actor_ref: "", event_type: "", case_id: "" });
+                            void verifyRecord(seq);
+                          }}
+                        >
+                          #{seq}
+                        </button>
+                      ))
+                    ) : (
+                      <span>none cited</span>
+                    )}
+                  </p>
+                  {canDispose && alert.state !== "disposed" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {alert.state === "open" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          aria-label={`Acknowledge ${alert.rule_id}`}
+                          onClick={() => void move(alert.alert_id, "acknowledge")}
+                        >
+                          Acknowledge
+                        </Button>
+                      ) : null}
+                      {alert.state === "acknowledged" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          aria-label={`Investigate ${alert.rule_id}`}
+                          onClick={() => void move(alert.alert_id, "investigate")}
+                        >
+                          Investigate
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        aria-label={`Dispose of ${alert.rule_id}`}
+                        onClick={() => {
+                          setDisposing(alert);
+                          setReason("");
+                          setDisposition("confirmed");
+                        }}
+                      >
+                        Dispose
+                      </Button>
+                    </div>
+                  ) : null}
+                  {alert.state === "disposed" ? (
+                    <p className="text-xs text-fg-muted">
+                      {alert.disposition} by {alert.disposed_by}: {alert.disposition_reason}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {!canDispose ? (
+              <p className="text-xs text-fg-muted">
+                Read-only: closing an alert needs alert:dispose, which costs its
+                holder every money permission.
+              </p>
+            ) : null}
+          </Card>
+        </section>
+
+        {/* 5. Monitors */}
+        <section aria-labelledby="audit-monitors">
+          <Card className="space-y-3" data-testid="monitors-panel">
+            <h2 id="audit-monitors" className="font-medium">
+              Monitors
+            </h2>
+            <p className="text-xs text-fg-muted">
+              Who is watching, and since when. A monitor is someone holding an audit
+              duty, which is a time-boxed grant rather than a permanent role, so this
+              list empties by itself when nobody recertifies.
+            </p>
+            {refused.grants ? (
+              <p className="text-sm text-fg-muted" data-testid="monitors-refused">
+                Not for this role: the grant list needs audit:assign. Everything else
+                on this page is still live.
+              </p>
+            ) : monitors.length === 0 ? (
+              <p className="text-sm text-fg-muted" data-testid="no-monitors">
+                Nobody currently holds an audit duty by grant.
+              </p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {monitors.map((grant) => (
+                  <li key={grant.grant_id} className="flex justify-between gap-2">
+                    <span>
+                      <span className="font-mono text-xs">{grant.subject_ref}</span>{" "}
+                      <span className="text-fg-muted">{grant.permission}</span>
+                    </span>
+                    <span className="text-xs text-fg-muted">
+                      since {when(grant.requested_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h3 className="pt-2 text-sm font-medium">Alerts someone owns</h3>
+            <ul className="space-y-1 text-xs text-fg-muted">
+              {openAlerts.filter((alert) => alert.acknowledged_by).length ? (
+                openAlerts
+                  .filter((alert) => alert.acknowledged_by)
+                  .map((alert) => (
+                    <li key={alert.alert_id}>
+                      {alert.rule_id} · {alert.acknowledged_by} since{" "}
+                      {when(alert.acknowledged_at)}
+                    </li>
+                  ))
+              ) : (
+                <li>No open alert has been picked up yet.</li>
+              )}
+            </ul>
+          </Card>
+        </section>
+
+        {/* 6. Access */}
+        <section aria-labelledby="audit-access">
+          <Card className="space-y-3" data-testid="access-panel">
+            <div className="flex items-center justify-between">
+              <h2 id="audit-access" className="font-medium">
+                Access
+              </h2>
+              <Badge tone={breakGlass.length ? "warning" : "neutral"}>
+                {breakGlass.length} break-glass
+              </Badge>
+            </div>
+            <p className="text-xs text-fg-muted">
+              Audit duties are granted, approved by a second person, time-boxed and
+              recertified. Holding one removes every money permission.
+            </p>
+            {refused.grants ? (
+              <p className="text-sm text-fg-muted" data-testid="access-refused">
+                Not for this role: granting, approving and revoking audit duties needs
+                audit:assign, which is a role permission and never itself a grant.
+              </p>
+            ) : grants.length === 0 ? (
+              <p className="text-sm text-fg-muted">No grants have been requested.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {grants.slice(0, 10).map((grant) => (
+                  <li key={grant.grant_id} className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-mono text-xs">{grant.subject_ref}</span>
+                      <Badge
+                        tone={
+                          grant.state === "active"
+                            ? "success"
+                            : grant.state === "pending"
+                              ? "warning"
+                              : "neutral"
+                        }
+                      >
+                        {grant.state}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-fg-muted">
+                      {grant.permission} · expires {when(grant.expires_at)} · review due{" "}
+                      {when(grant.review_due_at)}
+                      {grant.break_glass ? " · BREAK-GLASS" : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+
+        {/* 7. Recovery */}
+        <section aria-labelledby="audit-recovery">
+          <Card className="space-y-3" data-testid="recovery-panel">
+            <div className="flex items-center justify-between">
+              <h2 id="audit-recovery" className="font-medium">
+                Recovery
+              </h2>
+              {recovery ? (
+                <Badge tone={recovery.backups_configured ? "success" : "danger"}>
+                  {recovery.backups_configured ? "key set" : "no backup key"}
+                </Badge>
+              ) : null}
+            </div>
+            {recovery ? (
+              <>
+                <dl className="space-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs uppercase text-fg-muted">Last backup</dt>
+                    <dd className="font-mono text-xs" data-testid="last-backup">
+                      {recovery.last_backup
+                        ? `${when(String(recovery.last_backup.at))} · ${recovery.last_backup.records} records`
+                        : "never taken"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase text-fg-muted">Last restore</dt>
+                    <dd className="font-mono text-xs">
+                      {recovery.last_restore
+                        ? `${when(String(recovery.last_restore.at))} · lost ${recovery.last_restore.lost_count} record(s)`
+                        : "never restored"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase text-fg-muted">Last segment sealed</dt>
+                    <dd className="font-mono text-xs">
+                      {recovery.last_segment_sealed
+                        ? `${when(String(recovery.last_segment_sealed.at))} · seq ${recovery.last_segment_sealed.from_seq} to ${recovery.last_segment_sealed.to_seq}`
+                        : "nothing archived"}
+                    </dd>
+                  </div>
+                </dl>
+                {!recovery.backups_configured ? (
+                  <Alert tone="danger">
+                    CLARITY_AUDIT_BACKUP_KEY is unset, so a backup is refused rather
+                    than written in the clear. Nothing is being backed up.
+                  </Alert>
+                ) : null}
+                <p className="text-xs text-fg-muted">
+                  Backup and restore are operator actions with step-up, run from the
+                  runbook (WT-14), not from this page.
+                </p>
+              </>
+            ) : null}
+          </Card>
+        </section>
       </div>
 
       {/* 2 and 3. Trail explorer and actor timeline */}
-      <Card className="space-y-3" data-testid="trail-explorer">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">Trail explorer</h2>
-          <Badge tone="warning">reading this is recorded</Badge>
-        </div>
-        <p className="text-xs text-slate-500">
-          Hashes and masked detail only, never a payload and never raw personal
-          data. Leave the actor blank for everything, or name one for their
-          timeline: sign-ins, actions and refusals in one line.
-        </p>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-slate-600">
-            Actor
-            <Input
-              className="mt-1 w-40"
-              placeholder="sup:ruwan"
-              value={filters.actor_ref}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, actor_ref: event.target.value }))
-              }
-            />
-          </label>
-          <label className="text-xs text-slate-600">
-            Event type
-            <Input
-              className="mt-1 w-44"
-              placeholder="action.executed"
-              value={filters.event_type}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, event_type: event.target.value }))
-              }
-            />
-          </label>
-          <label className="text-xs text-slate-600">
-            Case
-            <Input
-              className="mt-1 w-40"
-              placeholder="CS-2026-0012"
-              value={filters.case_id}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, case_id: event.target.value }))
-              }
-            />
-          </label>
-          <Button disabled={busy} onClick={() => void loadTrail()} data-testid="load-trail">
-            Read the trail
-          </Button>
-          {canExport ? (
-            <a
-              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-              href={`/v1/audit/export${filters.case_id ? `?case_id=${filters.case_id}` : ""}`}
-              data-testid="export-link"
-            >
-              Export a verifiable bundle
-            </a>
-          ) : null}
-        </div>
-        {canExport ? (
-          <p className="text-xs text-slate-500">
-            The bundle is checked with backend/scripts/verify_audit_export.py,
-            which imports nothing from Clarity. Scoping it to a case makes it a
-            selection, and it says so, so nobody reads a selection as the whole
-            trail.
+      <section aria-labelledby="audit-trail">
+        <Card className="space-y-3" data-testid="trail-explorer">
+          <div className="flex items-center justify-between">
+            <h2 id="audit-trail" className="font-medium">
+              Trail explorer
+            </h2>
+            <Badge tone="warning">reading this is recorded</Badge>
+          </div>
+          <p className="text-xs text-fg-muted">
+            Hashes and masked detail only, never a payload and never raw personal
+            data. Leave the actor blank for everything, or name one for their
+            timeline: sign-ins, actions and refusals in one line.
           </p>
-        ) : null}
-        {trail ? (
-          <div className="overflow-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-slate-500">
-                <tr>
-                  <th className="py-1">#</th>
-                  <th className="py-1">When</th>
-                  <th className="py-1">Event</th>
-                  <th className="py-1">Actor</th>
-                  <th className="py-1">Object</th>
-                  <th className="py-1">Detail</th>
-                  <th className="py-1" />
-                </tr>
-              </thead>
-              <tbody>
-                {trail.records.map((record: AuditRecordView) => (
-                  <tr key={record.seq} className="border-t border-slate-100 align-top">
-                    <td className="py-1 font-mono">{record.seq}</td>
-                    <td className="py-1 font-mono">{when(record.recorded_at)}</td>
-                    <td className="py-1 font-mono">{record.event_type}</td>
-                    <td className="py-1 font-mono">{record.actor_ref}</td>
-                    <td className="py-1 font-mono">{record.object_ref}</td>
-                    <td className="max-w-xs truncate py-1 text-slate-600">
-                      {JSON.stringify(record.detail)}
-                    </td>
-                    <td className="py-1">
-                      {verdicts[record.seq] ? (
-                        <Badge tone={verdicts[record.seq].intact ? "success" : "danger"}>
-                          {verdicts[record.seq].intact ? "hash ok" : "FAILS"}
-                        </Badge>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          onClick={() => void verifyRecord(record.seq)}
-                        >
-                          Verify
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {trail.records.length === 0 ? (
-              <p className="py-2 text-sm text-slate-600" data-testid="no-records">
-                No records match those filters.
-              </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Actor" className="w-40">
+              {(control) => (
+                <Input
+                  {...control}
+                  placeholder="sup:ruwan"
+                  value={filters.actor_ref}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, actor_ref: event.target.value }))
+                  }
+                />
+              )}
+            </Field>
+            <Field label="Event type" className="w-44">
+              {(control) => (
+                <Input
+                  {...control}
+                  placeholder="action.executed"
+                  value={filters.event_type}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, event_type: event.target.value }))
+                  }
+                />
+              )}
+            </Field>
+            <Field label="Case" className="w-40">
+              {(control) => (
+                <Input
+                  {...control}
+                  placeholder="CS-2026-0012"
+                  value={filters.case_id}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, case_id: event.target.value }))
+                  }
+                />
+              )}
+            </Field>
+            <Button loading={busy} onClick={() => void loadTrail()} data-testid="load-trail">
+              Read the trail
+            </Button>
+            {canExport ? (
+              <a
+                className="inline-flex min-h-10 items-center rounded-md border border-border-strong px-3 text-sm text-fg hover:bg-surface-2"
+                href={`/v1/audit/export${filters.case_id ? `?case_id=${filters.case_id}` : ""}`}
+                data-testid="export-link"
+              >
+                Export a verifiable bundle
+              </a>
             ) : null}
           </div>
-        ) : (
-          <p className="text-sm text-slate-600">
-            Not loaded. The trail is read on request, not on a timer, because every
-            read is recorded and a polling dashboard would bury the reads that
-            matter in the ones that do not.
+          {canExport ? (
+            <p className="text-xs text-fg-muted">
+              The bundle is checked with backend/scripts/verify_audit_export.py,
+              which imports nothing from Clarity. Scoping it to a case makes it a
+              selection, and it says so, so nobody reads a selection as the whole
+              trail.
+            </p>
+          ) : null}
+          {trail ? (
+            <>
+              <p className="text-xs text-fg-muted">
+                Up and Down move between records, Home and End jump to the ends, and
+                Enter recomputes the hashes of the record that has focus.
+              </p>
+              <Table
+                role="grid"
+                caption="Audit trail records matching the current filters"
+                scrollLabel="Audit trail"
+                className="text-xs"
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>#</TableHeaderCell>
+                    <TableHeaderCell>When</TableHeaderCell>
+                    <TableHeaderCell>Event</TableHeaderCell>
+                    <TableHeaderCell>Actor</TableHeaderCell>
+                    <TableHeaderCell>Object</TableHeaderCell>
+                    <TableHeaderCell>Detail</TableHeaderCell>
+                    <TableHeaderCell>
+                      <span className="sr-only">Hash verdict</span>
+                    </TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {records.map((record: AuditRecordView, index) => (
+                    <TableRow
+                      key={record.seq}
+                      {...rowProps(index)}
+                      className="align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+                    >
+                      <TableCell className="font-mono">{record.seq}</TableCell>
+                      <TableCell className="font-mono">{when(record.recorded_at)}</TableCell>
+                      <TableCell className="font-mono">{record.event_type}</TableCell>
+                      <TableCell className="font-mono">{record.actor_ref}</TableCell>
+                      <TableCell className="font-mono">{record.object_ref}</TableCell>
+                      <TableCell className="max-w-xs truncate text-fg-muted">
+                        {JSON.stringify(record.detail)}
+                      </TableCell>
+                      <TableCell>
+                        {verdicts[record.seq] ? (
+                          <Badge tone={verdicts[record.seq].intact ? "success" : "danger"}>
+                            {verdicts[record.seq].intact ? "hash ok" : "FAILS"}
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Verify record ${record.seq}`}
+                            onClick={() => void verifyRecord(record.seq)}
+                          >
+                            Verify
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {records.length === 0 ? (
+                <p className="py-2 text-sm text-fg-muted" data-testid="no-records">
+                  No records match those filters.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-fg-muted">
+              Not loaded. The trail is read on request, not on a timer, because every
+              read is recorded and a polling dashboard would bury the reads that
+              matter in the ones that do not.
+            </p>
+          )}
+        </Card>
+      </section>
+
+      <Dialog
+        open={disposing !== null}
+        onClose={() => setDisposing(null)}
+        title="Close this alert"
+        description={
+          disposing
+            ? `${disposing.rule_id}: ${disposing.summary}`
+            : undefined
+        }
+        dismissOnBackdrop={false}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDisposing(null)}>
+              Cancel
+            </Button>
+            <Button disabled={busy || !reason.trim()} onClick={() => void dispose()}>
+              Close the alert
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-fg-muted">
+            A disposition is part of the trail and cannot be edited afterwards. The
+            reason is what the next reader has to go on, so it is required rather
+            than encouraged.
           </p>
-        )}
-      </Card>
+          <Field label="Disposition">
+            {(control) => (
+              <Select
+                {...control}
+                value={disposition}
+                onChange={(event) => setDisposition(event.target.value)}
+              >
+                {DISPOSITIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field
+            label="Reason (required)"
+            hint="What you found, in words the next reader can act on. The API refuses a disposition without one."
+          >
+            {(control) => (
+              <Input
+                {...control}
+                data-autofocus
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+      </Dialog>
     </div>
   );
 }

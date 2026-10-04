@@ -1,145 +1,254 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert, Dialog, ErrorState } from "@clarity/ui";
+import { useMe } from "@/lib/useMe";
 
-const DEMO = {
-  name: "Dilani Perera",
-  masked: "077 *** 4567",
-  balance_lkr: "285.50",
-  pack: {
-    name: "Anytime 10GB",
-    data_gb: 10,
-    used_gb: 7.2,
-    used_pct: 72,
-    days_left: 3,
-  },
-  alerts: [
-    { text: "LKR 49.00 was charged by a VAS subscription yesterday" },
-  ],
-};
+/**
+ * Home, on the customer's real account (E4).
+ *
+ * This page was a `const DEMO` object: a name, a masked number, a balance, a
+ * pack and one alert, all written into the source. The Reload button had an
+ * empty `onClick` and three of the five quick actions pointed at `"#"`. It
+ * showed a customer a balance no system had produced, which is the one thing
+ * a product whose promise is "we explain with evidence" must never do.
+ *
+ * It now renders `GET /v1/me/app` and nothing else. There is no fallback
+ * object: a failed load is an error state, because an invented balance is
+ * worse than no balance.
+ *
+ * **The reload amounts.** The API accepts exactly 100, 200, 500, 1000 and
+ * 2000 and answers 422 for anything else, so the sheet offers those five.
+ * That list is duplicated here, which is a small but real smell: it belongs
+ * in the payload so the server stays the only place it is written. The
+ * refusal is surfaced verbatim, so if the server's list changes the customer
+ * is told what is allowed rather than left guessing.
+ */
 
-const QUICK_ACTIONS = [
-  { label: "Reload",   href: "#"        },
-  { label: "Packages", href: "#"        },
-  { label: "Usage",    href: "#"        },
-  { label: "Cases",    href: "/cases"   },
-  { label: "Support",  href: "/clarity" },
-];
+const RELOAD_AMOUNTS = ["100", "200", "500", "1000", "2000"];
 
 export default function HomePage() {
   const router = useRouter();
-  const a = DEMO;
-  const pack = a.pack;
-  const usedPct = Math.min(pack.used_pct, 100);
-  const remaining = (pack.data_gb - pack.used_gb).toFixed(1);
+  const { app, loading, error, refresh, act, busy } = useMe();
+  const [reloading, setReloading] = useState(false);
+  const [amount, setAmount] = useState(RELOAD_AMOUNTS[1]);
+
+  if (loading) {
+    return (
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
+        <p role="status" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+          Loading your account
+        </p>
+        <div style={{ display: "grid", gap: 12 }}>
+          {[96, 120, 64].map((height, i) => (
+            <div
+              key={i}
+              aria-hidden="true"
+              style={{
+                height,
+                borderRadius: "var(--radius)",
+                background: "rgb(var(--c-surface-2))",
+              }}
+            />
+          ))}
+        </div>
+      </main>
+    );
+  }
+
+  if (!app) {
+    return (
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
+        <ErrorState
+          title="We could not load your account"
+          message={error ?? "Please try again in a moment."}
+          onRetry={refresh}
+        />
+      </main>
+    );
+  }
+
+  const pack = app.pack;
+  const usedPct = pack?.used_pct ?? null;
+  const remaining =
+    pack && pack.data_gb && pack.used_gb
+      ? (Number(pack.data_gb) - Number(pack.used_gb)).toFixed(1)
+      : null;
+
+  const quickActions: Array<{ label: string; onClick: () => void }> = [
+    { label: "Reload", onClick: () => setReloading(true) },
+    { label: "Packages", onClick: () => router.push("/packages") },
+    { label: "Usage", onClick: () => router.push("/usage") },
+    { label: "Cases", onClick: () => router.push("/cases") },
+    { label: "Support", onClick: () => router.push("/clarity") },
+  ];
+
+  async function submitReload() {
+    const ok = await act((api) => api.reload(amount));
+    if (ok) setReloading(false);
+  }
 
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
-
-      {/* greeting */}
-      <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 2px", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--muted)",
+          margin: "0 0 2px",
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: ".06em",
+        }}
+      >
         Hello
       </p>
-      <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 2px", color: "var(--ink)" }}>
-        {a.name}
+      <h1
+        style={{
+          fontSize: 26,
+          fontWeight: 800,
+          letterSpacing: "-.03em",
+          margin: "0 0 2px",
+          color: "var(--ink)",
+        }}
+      >
+        {app.name}
       </h1>
-      <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px", fontFamily: "monospace" }}>
-        {a.masked}
+      <p
+        style={{
+          fontSize: 13,
+          color: "var(--muted)",
+          margin: "0 0 20px",
+          fontFamily: "monospace",
+        }}
+      >
+        {app.masked}
       </p>
 
-      {/* balance card */}
-      <div style={{
-        border: "1px solid var(--line)",
-        borderTop: "3px solid var(--orange)",
-        borderRadius: "var(--radius)",
-        padding: "18px 20px",
-        background: "rgb(var(--c-surface))",
-        boxShadow: "var(--shadow)",
-        marginBottom: 14,
-      }}>
-        <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}>Main balance</p>
-        <p style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", margin: 0, color: "var(--ink)" }}>
-          LKR {a.balance_lkr}
+      {error ? (
+        <div style={{ marginBottom: 14 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
+
+      <section
+        aria-labelledby="home-balance"
+        className="h-card h-rule-card"
+        style={{ marginBottom: 14 }}
+      >
+        <h2
+          id="home-balance"
+          style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
+        >
+          Main balance
+        </h2>
+        <p
+          style={{
+            fontSize: 32,
+            fontWeight: 800,
+            letterSpacing: "-.03em",
+            margin: 0,
+            color: "var(--ink)",
+          }}
+        >
+          LKR {app.balance_lkr}
         </p>
         <button
-          onClick={() => {}}
-          style={{
-            marginTop: 14,
-            background: "var(--orange)",
-            color: "rgb(var(--c-on-primary))",
-            border: 0,
-            borderRadius: 999,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          type="button"
+          className="h-btn h-btn-primary"
+          style={{ marginTop: 14, borderRadius: 999, padding: "10px 24px" }}
+          onClick={() => setReloading(true)}
         >
           Reload
         </button>
-      </div>
+      </section>
 
-      {/* pack card */}
-      <div style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
-        padding: "16px 20px",
-        background: "rgb(var(--c-surface))",
-        boxShadow: "var(--shadow)",
-        marginBottom: 14,
-      }}>
-        <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}>Current pack</p>
-        <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>{pack.name}</p>
-        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
-          Data remaining: {remaining} GB &nbsp;·&nbsp; Valid for {pack.days_left} days
-        </p>
-        <div style={{ height: 6, borderRadius: 999, background: "rgb(var(--c-surface-2))", overflow: "hidden" }}>
-          <div style={{
-            height: "100%",
-            width: `${usedPct}%`,
-            background: usedPct >= 80 ? "rgb(var(--c-warning))" : "var(--orange)",
-            borderRadius: 999,
-          }} />
-        </div>
-        {usedPct >= 80 && (
-          <p style={{ fontSize: 12, color: "rgb(var(--c-warning))", margin: "6px 0 0", fontWeight: 600 }}>
-            Fair use cap active - speed reduced
-          </p>
-        )}
-      </div>
-
-      {/* quick actions */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
-        gap: 8,
-        marginBottom: 16,
-      }}>
-        {QUICK_ACTIONS.map(({ label, href }) => (
-          <button
-            key={label}
-            onClick={() => router.push(href)}
-            style={{
-              border: "1px solid var(--line)",
-              background: "rgb(var(--c-surface))",
-              borderRadius: "var(--radius-card-sm)",
-              padding: "12px 6px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--ink)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              textAlign: "center",
-            }}
+      {pack ? (
+        <section aria-labelledby="home-pack" className="h-card" style={{ marginBottom: 14 }}>
+          <h2
+            id="home-pack"
+            style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
           >
-            {label}
-          </button>
-        ))}
-      </div>
+            Current pack
+          </h2>
+          <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>{pack.name}</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
+            {remaining ? `Data remaining: ${remaining} GB` : "Data allowance not metered"}
+            &nbsp;·&nbsp; Valid for {pack.days_left} days
+          </p>
+          {usedPct !== null ? (
+            <>
+              <div
+                role="progressbar"
+                aria-valuenow={Math.min(usedPct, 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Data used"
+                style={{
+                  height: 6,
+                  borderRadius: 999,
+                  background: "rgb(var(--c-surface-2))",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(usedPct, 100)}%`,
+                    background: usedPct >= 80 ? "rgb(var(--c-warning))" : "var(--orange)",
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
+              {/* The restriction wording comes from the pack record, not from a
+                  threshold this page decided (I10). */}
+              <p style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0 0" }}>
+                {pack.restrictions}
+              </p>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
-      {/* Clarity prompt */}
+      <nav aria-label="Quick actions" style={{ marginBottom: 16 }}>
+        <ul
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: 8,
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+          }}
+        >
+          {quickActions.map(({ label, onClick }) => (
+            <li key={label}>
+              <button
+                type="button"
+                onClick={onClick}
+                style={{
+                  width: "100%",
+                  border: "1px solid var(--line)",
+                  background: "rgb(var(--c-surface))",
+                  borderRadius: "var(--radius-card-sm)",
+                  padding: "12px 6px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "center",
+                }}
+              >
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
       <button
+        type="button"
         onClick={() => router.push("/clarity")}
         style={{
           width: "100%",
@@ -156,54 +265,151 @@ export default function HomePage() {
           marginBottom: 14,
         }}
       >
-        <div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "var(--orange-ink)" }}>
+        <span>
+          <span
+            style={{
+              display: "block",
+              fontWeight: 700,
+              fontSize: 15,
+              color: "var(--orange-ink)",
+            }}
+          >
             Something doesn&apos;t look right?
-          </p>
-          <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--muted)" }}>
+          </span>
+          <span style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 3 }}>
             Ask Clarity why your balance changed
-          </p>
-        </div>
-        <span style={{ fontSize: 20, color: "var(--orange)", marginLeft: 12 }}>→</span>
+          </span>
+        </span>
+        <span aria-hidden="true" style={{ fontSize: 20, color: "var(--orange)", marginLeft: 12 }}>
+          →
+        </span>
       </button>
 
-      {/* alerts */}
-      {a.alerts.length > 0 && (
-        <>
-          <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--muted)", margin: "0 0 8px" }}>
+      {app.alerts.length > 0 ? (
+        <section aria-labelledby="home-alerts">
+          <h2
+            id="home-alerts"
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: ".08em",
+              color: "var(--muted)",
+              margin: "0 0 8px",
+            }}
+          >
             For you
-          </p>
-          {a.alerts.map((al, i) => (
+          </h2>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {app.alerts.map((alert, i) => (
+              <li key={`${alert.kind}-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => router.push("/clarity")}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    border: "1px solid var(--line)",
+                    borderRadius: "var(--radius-card-sm)",
+                    background: "rgb(var(--c-surface))",
+                    padding: "14px 16px",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                    fontSize: 14,
+                    color: "var(--ink)",
+                    marginBottom: 8,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      flexShrink: 0,
+                      background: "var(--orange-soft)",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 18,
+                    }}
+                  >
+                    !
+                  </span>
+                  {alert.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <Dialog
+        open={reloading}
+        onClose={() => setReloading(false)}
+        title="Reload your balance"
+        description="These are the amounts this account can reload. The reload is simulated."
+        footer={
+          <>
             <button
-              key={i}
-              onClick={() => router.push("/clarity")}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                border: "1px solid var(--line)",
-                borderRadius: "var(--radius-card-sm)",
-                background: "rgb(var(--c-surface))",
-                padding: "14px 16px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                textAlign: "left",
-                fontSize: 14,
-                color: "var(--ink)",
-                marginBottom: 8,
-              }}
+              type="button"
+              className="h-btn h-btn-ghost"
+              onClick={() => setReloading(false)}
             >
-              <span style={{
-                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                background: "var(--orange-soft)", display: "grid", placeItems: "center",
-                fontSize: 18,
-              }}>!</span>
-              {al.text}
+              Cancel
             </button>
-          ))}
-        </>
-      )}
+            <button
+              type="button"
+              className="h-btn h-btn-primary"
+              data-autofocus
+              disabled={busy}
+              onClick={() => void submitReload()}
+            >
+              {busy ? "Reloading…" : `Reload LKR ${amount}`}
+            </button>
+          </>
+        }
+      >
+        <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
+          <legend style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Amount</legend>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {RELOAD_AMOUNTS.map((value) => (
+              <label
+                key={value}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  fontSize: 14,
+                  fontWeight: 650,
+                  cursor: "pointer",
+                  border: value === amount ? "2px solid var(--orange)" : "1px solid var(--line)",
+                  background: value === amount ? "var(--orange-soft)" : "rgb(var(--c-surface))",
+                  color: value === amount ? "var(--orange-ink)" : "var(--ink)",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="reload-amount"
+                  value={value}
+                  checked={value === amount}
+                  onChange={() => setAmount(value)}
+                />
+                LKR {value}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {error ? (
+          <div style={{ marginTop: 12 }}>
+            <Alert tone="danger">{error}</Alert>
+          </div>
+        ) : null}
+      </Dialog>
     </main>
   );
 }

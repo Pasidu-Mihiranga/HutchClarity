@@ -12,9 +12,9 @@ import { KUMAR, NIMAL, customerTokenFor, signedIn } from "./session";
  * failure that matters, so each asserts what must *not* be on the page as well
  * as what must.
  *
- * Both go through the chat, because that is the customer's only real route to
- * a case today: the `/cases` page is not wired to the backend (there is no
- * `GET /v1/cases`) and renders two hardcoded demo rows.
+ * Both go through the chat, because that is where a case is *opened*. E4 wired
+ * `/cases` to `/v1/me/app`, so the list is real now and shows what the chat
+ * produced; it is still not a way to start a dispute, which is the chat's job.
  */
 test.describe("the remaining demo journeys", () => {
   test("a duplicate reload is already refunded, with nobody in the loop", async ({
