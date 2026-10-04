@@ -19,7 +19,11 @@ export function AccessDenied({ need }: { need: string }) {
   if (restoring) {
     return (
       <Card className="flex items-center gap-3" role="status">
-        <Spinner size="sm" label="Restoring staff session" />
+        {/* The card is the live region and the paragraph is its text, so the
+            spinner is decoration here. Left as its own `role="status"` it
+            would announce a second time from inside the region that has
+            already said what is happening. */}
+        <Spinner size="sm" label="" role="presentation" aria-hidden="true" />
         <p className="text-sm text-mute">Restoring staff session…</p>
       </Card>
     );

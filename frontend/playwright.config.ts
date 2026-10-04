@@ -31,7 +31,32 @@ export default defineConfig({
     trace: "retain-on-failure",
     video: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      /**
+       * A phone viewport (E6).
+       *
+       * The customer app is the one most people would use on a phone, and the
+       * only thing that had ever checked it at that size was a human looking
+       * at it. The specs here are the ones where layout at 393px decides
+       * whether the journey works at all: the composer and the confirm sheet
+       * in the chat, the sign-in form, and the receipt verdict.
+       *
+       * The console is deliberately not in this project. It is a desk tool on
+       * a desktop, its tables do not reflow to a phone, and pretending
+       * otherwise would be a test asserting something nobody asked the product
+       * to do.
+       */
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 7"] },
+      testMatch: [
+        "**/dispute-charge.spec.ts",
+        "**/login.spec.ts",
+        "**/customer-receipt.spec.ts",
+      ],
+    },
+  ],
   webServer: [
     {
       // The repository root is two levels up from this file's directory.

@@ -231,7 +231,7 @@ jobs:
         run: cd frontend && npm run sdk:check
 
   frontend:
-    name: frontend (typecheck and build)
+    name: frontend (lint, typecheck, test and build)
     runs-on: ubuntu-latest
     # Blocking (B10). It used to report without failing, which meant a broken
     # build could land; the build is green, so the exemption is gone.
@@ -247,8 +247,16 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         run: npm ci
-      - name: Typecheck the SDK
+      # Both of these existed as scripts and neither was invoked by any
+      # workflow, so a lint error or a failing component test could land (E6).
+      # `lint` could not even run before E6: no app had an ESLint config, so
+      # `next lint` prompted for one and exited 1.
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck every workspace
         run: npm run typecheck
+      - name: Component tests
+        run: npm test
       - name: Build every app
         run: npm run build
 

@@ -143,9 +143,15 @@ const LOGIN_BY_LABEL: Record<string, { username: string; password: string }> = {
   Security: { username: "security", password: "security-clarity" },
   Platform: { username: "platform", password: "platform-clarity" },
   // CX engineering holds `foresight:read` and `config:draft`, which no other
-  // synthetic account does, so Foresight and Policy Studio can only be
-  // reached as this person (WT-13 steps 7 and 8).
+  // synthetic account does, so Policy Studio can only be reached as this
+  // person (WT-13 steps 7 and 8).
   CX: { username: "cx", password: "cx-clarity" },
+  // Product holds `foresight:run` and `foresight:scenario:draft` and nothing
+  // else does, so a rehearsal can only be asked for as this person. The
+  // account was added with E6: C4 created `Role.PRODUCT` and the synthetic
+  // directory had no member of it, which left the rehearsal path unreachable
+  // from a browser.
+  Product: { username: "product", password: "product-clarity" },
   "VAS Ops": { username: "vasops", password: "vasops-clarity" },
 };
 

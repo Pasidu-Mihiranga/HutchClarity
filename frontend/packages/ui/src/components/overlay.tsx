@@ -42,6 +42,11 @@ export const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(function Dia
 
   return createPortal(
     <div
+      // A scrim, not a control: dismissing by clicking it is a convenience for
+      // a pointer, and the keyboard route out is Escape, which `useFocusTrap`
+      // handles. `presentation` says that rather than leaving a bare div with
+      // a mouse handler and no role.
+      role="presentation"
       className="ui-anim-fade fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 p-0 sm:items-center sm:p-4"
       onMouseDown={(event) => {
         if (dismissOnBackdrop && event.target === event.currentTarget) onClose();

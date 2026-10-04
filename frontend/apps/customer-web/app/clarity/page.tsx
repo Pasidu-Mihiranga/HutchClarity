@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Dialog, useFocusTrap } from "@clarity/ui";
 import { supportedLangs, t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
 import { expireSession, withSession } from "@/lib/session";
@@ -205,6 +206,12 @@ export default function ClarityPage() {
   const [showTopics, setShowTopics] = useState(false);
   const [topicCategory, setTopicCategory] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // The history drawer is modal, so it gets the same treatment as a dialog:
+  // focus moves in, Tab stays inside, Escape closes it and focus returns to
+  // the button that opened it (E6). It had none of that, and no close button
+  // either, so the only way out was a mouse click on the scrim.
+  const historyPanel = useRef<HTMLDivElement>(null);
+  useFocusTrap(historyPanel, showHistory, () => setShowHistory(false));
   const [showEvidence, setShowEvidence] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; bullets: string[]; outcome: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -894,16 +901,47 @@ export default function ClarityPage() {
 
       {/* ── History drawer ── */}
       {showHistory && (
-        <div onClick={() => setShowHistory(false)} style={{
-          position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.4)",
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            position: "absolute", top: 0, left: 0, bottom: 0, width: "min(320px,90vw)",
-            background: "rgb(var(--c-surface))", display: "flex", flexDirection: "column",
-            boxShadow: "4px 0 24px rgba(0,0,0,.12)", overflowY: "auto",
-          }}>
-            <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid var(--line)" }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{tl(lang, "chatHistory")}</h2>
+        <div
+          role="presentation"
+          onClick={(event) => {
+            // Only the scrim itself dismisses. Closing on any click that
+            // bubbled up from the panel is what forced the panel to stop
+            // propagation, which left a dialog carrying a mouse handler.
+            if (event.target === event.currentTarget) setShowHistory(false);
+          }}
+          style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.4)" }}
+        >
+          <div
+            ref={historyPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-history-title"
+            tabIndex={-1}
+            style={{
+              position: "absolute", top: 0, left: 0, bottom: 0, width: "min(320px,90vw)",
+              background: "rgb(var(--c-surface))", display: "flex", flexDirection: "column",
+              boxShadow: "4px 0 24px rgba(0,0,0,.12)", overflowY: "auto",
+            }}
+          >
+            <div style={{
+              padding: "20px 16px 12px", borderBottom: "1px solid var(--line)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            }}>
+              <h2 id="chat-history-title" style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+                {tl(lang, "chatHistory")}
+              </h2>
+              <button
+                type="button"
+                data-autofocus
+                aria-label={tl(lang, "cancel")}
+                onClick={() => setShowHistory(false)}
+                style={{
+                  border: 0, background: "transparent", cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 22, lineHeight: 1, color: "var(--muted)", padding: "0 4px",
+                }}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
             {threads.length === 0 ? (
               <p style={{ padding: 16, fontSize: 14, color: "var(--muted)" }}>{tl(lang, "empty")}</p>
@@ -941,31 +979,39 @@ export default function ClarityPage() {
         />
       )}
 
+      {/* The money confirmation, on the shared Dialog (E6).
+          This was a scrim div with a click handler and a panel inside it: no
+          `role="dialog"`, no `aria-modal`, no focus trap, no Escape and no
+          focus return. It is the single most consequential control a customer
+          touches - the tap that moves money - and it was the one sheet in the
+          app that a keyboard or screen-reader user could not work. `Dialog`
+          brings all of that, and `dismissOnBackdrop={false}` because a stray
+          tap on the scrim must not dismiss a decision about a refund. */}
       {pendingConfirm && (
-        <div onClick={() => setPendingConfirm(null)} style={{
-          position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,.5)",
-          display: "grid", placeItems: "center", padding: 16,
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: "rgb(var(--c-surface))", borderRadius: "var(--radius)", padding: "24px 20px",
-            maxWidth: 360, width: "100%", boxShadow: "var(--shadow)",
-          }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>{pendingConfirm.title}</h3>
-            <ul style={{ margin: "0 0 20px", paddingLeft: 18, display: "grid", gap: 6 }}>
-              {pendingConfirm.bullets.map((b, i) => <li key={i} style={{ fontSize: 14 }}>{b}</li>)}
-            </ul>
-            <div style={{ display: "flex", gap: 10 }}>
+        <Dialog
+          open
+          onClose={() => setPendingConfirm(null)}
+          title={pendingConfirm.title}
+          size="sm"
+          dismissOnBackdrop={false}
+          closeLabel={tl(lang, "cancel")}
+          footer={
+            <>
               <button onClick={() => setPendingConfirm(null)} style={{
                 flex: 1, border: "1px solid var(--line)", background: "rgb(var(--c-surface))", borderRadius: 999,
                 padding: "10px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "cancel")}</button>
-              <button onClick={doConfirm} style={{
+              <button data-autofocus onClick={doConfirm} style={{
                 flex: 1, border: 0, background: "var(--orange-strong)", color: "rgb(var(--c-on-primary))", borderRadius: 999,
                 padding: "10px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
               }}>{tl(lang, "confirm")}</button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+            {pendingConfirm.bullets.map((b, i) => <li key={i} style={{ fontSize: 14 }}>{b}</li>)}
+          </ul>
+        </Dialog>
       )}
     </>
   );
