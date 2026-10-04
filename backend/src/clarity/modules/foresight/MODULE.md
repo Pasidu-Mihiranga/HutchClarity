@@ -48,7 +48,9 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `PersonaSimulator.run(scenario, *, seed) -> tuple[Prediction, ...]` | `propensities(scenario, *, seed) -> PersonaRun` | Drivers return propensities so they are comparable and so banding stays in the module (ADR-0043) |
 
 ## 3. Used by
-`clarity.app.container` (builds the catalogue, engine, backtest, service and rehearsal), `clarity.app.collections` (the seven collection names) and `clarity.interfaces.http` (the `/v1/foresight` routes and `GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+`clarity.app.container` (builds the catalogue, engine, backtest, service, rehearsal and radar, and registers the radar as a `complaint.created` consumer), `clarity.app.collections` (the eight collection names) and `clarity.interfaces.http` (the `/v1/foresight` routes). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
+
+`GET /v1/demo/foresight` was the module's only surface until C4 and was retired once the console moved onto `/v1/foresight`.
 
 ### `/v1` surface (C4, F06)
 | Route | Permission |
@@ -67,7 +69,6 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `GET /v1/foresight/launches`, `.../backtests`, `.../calibration`, `.../spikes` | `foresight:read` |
 
 `Role.PRODUCT` holds `foresight:read`, `foresight:scenario:draft` and `foresight:run`. It deliberately does **not** hold `foresight:outcome:record`: the person who wants the calibration gate open must not be the one recording the evidence that opens it. `Role.CX_ENGINEER` holds `foresight:read` and `foresight:outcome:record` and cannot draft.
-`clarity.app.container` (builds the catalogue, engine, backtest, service and radar, and registers the radar as a `complaint.created` consumer), `clarity.app.collections` (the eight collection names) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf (plan 21 section 11.2).
 
 ### Events
 | Event | Direction | Notes |
@@ -75,13 +76,9 @@ Other code imports only `public.py`: the baseline and backtest names, C1's `Fore
 | `complaint.created` | consumed | The radar counts per channel. It reads no complaint text; `autopsy` is what does. |
 | `forecast.ready` | produced | A run finished. Codes and counts only. |
 | `spike.detected` | produced | A window reached the threshold. A channel code, never a channel name. |
-
-Both produced events go through the outbox in the same transaction as the state change (I7). Plan 21 section 11.3 carries all three rows.
-
-### Events
-| Event | Direction | Notes |
-|---|---|---|
 | `cluster.updated` | consumed | Codes and counts only; produces an inert candidate a person confirms (C7). |
+
+Both produced events go through the outbox in the same transaction as the state change (I7). Plan 21 section 11.3 carries all four rows.
 
 ## 4. Depends on
 | Package | Through |

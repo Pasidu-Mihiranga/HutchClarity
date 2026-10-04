@@ -16,10 +16,21 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
     read. That seeding moved to `clarity.app.container`, which runs it in every
     non-`prod` profile: a GET that writes to a store is a surprise, and the
     reviewer workspace route must never import a mock driver.
-  - **`GET /v1/demo/foresight` stayed** when D4 landed, because Workstream C
-    had not reached `main` and the console would have had nothing to read.
-    Workstream C lands with this change, so that reason has expired: retiring
-    the route and moving the console onto `/v1/foresight` is the follow-up.
+- **`GET /v1/demo/foresight`**, the last of the three. It stayed through D4
+  because Workstream C had not reached `main` and the console would have had
+  nothing to read; C landed, so the reason expired. The console now reads
+  `/v1/foresight`, and `demoForesight()` is gone from the SDK, replaced by
+  `foresightScenarios`, `foresightScenario`, `foresightRuns`, `foresightRun`,
+  `requestForesightRun`, `foresightCalibration` and `foresightSpikes`.
+  - The route rehearsed a scenario on every request and discarded the result,
+    so nothing it showed could be cited afterwards. The console reads stored
+    runs and reports instead.
+  - It was gated on `desk:queue:read`. The real routes use `foresight:read`
+    and `foresight:run`, which is why the Insights page now asks for its
+    foresight panel separately and degrades to a note rather than failing the
+    whole page for a desk reader who holds neither.
+  - The console's "NOT CALIBRATED" badge was hard-coded. It now comes from
+    `GET /v1/foresight/calibration`.
   - `POST /v1/demo/reset`, `GET /v1/demo/inbox` and `GET /v1/demo/subscribers`
     stay as `SYNTHETIC_ONLY`, unchanged.
 

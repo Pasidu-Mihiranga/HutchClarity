@@ -25,7 +25,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -2812,74 +2812,8 @@ def _register_routes(app: FastAPI) -> None:
         clarity: ClarityDep,
         _: Annotated[Principal, Depends(requires(Permission.FORESIGHT_READ))],
     ) -> dict[str, Any]:
-        """Early-warning spikes. C5 supplies the detector that fills this."""
+        """Early-warning spikes, raised by the radar (C5)."""
         return {"spikes": [_spike_view(item) for item in clarity.foresight_service.spikes()]}
-
-    @app.get(
-        "/v1/demo/foresight",
-        tags=["demo"],
-        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
-    )
-    def demo_foresight(clarity: ClarityDep) -> dict[str, Any]:
-        """Rehearse retiring a pack. Scenarios, not certainties."""
-        from clarity.modules.foresight.public import (
-            DEMO_LAUNCHES,
-            ChangeType,
-            Scenario,
-        )
-
-        scenario = Scenario(
-            name="Retire Unlimited Data",
-            change_type=ChangeType.PACK_RETIRED,
-            affected_products=("SYNTHETIC-UNLIMITED-30",),
-            effective_date=date(2027, 10, 1),
-        )
-        calibration = clarity.foresight_backtest.run(DEMO_LAUNCHES)
-        rehearsed = clarity.foresight_rehearsal.run(scenario, seed=42)
-        report = clarity.foresight.run(scenario, calibration=calibration)
-        return {
-            "run_id": report.run_id,
-            "scenario": report.scenario,
-            "backtested": report.backtested,
-            "basis": report.basis,
-            "caveats": report.caveats,
-            "predictions": [
-                {
-                    "theme": item.theme,
-                    "segment": item.segment,
-                    "band": item.band.value,
-                    "mitigation": item.suggested_mitigation,
-                }
-                for item in report.predictions
-                if item.band.value != "low"
-            ],
-            # The headline is always the statistical baseline; the second column
-            # is another method's view and never sets a band (I1, C3).
-            "baseline_vs_swarm": [
-                {
-                    "theme": item.theme,
-                    "segment": item.segment,
-                    "baseline": item.headline.value,
-                    "swarm": item.comparison.value if item.comparison else None,
-                    "agrees": item.agrees,
-                }
-                for item in rehearsed.comparison
-            ],
-            "simulation": {
-                "seed": rehearsed.seed,
-                "version": rehearsed.headline_simulator,
-                "comparison_version": rehearsed.comparison_simulator,
-                "agreement_rate": (
-                    str(rehearsed.agreement_rate) if rehearsed.agreement_rate is not None else None
-                ),
-                "provenance": rehearsed.provenance,
-            },
-            "calibration_status": calibration.status.value,
-            "note": (
-                "SCENARIO, NOT CERTAINTY. NOT CALIBRATED ON REAL HUTCH LAUNCHES. "
-                "Synthetic aggregate personas only; this cannot change a customer."
-            ),
-        }
 
 
 # --------------------------------------------------------------------------- #
