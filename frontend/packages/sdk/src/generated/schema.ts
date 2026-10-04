@@ -875,6 +875,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cases/{case_id}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Transcript
+         * @description What was said on this case, oldest first (A4, ADR-0040).
+         *
+         *     Subject bound like every other case route (I9): the transcript is the
+         *     most personal thing the conversation holds, so the case id alone must
+         *     not open it. Staff with `case:read:any` see it because that is what
+         *     makes a handoff workable: the agent picking the case up can read what
+         *     the customer already explained instead of asking them again.
+         *
+         *     The text is masked, as it was when it was stored. Retention is applied
+         *     on read, so a line past its window is gone here even if the table has
+         *     not been swept.
+         */
+        get: operations["get_transcript_v1_cases__case_id__transcript_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/clarity/route": {
         parameters: {
             query?: never;
@@ -3593,6 +3623,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimelineView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_transcript_v1_cases__case_id__transcript_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

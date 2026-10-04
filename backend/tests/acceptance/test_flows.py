@@ -433,3 +433,60 @@ def test_the_stateless_path_does_not_let_held_text_choose_an_intent(api):
 
     assert turn["intake"]["intent"] == "FALLBACK"
     assert turn["intake"]["confidence"] == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# The transcript (A4, ADR-0040)
+#
+# A record of what was said, never memory: nothing in the turn pipeline reads it
+# back, which `tests/architecture/test_transcript_is_not_memory.py` enforces.
+# These cover what it is for: the customer can look back, and the agent picking
+# up a handoff can read what was already explained.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_conversation_is_readable_afterwards_in_the_order_it_happened(api, me):
+    case_id = _open(api, me, DILANI, channel="app", language="en")
+    _turn(api, me, case_id, "Why was LKR 49 deducted from my balance?", language="en")
+    _turn(api, me, case_id, "can you stop it", language="en")
+
+    read = api.get(f"/v1/cases/{case_id}/transcript", headers=me)
+
+    assert read.status_code == 200, read.text
+    body = read.json()
+    entries = body["entries"]
+    assert body["masked"] is True
+    assert [e["role"] for e in entries[:2]] == ["customer", "clarity"]
+    assert entries[0]["text"] == "Why was LKR 49 deducted from my balance?"
+    # Clarity's side is what the customer was actually told, after verification.
+    assert entries[1]["text"]
+    assert [e["turn_no"] for e in entries] == sorted(e["turn_no"] for e in entries)
+
+
+def test_another_customer_cannot_read_my_transcript(api):
+    """The most personal thing the conversation holds, so the case id alone
+    must not open it (I9). Same binding as every other case route."""
+    mine = {"Authorization": f"Bearer {customer_token(api, DILANI)}"}
+    case_id = _open(api, mine, DILANI, channel="app", language="en")
+    _turn(api, mine, case_id, "Why was LKR 49 deducted from my balance?", language="en")
+
+    theirs = {"Authorization": f"Bearer {customer_token(api, KUMAR)}"}
+    read = api.get(f"/v1/cases/{case_id}/transcript", headers=theirs)
+
+    assert read.status_code == 403
+
+
+def test_a_transcript_needs_a_session(api):
+    read = api.get("/v1/cases/CASE-NOPE/transcript")
+    assert read.status_code == 401
+
+
+def test_the_transcript_holds_masked_text_not_what_was_typed(api, me):
+    """I13: a number in a complaint is a token here, never in the clear."""
+    case_id = _open(api, me, DILANI, channel="app", language="en")
+    _turn(api, me, case_id, "my number 0781234567 was charged twice", language="en")
+
+    entries = api.get(f"/v1/cases/{case_id}/transcript", headers=me).json()["entries"]
+    said = next(e for e in entries if e["role"] == "customer")
+
+    assert "0781234567" not in said["text"]

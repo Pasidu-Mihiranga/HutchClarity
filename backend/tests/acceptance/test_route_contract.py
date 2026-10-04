@@ -82,6 +82,7 @@ SIGNED_IN = {
     ("POST", "/v1/cases"),
     ("GET", "/v1/cases/{case_id}"),
     ("GET", "/v1/cases/{case_id}/timeline"),
+    ("GET", "/v1/cases/{case_id}/transcript"),
     ("POST", "/v1/cases/{case_id}/evaluate"),
     ("POST", "/v1/cases/{case_id}/proposals"),
     ("POST", "/v1/cases/{case_id}/confirm"),

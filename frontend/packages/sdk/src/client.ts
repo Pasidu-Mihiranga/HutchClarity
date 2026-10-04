@@ -51,6 +51,22 @@ export type CasePayload = {
   [key: string]: unknown;
 };
 
+export type TranscriptEntry = {
+  turn_no: number;
+  role: "customer" | "clarity";
+  text: string;
+  language: string;
+  channel: string;
+  at: string;
+};
+
+export type TranscriptPayload = {
+  case_id: string;
+  entries: TranscriptEntry[];
+  masked: boolean;
+  retention_days: number;
+};
+
 export type ReceiptPayload = {
   receipt_id?: string;
   id?: string;
@@ -450,6 +466,16 @@ export class ClarityClient {
 
   caseTimeline(caseId: string): Promise<TimelinePayload> {
     return this.request(`/v1/cases/${encodeURIComponent(caseId)}/timeline`);
+  }
+
+  /**
+   * What was said on a case, oldest first and masked (ADR-0040).
+   *
+   * Subject bound: a customer sees their own, staff with `case:read:any` see
+   * it so a handoff carries what was already explained.
+   */
+  caseTranscript(caseId: string): Promise<TranscriptPayload> {
+    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/transcript`);
   }
 
   proposeCase(

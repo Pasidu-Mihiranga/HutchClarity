@@ -16,7 +16,7 @@ from clarity.modules.actions.capability import CONFIRMATIONS, PLANS
 from clarity.modules.assurance.public import ALERTS, HEARTBEATS
 from clarity.modules.autopsy.public import CLUSTERS, COMPLAINTS
 from clarity.modules.case.public import CASE_SEQUENCE, CASES
-from clarity.modules.conversation.public import CONVERSATION_STATES
+from clarity.modules.conversation.public import CONVERSATION_STATES, CONVERSATION_TRANSCRIPTS
 from clarity.modules.deskops.public import BATCHES
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import (
@@ -79,6 +79,7 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     RISKS,
     # conversation
     CONVERSATION_STATES,
+    CONVERSATION_TRANSCRIPTS,
     # knowledge
     SOURCES,
     CHUNKS,

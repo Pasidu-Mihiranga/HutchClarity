@@ -45,6 +45,13 @@ APPEND_ONLY: frozenset[str] = frozenset(
         "platform.audit",
         "platform.audit_checkpoints",
         "platform.audit_segments",
+        # What a customer was told, and what they said (A4, ADR-0040). A
+        # transcript somebody can edit after the fact is not a record of a
+        # conversation, it is a draft of one, and the handoff and dispute it
+        # exists for both depend on it being the former. Retention is enforced
+        # by expiry on read; an expired line is deleted, which is a removal of
+        # the whole row and not a rewrite of one.
+        "conversation.transcripts",
     }
 )
 

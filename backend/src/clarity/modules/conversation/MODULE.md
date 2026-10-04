@@ -7,7 +7,7 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` and `full`); turn pipeline C01 (#19), flow registry and seven flows C02 (#21), bounded agent step C03 (#22), intake rules and Singlish C04 (#23), all 2026-10-03 |
-| Files | `intents.py`, `intent_routes.py`, `intake.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `verify.py`, `flows.py`, `router.py`, `agent.py`, `public.py` |
+| Files | `intents.py`, `intent_routes.py`, `intake.py`, `service.py`, `suggestions.py`, `orchestrator.py`, `state.py`, `transcript.py`, `verify.py`, `flows.py`, `router.py`, `agent.py`, `public.py` |
 
 ## 1. Purpose
 Customer chat for the immersive "Clarity chat". Two paths:
@@ -45,7 +45,9 @@ No synchronous call to another module (`"conversation": set()` in `tests/archite
 ## 5. Data owned
 `conversation.states`: short-term state per **case**, TTL 24 hours. One PostgreSQL schema and role in the `full` profile (`conversation`), in-memory in `lite`.
 
-Holds flow, state, slots, language, last proposal id, turn counter and the channels the conversation has been held on. Holds **no message history and no reply text**: plan 22 section 9 allows no long-term memory of conversation content, and there is deliberately nowhere in `ConversationState` to put a transcript (asserted by `test_state_carries_no_message_text_by_shape`).
+Holds flow, state, slots, language, last proposal id, turn counter and the channels the conversation has been held on. Holds **no message history and no reply text**, and still must not: what a customer said is never read back into a turn (plan 22 section 9), so there is deliberately nowhere in `ConversationState` to put it (asserted by `test_state_carries_no_message_text_by_shape`). The transcript below is a separate collection, read by interfaces and never by this pipeline.
+
+`conversation.transcripts` holds one row per speaker per turn (masked text, turn number, role, language, channel, timestamp, expiry), keyed `case_id:turn_no:role`. Append-only and listed in `platform.persistence.schemas.APPEND_ONLY`; retention is enforced by expiry on read, with `purge_expired` as housekeeping for the table rather than the control.
 
 ## 5a. Flows (C02)
 
@@ -94,6 +96,7 @@ conversation completes, and the codes are in the turn audit under
 - An injection **neutralises** the turn rather than refusing it: the held text does not get to choose an intent, a safe template answers, and the codes are audited. The controls that stop money moving are elsewhere (I1, ADR-0007).
 - A reply that fails verification is not sent. The customer gets the approved fallback and the case goes to a person.
 - Conversation state is case scoped, so the route that writes it is subject bound (I9).
+- **A transcript is a record, never memory** (ADR-0040). It is written after the reply is composed and verified, holds masked text only, is append-only with a 90-day retention applied on read, and is read only through a subject-bound route. Nothing in the turn pipeline may read it back, which `tests/architecture/test_transcript_is_not_memory.py` enforces: that test is the whole argument for keeping it at all.
 - `last_proposal_id` is a pointer, not a permission. Executing still needs a confirmation token minted outside this path (ADR-0007).
 - Time comes from the injected clock (I11): every entry point takes `now`.
 - A state may only use the tools its flow declares. Checked when the file loads and again at call time, because a validated list nothing consults is documentation.
@@ -158,4 +161,5 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C02-flow-registry.md` | Flow DSL as policy content, the seven flows, the router, and the tool allowlist |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C03-bounded-agent-step.md` | Bounded agent step: planner validation, argument allowlist, per-turn limits and the deterministic fallback |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C04-intake-singlish.md` | Ordered intake rules, Singlish detection and vocabulary, the `extract` seam, and a held-out set |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-A4-A8-transcript-streaming-tools-copy-throttle.md` | A4: `transcript.py`, the record of what was said (ADR-0040) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-W0-A1-receipt-otp-and-reply-honesty.md` | A3: the stateless path gains the cheap refusals, forbidden-content refusal, injection guard and reply verifier; the shared pieces move into `service.py` and client facts are filtered on both routes |

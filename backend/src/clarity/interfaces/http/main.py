@@ -1438,6 +1438,34 @@ def _register_routes(app: FastAPI) -> None:
         authorize_case_access(principal, record.subscriber_ref)
         return _case_summary(record)
 
+    @app.get("/v1/cases/{case_id}/transcript", tags=["conversation"])
+    def get_transcript(
+        case_id: str,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.CASE_READ))],
+    ) -> dict[str, Any]:
+        """What was said on this case, oldest first (A4, ADR-0040).
+
+        Subject bound like every other case route (I9): the transcript is the
+        most personal thing the conversation holds, so the case id alone must
+        not open it. Staff with `case:read:any` see it because that is what
+        makes a handoff workable: the agent picking the case up can read what
+        the customer already explained instead of asking them again.
+
+        The text is masked, as it was when it was stored. Retention is applied
+        on read, so a line past its window is gone here even if the table has
+        not been swept.
+        """
+        record = clarity.cases.get(case_id)
+        authorize_case_access(principal, record.subscriber_ref)
+        entries = clarity.conversation.transcript.for_case(case_id)
+        return {
+            "case_id": case_id,
+            "entries": [entry.to_dict() for entry in entries],
+            "masked": True,
+            "retention_days": clarity.conversation.transcript.retention.days,
+        }
+
     @app.get("/v1/cases/{case_id}/timeline", response_model=TimelineView, tags=["cases"])
     def get_timeline(
         case_id: str,

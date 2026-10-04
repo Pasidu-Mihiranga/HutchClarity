@@ -69,11 +69,19 @@ from clarity.modules.conversation.state import (
     ConversationStore,
 )
 from clarity.modules.conversation.suggestions import build_suggestions, signals_from_snapshot
+from clarity.modules.conversation.transcript import (
+    CONVERSATION_TRANSCRIPTS,
+    DEFAULT_RETENTION,
+    TranscriptEntry,
+    TranscriptStore,
+)
 from clarity.modules.conversation.verify import VerifierResult, verify_reply
 
 __all__ = [
     "ASSIST_BELOW",
     "CONVERSATION_STATES",
+    "CONVERSATION_TRANSCRIPTS",
+    "DEFAULT_RETENTION",
     "DEFAULT_TTL",
     "MAX_MESSAGE_CHARS",
     "MAX_TOOL_CALLS_PER_TURN",
@@ -106,6 +114,8 @@ __all__ = [
     "Rule",
     "ToolCaller",
     "ToolNotAllowed",
+    "TranscriptEntry",
+    "TranscriptStore",
     "Turn",
     "TurnRecord",
     "VerifierResult",
