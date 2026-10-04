@@ -4,6 +4,32 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Removed
+
+- **`GET /v1/demo/ops` and `GET /v1/demo/autopsy`** (D4), breaking for any
+  caller outside this repository. `/v1/insights/dashboards` (D2) and
+  `/v1/autopsy/clusters` (D1) replace them and answer the same data; the
+  console reads the replacements and the SDK's `demoOps()` and `demoAutopsy()`
+  are gone with them. A console running a shift should not be reading a route
+  tagged `demo`.
+  - `demo/autopsy` also seeded the synthetic complaint dataset lazily on first
+    read. That seeding moved to `clarity.app.container`, which runs it in every
+    non-`prod` profile: a GET that writes to a store is a surprise, and the
+    reviewer workspace route must never import a mock driver.
+  - **`GET /v1/demo/foresight` stays**, which deviates from the written D4
+    scope. Workstream C has not been built, so foresight has no API of its own
+    and the console would have nothing to read. Deleting it would blank the
+    screen rather than make it honest.
+  - `POST /v1/demo/reset`, `GET /v1/demo/inbox` and `GET /v1/demo/subscribers`
+    stay as `SYNTHETIC_ONLY`, unchanged.
+
+### Fixed
+
+- `frontend/scripts/check-sdk.mjs` ran at all on Windows. It shelled out to
+  `npx` through `execFileSync`, which does not resolve `PATHEXT`, so the guard
+  that compares the committed SDK types against the schema threw `ENOENT` on
+  every Windows machine and never once compared anything.
+
 ### Changed
 
 - **Foresight reads its parameters from the policy store** (C1/F03). The segment mix, the per-change-type theme catalogues, which change types borrow another's themes, the band thresholds and the calibration gate were Python constants, so a product manager could not change one without a release (I10, D2). They are now `config/policy/foresight.yaml`, resolved **as of the scenario's effective date** rather than "now", so a rehearsal of an October change uses October's parameters. Mitigation and caveat wording moved to `platform/content/foresight.py`.

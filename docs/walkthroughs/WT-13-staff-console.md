@@ -8,6 +8,7 @@
 | Journey | Staff password sign-in; Desk approve; Autopsy and Foresight; kill switches |
 | Status | verified |
 | Last verified | 2026-10-04 (local directory sign-in; VPS image is a root-side build, not a GitHub release) |
+| Re-verification owed | Steps 8-8b and 9-9b were rewritten for D3 and D4 on 2026-10-05 and have **not** been walked in a browser since. The routes behind them are covered by acceptance tests; the click path is not. |
 
 ## 1. What you will see
 
@@ -46,8 +47,12 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 | 5 | Sign in as `auditor` / `auditor-clarity` | Nav | - | Desk/Insights denied (no `desk:queue:read`); honest AccessDenied |
 | 6 | Sign in as `security` / `security-clarity` | Admin | GET switches | Can read switches; flip returns 403 (no `flags:kill_switch`) |
 | 7 | Sign in as `vasops` / `vasops-clarity` with step-up → Suspend GameZone | Desk card | `POST /v1/admin/merchants/suspend` | Simulated block on Dilani |
-| 8 | Sign in as `cx` / `cx-clarity` or `compliance` / `compliance-clarity` | Studio | local draft / export stub | Draft saves in sessionStorage; export downloads labelled JSON |
-| 9 | As **supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/demo/autopsy` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
+| 8 | Sign in as `cx` / `cx-clarity`, open **Policy Studio**, open a change on an existing policy key | Studio | `GET`/`POST /v1/admin/policy/changes` | The change appears in `draft` with the class the artefact's tags give it |
+| 8a | As **supervisor** (stepped up), approve that change, then schedule and activate it | Studio | `POST .../approve`, `.../schedule`, `.../activate` | State moves draft to active; the approval lists the approver, role and step-up |
+| 8b | As **cx** again, try to approve a change you opened yourself | Studio | `POST .../approve` | Refused, and the page shows the API's own reason (maker-checker) |
+| 9 | As **supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/autopsy/clusters` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
+| 9a | Confirm a cluster, then change the verdict with a reason | Autopsy | `POST .../review`, `.../supersede` | Both verdicts survive and are listed; a reversal with no reason is refused |
+| 9b | Sign in as `agent` / `agent-clarity` and open Autopsy | Autopsy | `GET /v1/autopsy/clusters` | The workspace reads, and no verdict buttons appear (no `autopsy:review`) |
 | 10 | Open **Foresight** | Foresight | `GET /v1/demo/foresight` | SCENARIO, NOT CERTAINTY; baseline-vs-swarm bands; not calibrated warning |
 
 ## 4. Under the hood

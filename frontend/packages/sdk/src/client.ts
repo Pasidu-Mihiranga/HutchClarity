@@ -597,10 +597,6 @@ export class ClarityClient {
     return this.request("/v1/demo/reset", { method: "POST" });
   }
 
-  demoOps(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/ops");
-  }
-
   /** Operations dashboards, folded from the event log (D2). */
   insightsDashboards(): Promise<Record<string, unknown>> {
     return this.request("/v1/insights/dashboards");
@@ -686,10 +682,6 @@ export class ClarityClient {
     );
   }
 
-  demoAutopsy(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/autopsy");
-  }
-
   // --- Complaint Autopsy (D1) ---------------------------------------------
 
   /** The reviewer workspace. `desk:queue:read`: seeing is not ruling. */
@@ -735,6 +727,15 @@ export class ClarityClient {
     );
   }
 
+  /**
+   * The foresight rehearsal, still on its demo address.
+   *
+   * D4 retired `demo/ops` and `demo/autopsy` because `/v1/insights/dashboards`
+   * and `/v1/autopsy/clusters` replaced them. This one survives the sweep:
+   * Workstream C, which gives foresight its own persistence, API and
+   * permissions, has not been built, so the console has nothing else to read.
+   * Deleting it would leave the screen blank rather than make it honest.
+   */
   demoForesight(): Promise<Record<string, unknown>> {
     return this.request("/v1/demo/foresight");
   }

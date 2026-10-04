@@ -2463,9 +2463,9 @@ def _register_routes(app: FastAPI) -> None:
 
         The projection has existed since I01 and had no surface of its own:
         the only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,
-        which is not where an operations dashboard belongs. The numbers are
-        the same; what changes is that the console is no longer reading a
-        demonstration endpoint to run a desk.
+        which is not where an operations dashboard belongs. That route is gone
+        as of D4, and the numbers are unchanged; what changed is that the
+        console no longer reads a demonstration endpoint to run a desk.
 
         Folded from the log rather than read from live objects, which is the
         property that matters: a restart does not lose the numbers, two
@@ -2480,88 +2480,6 @@ def _register_routes(app: FastAPI) -> None:
                 "Folded from the event log, not read from live objects. A replay "
                 "of the log rebuilds these numbers exactly; `events_folded` counts "
                 "the events this projection used."
-            ),
-        }
-
-    @app.get(
-        "/v1/demo/ops",
-        tags=["demo"],
-        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
-    )
-    def demo_ops(clarity: ClarityDep) -> dict[str, Any]:
-        """Console dashboards, folded from the event log (I01, #30).
-
-        This route used to read live objects, which is the context issue #30
-        starts from: the numbers were whatever happened to be in this process,
-        so a restart lost them and a second replica disagreed with the first.
-        It now reads the stored projection, which survives a restart and which
-        a replay of the log rebuilds exactly.
-
-        It also summed money with `money += float(stake)`. I3 allows no float
-        anywhere on a money path, and a dashboard is on one: a figure a desk
-        acts on has to be the figure the ledger holds. The projection keeps
-        `Decimal` and serialises as a string.
-
-        Still a `tags=["demo"]` route behind `DESK_QUEUE_READ`. The console's
-        own surface is the gap recorded in the I01 devlog.
-        """
-        boards = clarity.insights.dashboards()
-        return {
-            **boards,
-            "note": (
-                "Folded from the event log, not read from live objects. A replay "
-                "of the log rebuilds these numbers exactly; `events_folded` counts "
-                "the events this projection used."
-            ),
-        }
-
-    @app.get(
-        "/v1/demo/autopsy",
-        tags=["demo"],
-        dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
-    )
-    def demo_autopsy(clarity: ClarityDep) -> dict[str, Any]:
-        """Complaint Autopsy's current clusters, as a reviewer may be shown them.
-
-        Served by the autopsy service since AU01 (#13), where it used to build
-        a throwaway report per request. The service is fed by
-        `complaint.created` and keeps its clusters and their reviews, so a
-        verdict given here survives the request that gave it.
-
-        Every cluster goes through `staff_view`, which is the only sanctioned
-        way to put one in front of a person: it always carries `hypothesis` and
-        a `status_label`, so an unreviewed cluster cannot reach a screen
-        without saying that nobody has checked it (AU01 acceptance 1, I16).
-
-        The seeded demo complaints are accepted on first call when the store is
-        empty, so the demo path still shows something without a channel having
-        published any events yet.
-        """
-        if not clarity.autopsy.clusters():
-            from clarity.integration.drivers.mock.synthetic_dataset import (
-                generate_synthetic_dataset,
-            )
-            from clarity.modules.autopsy.public import BatchComplaint
-
-            dataset = generate_synthetic_dataset()
-            clarity.autopsy.ingest(
-                BatchComplaint(row.complaint_id, row.text, row.channel)
-                for row in dataset.complaints
-            )
-            clarity.autopsy.rerun()
-
-        workspace = clarity.autopsy.workspace()
-        views = workspace["clusters"]
-        return {
-            **workspace,
-            "clusters": views,
-            # Kept at the top level as well as on each cluster: a caller
-            # reading only the envelope still learns that none of this is
-            # established.
-            "hypothesis": any(view["hypothesis"] for view in views),
-            "note": (
-                "SYNTHETIC DATA. Hypotheses until a person reviews them. "
-                "Suggested mappings are guesses and never activate rules."
             ),
         }
 

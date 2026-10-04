@@ -5146,58 +5146,6 @@
         ]
       }
     },
-    "/v1/demo/autopsy": {
-      "get": {
-        "description": "Complaint Autopsy's current clusters, as a reviewer may be shown them.\n\nServed by the autopsy service since AU01 (#13), where it used to build\na throwaway report per request. The service is fed by\n`complaint.created` and keeps its clusters and their reviews, so a\nverdict given here survives the request that gave it.\n\nEvery cluster goes through `staff_view`, which is the only sanctioned\nway to put one in front of a person: it always carries `hypothesis` and\na `status_label`, so an unreviewed cluster cannot reach a screen\nwithout saying that nobody has checked it (AU01 acceptance 1, I16).\n\nThe seeded demo complaints are accepted on first call when the store is\nempty, so the demo path still shows something without a channel having\npublished any events yet.",
-        "operationId": "demo_autopsy_v1_demo_autopsy_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Autopsy V1 Demo Autopsy Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Autopsy",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
     "/v1/demo/foresight": {
       "get": {
         "description": "Rehearse retiring a pack. Scenarios, not certainties.",
@@ -5290,58 +5238,6 @@
           }
         },
         "summary": "Demo Inbox",
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/v1/demo/ops": {
-      "get": {
-        "description": "Console dashboards, folded from the event log (I01, #30).\n\nThis route used to read live objects, which is the context issue #30\nstarts from: the numbers were whatever happened to be in this process,\nso a restart lost them and a second replica disagreed with the first.\nIt now reads the stored projection, which survives a restart and which\na replay of the log rebuilds exactly.\n\nIt also summed money with `money += float(stake)`. I3 allows no float\nanywhere on a money path, and a dashboard is on one: a figure a desk\nacts on has to be the figure the ledger holds. The projection keeps\n`Decimal` and serialises as a string.\n\nStill a `tags=[\"demo\"]` route behind `DESK_QUEUE_READ`. The console's\nown surface is the gap recorded in the I01 devlog.",
-        "operationId": "demo_ops_v1_demo_ops_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Demo Ops V1 Demo Ops Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Demo Ops",
         "tags": [
           "demo"
         ]
@@ -5508,7 +5404,7 @@
     },
     "/v1/insights/dashboards": {
       "get": {
-        "description": "Console dashboards, folded from the event log (D2).\n\nThe projection has existed since I01 and had no surface of its own:\nthe only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,\nwhich is not where an operations dashboard belongs. The numbers are\nthe same; what changes is that the console is no longer reading a\ndemonstration endpoint to run a desk.\n\nFolded from the log rather than read from live objects, which is the\nproperty that matters: a restart does not lose the numbers, two\nreplicas agree, and a replay of the log rebuilds them exactly. Money\nstays `Decimal` and serialises as a string, because a figure a desk\nacts on has to be the figure the ledger holds (I3).",
+        "description": "Console dashboards, folded from the event log (D2).\n\nThe projection has existed since I01 and had no surface of its own:\nthe only way to read it was `GET /v1/demo/ops`, a route tagged `demo`,\nwhich is not where an operations dashboard belongs. That route is gone\nas of D4, and the numbers are unchanged; what changed is that the\nconsole no longer reads a demonstration endpoint to run a desk.\n\nFolded from the log rather than read from live objects, which is the\nproperty that matters: a restart does not lose the numbers, two\nreplicas agree, and a replay of the log rebuilds them exactly. Money\nstays `Decimal` and serialises as a string, because a figure a desk\nacts on has to be the figure the ledger holds (I3).",
         "operationId": "insights_dashboards_v1_insights_dashboards_get",
         "parameters": [
           {
