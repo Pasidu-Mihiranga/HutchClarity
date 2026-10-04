@@ -21,6 +21,8 @@ import {
   makeInitialState,
   fetchSuggestions,
   fetchTurn,
+  streamTurn,
+  type TurnStage,
   openCase,
   evaluateCase,
   fetchTimeline,
@@ -51,6 +53,9 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     chatHi: "Hi {name}", howHelpToday: "How can I help you today?",
     chatSubtitle: "Ask me anything about your Hutch account.",
     askClarityAnything: "Ask Clarity anything...", speak: "Speak",
+    stageMasked: "Protecting your details...", stageUnderstood: "Understanding your question...",
+    stageChecked: "Checking your account...", stageComposed: "Writing the answer...",
+    stageVerified: "Checking the answer...",
     newChat: "New chat", chatHistory: "History", empty: "Nothing here yet.",
     seeMoreTopics: "See more topics", seeFewerTopics: "Show fewer",
     browseTopics: "Browse topics",
@@ -82,6 +87,9 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     chatHi: "ආයුබෝවන් {name}", howHelpToday: "අද මම උදව් කරන්නේ කෙසේද?",
     chatSubtitle: "ඔබේ Hutch ගිණුම ගැන ඕනෑම දෙයක් අසන්න.",
     askClarityAnything: "Clarity ගෙන් ඕනෑම දෙයක් අසන්න...", speak: "කතා කරන්න",
+    stageMasked: "ඔබේ විස්තර ආරක්ෂා කරමින්...", stageUnderstood: "ඔබේ ප්‍රශ්නය තේරුම් ගනිමින්...",
+    stageChecked: "ඔබේ ගිණුම පරීක්ෂා කරමින්...", stageComposed: "පිළිතුර ලියමින්...",
+    stageVerified: "පිළිතුර පරීක්ෂා කරමින්...",
     newChat: "නව කතාබස්", chatHistory: "ඉතිහාසය", empty: "මෙතැන තවම කිසිවක් නැත.",
     seeMoreTopics: "තවත් මාතෘකා", seeFewerTopics: "අඩුවෙන් පෙන්වන්න",
     browseTopics: "මාතෘකා බලන්න",
@@ -106,6 +114,9 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     chatHi: "வணக்கம் {name}", howHelpToday: "இன்று நான் எப்படி உதவட்டும்?",
     chatSubtitle: "உங்கள் Hutch கணக்கு பற்றி எதையும் கேளுங்கள்.",
     askClarityAnything: "Clarity இடம் எதையும் கேளுங்கள்...", speak: "பேசு",
+    stageMasked: "உங்கள் விவரங்களைப் பாதுகாக்கிறேன்...", stageUnderstood: "உங்கள் கேள்வியைப் புரிந்துகொள்கிறேன்...",
+    stageChecked: "உங்கள் கணக்கைச் சரிபார்க்கிறேன்...", stageComposed: "பதிலை எழுதுகிறேன்...",
+    stageVerified: "பதிலைச் சரிபார்க்கிறேன்...",
     newChat: "புதிய அரட்டை", chatHistory: "வரலாறு", empty: "இங்கே இன்னும் ஒன்றுமில்லை.",
     seeMoreTopics: "மேலும் தலைப்புகள்", seeFewerTopics: "குறைவாகக் காட்டு",
     browseTopics: "தலைப்புகளைப் பார்",
@@ -133,6 +144,15 @@ function tl(lang: Lang, key: string): string {
 
 const LANG_LABELS: Record<Lang, string> = { en: "EN", si: "සිං", ta: "த" };
 const DEMO_NAME = "Dilani Perera";
+
+/** Server stage code -> the i18n key the waiting card shows (A5). */
+const STAGE_LABELS: Record<TurnStage, string> = {
+  masked: "stageMasked",
+  understood: "stageUnderstood",
+  checked: "stageChecked",
+  composed: "stageComposed",
+  verified: "stageVerified",
+};
 
 // ─── component ─────────────────────────────────────────────────────────────────
 
@@ -237,14 +257,20 @@ export default function ClarityPage() {
       thinkingLabel: tl(lang, "askClarityAnything"),
     }));
 
-    // push thinking
-    setTimeout(() => {
-      setCs((s) => ({
-        ...s,
-        messages: [...s.messages, { role: "clarity", kind: "thinking" as ResultKind }],
-        thinkingLabel: "Checking your account...",
-      }));
-    }, 50);
+    // The waiting card goes up at once, with no invented label on it: what it
+    // says now comes from the server as each pipeline step completes (A5).
+    // This used to be a `setTimeout` with a hardcoded English string, so it
+    // reported nothing and a hung turn looked exactly like a slow one.
+    setCs((s) => ({
+      ...s,
+      messages: [...s.messages, { role: "clarity", kind: "thinking" as ResultKind }],
+      thinkingLabel: tl(lang, "stageUnderstood"),
+    }));
+
+    const onStage = (stage: TurnStage) => {
+      const label = STAGE_LABELS[stage];
+      if (label) setCs((s) => ({ ...s, thinkingLabel: tl(lang, label) }));
+    };
 
     try {
       // turn classification
@@ -259,7 +285,15 @@ export default function ClarityPage() {
       // every turn stateless and no flow ever ran (C05 devlog).
       await appReady.current;
       const account = appRef.current;
-      const turn = await fetchTurn(typed, lang, intentOverride, facts, account, cs.caseId);
+      const turn = await streamTurn(
+        typed,
+        lang,
+        intentOverride,
+        facts,
+        account,
+        cs.caseId,
+        onStage
+      );
 
       // The composed answer. Approved template or grounded quote, already
       // through the verifier, and until now discarded (A1).

@@ -39,7 +39,8 @@ reply tells the customer not to send it. This is the one hard stop.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import contextlib
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -70,6 +71,36 @@ from clarity.platform.audit.ledger import AuditEventType, AuditLedger
 from clarity.platform.messaging.envelope import Event
 from clarity.platform.messaging.outbox import outbox_in
 from clarity.platform.persistence import UnitOfWorkFactory
+
+#: What the customer is told is happening, as stable codes (A5).
+#:
+#: A closed set on purpose. The streaming route sends these and nothing else,
+#: so a progress event cannot carry a fragment of the message, a figure or an
+#: intent: the stream is a progress bar, not a second answer channel. The
+#: wording for each lives in the interface's own i18n, because it is customer
+#: copy and does not belong in a module (I15).
+STAGE_MASKED = "masked"
+"""Personal data in the message has been tokenised. First, because nothing
+downstream may see the raw text."""
+STAGE_UNDERSTOOD = "understood"
+"""Intake has a route and an intent."""
+STAGE_CHECKED = "checked"
+"""The flow stepped: evidence read, tools called, any retrieval done."""
+STAGE_COMPOSED = "composed"
+"""A reply exists, from an approved template."""
+STAGE_VERIFIED = "verified"
+"""The reply passed the verifier, or was replaced by one that does."""
+
+STAGES: tuple[str, ...] = (
+    STAGE_MASKED,
+    STAGE_UNDERSTOOD,
+    STAGE_CHECKED,
+    STAGE_COMPOSED,
+    STAGE_VERIFIED,
+)
+
+#: Called once per completed step. Takes a code from :data:`STAGES`.
+StageReporter = Callable[[str], None]
 
 
 @dataclass(frozen=True)
@@ -272,6 +303,7 @@ class ConversationOrchestrator:
         intent_override: str | None = None,
         facts: Mapping[str, Any] | None = None,
         now: datetime | None = None,
+        on_stage: StageReporter | None = None,
     ) -> Turn:
         """Run one customer message through the pipeline.
 
@@ -290,8 +322,24 @@ class ConversationOrchestrator:
                 guard still runs on the text.
             facts: the authoritative set the reply is verified against.
             now: injected clock (I11).
+            on_stage: called as each step completes, with a stable stage code
+                and nothing else (A5). It is how the streaming route reports
+                real progress instead of the browser animating a guess. It
+                carries no customer content by construction: the codes are a
+                closed set, so a caller cannot be handed a message to leak.
+                Exceptions from it are swallowed; a listener that has gone away
+                must not fail the turn.
         """
         moment = now or utc_now()
+
+        def stage(name: str) -> None:
+            if on_stage is None:
+                return
+            # Suppressed: a listener that has gone away (a browser that closed
+            # the stream mid-turn) must not fail a turn that is otherwise fine.
+            with contextlib.suppress(Exception):
+                on_stage(name)
+
         known: dict[str, Any] = dict(facts or {})
         # Validated once, here. An unrecognised hint (a browser sending
         # "si-en", say) must not reach the stored state or the event: the
@@ -334,6 +382,7 @@ class ConversationOrchestrator:
                 now=moment,
             )
 
+        stage(STAGE_MASKED)
         verdict = self._inspect(masked.text)
 
         # -- 3. Intake, on masked text ------------------------------------- #
@@ -359,6 +408,7 @@ class ConversationOrchestrator:
         state.language = language.value
 
         # -- 4. Handoff check ---------------------------------------------- #
+        stage(STAGE_UNDERSTOOD)
         handoff = check_handoff(intake)
         if handoff["handoff"]:
             intake.route = "handoff"
@@ -366,6 +416,7 @@ class ConversationOrchestrator:
 
         # -- 5. Flow step -------------------------------------------------- #
         outcome = self._step(state, intake, known)
+        stage(STAGE_CHECKED)
         state.flow = outcome.flow
         state.state = outcome.state
         state.slots.update(outcome.slots)
@@ -395,6 +446,7 @@ class ConversationOrchestrator:
             handoff = {"handoff": True, "reason": "no_published_source", "queue": "cx-knowledge"}
 
         # -- 7. Verify ----------------------------------------------------- #
+        stage(STAGE_COMPOSED)
         verifier = verify_reply(
             reply,
             facts=known,
@@ -443,6 +495,7 @@ class ConversationOrchestrator:
         )
 
         # -- 8. Record ----------------------------------------------------- #
+        stage(STAGE_VERIFIED)
         self._record(record, subscriber_ref=subscriber_ref, now=moment)
 
         # The transcript, written last and deliberately so: by here the reply

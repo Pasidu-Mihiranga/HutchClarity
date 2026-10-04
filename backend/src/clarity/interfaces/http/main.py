@@ -21,6 +21,7 @@ these routes exactly as plan §19 describes.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -32,7 +33,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.responses import Response as RawResponse
 from pydantic import TypeAdapter
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -148,6 +149,7 @@ _STATUS_FOR_CODE = {
 _DURATION_ADAPTER: TypeAdapter[timedelta] = TypeAdapter(timedelta)
 
 _log = logging.getLogger("clarity.audit.grants")
+_stream_log = logging.getLogger("clarity.conversation.stream")
 
 _app_state: dict[str, Clarity] = {}
 
@@ -345,6 +347,7 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
     # Authentication and authorization are profile-selected drivers. Lite uses
     # local JWT/Python drivers; full may use Keycloak and OPA.
     core = clarity or get_clarity()
+
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
     app.state.audit_grants = core.audit_grants
@@ -2212,6 +2215,20 @@ def _register_routes(app: FastAPI) -> None:
         carried is still there, with `state`, `verifier` and `refused` added
         when a case is in play.
         """
+        return {"turn": _run_turn(body, clarity, principal)}
+
+    def _run_turn(
+        body: dict[str, Any],
+        clarity: Clarity,
+        principal: Principal,
+        on_stage: Callable[[str], None] | None = None,
+    ) -> dict[str, Any]:
+        """One turn, shared by the JSON route and the streaming one (A5).
+
+        `on_stage` is passed to the orchestrator, which calls it with a stage
+        code as each step finishes. It is ignored on the stateless path, which
+        has no pipeline to report on.
+        """
         from clarity.kernel.common import Channel
         from clarity.modules.conversation.public import handle_turn
 
@@ -2249,6 +2266,7 @@ def _register_routes(app: FastAPI) -> None:
                 language_hint=body.get("language"),
                 intent_override=body.get("intent"),
                 facts=_case_facts(record) | _client_context(facts),
+                on_stage=on_stage,
             )
             payload = turn.to_dict()
             route = turn.intake.route
@@ -2272,7 +2290,79 @@ def _register_routes(app: FastAPI) -> None:
         # Attach knowledge articles when route needs them.
         if route in {"knowledge", "both"}:
             payload["articles"] = knowledge_search(clarity, text).get("articles") or []
-        return {"turn": payload}
+        return payload
+
+    @app.post("/v1/conversation/turn/stream", tags=["conversation"])
+    async def conversation_turn_stream(
+        body: dict[str, Any],
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(public())],
+    ) -> RawResponse:
+        """The same turn, as Server-Sent Events (A5).
+
+        The chat used to animate a `setTimeout` with a hardcoded English label
+        while one request ran to completion, so the progress it showed
+        reflected nothing: a fast turn still waited, and a hung one looked
+        exactly like a slow one.
+
+        Two event types, and only two:
+
+        - `stage`, one per completed pipeline step, carrying a code from the
+          closed `STAGES` vocabulary. **No customer content travels on a stage
+          event**, which is why the orchestrator is handed a code rather than a
+          message: a progress channel that can carry text is a second answer
+          channel that nothing verifies.
+        - `turn`, the identical payload the JSON route returns, once, at the
+          end. Composed, verified and recorded before it is sent. Streaming
+          reports progress; it does not stream a reply into the customer's view
+          before the verifier has seen it.
+
+        An error ends the stream with an `error` event carrying a status and no
+        detail, because the response has already begun with a 200 and cannot
+        become a 4xx.
+        """
+        queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def report(stage_name: str) -> None:
+            # Called from the worker thread, so hop back onto the loop.
+            loop.call_soon_threadsafe(queue.put_nowait, ("stage", {"stage": stage_name}))
+
+        async def work() -> None:
+            try:
+                payload = await run_in_threadpool(_run_turn, body, clarity, principal, report)
+                await queue.put(("turn", {"turn": payload}))
+            except HTTPException as refused:
+                await queue.put(("error", {"status": refused.status_code}))
+            except Exception:
+                _stream_log.exception("conversation turn stream failed")
+                await queue.put(("error", {"status": 500}))
+            finally:
+                await queue.put(None)
+
+        async def events() -> AsyncIterator[str]:
+            task = loop.create_task(work())
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    name, data = item
+                    yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
+            finally:
+                task.cancel()
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-store",
+                # nginx buffers a proxied response by default, which would hold
+                # every stage back until the turn finished and make the stream
+                # pointless in the deployed profile.
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.post("/v1/conversation/suggestions", tags=["conversation"])
     def conversation_suggestions(body: dict[str, Any]) -> dict[str, Any]:

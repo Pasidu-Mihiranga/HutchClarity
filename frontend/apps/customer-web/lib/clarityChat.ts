@@ -364,6 +364,39 @@ type TurnResponse = {
   };
 };
 
+/** The pipeline steps the server reports, in order (A5). A closed set. */
+export type TurnStage = "masked" | "understood" | "checked" | "composed" | "verified";
+
+function turnBody(
+  text: string,
+  lang: string,
+  intentOverride: string | null,
+  facts: Record<string, unknown>,
+  app: AppState,
+  caseId?: string | null
+): Record<string, unknown> {
+  return {
+    text,
+    language: lang,
+    intent: intentOverride,
+    facts,
+    // Top level, not inside `facts`: the route reads it from the body and
+    // only then takes the stateful pipeline. Passing it in `facts` left
+    // every turn stateless, which is the bug C05 fixes.
+    //
+    // Null on the first turn of a conversation, because the case does not
+    // exist yet. The server answers statelessly and keeps nothing, which is
+    // correct: there is nothing to attach state to.
+    case_id: caseId ?? null,
+    channel: "app",
+    snapshot: {
+      pack: app.pack || {},
+      subscriptions: app.subscriptions || [],
+      activity: app.activity || [],
+    },
+  };
+}
+
 export async function fetchTurn(
   text: string,
   lang: string,
@@ -373,29 +406,101 @@ export async function fetchTurn(
   caseId?: string | null
 ): Promise<TurnResponse["turn"]> {
   try {
-    const payload = await apiFetch<TurnResponse>("/v1/conversation/turn", "POST", {
-      text,
-      language: lang,
-      intent: intentOverride,
-      facts,
-      // Top level, not inside `facts`: the route reads it from the body and
-      // only then takes the stateful pipeline. Passing it in `facts` left
-      // every turn stateless, which is the bug C05 fixes.
-      //
-      // Null on the first turn of a conversation, because the case does not
-      // exist yet. The server answers statelessly and keeps nothing, which is
-      // correct: there is nothing to attach state to.
-      case_id: caseId ?? null,
-      channel: "app",
-      snapshot: {
-        pack: app.pack || {},
-        subscriptions: app.subscriptions || [],
-        activity: app.activity || [],
-      },
-    });
+    const payload = await apiFetch<TurnResponse>(
+      "/v1/conversation/turn",
+      "POST",
+      turnBody(text, lang, intentOverride, facts, app, caseId)
+    );
     return payload.turn ?? {};
   } catch {
     return {};
+  }
+}
+
+/**
+ * The same turn over Server-Sent Events, reporting real progress (A5).
+ *
+ * `onStage` fires as each pipeline step completes. The events carry a code and
+ * nothing else, so this cannot show the customer anything the verifier has not
+ * seen: the answer arrives once, at the end, exactly as it does on the JSON
+ * route.
+ *
+ * Falls back to `fetchTurn` when the browser has no `ReadableStream` or the
+ * stream fails before the answer. A chat that breaks because progress could
+ * not be reported would be a worse trade than no progress at all.
+ */
+export async function streamTurn(
+  text: string,
+  lang: string,
+  intentOverride: string | null,
+  facts: Record<string, unknown>,
+  app: AppState,
+  caseId: string | null | undefined,
+  onStage: (stage: TurnStage) => void
+): Promise<TurnResponse["turn"]> {
+  const fallback = () => fetchTurn(text, lang, intentOverride, facts, app, caseId);
+
+  if (typeof window === "undefined" || typeof ReadableStream === "undefined") {
+    return fallback();
+  }
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = readToken() ?? "";
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE}/v1/conversation/turn/stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(turnBody(text, lang, intentOverride, facts, app, caseId)),
+    });
+    if (res.status === 401) {
+      expireSession();
+      return {};
+    }
+    if (!res.ok || !res.body) return fallback();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let answer: TurnResponse["turn"] | null = null;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE frames are separated by a blank line. Keep the trailing partial.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+
+      for (const frame of frames) {
+        let name = "";
+        let data = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event: ")) name = line.slice(7).trim();
+          else if (line.startsWith("data: ")) data = line.slice(6);
+        }
+        if (!name || !data) continue;
+        try {
+          const parsed = JSON.parse(data) as Record<string, unknown>;
+          if (name === "stage" && typeof parsed.stage === "string") {
+            onStage(parsed.stage as TurnStage);
+          } else if (name === "turn") {
+            answer = (parsed as { turn?: TurnResponse["turn"] }).turn ?? {};
+          } else if (name === "error") {
+            return {};
+          }
+        } catch {
+          /* a malformed frame is not worth losing the turn over */
+        }
+      }
+    }
+
+    // A stream that ended without an answer is a failure, not an empty reply.
+    return answer ?? (await fallback());
+  } catch {
+    return fallback();
   }
 }
 

@@ -49,6 +49,7 @@ PUBLIC = {
     ("GET", "/v1/knowledge/search"),
     ("POST", "/v1/clarity/route"),
     ("POST", "/v1/conversation/turn"),
+    ("POST", "/v1/conversation/turn/stream"),
     ("POST", "/v1/conversation/suggestions"),
     ("GET", "/v1/conversation/suggestions"),
 }
@@ -138,6 +139,7 @@ BODIES: dict[str, dict[str, object]] = {
     "/v1/me/family": {"msisdn": "+94781234567"},
     "/v1/me/preferences": {"language": "en"},
     "/v1/conversation/turn": {"text": "why was I charged"},
+    "/v1/conversation/turn/stream": {"text": "why was I charged"},
 }
 
 

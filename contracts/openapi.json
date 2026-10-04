@@ -4352,6 +4352,66 @@
         ]
       }
     },
+    "/v1/conversation/turn/stream": {
+      "post": {
+        "description": "The same turn, as Server-Sent Events (A5).\n\nThe chat used to animate a `setTimeout` with a hardcoded English label\nwhile one request ran to completion, so the progress it showed\nreflected nothing: a fast turn still waited, and a hung one looked\nexactly like a slow one.\n\nTwo event types, and only two:\n\n- `stage`, one per completed pipeline step, carrying a code from the\n  closed `STAGES` vocabulary. **No customer content travels on a stage\n  event**, which is why the orchestrator is handed a code rather than a\n  message: a progress channel that can carry text is a second answer\n  channel that nothing verifies.\n- `turn`, the identical payload the JSON route returns, once, at the\n  end. Composed, verified and recorded before it is sent. Streaming\n  reports progress; it does not stream a reply into the customer's view\n  before the verifier has seen it.\n\nAn error ends the stream with an `error` event carrying a status and no\ndetail, because the response has already begun with a 200 and cannot\nbecome a 4xx.",
+        "operationId": "conversation_turn_stream_v1_conversation_turn_stream_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Conversation Turn Stream",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
     "/v1/demo/autopsy": {
       "get": {
         "description": "Complaint Autopsy's current clusters, as a reviewer may be shown them.\n\nServed by the autopsy service since AU01 (#13), where it used to build\na throwaway report per request. The service is fed by\n`complaint.created` and keeps its clusters and their reviews, so a\nverdict given here survives the request that gave it.\n\nEvery cluster goes through `staff_view`, which is the only sanctioned\nway to put one in front of a person: it always carries `hypothesis` and\na `status_label`, so an unreviewed cluster cannot reach a screen\nwithout saying that nobody has checked it (AU01 acceptance 1, I16).\n\nThe seeded demo complaints are accepted on first call when the store is\nempty, so the demo path still shows something without a channel having\npublished any events yet.",

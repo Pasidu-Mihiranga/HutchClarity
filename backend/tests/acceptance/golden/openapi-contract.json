@@ -536,6 +536,14 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/conversation/turn/stream": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "object",
+      "response": null,
+      "status": "200"
+    },
     "POST /v1/demo/reset": {
       "parameters": [],
       "request": null,
