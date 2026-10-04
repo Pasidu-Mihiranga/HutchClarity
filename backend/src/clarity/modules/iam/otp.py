@@ -222,7 +222,9 @@ class OtpService:
 
             # Constant-time, so response timing does not leak how much of
             # the code was right.
-            if not hmac.compare_digest(challenge.code, code.strip()):
+            # The SMS groups the digits ("123 456"), so a pasted code may
+            # carry a space; whitespace is never part of the code.
+            if not hmac.compare_digest(challenge.code, "".join(code.split())):
                 challenges.put(challenge_id, challenge)
                 unit.commit()
                 raise OtpRefused

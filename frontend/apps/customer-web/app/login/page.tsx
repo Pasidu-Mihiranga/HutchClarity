@@ -160,9 +160,10 @@ export default function LoginPage() {
                   inputMode="numeric"
                   placeholder="123456"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  // The SMS shows "123 456"; keep the digits, so a pasted or
+                  // spaced code is not cut short by the length limit.
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   required
-                  maxLength={6}
                   className="rounded-[14px] px-3 py-2.5 font-mono text-2xl tracking-[.32em]"
                 />
               )}
