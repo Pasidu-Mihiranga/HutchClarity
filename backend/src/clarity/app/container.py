@@ -149,6 +149,7 @@ from clarity.platform.persistence import (
     UnitOfWorkFactory,
 )
 from clarity.platform.persistence.postgres import PostgresStore
+from clarity.platform.throttle import MemoryRateLimiter
 
 
 class Profile(StrEnum):
@@ -787,6 +788,10 @@ class Clarity:
         self.policies = PolicyResolver.from_directory(
             policy_dir or default_policy_dir(self.settings.policy_dir)
         )
+        # Request rate limiting (A8). The in-memory driver is per replica and
+        # forgotten on restart, which is why it is a flood control and not a
+        # quota; `full` replaces it with a shared driver behind the same port.
+        self.rate_limiter = MemoryRateLimiter()
         # Signed checkpoints (ADR-0035), with their own key. Carried across a
         # reset with the trail: a new key would fail every earlier checkpoint.
         self.audit_checkpoints = audit_checkpoints or self._new_checkpointer(clock)

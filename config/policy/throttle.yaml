@@ -1,0 +1,52 @@
+# Request rate limits. ASSUMPTION - REQUIRES HUTCH VALIDATION.
+#
+# These are thresholds, so they live here rather than in code (I10). They are
+# deliberately generous: the limiter exists to stop a flood and an abuse loop,
+# not to ration ordinary use, and a limit a real customer can reach is a limit
+# that will be removed in a hurry rather than tuned.
+#
+# The window is fixed at 60 seconds and is not a policy key: changing the
+# window changes what the number means, so a reviewer approving "30" should
+# never have to go and look up what it is 30 of.
+
+keys:
+  - key: throttle.conversation.per_minute
+    kind: number
+    owner_role: platform
+    tags: [operational]
+    guardrail: { min: 1, max: 600 }
+    description: >
+      Assistant turns one caller may take per minute, counted per subscriber
+      when signed in and per client address when not. Covers
+      /v1/conversation/turn and its streaming twin, which are the two routes
+      that run the whole pipeline and can be called anonymously.
+    values:
+      - value: "30"
+        version: 1
+
+  - key: throttle.knowledge.per_minute
+    kind: number
+    owner_role: platform
+    tags: [operational]
+    guardrail: { min: 1, max: 600 }
+    description: >
+      Knowledge searches and suggestion requests per minute. Higher than the
+      turn limit because these are cheap reads, and a chat UI asks for
+      suggestions on load.
+    values:
+      - value: "60"
+        version: 1
+
+  - key: throttle.anonymous.per_minute
+    kind: number
+    owner_role: platform
+    tags: [operational]
+    guardrail: { min: 1, max: 600 }
+    description: >
+      The ceiling for a caller with no session at all, across every throttled
+      route together. An anonymous caller is the one case where the limiter is
+      the only thing standing between a script and the pipeline, so it is
+      counted as one budget rather than per route.
+    values:
+      - value: "45"
+        version: 1
