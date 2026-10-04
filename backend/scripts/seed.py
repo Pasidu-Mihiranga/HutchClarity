@@ -8,6 +8,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -20,6 +21,7 @@ if "__file__" in globals():
     sys.path.insert(0, str(ROOT / "src"))
 
 from clarity.integration.drivers.mock.store import (
+    configure,
     create_schema,
     reset_engine,
     save_complaints,
@@ -37,6 +39,10 @@ from clarity.integration.drivers.mock.world import DEMO_NOW, build_demo_world, r
 
 
 def main() -> None:
+    # The store never reads the environment (B07): an entry point tells it
+    # which database to use, as the composition root does. Without this the
+    # seed silently went to the SQLite fallback, not to DATABASE_URL.
+    configure(os.environ.get("DATABASE_URL"))
     reset_engine()
     create_schema()
     world = build_demo_world(now=DEMO_NOW, persist=False)
