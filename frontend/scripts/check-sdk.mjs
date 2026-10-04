@@ -21,10 +21,13 @@ const fresh = join(scratch, "schema.ts");
 try {
   execFileSync("npx", ["openapi-typescript", SCHEMA, "-o", fresh], {
     stdio: ["ignore", "ignore", "inherit"],
+    // npx is npx.cmd on Windows, which execFile cannot start without a shell.
+    shell: process.platform === "win32",
   });
 
-  const current = readFileSync(COMMITTED, "utf8");
-  const generated = readFileSync(fresh, "utf8");
+  // A Windows checkout may have CRLF endings; the generator writes LF.
+  const current = readFileSync(COMMITTED, "utf8").replaceAll("\r\n", "\n");
+  const generated = readFileSync(fresh, "utf8").replaceAll("\r\n", "\n");
 
   if (current !== generated) {
     console.error(

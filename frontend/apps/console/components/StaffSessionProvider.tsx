@@ -13,7 +13,10 @@ import {
   ClarityClient,
   createClarityClient,
   type SessionView,
+  type SignInMethods,
 } from "@clarity/sdk";
+
+export type { SignInMethods };
 
 const STORAGE_KEY = "clarity_console_staff_v2";
 
@@ -37,18 +40,6 @@ type StaffSessionContextValue = {
   refresh: () => Promise<void>;
   generation: number;
 };
-
-export type SignInMethods = {
-  /** Keycloak, or whichever provider this deployment federates. */
-  provider: boolean;
-  /** The simulated staff directory: a username and password. */
-  directory: boolean;
-  /** The development role picker, which has no credential at all. */
-  development_role_picker: boolean;
-};
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 const StaffSessionContext = createContext<StaffSessionContextValue | null>(null);
 
@@ -100,33 +91,28 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
     // page can see would leave the session alive on the server and the
     // provider's own cookie untouched, so the next visit would return
     // instantly with nothing asked for.
-    void fetch(`${API_BASE}/v1/auth/logout`, { method: "POST", credentials: "include" })
-      .then((res) => (res.ok ? (res.json() as Promise<{ provider_logout?: string }>) : null))
+    void client
+      .logout()
       .then((body) => {
         clearLocally();
-        if (body?.provider_logout) window.location.assign(body.provider_logout);
+        if (body.provider_logout) window.location.assign(body.provider_logout);
       })
       .catch(clearLocally);
   }, [client]);
 
   const signInWithProvider = useCallback(() => {
     const here = window.location.pathname + window.location.search;
-    window.location.assign(
-      `${API_BASE}/v1/auth/staff/oidc/start?return_to=${encodeURIComponent(here)}`,
-    );
-  }, []);
+    window.location.assign(client.oidcStartUrl(here));
+  }, [client]);
 
   const stepUpWithProvider = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       const here = window.location.pathname + window.location.search;
-      const res = await fetch(
-        `${API_BASE}/v1/auth/staff/step-up?return_to=${encodeURIComponent(here)}`,
-        { method: "POST", credentials: "include" },
-      );
-      if (!res.ok) throw new Error("step-up is not available");
-      const { redirect_to } = (await res.json()) as { redirect_to: string };
+      const { redirect_to } = await client.stepUp(here).catch(() => {
+        throw new Error("step-up is not available");
+      });
       // The provider re-authenticates and sends the browser back here with a
       // stronger session. Nothing is granted by this call itself.
       window.location.assign(redirect_to);
@@ -134,7 +120,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       setError(err instanceof Error ? err.message : "Step-up failed");
       setBusy(false);
     }
-  }, []);
+  }, [client]);
 
   // Which sign-in paths exist here. Asked rather than assumed: a console that
   // decided from its own build-time setting would show a provider button on a
@@ -142,10 +128,10 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
   // the password routes are gone.
   useEffect(() => {
     let cancelled = false;
-    void fetch(`${API_BASE}/v1/auth/sign-in-methods`, { credentials: "include" })
-      .then((res) => (res.ok ? (res.json() as Promise<SignInMethods>) : null))
+    void client
+      .signInMethods()
       .then((found) => {
-        if (!cancelled && found) setMethods(found);
+        if (!cancelled) setMethods(found);
       })
       .catch(() => {
         /* the sign-in screen falls back to showing the form */
@@ -153,7 +139,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [client]);
 
   // Restoring a session.
   //

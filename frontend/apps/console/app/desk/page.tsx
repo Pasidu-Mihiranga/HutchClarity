@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card } from "@clarity/ui";
 import type {
-  ApproveResult,
+  ExecutionView,
   CasePayload,
   DecisionPayload,
   QueueItem,
@@ -35,7 +35,7 @@ export default function DeskPage() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<{
-    execution: ApproveResult;
+    execution: ExecutionView;
     verified: ReceiptPayload;
   } | null>(null);
   const [acting, setActing] = useState(false);
@@ -106,7 +106,7 @@ export default function DeskPage() {
         plan_id: pid,
         role,
       });
-      if (body.status === "AWAITING_SECOND_APPROVAL" || body.detail) {
+      if ("detail" in body) {
         setNote(
           `${body.detail || "Awaiting second approval"} - sign in as a different user (e.g. finance) and approve again.`,
         );

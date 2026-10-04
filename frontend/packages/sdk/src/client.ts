@@ -1,3 +1,52 @@
+import type { components } from "./generated/schema";
+import type {
+  ApiPath,
+  BodyOf,
+  HttpMethod,
+  MethodsOf,
+  OnlyIfOpen,
+  PathParamsOf,
+  QueryOf,
+  SuccessBody,
+} from "./routes";
+import type {
+  AlertQueue,
+  ApproveResult,
+  AlertView,
+  AuditGrantView,
+  AuditHealth,
+  AuditRecordVerdict,
+  AuditRecovery,
+  AuditTrailPage,
+  CaseSummary,
+  CustomerApp,
+  CustomerHome,
+  CustomerReceiptRow,
+  DecisionView,
+  DemoSubscriber,
+  ExecutionView,
+  LogoutResult,
+  MyCaseRow,
+  OpenCaseBody,
+  OtpRequestResult,
+  PlanView,
+  PreferencesBody,
+  ProposeBody,
+  QueueItem,
+  SafeguardKind,
+  SessionRecord,
+  SessionView,
+  SignedReceipt,
+  SignInMethods,
+  StaffLoginRequest,
+  StaffSessionRequest,
+  StepUpResult,
+  SwitchStateView,
+  TimelineView,
+  TranscriptPayload,
+  VerificationView,
+} from "./types";
+
 export type ClarityClientOptions = {
   baseUrl?: string;
   token?: string;
@@ -22,288 +71,6 @@ export class ClarityApiError extends Error {
   }
 }
 
-export type OtpRequestResult = {
-  /** Required by `verifyOtp`: the challenge this code belongs to. */
-  challenge_id: string;
-  sent_to?: string;
-  simulated?: boolean;
-  detail?: string;
-  /** Older field names kept so a caller reading them still compiles. */
-  ok?: boolean;
-  msisdn_masked?: string;
-  message?: string;
-};
-
-export type OtpVerifyResult = {
-  token: string;
-  expires_at: string;
-  principal: Record<string, unknown>;
-  rls?: Record<string, unknown>;
-};
-
-export type CasePayload = {
-  case_id?: string;
-  case_no?: string;
-  id?: string;
-  state?: string;
-  msisdn_masked?: string;
-  channel?: string;
-  [key: string]: unknown;
-};
-
-export type TranscriptEntry = {
-  turn_no: number;
-  role: "customer" | "clarity";
-  text: string;
-  language: string;
-  channel: string;
-  at: string;
-};
-
-export type TranscriptPayload = {
-  case_id: string;
-  entries: TranscriptEntry[];
-  masked: boolean;
-  retention_days: number;
-};
-
-export type ReceiptPayload = {
-  receipt_id?: string;
-  id?: string;
-  valid?: boolean;
-  chain_ok?: boolean;
-  status?: string;
-  reason?: string;
-  corrected_lkr?: string;
-  key_id?: string;
-  [key: string]: unknown;
-};
-
-export type SessionView = {
-  token: string;
-  expires_at?: string | null;
-  subject: string;
-  roles: string[];
-  assurance: string;
-  permissions: string[];
-};
-
-export type QueueItem = {
-  case_id: string;
-  case_no: string;
-  state: string;
-  outcome?: string | null;
-  cause?: string | null;
-  money_at_stake_lkr?: string | null;
-  msisdn_masked: string;
-  channel: string;
-  reason?: string | null;
-  plan_id?: string | null;
-};
-
-export type RuledOutItem = {
-  rule_id: string;
-  [key: string]: unknown;
-};
-
-export type DecisionPayload = {
-  outcome: string;
-  cause?: { rule_id: string; rule_version?: string; confidence?: number } | null;
-  amount_lkr?: string | null;
-  rationale?: string[];
-  allowed_actions?: string[];
-  handoff_reason?: string | null;
-  ruled_out?: RuledOutItem[];
-  unknown?: RuledOutItem[];
-  [key: string]: unknown;
-};
-
-export type TimelineEvent = {
-  source: string;
-  event_type: string;
-  amount_lkr?: string | null;
-  occurred_at?: string;
-  [key: string]: unknown;
-};
-
-export type TimelineSource = {
-  source: string;
-  completeness: string;
-};
-
-export type TimelinePayload = {
-  events: TimelineEvent[];
-  sources: TimelineSource[];
-  snapshot_hash?: string;
-  [key: string]: unknown;
-};
-
-export type ProposalPayload = {
-  plan_id: string;
-  [key: string]: unknown;
-};
-
-export type ApproveResult = {
-  status?: string;
-  detail?: string;
-  case_id?: string;
-  plan_id?: string;
-  receipt_id?: string;
-  confirmed_by?: string;
-  actions?: Array<{
-    type: string;
-    before?: { balance_lkr?: string };
-    after?: { balance_lkr?: string };
-  }>;
-  [key: string]: unknown;
-};
-
-export type DemoSubscriber = {
-  name: string;
-  msisdn: string;
-  masked: string;
-  language?: string;
-  balance_lkr?: string;
-  scenario?: string;
-};
-
-export type SwitchStateView = {
-  switches: Array<{ key: string; enabled: boolean }>;
-  disabled: string[];
-  history: Array<{
-    name: string;
-    enabled: boolean;
-    actor_ref: string;
-    reason: string;
-    at: string;
-  }>;
-};
-
-export type AuditRecordView = {
-  seq: number;
-  hash_version: number;
-  event_type: string;
-  actor_ref: string;
-  actor_kind: string;
-  session_ref?: string | null;
-  object_ref: string;
-  case_id?: string | null;
-  payload_hash: string;
-  detail: Record<string, unknown>;
-  detail_hash: string;
-  occurred_at: string;
-  recorded_at: string;
-  prev_hash?: string | null;
-  chain_hash: string;
-};
-
-export type AuditTrailPage = {
-  records: AuditRecordView[];
-  next_after_seq: number | null;
-  verification: {
-    intact: boolean;
-    length: number;
-    checkpoints: number;
-    last_checkpoint_seq: number | null;
-    broken_at: number | null;
-    reason: string | null;
-    lost_from: number | null;
-    lost_to: number | null;
-  };
-};
-
-export type AuditHealth = {
-  intact: boolean;
-  length: number;
-  verified_from: number;
-  broken_at: number | null;
-  reason: string | null;
-  lost_from: number | null;
-  lost_to: number | null;
-  checkpoints: number;
-  last_checkpoint_seq: number | null;
-  last_checkpoint_at: string | null;
-  last_checkpoint_age_seconds: number | null;
-  detection_last_ran_at: string | null;
-  writer_lag_events: number;
-  archived_below_seq: number;
-  witness_url: string;
-};
-
-export type AuditRecovery = {
-  last_backup: Record<string, unknown> | null;
-  last_backup_read: Record<string, unknown> | null;
-  last_restore: Record<string, unknown> | null;
-  last_segment_sealed: Record<string, unknown> | null;
-  last_erasure: Record<string, unknown> | null;
-  backups_configured: boolean;
-};
-
-export type AuditRecordVerdict = {
-  seq: number;
-  detail_matches_its_hash: boolean;
-  record_hash_matches_its_contents: boolean;
-  follows_its_predecessor: boolean;
-  predecessor_available: boolean;
-  intact: boolean;
-  hash_version: number;
-  chain_hash: string;
-};
-
-export type AuditGrantView = {
-  grant_id: string;
-  subject_kind: string;
-  subject_ref: string;
-  permission: string;
-  state: string;
-  reason: string;
-  requested_by: string;
-  requested_at: string;
-  approved_by?: string | null;
-  expires_at?: string | null;
-  review_due_at?: string | null;
-  break_glass: boolean;
-};
-
-export type AlertView = {
-  alert_id: string;
-  rule_id: string;
-  band: string;
-  group_key: string;
-  summary: string;
-  evidence: number[];
-  subject_ref?: string | null;
-  case_id?: string | null;
-  state: string;
-  raised_at: string;
-  last_seen_at: string;
-  occurrences: number;
-  acknowledged_by?: string | null;
-  acknowledged_at?: string | null;
-  escalated_at?: string | null;
-  disposed_by?: string | null;
-  disposed_at?: string | null;
-  disposition?: string | null;
-  disposition_reason?: string | null;
-};
-
-export type AlertQueue = {
-  alerts: AlertView[];
-  detection_last_ran_at: string | null;
-};
-
-export type StaffSessionRequest = {
-  user_ref: string;
-  roles: string[];
-  step_up?: boolean;
-};
-
-export type StaffLoginRequest = {
-  username: string;
-  password: string;
-  step_up_code?: string;
-};
-
 function resolveBase(baseUrl?: string): string {
   const fromEnv =
     typeof process !== "undefined"
@@ -324,6 +91,34 @@ function readCsrfCookie(): string | null {
   return found ? decodeURIComponent(found.slice(CSRF_COOKIE.length + 1)) : null;
 }
 
+/** Fill `{placeholders}` in a path template, encoding each value. */
+export function expandPath(template: string, params?: Record<string, unknown>): string {
+  return template.replace(/\{([^}]+)\}/g, (_, name: string) => {
+    const value = params?.[name];
+    if (value === undefined || value === null) {
+      throw new Error(`missing path parameter "${name}" for ${template}`);
+    }
+    return encodeURIComponent(String(value));
+  });
+}
+
+function queryString(query?: Record<string, unknown>): string {
+  if (!query) return "";
+  const out = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== "") out.set(key, String(value));
+  }
+  const text = out.toString();
+  return text ? `?${text}` : "";
+}
+
+/** What a caller may pass for one route. Every part is typed from the schema. */
+type CallOptions<P extends ApiPath, M extends HttpMethod> = {
+  path?: PathParamsOf<P, M>;
+  query?: QueryOf<P, M>;
+  body?: BodyOf<P, M>;
+};
+
 export class ClarityClient {
   private baseUrl: string;
   private token?: string;
@@ -343,10 +138,7 @@ export class ClarityClient {
     this.token = token;
   }
 
-  private async request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<T> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     if (!headers.has("Content-Type") && init.body) {
       headers.set("Content-Type", "application/json");
@@ -407,15 +199,66 @@ export class ClarityClient {
     return (await res.json()) as T;
   }
 
-  health(): Promise<{ status: string }> {
-    return this.request("/health");
+  /**
+   * The one way a route is called. `path` must be a path the schema defines,
+   * `method` one that path defines, and the params, query and body are the
+   * schema's. The result is the schema's success body, so nothing here can
+   * disagree with the backend without `tsc` failing after `sdk:generate`.
+   */
+  private call<P extends ApiPath, M extends MethodsOf<P>>(
+    method: M,
+    path: P,
+    options: CallOptions<P, M> = {},
+  ): Promise<SuccessBody<P, M>> {
+    return this.request<SuccessBody<P, M>>(
+      `${expandPath(path, options.path as Record<string, unknown> | undefined)}${queryString(
+        options.query as Record<string, unknown> | undefined,
+      )}`,
+      {
+        method: method.toUpperCase(),
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      },
+    );
   }
 
+  /**
+   * Like `call`, for a route whose response the backend publishes no model for
+   * (it returns an open dictionary). The caller states the shape; the route
+   * itself is still checked against the schema, and the trailing guard stops
+   * this being used on a route the schema does type.
+   */
+  private declared<R, P extends ApiPath, M extends MethodsOf<P>>(
+    method: M,
+    path: P,
+    options: CallOptions<P, M> = {},
+    ..._open: OnlyIfOpen<P, M>
+  ): Promise<R> {
+    return this.call(method, path, options) as unknown as Promise<R>;
+  }
+
+  /**
+   * The generated `SessionView` marks `roles` and `permissions` optional
+   * because the server defaults them; the API always sends both, so callers
+   * get arrays and never have to guard.
+   */
+  private session(pending: Promise<components["schemas"]["SessionView"]>): Promise<SessionView> {
+    return pending.then((view) => ({
+      ...view,
+      roles: view.roles ?? [],
+      permissions: view.permissions ?? [],
+    }));
+  }
+
+  /* ------------------------------------------------------------ platform */
+
+  health(): Promise<{ status: string }> {
+    return this.declared("get", "/health");
+  }
+
+  /* ---------------------------------------------------------------- auth */
+
   requestOtp(msisdn: string): Promise<OtpRequestResult> {
-    return this.request("/v1/auth/otp/request", {
-      method: "POST",
-      body: JSON.stringify({ msisdn }),
-    });
+    return this.declared("post", "/v1/auth/otp/request", { body: { msisdn } });
   }
 
   /**
@@ -427,7 +270,7 @@ export class ClarityClient {
    * way to complete a sign-in in the prototype.
    */
   demoInbox(msisdn: string): Promise<{ code: string; msisdn?: string; text?: string }> {
-    return this.request(`/v1/demo/inbox?msisdn=${encodeURIComponent(msisdn)}`);
+    return this.declared("get", "/v1/demo/inbox", { query: { msisdn } });
   }
 
   /**
@@ -438,55 +281,92 @@ export class ClarityClient {
    * customer-web sign-in never worked: the login page caught the error and
    * wrote a placeholder token, which hid it.
    */
-  verifyOtp(challengeId: string, code: string): Promise<OtpVerifyResult> {
-    return this.request("/v1/auth/otp/verify", {
-      method: "POST",
-      body: JSON.stringify({ challenge_id: challengeId, code }),
-    });
+  verifyOtp(challengeId: string, code: string): Promise<SessionView> {
+    return this.session(
+      this.call("post", "/v1/auth/otp/verify", {
+        body: { challenge_id: challengeId, code, channel: "web" },
+      }),
+    );
+  }
+
+  refreshSession(refreshToken: string): Promise<SessionView> {
+    return this.session(
+      this.call("post", "/v1/auth/refresh", { body: { refresh_token: refreshToken } }),
+    );
   }
 
   staffSession(body: StaffSessionRequest): Promise<SessionView> {
-    return this.request("/v1/auth/staff/session", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    return this.session(
+      this.call("post", "/v1/auth/staff/session", { body: { step_up: false, ...body } }),
+    );
   }
 
   /** Directory sign-in. The server assigns the role. Synthetic profiles only. */
   staffLogin(body: StaffLoginRequest): Promise<SessionView> {
-    return this.request("/v1/auth/staff/login", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    return this.session(
+      this.call("post", "/v1/auth/staff/login", { body: { step_up_code: "", ...body } }),
+    );
   }
 
   whoami(): Promise<SessionView> {
-    return this.request("/v1/auth/me");
+    return this.session(this.call("get", "/v1/auth/me"));
   }
+
+  /** Which staff sign-in paths this deployment offers. Public. */
+  signInMethods(): Promise<SignInMethods> {
+    return this.declared("get", "/v1/auth/sign-in-methods");
+  }
+
+  /** Revokes the session on the server and clears the cookie. */
+  logout(): Promise<LogoutResult> {
+    return this.declared("post", "/v1/auth/logout");
+  }
+
+  /**
+   * Ask the provider to re-authenticate before an approval (B2). Returns where
+   * to send the browser; nothing is granted by this call itself.
+   */
+  stepUp(returnTo: string): Promise<StepUpResult> {
+    return this.declared("post", "/v1/auth/staff/step-up", { query: { return_to: returnTo } });
+  }
+
+  /** Where the browser goes to sign in through the provider. A redirect, not a fetch. */
+  oidcStartUrl(returnTo: string): string {
+    return `${this.baseUrl}/v1/auth/staff/oidc/start${queryString({ return_to: returnTo })}`;
+  }
+
+  /** The signed-in person's own live sessions. Never carries a token. */
+  listSessions(): Promise<{ sessions: SessionRecord[] }> {
+    return this.declared("get", "/v1/auth/sessions");
+  }
+
+  /** Sign out everywhere. `keepCurrent` leaves this device signed in. */
+  endOtherSessions(keepCurrent = true): Promise<{ ended: number; kept_current: boolean }> {
+    return this.declared("delete", "/v1/auth/sessions", { query: { keep_current: keepCurrent } });
+  }
+
+  /* --------------------------------------------------------------- cases */
 
   deskQueue(): Promise<QueueItem[]> {
-    return this.request("/v1/desk/queue");
+    return this.call("get", "/v1/desk/queue");
   }
 
-  createCase(body: Record<string, unknown>): Promise<CasePayload> {
-    return this.request("/v1/cases", {
-      method: "POST",
-      body: JSON.stringify(body),
+  createCase(body: OpenCaseBody): Promise<CaseSummary> {
+    return this.call("post", "/v1/cases", {
+      body: { channel: "web", language: "en", customer_requested_human: false, ...body },
     });
   }
 
-  getCase(caseId: string): Promise<CasePayload> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}`);
+  getCase(caseId: string): Promise<CaseSummary> {
+    return this.call("get", "/v1/cases/{case_id}", { path: { case_id: caseId } });
   }
 
-  evaluateCase(caseId: string): Promise<DecisionPayload> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/evaluate`, {
-      method: "POST",
-    });
+  evaluateCase(caseId: string): Promise<DecisionView> {
+    return this.call("post", "/v1/cases/{case_id}/evaluate", { path: { case_id: caseId } });
   }
 
-  caseTimeline(caseId: string): Promise<TimelinePayload> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/timeline`);
+  caseTimeline(caseId: string): Promise<TimelineView> {
+    return this.call("get", "/v1/cases/{case_id}/timeline", { path: { case_id: caseId } });
   }
 
   /**
@@ -496,89 +376,145 @@ export class ClarityClient {
    * it so a handoff carries what was already explained.
    */
   caseTranscript(caseId: string): Promise<TranscriptPayload> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/transcript`);
+    return this.declared("get", "/v1/cases/{case_id}/transcript", { path: { case_id: caseId } });
   }
 
-  proposeCase(
-    caseId: string,
-    body: Record<string, unknown> = { created_by: "desk:console" },
-  ): Promise<ProposalPayload> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/proposals`, {
-      method: "POST",
-      body: JSON.stringify(body),
+  proposeCase(caseId: string, body: ProposeBody = { created_by: "desk:console" }): Promise<PlanView> {
+    return this.call("post", "/v1/cases/{case_id}/proposals", {
+      path: { case_id: caseId },
+      body: { created_by: "desk:console", ...body },
     });
   }
 
-  approveCase(
-    caseId: string,
-    body: { plan_id: string; role: string },
-  ): Promise<ApproveResult> {
-    return this.request(`/v1/cases/${encodeURIComponent(caseId)}/approve`, {
-      method: "POST",
-      body: JSON.stringify(body),
+  /** Staff approval of a plan. */
+  approveCase(caseId: string, body: { plan_id: string; role: string }): Promise<ApproveResult> {
+    return this.declared("post", "/v1/cases/{case_id}/approve", {
+      path: { case_id: caseId },
+      body,
     });
   }
 
-  getReceipt(receiptId: string): Promise<ReceiptPayload> {
-    return this.request(`/v1/receipts/${encodeURIComponent(receiptId)}`);
-  }
-
-  verifyReceipt(receiptId: string): Promise<ReceiptPayload> {
-    return this.request(`/v1/receipts/${encodeURIComponent(receiptId)}/verify`, {
-      method: "POST",
+  /** The customer confirms a one-tap plan. */
+  confirmCase(caseId: string, planId: string): Promise<ExecutionView> {
+    return this.call("post", "/v1/cases/{case_id}/confirm", {
+      path: { case_id: caseId },
+      body: { plan_id: planId },
     });
   }
+
+  /* ------------------------------------------------------------ receipts */
+
+  getReceipt(receiptId: string): Promise<SignedReceipt> {
+    return this.declared("get", "/v1/receipts/{receipt_id}", { path: { receipt_id: receiptId } });
+  }
+
+  verifyReceipt(receiptId: string): Promise<VerificationView> {
+    return this.call("post", "/v1/receipts/{receipt_id}/verify", {
+      path: { receipt_id: receiptId },
+    });
+  }
+
+  /* ------------------------------------------------------ the customer ("me") */
+
+  /** The one customer read: every screen renders this payload. */
+  myApp(): Promise<CustomerApp> {
+    return this.declared("get", "/v1/me/app");
+  }
+
+  myHome(): Promise<CustomerHome> {
+    return this.declared("get", "/v1/me/home");
+  }
+
+  myCases(): Promise<MyCaseRow[]> {
+    return this.declared("get", "/v1/me/cases");
+  }
+
+  myReceipts(): Promise<CustomerReceiptRow[]> {
+    return this.declared("get", "/v1/me/receipts");
+  }
+
+  /** Each write below returns the refreshed `CustomerApp`. */
+  reload(amountLkr: string): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/reload", { body: { amount_lkr: amountLkr } });
+  }
+
+  purchasePackage(offeringId: string): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/packages/{offering_id}/purchase", {
+      path: { offering_id: offeringId },
+    });
+  }
+
+  cancelSubscription(subscriptionId: string): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/subscriptions/{subscription_id}/cancel", {
+      path: { subscription_id: subscriptionId },
+    });
+  }
+
+  setSafeguard(kind: SafeguardKind, value: string): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/safeguards", { body: { kind, value } });
+  }
+
+  addFamilyMember(msisdn: string): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/family", { body: { msisdn } });
+  }
+
+  savePreferences(body: PreferencesBody): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/preferences", {
+      body: { large_text: false, notify: "important", ...body },
+    });
+  }
+
+  /* ---------------------------------------------------------------- demo */
 
   demoSubscribers(): Promise<DemoSubscriber[]> {
-    return this.request("/v1/demo/subscribers");
+    return this.call("get", "/v1/demo/subscribers");
   }
 
   demoReset(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/reset", { method: "POST" });
+    return this.declared("post", "/v1/demo/reset");
   }
 
   demoOps(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/ops");
+    return this.declared("get", "/v1/demo/ops");
   }
 
   demoAutopsy(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/autopsy");
+    return this.declared("get", "/v1/demo/autopsy");
   }
 
   demoForesight(): Promise<Record<string, unknown>> {
-    return this.request("/v1/demo/foresight");
+    return this.declared("get", "/v1/demo/foresight");
   }
 
   /** Seed one evaluated case per demo subscriber (Desk "Create demo cases"). */
   async demoSeed(): Promise<number> {
     const people = await this.demoSubscribers();
     for (const person of people) {
-      const opened = await this.createCase({
-        msisdn: person.msisdn,
-        channel: "whatsapp",
-      });
-      const caseId = opened.case_id || opened.id;
-      if (caseId) await this.evaluateCase(String(caseId));
+      const opened = await this.createCase({ msisdn: person.msisdn, channel: "whatsapp" });
+      await this.evaluateCase(opened.case_id);
     }
     return people.length;
   }
 
+  /* --------------------------------------------------------------- admin */
+
   listSwitches(): Promise<SwitchStateView> {
-    return this.request("/v1/admin/switches");
+    return this.declared("get", "/v1/admin/switches");
   }
 
-  flipSwitch(body: {
-    key: string;
-    enabled: boolean;
+  flipSwitch(body: { key: string; enabled: boolean; reason: string }): Promise<SwitchStateView> {
+    return this.declared("post", "/v1/admin/switches", { body });
+  }
+
+  suspendMerchant(body: {
+    merchant_id: string;
     reason: string;
-  }): Promise<SwitchStateView> {
-    return this.request("/v1/admin/switches", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    subscriber_msisdn?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.declared("post", "/v1/admin/merchants/suspend", { body });
   }
 
-  // -- audit assurance (plan 5.8) ------------------------------------------ //
+  /* ------------------------------------------- audit assurance (plan 5.8) */
 
   /**
    * Chain health. Deliberately *not* recorded as `audit.read` by the server: a
@@ -586,7 +522,7 @@ export class ClarityClient {
    * the `mass_audit_read` rule. Reading the trail itself is recorded.
    */
   auditHealth(): Promise<AuditHealth> {
-    return this.request("/v1/audit/health");
+    return this.declared("get", "/v1/audit/health");
   }
 
   /** The trail. This one *is* recorded: who looked, with which filters. */
@@ -597,40 +533,35 @@ export class ClarityClient {
     after_seq?: number;
     limit?: number;
   }): Promise<AuditTrailPage> {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params || {})) {
-      if (value !== undefined && value !== "") query.set(key, String(value));
-    }
-    const suffix = query.toString();
-    return this.request(`/v1/audit${suffix ? `?${suffix}` : ""}`);
+    return this.declared("get", "/v1/audit", { query: params });
   }
 
   auditRecovery(): Promise<AuditRecovery> {
-    return this.request("/v1/audit/recovery");
+    return this.declared("get", "/v1/audit/recovery");
   }
 
   /** Recompute one record's hashes. Changes nothing. */
   verifyAuditRecord(seq: number): Promise<AuditRecordVerdict> {
-    return this.request(`/v1/audit/records/${seq}/verify`, { method: "POST" });
+    return this.declared("post", "/v1/audit/records/{seq}/verify", { path: { seq } });
   }
 
   listAuditGrants(): Promise<{ grants: AuditGrantView[] }> {
-    return this.request("/v1/audit/grants");
+    return this.declared("get", "/v1/audit/grants");
   }
 
   listAlerts(openOnly = false): Promise<AlertQueue> {
-    return this.request(`/v1/assurance/alerts?open_only=${openOnly}`);
+    return this.declared("get", "/v1/assurance/alerts", { query: { open_only: openOnly } });
   }
 
   acknowledgeAlert(alertId: string): Promise<AlertView> {
-    return this.request(`/v1/assurance/alerts/${alertId}/acknowledge`, {
-      method: "POST",
+    return this.declared("post", "/v1/assurance/alerts/{alert_id}/acknowledge", {
+      path: { alert_id: alertId },
     });
   }
 
   investigateAlert(alertId: string): Promise<AlertView> {
-    return this.request(`/v1/assurance/alerts/${alertId}/investigate`, {
-      method: "POST",
+    return this.declared("post", "/v1/assurance/alerts/{alert_id}/investigate", {
+      path: { alert_id: alertId },
     });
   }
 
@@ -638,20 +569,9 @@ export class ClarityClient {
     alertId: string,
     body: { disposition: string; reason: string },
   ): Promise<AlertView> {
-    return this.request(`/v1/assurance/alerts/${alertId}/dispose`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-  }
-
-  suspendMerchant(body: {
-    merchant_id: string;
-    reason: string;
-    subscriber_msisdn?: string;
-  }): Promise<Record<string, unknown>> {
-    return this.request("/v1/admin/merchants/suspend", {
-      method: "POST",
-      body: JSON.stringify(body),
+    return this.declared("post", "/v1/assurance/alerts/{alert_id}/dispose", {
+      path: { alert_id: alertId },
+      body,
     });
   }
 }
