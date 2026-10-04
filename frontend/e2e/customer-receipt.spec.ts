@@ -36,7 +36,7 @@ test.describe("the customer's receipt page", () => {
     // signature, not the page assuming a pass.
     await expect(result).toHaveAttribute("data-verified", "true");
     await expect(result.getByText(receiptId)).toBeVisible();
-    await expect(result.getByText("Verified")).toBeVisible();
+    await expect(result.getByText("Verified", { exact: true })).toBeVisible();
     await expect(result.getByText("Intact")).toBeVisible();
   });
 
