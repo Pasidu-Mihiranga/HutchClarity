@@ -1122,17 +1122,21 @@ def _register_routes(app: FastAPI) -> None:
                 detail={"outcome": outcome, "channel": "sms"},
             )
 
-        if account is None:
-            requested("unknown_number")
-            raise HTTPException(status_code=404, detail="We could not find this Hutch number.")
-
+        # The same answer whether or not the number is a subscriber. A 404 here
+        # let anyone test which numbers are HUTCH customers, one request at a
+        # time, with no credentials: `OtpRefused` states the rule for the module
+        # ("a specific one would tell an attacker whether a number exists") and
+        # the channel gateway already keeps it. A challenge is issued either
+        # way, so the body, the timing and the rate limit are the same for both;
+        # an unknown number then fails `verify` like any wrong code. The trail
+        # still records which it was, because the trail is not the attacker.
         try:
             challenge_id = clarity.otp.request(msisdn)
         except OtpRefused as error:
             requested("refused")
             raise HTTPException(status_code=429, detail=str(error)) from error
 
-        requested("sent", challenge_id)
+        requested("sent" if account is not None else "unknown_number", challenge_id)
         return {
             "challenge_id": challenge_id,
             "sent_to": mask_msisdn(msisdn),
