@@ -34,6 +34,7 @@ from urllib.parse import urlencode, urlparse
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
+from clarity.app.container import Profile
 from clarity.interfaces.http import trail
 from clarity.interfaces.http.auth import ANONYMOUS, current_principal, requires
 from clarity.interfaces.http.cookies import ID_TOKEN_COOKIE, STAFF_COOKIE
@@ -132,6 +133,28 @@ def register(app: FastAPI) -> None:
             # `demo_only` uses 404.
             raise HTTPException(status_code=404, detail="not found")
         return clarity.oidc
+
+    @app.get("/v1/auth/sign-in-methods", tags=["auth"])
+    def sign_in_methods(clarity: ClarityDep) -> dict[str, Any]:
+        """How staff may sign in to this deployment.
+
+        The console has to know, because the two paths look nothing alike: one
+        is a redirect to the provider, the other a form. Asking is better than
+        guessing, and better than the console carrying its own build-time
+        setting that can disagree with what the API is actually configured for.
+
+        Public: it names mechanisms, not people, and a caller who cannot sign
+        in learns only what they would see on the sign-in screen anyway.
+        """
+        return {
+            "provider": clarity.oidc is not None,
+            "directory": clarity.staff_directory is not None,
+            # The role picker is the development fallback, and it is already
+            # 404 in `prod` and gone once a directory is configured.
+            "development_role_picker": (
+                clarity.staff_directory is None and clarity.profile is not Profile.PROD
+            ),
+        }
 
     @app.get("/v1/auth/staff/oidc/start", tags=["auth"])
     def start(clarity: ClarityDep, return_to: str = "/") -> RedirectResponse:

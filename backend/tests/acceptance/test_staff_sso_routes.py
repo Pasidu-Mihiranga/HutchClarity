@@ -289,3 +289,35 @@ def test_one_person_cannot_end_another_persons_sessions() -> None:
     api.request("DELETE", "/v1/auth/sessions", params={"keep_current": False})
 
     assert clarity.tokens.verify(theirs.value).ref == "agent-1"
+
+
+# --------------------------------------------------------------------------- #
+# What the console asks before it draws a sign-in screen
+# --------------------------------------------------------------------------- #
+
+
+def test_sign_in_methods_reports_the_provider_when_configured(configured: TestClient) -> None:
+    found = configured.get("/v1/auth/sign-in-methods")
+
+    assert found.status_code == 200
+    assert found.json()["provider"] is True
+
+
+def test_sign_in_methods_reports_no_provider_when_it_is_not(unconfigured: TestClient) -> None:
+    """The console must not offer a button that leads to a 404."""
+    found = unconfigured.get("/v1/auth/sign-in-methods")
+
+    assert found.json()["provider"] is False
+
+
+def test_sign_in_methods_needs_no_session(unconfigured: TestClient) -> None:
+    """It is read before anybody has signed in, which is the whole point."""
+    assert unconfigured.get("/v1/auth/sign-in-methods").status_code == 200
+
+
+def test_sign_in_methods_names_mechanisms_and_not_people(configured: TestClient) -> None:
+    """Public, so it must say nothing about who can sign in."""
+    body = configured.get("/v1/auth/sign-in-methods").json()
+
+    assert set(body) == {"provider", "directory", "development_role_picker"}
+    assert all(isinstance(value, bool) for value in body.values())

@@ -21,6 +21,8 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **The staff console signs in through the provider** (B1, B2). `GET /v1/auth/sign-in-methods` reports which paths a deployment offers, so the console shows what the API will actually accept rather than what it was built expecting; where a provider is configured it offers "Sign in with HUTCH SSO", and a signed-in session that is not stepped up offers "Re-authenticate", which is the first caller the step-up route has ever had. Signing out now tells the API and follows the provider's logout, rather than only clearing what the page can see.
+
 - **CSRF protection for cookie-borne sessions** (B4). A double-submit token: the API sets a readable `clarity_csrf` cookie beside the session, and a state-changing request relying on a cookie must echo it in `X-CSRF-Token`. A request carrying a bearer token is exempt, because another origin cannot make a browser send a header it does not know. Sign-in routes and the POSTs the trail already declares read-only are exempt too.
 - **The customer session is an `HttpOnly` cookie**, set by `POST /v1/auth/otp/verify`. The token stayed in `sessionStorage`, readable by any script on the page, and it is the credential that opens a dispute and confirms a refund. The response body still carries the token, because the WhatsApp gateway and the MCP server are not browsers.
 

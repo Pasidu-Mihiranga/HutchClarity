@@ -720,6 +720,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/sign-in-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign In Methods
+         * @description How staff may sign in to this deployment.
+         *
+         *     The console has to know, because the two paths look nothing alike: one
+         *     is a redirect to the provider, the other a form. Asking is better than
+         *     guessing, and better than the console carrying its own build-time
+         *     setting that can disagree with what the API is actually configured for.
+         *
+         *     Public: it names mechanisms, not people, and a caller who cannot sign
+         *     in learns only what they would see on the sign-in screen anyway.
+         */
+        get: operations["sign_in_methods_v1_auth_sign_in_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/staff/login": {
         parameters: {
             query?: never;
@@ -3527,6 +3555,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_in_methods_v1_auth_sign_in_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

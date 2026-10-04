@@ -26,11 +26,29 @@ type StaffSessionContextValue = {
   restoring: boolean;
   error: string | null;
   signIn: (username: string, password: string, stepUpCode: string) => Promise<boolean>;
+  /** Send the browser to the provider to sign in (B1). */
+  signInWithProvider: () => void;
+  /** Ask the provider to re-authenticate before an approval (B2). */
+  stepUpWithProvider: () => Promise<void>;
+  /** Which sign-in paths this deployment offers. Null until it has answered. */
+  methods: SignInMethods | null;
   signOut: () => void;
   hasPermission: (...perms: string[]) => boolean;
   refresh: () => Promise<void>;
   generation: number;
 };
+
+export type SignInMethods = {
+  /** Keycloak, or whichever provider this deployment federates. */
+  provider: boolean;
+  /** The simulated staff directory: a username and password. */
+  directory: boolean;
+  /** The development role picker, which has no credential at all. */
+  development_role_picker: boolean;
+};
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 const StaffSessionContext = createContext<StaffSessionContextValue | null>(null);
 
@@ -56,6 +74,7 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
   const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
+  const [methods, setMethods] = useState<SignInMethods | null>(null);
 
   const applySession = useCallback(
     (token: string, me: SessionView) => {
@@ -68,33 +87,106 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(() => {
-    client.setToken(undefined);
-    setSession(null);
-    writeStored(null);
-    setGeneration((g) => g + 1);
-    setError(null);
+    const clearLocally = () => {
+      client.setToken(undefined);
+      setSession(null);
+      writeStored(null);
+      setGeneration((g) => g + 1);
+      setError(null);
+    };
+
+    // Tell the API, so the session is revoked and the cookie cleared, and
+    // follow the provider's logout when there is one. Clearing only what this
+    // page can see would leave the session alive on the server and the
+    // provider's own cookie untouched, so the next visit would return
+    // instantly with nothing asked for.
+    void fetch(`${API_BASE}/v1/auth/logout`, { method: "POST", credentials: "include" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ provider_logout?: string }>) : null))
+      .then((body) => {
+        clearLocally();
+        if (body?.provider_logout) window.location.assign(body.provider_logout);
+      })
+      .catch(clearLocally);
   }, [client]);
 
-  useEffect(() => {
-    const token = readStored();
-    if (!token) {
-      setRestoring(false);
-      return;
+  const signInWithProvider = useCallback(() => {
+    const here = window.location.pathname + window.location.search;
+    window.location.assign(
+      `${API_BASE}/v1/auth/staff/oidc/start?return_to=${encodeURIComponent(here)}`,
+    );
+  }, []);
+
+  const stepUpWithProvider = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const here = window.location.pathname + window.location.search;
+      const res = await fetch(
+        `${API_BASE}/v1/auth/staff/step-up?return_to=${encodeURIComponent(here)}`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) throw new Error("step-up is not available");
+      const { redirect_to } = (await res.json()) as { redirect_to: string };
+      // The provider re-authenticates and sends the browser back here with a
+      // stronger session. Nothing is granted by this call itself.
+      window.location.assign(redirect_to);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Step-up failed");
+      setBusy(false);
     }
-    client.setToken(token);
+  }, []);
+
+  // Which sign-in paths exist here. Asked rather than assumed: a console that
+  // decided from its own build-time setting would show a provider button on a
+  // deployment with no provider configured, and a password form on one where
+  // the password routes are gone.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${API_BASE}/v1/auth/sign-in-methods`, { credentials: "include" })
+      .then((res) => (res.ok ? (res.json() as Promise<SignInMethods>) : null))
+      .then((found) => {
+        if (!cancelled && found) setMethods(found);
+      })
+      .catch(() => {
+        /* the sign-in screen falls back to showing the form */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Restoring a session.
+  //
+  // Two carriers now. A sign-in through the provider leaves an `HttpOnly`
+  // cookie the browser sends on its own and this code cannot read, so the only
+  // way to know whether one exists is to ask. A token in `sessionStorage` is
+  // the older path, still used by the development sign-in, and it is tried
+  // first because it is the one this code can see.
+  useEffect(() => {
+    let cancelled = false;
+    const token = readStored();
+    if (token) client.setToken(token);
+
     void client
       .whoami()
       .then((me) => {
-        setSession({ ...me, token });
+        if (cancelled) return;
+        setSession(token ? { ...me, token } : me);
         setGeneration((g) => g + 1);
       })
       .catch(() => {
+        if (cancelled) return;
+        // Neither carrier produced a session. Clear the one we can.
         writeStored(null);
         client.setToken(undefined);
       })
       .finally(() => {
-        setRestoring(false);
+        if (!cancelled) setRestoring(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [client]);
 
   const signIn = useCallback(
@@ -154,6 +246,9 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       restoring,
       error,
       signIn,
+      signInWithProvider,
+      stepUpWithProvider,
+      methods,
       signOut,
       hasPermission,
       refresh,
@@ -168,6 +263,9 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
       restoring,
       error,
       signIn,
+      signInWithProvider,
+      stepUpWithProvider,
+      methods,
       signOut,
       hasPermission,
       refresh,
