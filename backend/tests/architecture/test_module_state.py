@@ -139,7 +139,10 @@ def test_no_module_accumulates_business_state_in_an_attribute() -> None:
     for path in sorted(MODULES.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
-        relative = str(path.relative_to(MODULES))
+        # `as_posix`, not `str`: on Windows the latter separates with a
+        # backslash, so no key ever matched the forward-slash DEFERRED map and
+        # an already-recorded attribute was reported as a new offender.
+        relative = path.relative_to(MODULES).as_posix()
         kept = [
             attribute
             for attribute in _collection_attributes(path)

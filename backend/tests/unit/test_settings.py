@@ -7,6 +7,8 @@ on the first request that happens to need the value.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from clarity.app.container import Clarity, Profile
@@ -97,7 +99,12 @@ def test_configured_signing_key_survives_a_restart(tmp_path) -> None:
     first_public_keys = first.signing.public_keys()
     second = Clarity(settings=settings)
 
-    assert key_path.stat().st_mode & 0o777 == 0o600
+    # POSIX mode only. NTFS does not carry one, so `chmod` is a no-op on
+    # Windows and the file reads back 0o666 however it was created. The
+    # control is real on the Linux host that runs the deployment and on CI;
+    # asserting it here would only fail for the platform, not the code.
+    if os.name != "nt":
+        assert key_path.stat().st_mode & 0o777 == 0o600
     assert second.signing.public_keys() == first_public_keys
 
 

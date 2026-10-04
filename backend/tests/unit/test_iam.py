@@ -6,6 +6,7 @@ case. These tests are the evidence that it no longer is.
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 
 import httpx
@@ -730,7 +731,12 @@ def test_a_persisted_issuer_key_keeps_sessions_across_a_restart(tmp_path):
     after = TokenIssuer(open_unit=lambda: MemoryUnitOfWork(store), key_path=key_path)
 
     assert after.verify(issued.value).subscriber_ref == "sub_a"
-    assert key_path.stat().st_mode & 0o777 == 0o600
+    # POSIX mode only. NTFS does not carry one, so `chmod` is a no-op on
+    # Windows and the file reads back 0o666 however it was created. The
+    # control is real on the Linux host that runs the deployment and on CI;
+    # asserting it here would only fail for the platform, not the code.
+    if os.name != "nt":
+        assert key_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_processes_starting_together_share_one_issuer_key(tmp_path):
