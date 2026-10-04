@@ -124,7 +124,7 @@ def test_a_non_string_case_claim_is_refused():
     assert error.value.code == "INVALID_CASE_CLAIM"
 
 
-@pytest.mark.parametrize("subject", ["+94771234567", "94771234567", "0771234567"])
+@pytest.mark.parametrize("subject", ["+94781234567", "94781234567", "0781234567"])
 def test_a_subject_that_is_a_phone_number_is_refused(subject: str):
     """The subject is a pseudonym, never an MSISDN.
 

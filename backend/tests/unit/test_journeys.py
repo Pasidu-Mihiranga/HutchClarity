@@ -21,10 +21,10 @@ from clarity.modules.timeline.builder import TimelineBuilder
 from clarity.platform.config.resolver import PolicyResolver
 from tests.conftest import snapshot_for
 
-DILANI = "+94771234567"  # VAS charged with no consent
-NIMAL = "+94772223333"  # reload taken twice
-KUMAR = "+94773334444"  # "unlimited" hit a disclosed FUP cap
-PRIYA = "+94774445555"  # large reload not credited, recent SIM swap
+DILANI = "+94781234567"  # VAS charged with no consent
+NIMAL = "+94782223333"  # reload taken twice
+KUMAR = "+94783334444"  # "unlimited" hit a disclosed FUP cap
+PRIYA = "+94784445555"  # large reload not credited, recent SIM swap
 
 
 def run(

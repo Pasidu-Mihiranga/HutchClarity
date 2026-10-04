@@ -613,10 +613,10 @@ def _register_routes(app: FastAPI) -> None:
     def demo_subscribers(clarity: ClarityDep) -> list[DemoSubscriber]:
         """Prototype only: the synthetic customers shipped with the demo."""
         scenarios = {
-            "+94771234567": "VAS charged with no consent",
-            "+94772223333": "Reload taken twice",
-            "+94773334444": "'Unlimited' hit a fair-use cap",
-            "+94774445555": "Large reload not credited, recent SIM swap",
+            "+94781234567": "VAS charged with no consent",
+            "+94782223333": "Reload taken twice",
+            "+94783334444": "'Unlimited' hit a fair-use cap",
+            "+94784445555": "Large reload not credited, recent SIM swap",
         }
         return [
             DemoSubscriber(
@@ -1146,7 +1146,7 @@ def _register_routes(app: FastAPI) -> None:
         principal: Annotated[Principal, Depends(requires(Permission.MERCHANT_SUSPEND))],
     ) -> dict[str, Any]:
         """Block a merchant on a demo subscriber (simulated). Needs step-up."""
-        msisdn = body.subscriber_msisdn or "0771234567"
+        msisdn = body.subscriber_msisdn or "0781234567"
         try:
             normalised = normalise_msisdn(msisdn)
         except ValueError as error:

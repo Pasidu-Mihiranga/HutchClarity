@@ -61,9 +61,9 @@ def test_personal_data_is_masked_before_anything_else_reads_it():
     """Deck S11 step 1: mask PII first, then understand."""
     autopsy = ComplaintAutopsy()
 
-    cleaned, _, _ = autopsy.clean(complaints("call me on 0771234567, my VAS charge is wrong"))
+    cleaned, _, _ = autopsy.clean(complaints("call me on 0781234567, my VAS charge is wrong"))
 
-    assert "0771234567" not in cleaned[0].masked_text
+    assert "0781234567" not in cleaned[0].masked_text
     assert "<PHONE_1>" in cleaned[0].masked_text
 
 
@@ -541,7 +541,7 @@ def test_only_masked_text_is_stored():
     """
     from clarity.modules.autopsy.public import AutopsyService
 
-    source = FakeComplaints(c9="call me on 0771234567 about the double charge")
+    source = FakeComplaints(c9="call me on 0781234567 about the double charge")
     service = AutopsyService(source=source)
 
     service.accept("c9")
@@ -549,7 +549,7 @@ def test_only_masked_text_is_stored():
     with service._open_unit() as unit:
         stored = unit.repository("autopsy.complaints").values()
     assert stored, "nothing was stored"
-    assert "0771234567" not in stored[0].masked_text
+    assert "0781234567" not in stored[0].masked_text
     assert not hasattr(stored[0], "text"), "the raw text travelled with the record"
 
 

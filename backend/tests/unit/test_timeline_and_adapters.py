@@ -19,7 +19,7 @@ from clarity.integration.registry import AdapterRegistry, NotYetIntegrated
 from clarity.kernel.common import Completeness, EventSource
 from clarity.modules.timeline.builder import TimelineBuilder, TimelineRequest
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 
 
 def test_timeline_joins_every_source_into_one_ordered_file(builder: TimelineBuilder):

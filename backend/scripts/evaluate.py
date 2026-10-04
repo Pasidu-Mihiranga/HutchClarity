@@ -70,7 +70,7 @@ RAG_AS_OF = datetime(2026, 10, 3, tzinfo=UTC)
 RAG_EFFECTIVE_FROM = datetime(2025, 1, 1, tzinfo=UTC)
 
 #: The subscriber the safety run opens its cases against (simulated world).
-SUBJECT = "+94771234567"
+SUBJECT = "+94781234567"
 
 #: Why a gate has no dataset. These are not excuses: each names the issue that
 #: will bring the dataset, and until then the gate blocks.

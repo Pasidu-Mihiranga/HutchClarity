@@ -26,8 +26,8 @@ from clarity.modules.resolution.public import ResolutionService
 
 from ..support.repositories import confirmations
 
-DILANI = "+94771234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
-PRIYA = "+94774445555"  # LKR 12,000 reload, SIM swap: STAFF_APPROVAL
+DILANI = "+94781234567"  # VAS without consent: ONE_TAP_FIX, LKR 49
+PRIYA = "+94784445555"  # LKR 12,000 reload, SIM swap: STAFF_APPROVAL
 REPO = Path(__file__).resolve().parents[3]
 
 

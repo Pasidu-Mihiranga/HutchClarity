@@ -24,7 +24,7 @@ from clarity.interfaces.http.main import CORRELATION_HEADER, create_app
 from clarity.kernel.common import Channel
 from clarity.platform.observability import current_trace_id, tracing
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ def test_spans_carry_identifiers_not_personal_data(spans: InMemorySpanExporter) 
     for finished in spans.get_finished_spans():
         rendered = str(dict(finished.attributes or {}))
         assert DILANI not in rendered, f"{finished.name} carries a raw number"
-        assert "771234567" not in rendered, f"{finished.name} carries a raw number"
+        assert "781234567" not in rendered, f"{finished.name} carries a raw number"
 
 
 def test_there_is_no_trace_id_outside_a_span() -> None:

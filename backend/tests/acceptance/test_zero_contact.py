@@ -11,7 +11,7 @@ from clarity.integration.drivers.mock.world import build_demo_world, ref_for
 from clarity.kernel.common import EventSource
 from clarity.platform.messaging.envelope import Event
 
-NIMAL = "+94772223333"
+NIMAL = "+94782223333"
 
 
 def test_two_captures_one_credit_are_auto_fixed_without_a_human() -> None:

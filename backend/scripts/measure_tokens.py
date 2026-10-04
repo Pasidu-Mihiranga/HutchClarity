@@ -22,10 +22,10 @@ from clarity.integration.drivers.mock.world import ref_for  # noqa: E402
 from clarity.kernel.common import Channel, Language  # noqa: E402
 
 JOURNEYS = [
-    ("VAS charged with no consent", "+94771234567", Language.SI),
-    ("Reload taken twice", "+94772223333", Language.EN),
-    ("'Unlimited' hit a fair-use cap", "+94773334444", Language.TA),
-    ("Large reload not credited", "+94774445555", Language.EN),
+    ("VAS charged with no consent", "+94781234567", Language.SI),
+    ("Reload taken twice", "+94782223333", Language.EN),
+    ("'Unlimited' hit a fair-use cap", "+94783334444", Language.TA),
+    ("Large reload not credited", "+94784445555", Language.EN),
 ]
 
 

@@ -41,7 +41,7 @@ from clarity.modules.actions.layer import ToolLayer
 
 from ..support.repositories import confirmations, tool_layer
 
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 SUBSCRIBER = ref_for(DILANI)
 
 

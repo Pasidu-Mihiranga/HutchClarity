@@ -14,10 +14,10 @@ from clarity.app.container import Clarity
 from clarity.integration.drivers.mock.world import build_demo_world
 from clarity.interfaces.http.main import create_app
 
-DILANI = "+94771234567"  # VAS charged with no consent -> one-tap
-NIMAL = "+94772223333"  # duplicate reload -> auto-fix
-KUMAR = "+94773334444"  # disclosed FUP cap -> explain only
-PRIYA = "+94774445555"  # large reload, SIM swap -> staff approval
+DILANI = "+94781234567"  # VAS charged with no consent -> one-tap
+NIMAL = "+94782223333"  # duplicate reload -> auto-fix
+KUMAR = "+94783334444"  # disclosed FUP cap -> explain only
+PRIYA = "+94784445555"  # large reload, SIM swap -> staff approval
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ def test_public_keys_are_published_for_verification(client: TestClient):
 
 
 def test_unknown_subscriber_is_rejected(client: TestClient):
-    assert client.post("/v1/cases", json={"msisdn": "+94770000000"}).status_code == 404
+    assert client.post("/v1/cases", json={"msisdn": "+94780000000"}).status_code == 404
 
 
 def test_malformed_number_is_rejected(client: TestClient):

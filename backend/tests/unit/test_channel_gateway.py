@@ -33,7 +33,7 @@ from clarity.interfaces.channels.webhooks import WebhookVerifier, sign
 from clarity.interfaces.channels.window import SERVICE_WINDOW, SendKind, ServiceWindows
 
 SECRET = "a-development-signing-secret-not-a-real-one"
-DILANI = "+94771234567"
+DILANI = "+94781234567"
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=UTC)
 
 
@@ -77,7 +77,7 @@ def post(
         # Signed one body, send another. The signature stays valid for the
         # original, which is exactly the attack the raw-bytes check catches.
         sent = json.dumps(
-            {"channel": channel, "msisdn": "+94770000000", "text": text, "thread_id": "t-1"}
+            {"channel": channel, "msisdn": "+94780000000", "text": text, "thread_id": "t-1"}
         ).encode()
     headers = {"content-type": "application/json", DELIVERY_HEADER: delivery}
     if signature is not None:
@@ -209,7 +209,7 @@ def test_a_rejected_webhook_echoes_nothing_from_its_payload(api):
     sent = post(api, text="a-distinctive-string-xyz", signature="sha256=" + "1" * 64)
 
     assert "a-distinctive-string-xyz" not in sent.text
-    assert "94771234567" not in sent.text
+    assert "94781234567" not in sent.text
 
 
 # -- the other half: a good webhook does the work ----------------------- #
@@ -255,7 +255,7 @@ def test_an_unknown_number_opens_nothing_and_reveals_nothing(api, core):
     """
     before = len(core.cases.all_cases())
 
-    body = post(api, msisdn="+94770000000", delivery="d-unknown").json()
+    body = post(api, msisdn="+94780000000", delivery="d-unknown").json()
 
     assert body["accepted"] is True
     assert body["known_subscriber"] is False
@@ -268,7 +268,7 @@ def test_the_case_stores_a_masked_number(api, core):
     body = post(api).json()
 
     record = core.cases.get(body["case_id"])
-    assert "771234567" not in record.case.customer.msisdn_masked
+    assert "781234567" not in record.case.customer.msisdn_masked
     assert "***" in record.case.customer.msisdn_masked
 
 

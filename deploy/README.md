@@ -70,6 +70,25 @@ Restore is deliberate: stop Clarity writers, decompress the selected dump into
 then start and run `healthcheck.sh`. Never restore automatically during an
 application rollback.
 
+## Reseed the synthetic world
+
+The `full` profile seeds the synthetic HUTCH world into PostgreSQL once, then
+reloads it on every start. A release that changes the world itself (for
+example the 078 subscriber numbers) needs a deliberate reseed. `seed.py`
+replaces only the synthetic world tables (customers, accounts, events,
+consents, complaints); cases, receipts and audit are untouched. Back up first:
+
+```bash
+ssh clarity-deploy@116.203.101.73 /opt/hutch-clarity/deploy/scripts/backup.sh
+ssh clarity-deploy@116.203.101.73 \
+  'docker compose --env-file /opt/hutch-clarity/.env.production \
+     -f /opt/hutch-clarity/deploy/compose/vps.yml exec -T clarity-api python -' \
+  < backend/scripts/seed.py
+```
+
+Restart `clarity-api`, `clarity-mcp`, `clarity-channel-gateway` and
+`hutch-sim` afterwards so they load the new world, then run `healthcheck.sh`.
+
 ## CI/CD
 
 The existing `.github/workflows/ci.yml` remains the merge gate. The separate

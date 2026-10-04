@@ -12,10 +12,14 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+# Run from a checkout, `__file__` finds the source tree. Piped into a deployed
+# container (`python - < seed.py`, deploy/README.md) there is no file and the
+# installed package is used instead.
+if "__file__" in globals():
+    ROOT = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(ROOT / "src"))
 
-from clarity.integration.drivers.mock.store import (  # noqa: E402
+from clarity.integration.drivers.mock.store import (
     create_schema,
     reset_engine,
     save_complaints,
@@ -24,12 +28,12 @@ from clarity.integration.drivers.mock.store import (  # noqa: E402
     session_scope,
     upsert_knowledge,
 )
-from clarity.integration.drivers.mock.store.knowledge import KNOWLEDGE_ARTICLES  # noqa: E402
-from clarity.integration.drivers.mock.store.volume import (  # noqa: E402
+from clarity.integration.drivers.mock.store.knowledge import KNOWLEDGE_ARTICLES
+from clarity.integration.drivers.mock.store.volume import (
     generate_complaints,
     generate_volume_customers,
 )
-from clarity.integration.drivers.mock.world import DEMO_NOW, build_demo_world, ref_for  # noqa: E402
+from clarity.integration.drivers.mock.world import DEMO_NOW, build_demo_world, ref_for
 
 
 def main() -> None:
@@ -37,7 +41,7 @@ def main() -> None:
     create_schema()
     world = build_demo_world(now=DEMO_NOW, persist=False)
     generate_volume_customers(world, count=40)
-    dilani_ref = ref_for("+94771234567")
+    dilani_ref = ref_for("+94781234567")
     with session_scope() as session:
         save_world(session, world)
         save_network(

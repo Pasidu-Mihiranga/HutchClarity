@@ -339,7 +339,7 @@ export default function ClarityPage() {
   ) {
     // step 1 - open case
     setCs((s) => ({ ...s, progressStep: 1 }));
-    const opened = await openCase(app.msisdn ?? "0771234567", lang, chargeRef, wantsHuman);
+    const opened = await openCase(app.msisdn ?? "0781234567", lang, chargeRef, wantsHuman);
     const caseId = opened.case_id;
 
     // step 2+3 - evaluate + timeline
