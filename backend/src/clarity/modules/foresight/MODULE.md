@@ -7,33 +7,58 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `public.py`, `simulation.py`, `backtest.py`, `swarm.py` |
+| Files | `public.py`, `catalogue.py`, `simulation.py`, `backtest.py`, `swarm.py` |
 
 ## 1. Purpose
 Foresight: scenario simulation over aggregates only, reported as relative bands, not counts, plus the backtest that measures how wrong the baseline was and refuses to call that a calibration.
 
 ## 2. Public surface (`public.py`)
-Other code imports only `public.py`, including the baseline and backtest names plus F02's `ScenarioRehearsal`, `PersonaSimulator`, `SeededPersonaSimulator`, `SwarmReport` and `Comparison`.
+Other code imports only `public.py`, including the baseline and backtest names plus F02's `ScenarioRehearsal`, `PersonaSimulator`, `SeededPersonaSimulator`, `SwarmReport` and `Comparison`, and C1's `ForesightCatalogue`, `Bands`, `ThemeCatalogue`, `ThemeWeight` and `CatalogueInvalid`.
 
-`Foresight.run(scenario, calibration=None)` returns a `ForesightReport`. `Backtest.run(launches)` replays recorded launch outcomes through the baseline and returns a `CalibrationReport`: mean absolute and signed band error, exact-band rate, top-theme hit rate, the pairs it could not compare, and a status.
+`ForesightCatalogue(policies)` reads the module's parameters from the policy store. It is the only thing `Foresight` and `Backtest` need wired, and the composition root builds one per container.
+
+`Foresight(catalogue, clock=None).run(scenario, calibration=None)` returns a `ForesightReport`. `Backtest(catalogue, clock=None).run(launches)` replays recorded launch outcomes through the baseline and returns a `CalibrationReport`: mean absolute and signed band error, exact-band rate, top-theme hit rate, the pairs it could not compare, and a status.
+
+`Scenario` is frozen, carries a real `scenario_id` field and a **required** `effective_date`. The whole run resolves policy `as_of` that date.
+
+### Changed in C1 (breaking)
+| Was | Is | Why |
+|---|---|---|
+| `Foresight()` | `Foresight(catalogue, clock=None)` | Parameters are policy, not constants (I10); time is injected (I11) |
+| `Backtest()` | `Backtest(catalogue, clock=None)` | The calibration gate resolves from policy |
+| `ScenarioRehearsal()` | `ScenarioRehearsal(catalogue)` | Builds the baseline it compares against |
+| `Scenario.scenario_id` (`@property`) | `scenario_id` field | The property returned a new id on every read, so a scenario could not be stored or cited |
+| `Scenario.effective_date: str \| None` | `effective_date: date`, required | It is what the run resolves policy at; it was free text nothing read |
+| `Scenario.segments` defaults to `DEMO_SEGMENTS` | defaults to `None`, meaning the policy catalogue at `effective_date` | The segment mix is policy |
+| `MIN_REAL_LAUNCHES`, `DEMO_SEGMENTS` exported | removed | A constant beside a policy key is the one that gets read by mistake (D2) |
 
 ## 3. Used by
-Tests only (no runtime caller yet).
+`clarity.app.container` (builds the catalogue, engine and backtest) and `clarity.interfaces.http` (`GET /v1/demo/foresight`). No other module calls it, and it calls none: foresight is a leaf.
 
 ## 4. Depends on
 | Package | Through |
 |---|---|
-| `clarity.kernel` | - |
+| `clarity.kernel` | `money`, `new_id` |
+| `clarity.platform.config` | `PolicyResolver`, for every tunable (I10) |
+| `clarity.platform.content` | `content.foresight`, for mitigation and caveat wording |
 
 ## 5. Data owned
-In-memory structures in the `lite` profile. Target: one PostgreSQL schema `foresight` with its own role (ADR-0013), same repository interfaces, same parity suite.
+None yet. Nothing is persisted: a run is built, returned and discarded. C2 adds the repository and the `foresight` schema (ADR-0013).
+
+Its **parameters** are owned by the policy store, not by this module: `config/policy/foresight.yaml` holds the segment catalogue, the per-change-type theme catalogues, the borrowing map, the band thresholds and the calibration gate.
 
 ## 6. Invariants
 - Never uses individual customer data; not decision-ready until backtested.
+- **No tunable lives in code (I10, D2).** Segments, theme weights, borrowing, band thresholds and the calibration gate all resolve from the policy store, and no constant shadows one. A test asserts the constants are gone.
+- **Everything resolves `as_of` the scenario's effective date**, never "now". A rehearsal of an October change uses October's parameters, including a value approved today whose window opens then.
+- **A malformed catalogue raises `CatalogueInvalid`** rather than defaulting. A run on half a parsed segment list reports numbers nobody authored, in the same shape as a correct run.
+- **A theme driver is an allowlist**, checked at parse time, so a typo cannot reach `getattr` and silently scale by 1.0, and no policy string can name an arbitrary attribute of `Segment`.
+- **Borrowed themes are declared in the report.** Seven of the twelve change types have no catalogue of their own; the report names the lender in its caveats instead of presenting another change type's themes as its own.
+- **A change type nobody characterised says so.** An empty prediction list carries an explicit caveat, because silence and "we expect no complaints" otherwise look identical.
 - Persona rehearsal is seeded and aggregate-only. It emits relative bands,
   records its simulator version and has no executing capability.
 - **Error is measured in band steps** (LOW=0, MEDIUM=1, HIGH=2), never in complaints, because bands are all the baseline emits.
-- **A synthetic launch never moves the calibration status.** `Provenance.SYNTHETIC` outcomes are the predictor's own assumptions played back; they exercise the method and validate nothing (I16). `CalibrationStatus.CALIBRATED` needs `MIN_REAL_LAUNCHES` (3, plan 02 §3.4) launches with `Provenance.REAL`, of which the prototype has none (**REQUIRES HUTCH CONFIRMATION**).
+- **A synthetic launch never moves the calibration status.** `Provenance.SYNTHETIC` outcomes are the predictor's own assumptions played back; they exercise the method and validate nothing (I16). `CalibrationStatus.CALIBRATED` needs `foresight.calibration.min_real_launches` (3, plan 02 §3.4; tagged regulatory so it is change class C4, with a guardrail that refuses a value under three) launches with `Provenance.REAL`, of which the prototype has none (**REQUIRES HUTCH CONFIRMATION**).
 - **Nothing comparable reports no error, not a perfect one.** With zero overlapping (theme, segment) pairs the error fields are `None`; a `0.000` would read as a flawless model. Same shape as an `UNEVALUABLE` evaluation gate.
 - **An observed theme the model never predicted is reported, not scored.** It lands in `unpredicted` rather than being treated as a LOW prediction, so under-prediction cannot be averaged away. A prediction with no recorded outcome lands in `unobserved`: absence of a record is not a LOW observation.
 - `ForesightReport.backtested` is derived from the calibration handed in, not hard-coded, so the plan §3.4 gate opens on evidence and on nothing else.
@@ -44,6 +69,7 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 ## 8. Tests
 - `tests/unit/test_autopsy_foresight.py`
 - `tests/unit/test_foresight_swarm.py`
+- `tests/unit/test_foresight_catalogue.py` (C1: policy-driven parameters, `as_of` resolution, parse refusals, borrowing, the frozen scenario)
 
 ## 9. Change history
 | Date | Devlog entry | Summary |
@@ -51,3 +77,4 @@ Uncalibrated by design (states so in every report). Runtime target: serverless b
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.foresight` with a public surface (R1) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-F01-foresight-backtest-and-calibration.md` | Added `backtest.py`: calibration report, band-step error, the real-launch gate (F01, #27) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-F02-synthetic-scenario-rehearsal.md` | Added seeded aggregate personas and baseline-vs-swarm comparison |
+| 2026-10-04 | `docs/devlog/2026/2026-10-04-C1-foresight-policy-and-typed-scenario.md` | Moved every tunable to `config/policy/foresight.yaml` and the wording to `platform/content/foresight.py`; froze `Scenario` with a real id and a required typed `effective_date`; injected the clock (C1/F03) |

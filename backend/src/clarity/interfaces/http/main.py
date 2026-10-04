@@ -25,7 +25,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -2535,13 +2535,11 @@ def _register_routes(app: FastAPI) -> None:
         tags=["demo"],
         dependencies=[Depends(requires(Permission.DESK_QUEUE_READ))],
     )
-    def demo_foresight() -> dict[str, Any]:
+    def demo_foresight(clarity: ClarityDep) -> dict[str, Any]:
         """Rehearse retiring a pack. Scenarios, not certainties."""
         from clarity.modules.foresight.public import (
             DEMO_LAUNCHES,
-            Backtest,
             ChangeType,
-            Foresight,
             Scenario,
             ScenarioRehearsal,
         )
@@ -2550,11 +2548,11 @@ def _register_routes(app: FastAPI) -> None:
             name="Retire Unlimited Data",
             change_type=ChangeType.PACK_RETIRED,
             affected_products=("SYNTHETIC-UNLIMITED-30",),
-            effective_date="2027-10-01",
+            effective_date=date(2027, 10, 1),
         )
-        calibration = Backtest().run(DEMO_LAUNCHES)
-        report = Foresight().run(scenario, calibration=calibration)
-        swarm = ScenarioRehearsal().run(scenario, seed=42)
+        calibration = clarity.foresight_backtest.run(DEMO_LAUNCHES)
+        report = clarity.foresight.run(scenario, calibration=calibration)
+        swarm = ScenarioRehearsal(clarity.foresight_catalogue).run(scenario, seed=42)
         return {
             "run_id": report.run_id,
             "scenario": report.scenario,

@@ -4,6 +4,14 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Changed
+
+- **Foresight reads its parameters from the policy store** (C1/F03). The segment mix, the per-change-type theme catalogues, which change types borrow another's themes, the band thresholds and the calibration gate were Python constants, so a product manager could not change one without a release (I10, D2). They are now `config/policy/foresight.yaml`, resolved **as of the scenario's effective date** rather than "now", so a rehearsal of an October change uses October's parameters. Mitigation and caveat wording moved to `platform/content/foresight.py`.
+  - Public surface, breaking: `Foresight(catalogue, clock=None)`, `Backtest(catalogue, clock=None)` and `ScenarioRehearsal(catalogue)` replace the no-argument constructors; `MIN_REAL_LAUNCHES` and `DEMO_SEGMENTS` are removed rather than kept as fallbacks.
+  - `Scenario` is frozen, `scenario_id` is a real field (it was a `@property` returning a different id on every read, so nothing could store or cite a scenario), and `effective_date` is a required `date` rather than an optional string nothing read.
+  - A report now names the lender when a change type borrows another's themes, and says so explicitly when no catalogue is configured at all, instead of returning an empty prediction list that reads as "no risk".
+  - `GET /v1/demo/foresight` is unchanged in shape.
+
 ### Added
 
 - An opt-in Baileys WhatsApp transport forwards signed one-to-one messages to

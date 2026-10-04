@@ -73,6 +73,7 @@ from clarity.modules.conversation.public import (
 from clarity.modules.decision.public import PolicyThresholds, ZenDecisionPolicy
 from clarity.modules.deskops.public import DeskOps
 from clarity.modules.detection.public import RuleEngine, load_packs
+from clarity.modules.foresight.public import Backtest, Foresight, ForesightCatalogue
 from clarity.modules.governance.public import (
     CHANGES,
     PolicyGovernance,
@@ -1071,6 +1072,14 @@ class Clarity:
             group="autopsy",
             handler=self.autopsy.on_complaint_created,
         )
+
+        # Foresight rehearses a change before it ships (C1/F03). It reads its
+        # segments, theme weights, band thresholds and calibration gate from the
+        # policy store rather than from constants, so the catalogue is the only
+        # thing it needs wired and the engine is built per call around it.
+        self.foresight_catalogue = ForesightCatalogue(self.policies)
+        self.foresight = Foresight(self.foresight_catalogue, clock=self.now)
+        self.foresight_backtest = Backtest(self.foresight_catalogue, clock=self.now)
 
         # Insights read models, folded from the event log (I01, #30). The
         # dashboards used to read live objects, which meant whatever was in one

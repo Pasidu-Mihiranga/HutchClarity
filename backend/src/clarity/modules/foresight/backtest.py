@@ -10,8 +10,8 @@ the gate asks for:
    :data:`DEMO_LAUNCHES` so the report can be produced and read today, but a
    launch authored by us is the predictor's own assumptions played back. It
    exercises the method; it validates nothing (I16).
-2. **Below the gate the report says so.** Fewer than
-   :data:`MIN_REAL_LAUNCHES` real launches gives
+2. **Below the gate the report says so.** Fewer real launches than
+   ``foresight.calibration.min_real_launches`` gives
    :attr:`CalibrationStatus.INSUFFICIENT`, in the same shape as an
    ``UNEVALUABLE`` evaluation gate: a number is still reported, and it still
    does not mean the model is calibrated.
@@ -21,25 +21,31 @@ the gate asks for:
 
 The error is measured in **band steps** (LOW=0, MEDIUM=1, HIGH=2), because
 that is the only thing the baseline emits. It is never a complaint count.
+
+**C1 note.** The gate itself is no longer a Python constant. It resolves from
+``foresight.calibration.min_real_launches``, tagged regulatory so lowering it
+needs a second approver, with a guardrail that refuses a value under three
+whatever the approval says. The constant is gone rather than kept as a fallback:
+a default here would be a number shadowing a policy value, which is exactly what
+D2 forbids.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
 from clarity.kernel.ids import new_id
+from clarity.modules.foresight.catalogue import ChangeType, ForesightCatalogue
 from clarity.modules.foresight.simulation import (
-    ChangeType,
     Foresight,
     Scenario,
     VolumeBand,
 )
-
-#: Plan 02 §3.4 gate. Three is the plan's number, not a statistical claim.
-MIN_REAL_LAUNCHES = 3
+from clarity.platform.content import foresight as wording
 
 _BAND_STEP: dict[VolumeBand, int] = {
     VolumeBand.LOW: 0,
@@ -159,7 +165,21 @@ class CalibrationReport:
 
 
 class Backtest:
-    """Replay historic launches through the baseline and score the bands."""
+    """Replay historic launches through the baseline and score the bands.
+
+    The gate is resolved ``as_of`` the moment the backtest runs, not as of any
+    launch: the question a calibration report answers is "may we rely on this
+    engine now", and the answer is governed by the rule in force now.
+    """
+
+    def __init__(
+        self,
+        catalogue: ForesightCatalogue,
+        *,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._catalogue = catalogue
+        self._clock = clock or (lambda: datetime.now(tz=UTC))
 
     def run(
         self,
@@ -167,7 +187,8 @@ class Backtest:
         *,
         foresight: Foresight | None = None,
     ) -> CalibrationReport:
-        engine = foresight or Foresight()
+        engine = foresight or Foresight(self._catalogue, clock=self._clock)
+        required = self._catalogue.min_real_launches(self._clock())
 
         misses: list[BandMiss] = []
         unpredicted: list[ObservedOutcome] = []
@@ -211,7 +232,7 @@ class Backtest:
             launches=len(launches),
             real_launches=real,
             compared=len(misses),
-            status=self._status(real),
+            status=self._status(real, required),
             mean_absolute_band_error=self._mean(abs(m.step_error) for m in misses),
             signed_band_error=self._mean(m.step_error for m in misses),
             exact_band_rate=self._rate(sum(1 for m in misses if m.is_exact), len(misses)),
@@ -219,20 +240,16 @@ class Backtest:
             misses=tuple(misses),
             unpredicted=tuple(unpredicted),
             unobserved=tuple(unobserved),
-            basis=(
-                "Replay of recorded launch outcomes against the statistical "
-                "baseline, aggregated per segment. No individual customer data "
-                "was read."
-            ),
-            caveats=self._caveats(launches, real, misses, unpredicted, unobserved),
+            basis=wording.BACKTEST_BASIS,
+            caveats=self._caveats(launches, real, required, misses, unpredicted, unobserved),
         )
 
     # ----------------------------------------------------------------- #
 
-    def _status(self, real: int) -> CalibrationStatus:
+    def _status(self, real: int, required: int) -> CalibrationStatus:
         if real == 0:
             return CalibrationStatus.NOT_CALIBRATED
-        if real < MIN_REAL_LAUNCHES:
+        if real < required:
             return CalibrationStatus.INSUFFICIENT
         return CalibrationStatus.CALIBRATED
 
@@ -258,50 +275,30 @@ class Backtest:
         self,
         launches: tuple[HistoricLaunch, ...],
         real: int,
+        required: int,
         misses: list[BandMiss],
         unpredicted: list[ObservedOutcome],
         unobserved: list[tuple[str, str]],
     ) -> list[str]:
         caveats = [
-            "Results are scenarios, not certainties (deck S11). A calibration "
-            "error does not turn a prediction into a forecast.",
-            "The error is measured in band steps (LOW, MEDIUM, HIGH), not in "
-            "complaints. Bands are relative within one run.",
-            "Advisory only: a calibration report never authorises an automated action.",
+            wording.BACKTEST_CAVEATS["error_is_not_a_forecast"],
+            wording.BACKTEST_CAVEATS["band_steps_not_complaints"],
+            wording.BACKTEST_CAVEATS["advisory_only"],
         ]
         synthetic = len(launches) - real
         if synthetic:
-            caveats.append(
-                f"{synthetic} of {len(launches)} launches are SIMULATED, authored "
-                "for the prototype. A synthetic backtest exercises the method and "
-                "validates nothing."
-            )
-        if real < MIN_REAL_LAUNCHES:
-            caveats.append(
-                f"{real} real launches against the {MIN_REAL_LAUNCHES} the plan "
-                "§3.4 gate requires, so this report does not establish calibration."
-            )
+            caveats.append(wording.synthetic_launches_caveat(synthetic, len(launches)))
+        if real < required:
+            caveats.append(wording.below_gate_caveat(real, required))
         if not misses:
-            caveats.append(
-                "No observed theme matched a predicted one, so no calibration "
-                "error could be measured."
-            )
+            caveats.append(wording.BACKTEST_CAVEATS["nothing_comparable"])
         signed = self._mean(m.step_error for m in misses)
         if signed is not None and signed < 0:
-            caveats.append(
-                "The baseline under-predicted on average, which is the dangerous "
-                "direction for CX capacity planning."
-            )
+            caveats.append(wording.BACKTEST_CAVEATS["under_predicted"])
         if unpredicted:
-            caveats.append(
-                "Observed theme-segment outcomes never predicted at all: "
-                f"{len(unpredicted)}. They are excluded from the error."
-            )
+            caveats.append(wording.unpredicted_caveat(len(unpredicted)))
         if unobserved:
-            caveats.append(
-                "Predicted theme-segment pairs with no recorded outcome: "
-                f"{len(unobserved)}. Absence of a record is not a LOW observation."
-            )
+            caveats.append(wording.unobserved_caveat(len(unobserved)))
         return caveats
 
 
@@ -312,7 +309,11 @@ class Backtest:
 DEMO_LAUNCHES: tuple[HistoricLaunch, ...] = (
     HistoricLaunch(
         launch_id="SIM-LAUNCH-1",
-        scenario=Scenario(name="Retire the 10GB pack", change_type=ChangeType.PACK_RETIRED),
+        scenario=Scenario(
+            name="Retire the 10GB pack",
+            change_type=ChangeType.PACK_RETIRED,
+            effective_date=date(2026, 3, 1),
+        ),
         observed=(
             ObservedOutcome("pack sunset confusion", "students", VolumeBand.HIGH),
             ObservedOutcome("pack sunset confusion", "low-usage prepaid", VolumeBand.MEDIUM),
@@ -326,6 +327,7 @@ DEMO_LAUNCHES: tuple[HistoricLaunch, ...] = (
         scenario=Scenario(
             name="Tighten the FUP on the unlimited plan",
             change_type=ChangeType.FUP_TIGHTENED,
+            effective_date=date(2026, 5, 1),
             severity=Decimal("1.4"),
         ),
         observed=(
@@ -340,6 +342,7 @@ DEMO_LAUNCHES: tuple[HistoricLaunch, ...] = (
         scenario=Scenario(
             name="Raise the per-MB out-of-bundle rate",
             change_type=ChangeType.PRICE_INCREASE,
+            effective_date=date(2026, 7, 1),
             affected_share=Decimal("0.6"),
         ),
         observed=(
