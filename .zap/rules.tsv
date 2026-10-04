@@ -8,6 +8,6 @@
 # Baseline on 2026-10-04: 0 fails, 64 passes, 3 warnings, all three below.
 # The six header findings that were here before are fixed rather than ignored,
 # in clarity/interfaces/http/headers.py.
-10049	IGNORE	(Non-Storable Content) no-store on a case, a decision or a receipt is deliberate. This rule is the inverse of 10049's storable variant and fires because we refuse caching of customer data; /static and /openapi.json stay cacheable.
-10055	IGNORE	(CSP style-src unsafe-inline) the static UI that FE01 (#28) retires uses inline styles. script-src has no unsafe-inline, which is the directive that stops injected script. Revisit when the static UI goes.
+10049	IGNORE	(Non-Storable Content) no-store on a case, a decision or a receipt is deliberate. This rule is the inverse of 10049's storable variant and fires because we refuse caching of customer data; /openapi.json, /docs and /redoc stay cacheable.
+10055	IGNORE	(CSP style-src unsafe-inline) the static UI is retired (FE01), so the only pages left are the generated /docs and /redoc, which style themselves inline. script-src has no unsafe-inline, which is the directive that stops injected script. Tightening style-src is now possible and is its own change.
 10109	IGNORE	(Modern Web Application) informational: ZAP noting the page is JavaScript-driven, which is not a finding.

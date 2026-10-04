@@ -16,11 +16,12 @@ FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
         up-full down-full test-full dev-e2e e2e e2e-install channel-gateway \
         contracts contracts-check \
         licences secrets \
-        web-install web-build web-customer web-console web-verify
+        web-install web-build web web-customer web-console web-verify
 
 help:
 	@echo "make setup   - create .venv and install the backend with dev tools"
-	@echo "make dev     - run the app (UI + API) on http://localhost:8000 (lite profile)"
+	@echo "make dev     - run the API on http://localhost:8000 (lite profile)"
+	@echo "make web     - run all three Next.js apps (:3000 customer, :3001 console, :3002 verify)"
 	@echo "make mcp     - run clarity-mcp (MCP over Streamable HTTP) on :8099"
 	@echo "make channel-gateway - WhatsApp/SMS/USSD ingress on :8102 (N02)"
 	@echo "make check   - everything CI runs: lint, types, import contracts, tests"
@@ -180,12 +181,17 @@ secrets:
 	docker run --rm -v "$(CURDIR)":/repo -w /repo zricethezav/gitleaks:latest \
 		detect --config .gitleaks.toml --no-banner --redact --exit-code 1
 
-# Frontend (Next.js apps). Optional: the backend serves a static UI on its own.
+# Frontend (Next.js apps). These are the UI: FE01 retired the static UI the
+# backend used to serve, so `make dev` alone gives you the API and no pages.
+# `make web` runs all three at once next to it (the demo path, WT-02).
 web-install:
 	cd frontend && npm install
 
 web-build:
 	cd frontend && npm run build
+
+web:
+	cd frontend && npm run dev:all
 
 web-customer:
 	cd frontend && npm run dev:customer

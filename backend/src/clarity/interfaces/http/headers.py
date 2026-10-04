@@ -6,9 +6,10 @@ its own; together they are the difference between a browser that enforces the
 app's intentions and one that guesses.
 
 Each header below says what it stops. The values are deliberately strict
-because this app serves exactly two kinds of response: JSON from `/v1`, and the
-small static UI that FE01 is retiring. Neither embeds anything, neither is
-meant to be framed, and neither needs a camera.
+because this app now serves one kind of response: JSON from `/v1`, plus the
+schema and key endpoints. FE01 retired the static UI, so nothing here is a
+page, nothing embeds anything, nothing is meant to be framed, and nothing
+needs a camera. The three Next.js apps set their own headers.
 """
 
 from __future__ import annotations
@@ -48,15 +49,15 @@ SECURITY_HEADERS: dict[str, str] = {
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Embedder-Policy": "require-corp",
     "Cross-Origin-Resource-Policy": "same-origin",
-    # A customer's case and receipt are not for a shared cache to keep. The
-    # static UI overrides this; see `_CACHEABLE` below.
+    # A customer's case and receipt are not for a shared cache to keep; see
+    # `_CACHEABLE` below for the public exceptions.
     "Referrer-Policy": "no-referrer",
 }
 
 #: Paths whose responses are public, identical for everyone, and worth caching.
 #: Everything else carries the no-store default, because a case, a decision or
 #: a receipt is one customer's and must not sit in an intermediary.
-_CACHEABLE = ("/static/", "/docs", "/redoc", "/openapi.json")
+_CACHEABLE = ("/docs", "/redoc", "/openapi.json")
 
 
 def _is_cacheable(path: str) -> bool:

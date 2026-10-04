@@ -3,7 +3,7 @@
 Each route is classified once:
 
 - ``PUBLIC``: answers anonymous callers by design (health, keys, sign-in,
-  receipt verification, help content, pages).
+  receipt verification, help content).
 - ``SIGNED_IN``: an anonymous caller gets 401.
 - ``SYNTHETIC_ONLY``: development and simulated-HUTCH routes; they work in the
   synthetic profiles and return 404 in ``prod`` (D3, D7).
@@ -27,14 +27,9 @@ PUBLIC = {
     # Exchanges a refresh token for a new access token (M-IAM). Public like
     # sign-in: the refresh token is the credential, so there is no session yet.
     ("POST", "/v1/auth/refresh"),
-    ("GET", "/"),
-    ("GET", "/desk"),
-    ("GET", "/ops"),
-    ("GET", "/autopsy"),
-    ("GET", "/foresight"),
-    ("GET", "/verify"),
-    ("GET", "/v"),
-    ("GET", "/v/{receipt_id}"),
+    # The page routes that used to sit here are gone: FE01 retired the static
+    # UI, so this app serves `/v1`, the schema and the key endpoints only, and
+    # the three Next.js apps are the UI.
     ("GET", "/docs"),
     ("GET", "/docs/oauth2-redirect"),
     ("GET", "/redoc"),

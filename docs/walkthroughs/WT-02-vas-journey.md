@@ -6,23 +6,18 @@
 |---|---|
 | Audience | developers / demo presenters / judges |
 | Journey | Customer asks (chip or free-form) about an unexpected VAS charge; Clarity Investigation Card → confirm modal → refund → Trust Receipt |
-| Status | API path verified; browser steps unverified (see note) |
-| Last verified | 2026-10-04 (API path only) |
+| Status | verified, API path and browser steps |
+| Last verified | 2026-10-04 (browser, `frontend/e2e/dispute-charge.spec.ts`) |
 
-> **C05 (#24), 2026-10-04.** The journey's API path is re-verified: the
-> acceptance suite drives this exact flow over `/v1` and ends at a receipt the
-> backend verifies (`test_the_dispute_charge_script_for_dilani_ends_with_a_verified_receipt`
-> and `tests/acceptance/test_assistant.py`), and `make check` is green.
+> **FE01 (#28), 2026-10-04.** Both halves are now verified. The acceptance
+> suite drives this flow over `/v1` and ends at a receipt the backend verifies
+> (`test_the_dispute_charge_script_for_dilani_ends_with_a_verified_receipt` and
+> `tests/acceptance/test_assistant.py`), and the browser steps below are driven
+> by `frontend/e2e/dispute-charge.spec.ts`, which ran green for the first time
+> in this change (14 of 14 in the suite). C05 wrote that suite but could not
+> execute it, so until now the steps below were only "believed correct".
 >
-> **The browser steps below are not re-verified.** C05 added a Playwright suite
-> for exactly this journey (`frontend/e2e/dispute-charge.spec.ts`), and the
-> browser binary could not be downloaded in the environment this change was
-> made in, so the suite has never been executed. Running
-> `make e2e-install && make e2e` on a machine with network access is what
-> clears this, and until somebody does the steps below are "believed correct",
-> which is not the same thing.
->
-> What did change in the browser path: the chat now sends `case_id` at the top
+> What C05 changed in the browser path: the chat now sends `case_id` at the top
 > level of the turn request, so the server-side flow actually runs. Before C05
 > it was sent only inside `facts` and every turn took the stateless path, which
 > means the "progress trail" step below was driven entirely client side.
@@ -39,10 +34,14 @@ in-thread **Trust Receipt** card and follow-up chips (prevent / support).
 ## 2. Prerequisites
 
 ```bash
-make dev       # legacy self-care UI + API (demo path)
-# optional modular brain:
-# make up-lite && make dev-new
+make dev           # API on :8000
+make web-install   # once
+make web           # the three Next.js apps: :3000 customer, :3001 console, :3002 verify
 ```
+
+Open the customer app at <http://localhost:3000>. FE01 retired the static UI
+the API used to serve, so `make dev` on its own gives you the API and no
+pages.
 
 Demo subscriber (synthetic): MSISDN `0771234567` (Dilani) / VAS silent renewal.
 
@@ -72,4 +71,5 @@ Demo subscriber (synthetic): MSISDN `0771234567` (Dilani) / VAS silent renewal.
 ## 6. Troubleshooting
 
 - Empty cards: hard-refresh; suggestions fall back to defaults if the API errors.
-- Empty world: `POST /v1/demo/reset` on the legacy app or re-seed.
+- Empty world: `POST /v1/demo/reset` against the API, or **Reset demo data**
+  on the console's Desk.

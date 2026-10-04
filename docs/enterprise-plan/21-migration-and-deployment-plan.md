@@ -95,7 +95,7 @@ hutch-clarity/
 │   │   │                        governance, iam, autopsy, foresight (+ later: notifications, proactive, knowledge, ...)
 │   │   │   └── <module>/        public.py  MODULE.md  ... (domain, application, infrastructure as it grows)
 │   │   ├── app/             L5  composition root (profiles, wiring; only reader of CLARITY_PROFILE), MCP view
-│   │   ├── interfaces/      L6  http (FastAPI /v1, auth dependencies, static UI until R5), mcp
+│   │   ├── interfaces/      L6  http (FastAPI /v1, auth dependencies), mcp
 │   │   └── entrypoints/     L7  process entry points (ASGI app; worker and stream from R3)
 │   ├── tests/               unit, golden, property, contract (parity), acceptance (black-box /v1), architecture
 │   └── scripts/             demo, measure_tokens

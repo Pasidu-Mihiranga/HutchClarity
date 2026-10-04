@@ -128,7 +128,7 @@ The alternative's ADR-0008 is stronger: the MCP server has *no* execute code and
 |---|---|---|
 | S1 | Full production stack in the prototype: Kafka + Apicurio, Valkey, SeaweedFS, OpenBao, flagd, Grafana LGTM, Langfuse, Procrastinate | Correct **production** choices, already consistent with our plan's production column. In the prototype they add heavy setup with no demo value. Feed the licence analysis (ADR-0012) into plan §21 instead. |
 | S2 | Modular monolith restructure: 20 modules, schema per module, 12 deployables | Right for a 6–8 developer production build. For us it is a rewrite. D5 captures the part that matters. |
-| S3 | Next.js 16 + pnpm + Turborepo + shadcn + TanStack | Production frontend. Our static pages are a recorded simplification, and the pages use only the public API, so swapping them later is contained. |
+| S3 | Next.js 16 + pnpm + Turborepo + shadcn + TanStack | Partly taken since this was written: the three Next.js apps are built on Next.js 14 and are now the only UI (FE01). The 16 upgrade is held until it passes the browser suite (ADR-0031); pnpm and Turborepo are still skipped for npm workspaces. |
 | S4 | Their prototype Gantt (6–8 developers, from 2026-10-05) | It schedules building from scratch. We have already built. |
 | S5 | MCP Apps UI cards, SSE live status, supervisor PWA push | Nice-to-have; no gap in the demo |
 | S6 | Per-PR devlog files + `MODULE.md` per module + walkthroughs | Good for parallel teams; heavy for ours. `agent.md` change log + ADRs (A13) cover it. Revisit if more than ~3 people commit. |

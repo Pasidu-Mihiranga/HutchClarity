@@ -4,6 +4,51 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Removed (FE01, #28)
+
+- **The static UI is retired.** `clarity.interfaces.http` no longer serves
+  pages: `GET /`, `/desk`, `/ops`, `/autopsy`, `/foresight`, `/verify`, `/v`
+  and `/v/{receipt_id}` are gone, along with the `/static` mount and
+  `interfaces/http/static/`. The three Next.js apps are the only UI. No `/v1`
+  route changed and the OpenAPI snapshot is unchanged: the page routes were all
+  `include_in_schema=False`.
+- **`VERIFY_BASE` now points at the verify app**, `http://localhost:3002/r` by
+  default rather than `http://localhost:8000/v`, because the route it used to
+  name no longer exists. A receipt's `verify_url` and its QR code follow it.
+  Deployments that set `VERIFY_BASE` explicitly are unaffected.
+
+### Changed (FE01, #28)
+
+- `@clarity/sdk` throws `ClarityApiError` (exported) instead of `Error` on a
+  failed call, carrying `status`. A caller that catches `Error` still works;
+  one that needs to tell "not found" from "unreachable" can now do so.
+- `list_receipts` (mock store repository) takes a required `verify_base`
+  keyword. It used to rebuild a restored receipt's `verify_url` from a
+  hard-coded `http://localhost:8000/v/...`, which ignored the configured base.
+
+### Fixed (FE01, #28)
+
+- **The customer chat never read the signed-in customer's account.** The page
+  held a hardcoded literal with `activity: []` and no setter, and
+  `accountIntents` reads exactly those fields to decide whether a question
+  reaches the rule engine. It answered `false` for `twice`, `slow`, `sub` and
+  `missing` for every customer, so three of the four demo journeys rendered
+  "Could not confirm" while the backend had a decision waiting: Nimal's
+  duplicate reload (`AUTO_FIX`, LKR 3,500.00) and Kumar's active fair-use cap
+  (`EXPLAIN_ONLY`) were both contradicted on screen. The page now fetches
+  `GET /v1/me/app`, and the greeting uses the customer's own name rather than
+  a constant.
+
+- **The public verify page no longer reports an unverified receipt as valid.**
+  It fell back to a "placeholder" verdict whenever the API call failed, and
+  that verdict was *valid* for any id not containing the string "bad", so an
+  unknown receipt number, a tampered one and an unreachable API all rendered
+  "Chain valid" with "Signature OK". It now has a third outcome, "could not
+  check", and shows it rather than guessing. The static page it replaces
+  showed an error on a 404.
+- The same page read `kid` where the API sends `key_id`, so a verified
+  receipt's key id never appeared.
+
 ### Added (F01, #27)
 
 - `clarity.modules.foresight.public` exports `Backtest`, `CalibrationReport`,

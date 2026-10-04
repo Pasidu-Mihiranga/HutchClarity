@@ -91,7 +91,8 @@ flowchart LR
 
 | Issue | Title | Area | Priority | Depends on |
 |---|---|---|---|---|
-| [FE01](issues/FE01-frontend-verified-build-static-ui-retired-next-j.md) | Frontend: verified build, static UI retired, Next.js 16, accessibility and language review | `frontend` | P1 | B09 |
+| [FE01](issues/FE01-frontend-verified-build-static-ui-retired-next-j.md) | Frontend: verified build, static UI retired, Next.js 14, accessibility and language review | `frontend` | P1 | B09 |
+| [FE02](issues/FE02-next-js-16-upgrade-behind-the-browser-suite.md) | Next.js 16 upgrade, gated on the browser suite | `frontend` | P3 | FE01 |
 | [X01](issues/X01-security-hardening-threat-model-checks-dast-depe.md) | Security hardening: threat-model checks, DAST, dependency and licence scanning | `security` | P1 | B10 |
 | [X02](issues/X02-performance-and-resilience-load-and-chaos-tests.md) | Performance and resilience: load and chaos tests | `platform` | P2 | B05, B04 |
 | [X03](issues/X03-deployment-artefacts-images-compose-full-helm-op.md) | Deployment artefacts: images, compose full, Helm, OpenTofu, serverless edges | `deploy` | P1 | B05, H01 |

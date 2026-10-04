@@ -2,8 +2,12 @@
 
 Found by the OWASP ZAP baseline: six missing-header rules across every page and
 asset. The headers are only worth adding if they are on *every* response, so
-these tests check the paths that are easy to miss: errors, 404s, static assets
-and the public verification endpoint that carries no credentials.
+these tests check the paths that are easy to miss: errors, 404s, and the
+public endpoints that carry no credentials.
+
+`/` is one of them, and it is a 404 since FE01 retired the static UI: a path
+with no route still has to carry every header, because that is exactly where
+middleware tends to stop short.
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ def api() -> TestClient:
     return TestClient(create_app(Clarity(world=build_demo_world())))
 
 
-PATHS = ["/health", "/", "/static/styles.css", "/v1/cases", "/does-not-exist"]
+PATHS = ["/health", "/", "/openapi.json", "/v1/cases", "/does-not-exist"]
 
 
 @pytest.mark.parametrize("path", PATHS)
@@ -53,8 +57,8 @@ def test_a_customers_data_is_never_stored_by_an_intermediary(api: TestClient) ->
 
 def test_public_assets_stay_cacheable(api: TestClient) -> None:
     """no-store on everything would be a performance bug dressed as security."""
-    assert "max-age" in api.get("/static/styles.css").headers["Cache-Control"]
     assert "max-age" in api.get("/openapi.json").headers["Cache-Control"]
+    assert "max-age" in api.get("/docs").headers["Cache-Control"]
 
 
 def test_a_route_that_sets_its_own_header_is_not_overwritten(api: TestClient) -> None:

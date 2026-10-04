@@ -4,12 +4,14 @@ Target 5–6 minutes (Guidelines §10 allows 3–7). Based on the storyboard in
 plan §42.5.
 
 ```bash
-make setup   # once
-make dev
+make setup         # once
+make web-install   # once
+make dev           # API on :8000
+make web           # the three apps: :3000 customer, :3001 console, :3002 verify
 ```
 
-Open <http://localhost:8000/>. Click **Reset demo data** before recording, so
-balances start clean.
+Open <http://localhost:3000/>. Click **Reset demo data** on the Desk
+(<http://localhost:3001/desk>) before recording, so balances start clean.
 
 > Keep the orange banner visible throughout: *all HUTCH systems are mocked and
 > every customer, charge and payment is synthetic*. Say it out loud once too.
@@ -62,11 +64,14 @@ The Trust Receipt appears. Point out:
 - **Recurrence test: PASSED** - and stress this: *it re-read the live state. It did not assume the block worked because the command was accepted.*
 - **Signed Ed25519, chain intact.**
 
-Scan the QR (or open `/v/TR-2027-000001`). The public page verifies it with
-nothing secret - the same check a customer, an agent on 1788, or TRCSL can run.
+Scan the QR (or open `:3002/r/TR-2027-000001`). The public page verifies it
+with nothing secret - the same check a customer, an agent on 1788, or TRCSL can
+run.
 
-**Optional, strong:** open `/v/TR-2027-999999` - a receipt that was never
-issued fails: *"No receipt numbered TR-2027-999999 has ever been issued."*
+**Optional, strong:** open `:3002/r/TR-2027-999999` - a receipt that was never
+issued does not verify: *"No receipt numbered TR-2027-999999 has ever been
+issued."* It says that rather than passing or failing the signature, because
+there is no document to check.
 
 ## 3:00–3:40 - Journey 2: fixed before she noticed
 
@@ -87,8 +92,8 @@ wrongly; the cap was shown at purchase. A receipt is still issued.
 **Say:** Refunding here would be wrong. Clarity knows the difference.
 
 **Large reload not credited** → **STAFF APPROVAL**, because of a SIM swap two
-days ago. Open `/desk`, show the queue sorted by money at stake, open the case,
-**Approve as supervisor**.
+days ago. Open the Desk on `:3001/desk`, show the queue sorted by money at
+stake, open the case, **Approve as supervisor**.
 
 ## 4:30–5:15 - The boundary
 

@@ -16,6 +16,13 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.11 - 2026-10-04
+
+| Area | Change | Chapters |
+|---|---|---|
+| Front end | Next.js 14 is the current framework; 16 stays the target and is held until it passes the browser suite (ADR-0031) | 19 §2.2 |
+| Front end | The FastAPI static UI is retired: the three Next.js apps are the only UI, and `interfaces.http` serves `/v1` only (FE01) | 19 §2.2, 21 §4 |
+
 ## v1.10 - 2026-10-02
 
 | Area | Change | Chapters |

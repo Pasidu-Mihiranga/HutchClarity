@@ -15,6 +15,7 @@ import {
 } from "@/components/FlowCards";
 import type { CardActions } from "@/components/ClarityMessageCard";
 import {
+  BASE,
   makeInitialState,
   fetchSuggestions,
   fetchTurn,
@@ -139,14 +140,44 @@ export default function ClarityPage() {
   const router = useRouter();
 
   const [cs, setCs] = useState<ClarityState>(makeInitialState);
-  const [app] = useState<AppState>({
-    msisdn: "0771234567",
-    name: DEMO_NAME,
-    pack: { used_pct: 72, data_gb: "10", used_gb: "7.2", days_left: 3, data_remaining: "2.8 GB" },
-    subscriptions: [],
-    activity: [],
-    cases: [],
-  });
+  // The signed-in customer's own account, from `GET /v1/me/app`.
+  //
+  // This used to be a hardcoded literal with `activity: []`, and it was never
+  // fetched: `const [app] = useState(...)` has no setter. `accountIntents(app)`
+  // reads exactly these fields to decide whether a question is worth
+  // evaluating, so with an empty activity list it answered `false` for
+  // `twice`, `slow`, `sub` and `missing` for every customer, forever. Only
+  // `balance` and `knowledge`, which are hardcoded `true`, ever got through.
+  // Three of the four demo journeys reached "Could not confirm" in the browser
+  // while the backend had a decision waiting (FE01, #28).
+  //
+  // The gate itself is still a client-side heuristic and still the wrong place
+  // for this: I1 says rules decide. It is kept here only because removing it
+  // is a larger change than this issue, and it is now fed real data instead of
+  // an empty literal, which is what made it wrong in practice.
+  const [app, setApp] = useState<AppState>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = window.sessionStorage.getItem("clarity_token");
+        if (!token) return;
+        const res = await fetch(`${BASE}/v1/me/app`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as AppState;
+        if (!cancelled) setApp(data);
+      } catch {
+        // No account state means the heuristic below stays conservative, which
+        // is the safe direction: it asks rather than inventing an answer.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [input, setInput] = useState("");
   const [showTopics, setShowTopics] = useState(false);
@@ -556,7 +587,7 @@ export default function ClarityPage() {
                   </svg>
                 </div>
                 <h1 style={{ fontSize: "clamp(24px,6vw,30px)", fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px", color: "var(--ink)" }}>
-                  {tl(lang, "chatHi").replace("{name}", DEMO_NAME)}
+                  {tl(lang, "chatHi").replace("{name}", app.name ?? DEMO_NAME)}
                 </h1>
                 <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "#3f3f46" }}>{tl(lang, "howHelpToday")}</p>
                 <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 24px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>

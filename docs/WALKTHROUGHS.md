@@ -5,7 +5,7 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | ID | Walkthrough | Journey / plan ref | Status | Last verified |
 |---|---|---|---|---|
 | WT-01 | Local setup (`make setup`, `make dev`, `lite` profile) and repository tour | AGENTS.md §13 | to write (flow works) | - |
-| WT-02 | [VAS charge without consent → one-tap fix → receipt](walkthroughs/WT-02-vas-journey.md) | 03 §6.1 | API path verified by the acceptance suite; browser steps unverified until the Playwright suite is run (C05) | 2026-10-04 |
+| WT-02 | [VAS charge without consent → one-tap fix → receipt](walkthroughs/WT-02-vas-journey.md) | 03 §6.1 | verified: the acceptance suite over `/v1` and the browser suite (`frontend/e2e/dispute-charge.spec.ts`), which ran green for the first time in FE01 | 2026-10-04 |
 | WT-03 | Duplicate reload → zero-contact refund | 03 §6.2 | to write (flow works) | - |
 | WT-04 | "Unlimited" data stopped → explain-only (FUP disclosed) | 03 §6.4 | to write (flow works) | - |
 | WT-05 | Large disputed reload → staff approval with step-up, four-eyes above policy threshold | 03 §6.5 | to write (flow works) | - |
@@ -16,4 +16,4 @@ A walkthrough is a **verified, step-by-step tour of a real flow**: what you clic
 | WT-10 | [External MCP client asks "why was I charged?"](walkthroughs/WT-10-external-mcp-client.md) | 07 §10.7 | verified | 2026-10-03 |
 | WT-11 | Running the `full` profile | 21 §9 | planned (R2) | - |
 | WT-12 | Deploying: containers for the core, serverless edges | 21 §5 | planned (R7) | - |
-| WT-13 | [Staff console roles: role switcher, desk, kill switches](walkthroughs/WT-13-staff-console.md) | 18 §5.4 | verified by the team (old layout); re-verify on `dev` | 2026-10-02 |
+| WT-13 | [Staff console roles: role switcher, desk, kill switches](walkthroughs/WT-13-staff-console.md) | 18 §5.4 | verified: queue and the four-eyes approval are driven by `frontend/e2e/staff-desk.spec.ts` (FE01) | 2026-10-04 |

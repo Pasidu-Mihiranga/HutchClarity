@@ -320,8 +320,9 @@ jobs:
         # Scanned where it runs, not on "staging": there is no staging
         # environment, and saying there is would be worse than saying this.
         # The lite profile needs no services (ADR-0006) and serves the same
-        # routes, headers and static UI as any other profile, which is what a
-        # baseline scan looks at.
+        # routes and headers as any other profile, which is what a baseline
+        # scan looks at. There are no pages to scan since FE01 retired the
+        # static UI: the three Next.js apps are scanned by their own suite.
         run: |
           set -euo pipefail
           cd backend

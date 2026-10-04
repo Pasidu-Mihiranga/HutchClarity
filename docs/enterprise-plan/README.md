@@ -83,6 +83,7 @@ All diagrams are written in Mermaid, which GitHub, GitLab and most Markdown view
 | v1.8 | 2026-10-02 | R4 started: H01 extracted the simulated HUTCH estate behind parity-tested HTTP drivers. |
 | v1.9 | 2026-10-02 | R6 started: N01 added event-driven, template-only notification routing and delivery tracking. |
 | v1.10 | 2026-10-02 | R6 continued: P01 added policy-backed stream detectors and zero-contact duplicate-reload resolution. |
+| v1.11 | 2026-10-04 | R5: the static UI is retired and the Next.js apps are the only UI; Next.js 14 is the current framework (FE01, ADR-0031). |
 
 ### v1.1 audit: gaps found and added
 

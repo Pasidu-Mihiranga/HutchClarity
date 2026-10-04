@@ -21,14 +21,12 @@ these routes exactly as plan §19 describes.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import Response as RawResponse
-from fastapi.staticfiles import StaticFiles
 
 from clarity.app.container import Clarity, Profile
 from clarity.contracts.case import CaseState
@@ -183,7 +181,6 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
     app.state.authorization_policy = core.authorization
     _register_handlers(app)
     _register_routes(app)
-    _register_pages(app)
     return app
 
 
@@ -1944,48 +1941,3 @@ def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
             "sms": 0,
         },
     }
-
-
-# --------------------------------------------------------------------------- #
-# Pages
-# --------------------------------------------------------------------------- #
-
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-
-def _register_pages(app: FastAPI) -> None:
-    """Serve the UI from the same process as the API.
-
-    **Prototype simplification.** Plan §21 specifies Next.js/TypeScript for
-    production; here the pages are plain HTML and vanilla JS served by FastAPI,
-    so the whole prototype runs from one command with no Node toolchain. The
-    pages only consume the public `/v1` API, so replacing them with the Next.js
-    app changes nothing on the server.
-    """
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-    @app.get("/", include_in_schema=False)
-    def customer_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
-
-    @app.get("/desk", include_in_schema=False)
-    def desk_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "desk.html")
-
-    @app.get("/ops", include_in_schema=False)
-    @app.get("/autopsy", include_in_schema=False)
-    @app.get("/foresight", include_in_schema=False)
-    def desk_section() -> FileResponse:
-        """Insights, Autopsy and Foresight share the Desk page."""
-        return FileResponse(STATIC_DIR / "desk.html")
-
-    @app.get("/verify", include_in_schema=False)
-    def verify_landing() -> FileResponse:
-        """Bottom-tab landing for checking a Trust Receipt."""
-        return FileResponse(STATIC_DIR / "verify.html")
-
-    @app.get("/v/{receipt_id}", include_in_schema=False)
-    @app.get("/v", include_in_schema=False)
-    def verify_page(receipt_id: str = "") -> FileResponse:
-        """Where a receipt QR code points."""
-        return FileResponse(STATIC_DIR / "verify.html")
