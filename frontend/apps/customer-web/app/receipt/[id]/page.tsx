@@ -158,8 +158,8 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
                   fontWeight: 700,
                   letterSpacing: ".08em",
                   textTransform: "uppercase",
-                  background: !checked ? "#fef3c7" : valid ? "#dcfce7" : "#fee2e2",
-                  color: !checked ? "#92400e" : valid ? "#14532d" : "#991b1b",
+                  background: !checked ? "rgb(var(--c-warning-soft))" : valid ? "rgb(var(--c-success-soft))" : "rgb(var(--c-danger-soft))",
+                  color: !checked ? "rgb(var(--c-warning))" : valid ? "rgb(var(--c-success))" : "rgb(var(--c-danger))",
                 }}
               >
                 {!checked ? "Not checked" : valid ? "Valid" : "Invalid"}
@@ -206,7 +206,7 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
                     style={{
                       margin: 0,
                       fontWeight: 600,
-                      color: state.chainOk ? "#047857" : "#b91c1c",
+                      color: state.chainOk ? "rgb(var(--c-success))" : "rgb(var(--c-danger))",
                     }}
                   >
                     {state.chainOk ? "Intact" : "Broken"}
@@ -214,7 +214,7 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
 
                   <dt style={{ color: "var(--muted)" }}>Signature</dt>
                   <dd
-                    style={{ margin: 0, fontWeight: 600, color: valid ? "#047857" : "#b91c1c" }}
+                    style={{ margin: 0, fontWeight: 600, color: valid ? "rgb(var(--c-success))" : "rgb(var(--c-danger))" }}
                   >
                     {valid ? "Verified" : "Failed"}
                   </dd>

@@ -150,6 +150,14 @@
       "response": null,
       "status": "200"
     },
+    "GET /v1/autopsy/clusters": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/cases/{case_id}": {
       "parameters": [
         "header:authorization?",
@@ -186,14 +194,6 @@
       "response": "object",
       "status": "200"
     },
-    "GET /v1/demo/autopsy": {
-      "parameters": [
-        "header:authorization?"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
     "GET /v1/demo/foresight": {
       "parameters": [
         "header:authorization?"
@@ -205,14 +205,6 @@
     "GET /v1/demo/inbox": {
       "parameters": [
         "query:msisdn"
-      ],
-      "request": null,
-      "response": "object",
-      "status": "200"
-    },
-    "GET /v1/demo/ops": {
-      "parameters": [
-        "header:authorization?"
       ],
       "request": null,
       "response": "object",
@@ -238,6 +230,14 @@
       ],
       "request": null,
       "response": "array[object]",
+      "status": "200"
+    },
+    "GET /v1/insights/dashboards": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
       "status": "200"
     },
     "GET /v1/knowledge/search": {
@@ -510,6 +510,33 @@
         "query:return_to?"
       ],
       "request": null,
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/autopsy/clusters/{cluster_id}/review": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "ReviewRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/autopsy/clusters/{cluster_id}/rule-candidate": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "RuleCandidateRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/autopsy/clusters/{cluster_id}/supersede": {
+      "parameters": [
+        "header:authorization?",
+        "path:cluster_id"
+      ],
+      "request": "SupersedeRequest",
       "response": "object",
       "status": "200"
     },
@@ -1041,6 +1068,27 @@
         "amount_lkr"
       ]
     },
+    "ReviewRequest": {
+      "fields": [
+        "accept",
+        "note"
+      ],
+      "required": [
+        "accept"
+      ]
+    },
+    "RuleCandidateRequest": {
+      "fields": [
+        "key",
+        "rationale",
+        "value"
+      ],
+      "required": [
+        "key",
+        "rationale",
+        "value"
+      ]
+    },
     "RuledOutView": {
       "fields": [
         "reason",
@@ -1109,6 +1157,16 @@
       "required": [
         "roles",
         "user_ref"
+      ]
+    },
+    "SupersedeRequest": {
+      "fields": [
+        "accept",
+        "note"
+      ],
+      "required": [
+        "accept",
+        "note"
       ]
     },
     "SwitchFlipRequest": {

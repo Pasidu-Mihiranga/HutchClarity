@@ -53,8 +53,8 @@ export function CaseRow({
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: ".04em",
-              background: isOpen ? "#fff1eb" : "#dcfce7",
-              color: isOpen ? "#c2410c" : "#14532d",
+              background: isOpen ? "rgb(var(--c-primary-soft))" : "rgb(var(--c-success-soft))",
+              color: isOpen ? "rgb(var(--c-primary))" : "rgb(var(--c-success))",
             }}
           >
             {state}
@@ -68,7 +68,7 @@ export function CaseRow({
           {currency} {amount}
         </p>
       </div>
-      <span style={{ color: "#a1a1aa", fontSize: 20, flexShrink: 0 }} aria-hidden="true">›</span>
+      <span style={{ color: "rgb(var(--c-fg-subtle))", fontSize: 20, flexShrink: 0 }} aria-hidden="true">›</span>
     </Link>
   );
 }

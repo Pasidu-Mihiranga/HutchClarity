@@ -7,6 +7,7 @@ graph with a different world or a frozen clock.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -1072,6 +1073,18 @@ class Clarity:
             group="autopsy",
             handler=self.autopsy.on_complaint_created,
         )
+        # Seed the synthetic complaints the reviewer workspace needs to show
+        # anything (D4).
+        #
+        # This used to happen lazily inside `GET /v1/demo/autopsy`, which is
+        # why that route could be deleted only once the seeding moved: a GET
+        # that writes to a store is a surprise, and the real workspace route
+        # must never import a mock driver. Here it is legal, because the
+        # composition root is the one place that may know which profile it is
+        # building (I20), and it is the one place that already decides every
+        # other synthetic-versus-real driver.
+        if self.profile is not Profile.PROD:
+            self._seed_synthetic_complaints()
 
         # Foresight rehearses a change before it ships (C1/F03). It reads its
         # segments, theme weights, band thresholds and calibration gate from the
@@ -1128,6 +1141,37 @@ class Clarity:
             open_unit=self.open_unit,
             intake_assist=self.intake_assist,
         )
+
+    def _seed_synthetic_complaints(self) -> None:
+        """Put the labelled synthetic complaints into autopsy (D4).
+
+        Autopsy is fed by `complaint.created`, so a freshly built synthetic
+        world has no complaints and the reviewer workspace has nothing to
+        show. Until a channel publishes real traffic, the demo dataset is what
+        fills it.
+
+        Best effort on purpose. If the mock dataset cannot be built, a console
+        with an empty cluster list is a far better outcome than a process that
+        will not start, and every other surface is unaffected.
+        """
+        if self.autopsy.clusters():
+            return
+        try:
+            from clarity.integration.drivers.mock.synthetic_dataset import (
+                generate_synthetic_dataset,
+            )
+            from clarity.modules.autopsy.public import BatchComplaint
+
+            dataset = generate_synthetic_dataset()
+            self.autopsy.ingest(
+                BatchComplaint(row.complaint_id, row.text, row.channel)
+                for row in dataset.complaints
+            )
+            self.autopsy.rerun()
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "could not seed synthetic complaints for autopsy", exc_info=True
+            )
 
     def _invalidate_answer_cache(self, event: Event) -> None:
         """Drop cached answers composed against an older corpus (K03).

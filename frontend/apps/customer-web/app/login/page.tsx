@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClarityClient } from "@clarity/sdk";
 import { t } from "@clarity/i18n";
+import { Alert, Button, Field, Input } from "@clarity/ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { safeNext } from "@/lib/session";
 
@@ -129,112 +130,64 @@ export default function LoginPage() {
 
         {step === "request" ? (
           <form onSubmit={onRequest} style={{ display: "grid", gap: 14 }}>
-            <div>
-              <label
-                htmlFor="msisdn"
-                style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}
-              >
-                Hutch number
-              </label>
-              <input
-                id="msisdn"
-                name="msisdn"
-                autoComplete="tel"
-                inputMode="tel"
-                placeholder="07XXXXXXXX"
-                value={msisdn}
-                onChange={(e) => setMsisdn(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  font: "inherit",
-                  fontSize: 15,
-                  padding: "12px 16px",
-                  border: "1px solid var(--line)",
-                  borderRadius: "var(--radius-sm)",
-                  background: "#fff",
-                  color: "var(--ink)",
-                  outline: "none",
-                }}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !msisdn}
-              className="h-btn h-btn-primary"
-              style={{ width: "100%" }}
-            >
+            <Field label="Hutch number">
+              {(control) => (
+                <Input
+                  {...control}
+                  name="msisdn"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  placeholder="07XXXXXXXX"
+                  value={msisdn}
+                  onChange={(e) => setMsisdn(e.target.value)}
+                  required
+                  className="rounded-[14px] px-4 py-3 text-[15px]"
+                />
+              )}
+            </Field>
+            <Button type="submit" pill size="lg" loading={busy} disabled={!msisdn} className="w-full">
               Continue
-            </button>
+            </Button>
           </form>
         ) : (
           <form onSubmit={onVerify} style={{ display: "grid", gap: 14 }}>
-            <div>
-              <label
-                htmlFor="otp"
-                style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}
-              >
-                6-digit code
-              </label>
-              <input
-                id="otp"
-                name="otp"
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-                maxLength={6}
-                style={{
-                  fontFamily: "ui-monospace, monospace",
-                  fontSize: 24,
-                  letterSpacing: ".32em",
-                  padding: "10px 12px",
-                  border: "1px solid var(--line)",
-                  borderRadius: "var(--radius-sm)",
-                  background: "#fff",
-                  color: "var(--ink)",
-                  width: "100%",
-                  outline: "none",
-                }}
-              />
-            </div>
+            <Field label="6-digit code">
+              {(control) => (
+                <Input
+                  {...control}
+                  name="otp"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  maxLength={6}
+                  className="rounded-[14px] px-3 py-2.5 font-mono text-2xl tracking-[.32em]"
+                />
+              )}
+            </Field>
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="submit"
-                disabled={busy || !code}
-                className="h-btn h-btn-primary"
-                style={{ flex: 1 }}
-              >
+              <Button type="submit" pill size="lg" loading={busy} disabled={!code} className="flex-1">
                 Sign in
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="h-btn h-btn-ghost"
+                variant="secondary"
+                pill
+                size="lg"
                 onClick={() => { setStep("request"); setStatus(null); }}
               >
                 Back
-              </button>
+              </Button>
             </div>
           </form>
         )}
 
         {status && (
-          <div
-            role="status"
-            style={{
-              marginTop: 14,
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontSize: 14,
-              background: status.tone === "ok" ? "#f0fdf4" : "var(--orange-soft)",
-              border: `1px solid ${status.tone === "ok" ? "#86efac" : "#fdd5c0"}`,
-              color: status.tone === "ok" ? "#166534" : "var(--orange-ink)",
-            }}
-          >
+          <Alert tone={status.tone === "ok" ? "success" : "info"} className="mt-3.5">
             {status.text}
-          </div>
+          </Alert>
         )}
       </div>
 
@@ -245,14 +198,14 @@ export default function LoginPage() {
           marginTop: 16,
           border: "1px dashed var(--warn)",
           borderRadius: 10,
-          background: "#fffbeb",
+          background: "rgb(var(--c-warning-soft))",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             background: "var(--warn)",
-            color: "#fff",
+            color: "rgb(var(--c-on-primary))",
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: ".03em",

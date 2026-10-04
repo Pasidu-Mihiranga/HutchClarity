@@ -4,27 +4,25 @@
 
 /* Hutch Clarity design tokens - mirrored from the old app */
 :root {
-  --orange:      #f26226;
-  /* White text on `--orange` measures 3.2:1, below the 4.5:1 WCAG AA needs for
-     normal-size text, which an axe run flagged as a serious violation on the
-     chat. `--orange` stays as it is for fills, borders and icons, where no
-     text sits on it. Anything that puts white text on an orange background
-     uses `--orange-strong` (5.2:1) instead. */
-  --orange-strong: #c2410c;
-  --orange-ink:  #c2410c;
-  --orange-soft: #fff1eb;
-  --ink:         #1a1a1a;
-  --muted:       #6b6b6b;
-  --line:        #ebebef;
-  --bg:          #ffffff;
-  --ok:          #047857;
-  --warn:        #b45309;
-  --stop:        #b91c1c;
-  --radius:      20px;
-  --radius-sm:   14px;
-  --shadow:      0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
-  --nav-h:       64px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Aliases onto the shared design tokens (@clarity/ui/tokens.css). The orange
+     fills keep --orange for borders and icons; white text on an orange fill
+     uses --orange-strong (5.2:1), which is what --c-primary resolves to. */
+  --orange:        rgb(var(--c-brand));
+  --orange-strong: rgb(var(--c-primary));
+  --orange-ink:    rgb(var(--c-primary));
+  --orange-soft:   rgb(var(--c-primary-soft));
+  --ink:           rgb(var(--c-fg));
+  --muted:         rgb(var(--c-fg-muted));
+  --line:          rgb(var(--c-border));
+  --bg:            rgb(var(--c-surface));
+  --ok:            rgb(var(--c-success));
+  --warn:          rgb(var(--c-warning));
+  --stop:          rgb(var(--c-danger));
+  --radius:        var(--radius-xl);
+  --radius-card-sm: 14px;
+  --shadow:        var(--shadow-2);
+  --nav-h:         64px;
+  --safe-bottom:   env(safe-area-inset-bottom, 0px);
 }
 
 * { box-sizing: border-box; }
@@ -50,7 +48,7 @@ a { color: var(--orange-ink); }
 
 /* ---- Hutch card ---- */
 .h-card {
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 18px;
@@ -75,14 +73,14 @@ a { color: var(--orange-ink); }
   transition: filter .15s;
 }
 .h-btn-primary {
-  background: var(--orange);
-  color: #fff;
+  background: var(--orange-strong);
+  color: rgb(var(--c-on-primary));
 }
 .h-btn-primary:hover { filter: brightness(.97); }
 .h-btn-primary:disabled { opacity: .55; cursor: not-allowed; filter: none; }
 .h-btn-ghost {
-  background: #fff;
-  border: 1.5px solid var(--orange-200, #f8b39a);
+  background: var(--bg);
+  border: 1.5px solid rgb(var(--c-primary) / 0.4);
   color: var(--orange-ink);
 }
 
@@ -95,7 +93,7 @@ a { color: var(--orange-ink); }
   text-align: left;
   cursor: pointer;
   font: inherit;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 14px 14px 12px;
@@ -103,7 +101,7 @@ a { color: var(--orange-ink); }
   transition: border-color .15s, background .15s;
 }
 .h-option:hover {
-  border-color: #f8b39a;
+  border-color: rgb(var(--c-primary) / 0.4);
   background: var(--orange-soft);
 }
 
@@ -118,10 +116,10 @@ a { color: var(--orange-ink); }
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.h-badge-open     { background: #fff1eb; color: #c2410c; }
-.h-badge-resolved { background: #dcfce7; color: #14532d; }
-.h-badge-neutral  { background: #f4f4f5; color: #52525b; }
-.h-badge-sim      { background: #fef3c7; color: #92400e; }
+.h-badge-open     { background: rgb(var(--c-primary-soft)); color: rgb(var(--c-primary)); }
+.h-badge-resolved { background: rgb(var(--c-success-soft)); color: rgb(var(--c-success)); }
+.h-badge-neutral  { background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg-muted)); }
+.h-badge-sim      { background: rgb(var(--c-warning-soft)); color: rgb(var(--c-warning)); }
 
 /* ---- Thinking orb (chat waiting state, components/ui/thinking-orb.tsx) ----
    Adapted from the MorphOrb design. Text keeps --muted (5.3:1 on white) as
@@ -265,7 +263,7 @@ a { color: var(--orange-ink); }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(24, 24, 27, .35);
+  background: rgb(var(--c-overlay) / .35);
   animation: vo-fade .2s ease-out both;
 }
 .vo-sheet {
@@ -311,7 +309,7 @@ a { color: var(--orange-ink); }
   margin: 0;
   width: 100%;
   padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-card-sm);
   background: var(--orange-soft);
   color: var(--ink);
   font-size: 16px;
@@ -332,8 +330,8 @@ a { color: var(--orange-ink); }
   cursor: pointer;
 }
 .vo-btn:focus-visible, .vo-close:focus-visible { outline: 2px solid var(--orange-strong); outline-offset: 2px; }
-.vo-btn-primary { background: var(--orange-strong); border-color: var(--orange-strong); color: #fff; }
-.vo-btn-primary:hover { background: #9a3412; border-color: #9a3412; }
+.vo-btn-primary { background: var(--orange-strong); border-color: var(--orange-strong); color: rgb(var(--c-on-primary)); }
+.vo-btn-primary:hover { background: rgb(var(--c-primary-hover)); border-color: rgb(var(--c-primary-hover)); }
 .vo-btn-ghost { border-color: transparent; color: var(--orange-ink); }
 
 @media (prefers-reduced-motion: reduce) {

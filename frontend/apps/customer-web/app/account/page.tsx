@@ -54,7 +54,7 @@ export default function AccountPage() {
                 fontFamily: "inherit",
                 cursor: "pointer",
                 border: l === lang ? "2px solid var(--orange)" : "1px solid var(--line)",
-                background: l === lang ? "var(--orange-soft)" : "#fff",
+                background: l === lang ? "var(--orange-soft)" : "rgb(var(--c-surface))",
                 color: l === lang ? "var(--orange-ink)" : "var(--ink)",
               }}
             >
@@ -73,9 +73,9 @@ export default function AccountPage() {
               width: "100%",
               textAlign: "left",
               padding: "14px 16px",
-              borderRadius: "var(--radius-sm)",
+              borderRadius: "var(--radius-card-sm)",
               border: "1px solid var(--line)",
-              background: "#fff",
+              background: "rgb(var(--c-surface))",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -88,7 +88,7 @@ export default function AccountPage() {
               <span style={{ display: "block", fontWeight: 650, fontSize: 15 }}>{label}</span>
               {sub && <span style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 1 }}>{sub}</span>}
             </span>
-            <span style={{ color: "#a1a1aa", fontSize: 18 }} aria-hidden="true">›</span>
+            <span style={{ color: "rgb(var(--c-fg-subtle))", fontSize: 18 }} aria-hidden="true">›</span>
           </button>
         ))}
       </div>
@@ -105,8 +105,8 @@ export default function AccountPage() {
       {/* Simulated notice - I16 */}
       <div
         style={{
-          border: "1px solid #fdd5c0",
-          borderRadius: "var(--radius-sm)",
+          border: "1px solid rgb(var(--c-primary) / 0.3)",
+          borderRadius: "var(--radius-card-sm)",
           background: "var(--orange-soft)",
           padding: "10px 14px",
           fontSize: 13,

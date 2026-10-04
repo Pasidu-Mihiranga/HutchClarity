@@ -38,10 +38,15 @@ not a cluster: a cluster is a claim that several complaints share a cause, so
 one arriving changes the answer for all of them.
 
 ## 3. Used by
-`clarity.app.container`, which constructs `AutopsyService` and registers it as
-the `autopsy` consumer group for `complaint.created`; and
-`clarity.interfaces.http` for `GET /v1/demo/autopsy`, which shows a reviewer
-the current clusters.
+`clarity.app.container`, which constructs `AutopsyService`, registers it as the
+`autopsy` consumer group for `complaint.created` and seeds the synthetic
+complaints in every non-`prod` profile (D4); and `clarity.interfaces.http` for
+the reviewer workspace, `GET /v1/autopsy/clusters` plus `POST .../review`,
+`.../supersede` and `.../rule-candidate`.
+
+`GET /v1/demo/autopsy` was retired in D4. It had seeded the demo dataset lazily
+on first read, so the seed moved to the composition root: a GET that writes is
+a surprise, and the real workspace route must never import a mock driver.
 
 ## 3a. Invariants
 
@@ -77,6 +82,11 @@ the current clusters.
 In-memory structures in the `lite` profile. Target: one PostgreSQL schema `autopsy` with its own role (ADR-0013), same repository interfaces, same parity suite.
 
 ## 6. Invariants
+- **Seeing a cluster and ruling on one are different permissions** (D1). Reading the workspace is `desk:queue:read`; recording a verdict is `autopsy:review`; proposing a policy change from a confirmed cluster is `rule:draft` on top. A reviewer who could do all three by holding one permission would have a confirmation already halfway to a published rule.
+- **The reviewer is the authenticated caller**, never a field in a request body. An anonymous verdict is not an audit record, and one attributed to whatever the caller typed is worse than none.
+- **A hypothesis cannot seed a policy change.** Only a confirmed cluster may be proposed, and the proposal is a `PolicyChange` in the draft state: this module cannot write a rule pack, activate anything, or shortcut the approval lifecycle (AU02).
+- **A proposal names an existing policy artefact.** The artefact's tags decide the change class, so inventing a key would route around the thing that decides how many approvals the change needs.
+
 - No complaint text reaches a model unmasked; refused content is not stored.
 
 ## 7. Migration status (enterprise-plan 21)
@@ -91,3 +101,5 @@ Batch logic in process. Runtime target: serverless batch job (ADR-0028).
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-R1-restructure.md` | Moved into `clarity.modules.autopsy` with a public surface (R1) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-AU02-autopsy-dataset-hardening.md` | Replaced the tiny demo tuple with DATA01 ingestion and honest reviewer workspace metadata |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D1-autopsy-review-api.md` | Reviewer workspace over HTTP: confirm, reject, supersede-with-reason, and a governed rule candidate (D1) |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-D4-retire-demo-routes.md` | `GET /v1/demo/autopsy` retired; the synthetic seed moved to the composition root (D4) |

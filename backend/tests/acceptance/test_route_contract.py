@@ -66,6 +66,15 @@ SIGNED_IN = {
     # Beginning a step-up needs a session: it re-authenticates somebody who is
     # already here (B2).
     ("POST", "/v1/auth/staff/step-up"),
+    # The Autopsy reviewer workspace (D1). Reading is the desk permission;
+    # ruling needs `autopsy:review`; proposing a policy change needs
+    # `rule:draft`, which is a different judgement from reviewing.
+    ("GET", "/v1/autopsy/clusters"),
+    # Operations dashboards, folded from the event log (D2).
+    ("GET", "/v1/insights/dashboards"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/review"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/supersede"),
+    ("POST", "/v1/autopsy/clusters/{cluster_id}/rule-candidate"),
     # A person's own sessions (B3). Signed in only, and the subject comes from
     # the token, so there is nothing to enumerate.
     ("GET", "/v1/auth/sessions"),
@@ -124,8 +133,6 @@ SIGNED_IN = {
     ("POST", "/v1/admin/policy/changes/{change_id}/schedule"),
     ("POST", "/v1/admin/policy/changes/{change_id}/activate"),
     ("POST", "/v1/admin/policy/changes/{change_id}/rollback"),
-    ("GET", "/v1/demo/ops"),
-    ("GET", "/v1/demo/autopsy"),
     ("GET", "/v1/demo/foresight"),
     ("GET", "/v1/me/home"),
     ("GET", "/v1/me/app"),
