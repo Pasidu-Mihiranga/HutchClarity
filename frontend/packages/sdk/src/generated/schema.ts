@@ -1283,26 +1283,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/demo/foresight": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Demo Foresight
-         * @description Rehearse retiring a pack. Scenarios, not certainties.
-         */
-        get: operations["demo_foresight_v1_demo_foresight_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/demo/inbox": {
         parameters: {
             query?: never;
@@ -1686,7 +1666,7 @@ export interface paths {
         };
         /**
          * List Spikes
-         * @description Early-warning spikes. C5 supplies the detector that fills this.
+         * @description Early-warning spikes, raised by the radar (C5).
          */
         get: operations["list_spikes_v1_foresight_spikes_get"];
         put?: never;
@@ -4977,39 +4957,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_foresight_v1_demo_foresight_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
             /** @description Validation Error */

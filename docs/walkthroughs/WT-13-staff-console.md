@@ -8,7 +8,7 @@
 | Journey | Staff password sign-in; Desk approve; Autopsy and Foresight; kill switches |
 | Status | verified |
 | Last verified | 2026-10-04 (local directory sign-in; VPS image is a root-side build, not a GitHub release) |
-| Re-verification owed | Steps 8-8b and 9-9b were rewritten for D3 and D4 on 2026-10-05 and have **not** been walked in a browser since. The routes behind them are covered by acceptance tests; the click path is not. |
+| Re-verification owed | Steps 8-8b, 9-9b and 10-10b were rewritten for D3, D4 and C on 2026-10-05 and have **not** been walked in a browser since. The routes behind them are covered by acceptance tests; the click path is not. |
 
 ## 1. What you will see
 
@@ -53,7 +53,9 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 | 9 | As **supervisor**, open **Complaint Autopsy** | Autopsy | `GET /v1/autopsy/clusters` | SYNTHETIC DATA, HYPOTHESIS labels, masked examples, trend and `TrigramSimilarity` disclosure |
 | 9a | Confirm a cluster, then change the verdict with a reason | Autopsy | `POST .../review`, `.../supersede` | Both verdicts survive and are listed; a reversal with no reason is refused |
 | 9b | Sign in as `agent` / `agent-clarity` and open Autopsy | Autopsy | `GET /v1/autopsy/clusters` | The workspace reads, and no verdict buttons appear (no `autopsy:review`) |
-| 10 | Open **Foresight** | Foresight | `GET /v1/demo/foresight` | SCENARIO, NOT CERTAINTY; baseline-vs-swarm bands; not calibrated warning |
+| 10 | Sign in as `product` / `product-clarity`, open **Foresight**, pick a scenario and press Rehearse | Foresight | `GET /v1/foresight/scenarios`, `POST /v1/foresight/runs` (202 + `Location`) | SCENARIO, NOT CERTAINTY; the run is stored and its report lists banded themes with a basis and caveats |
+| 10a | Press Rehearse again | Foresight | `POST /v1/foresight/runs` | A new run, because the page mints a fresh `Idempotency-Key` per click. An repeated key returns the original run marked REPLAYED |
+| 10b | Read the calibration panel | Foresight | `GET /v1/foresight/calibration` | NOT CALIBRATED comes from the API, not from the page. No launch decision rests on a rehearsal until it is backtested |
 
 ## 4. Under the hood
 

@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card } from "@clarity/ui";
-import type { AutopsyWorkspace } from "@clarity/sdk";
+import type { AutopsyWorkspace, ForesightPrediction } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 export default function InsightsPage() {
   const { client, session, generation, hasPermission } = useStaffSession();
   const allowed = hasPermission("desk:queue:read");
+  // Foresight is a separate permission from the desk's. This page is gated on
+  // the desk's, so a reader without `foresight:read` sees everything else
+  // rather than a 403 that takes the whole page down with it.
+  const canReadForesight = hasPermission("foresight:read");
   const [ops, setOps] = useState<Record<string, unknown> | null>(null);
   const [autopsy, setAutopsy] = useState<AutopsyWorkspace | null>(null);
-  const [foresight, setForesight] = useState<Record<string, unknown> | null>(null);
+  const [predictions, setPredictions] = useState<ForesightPrediction[] | null>(null);
+  const [foresightNote, setForesightNote] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,21 +24,43 @@ export default function InsightsPage() {
     setError(null);
     void (async () => {
       try {
-        const [o, a, f] = await Promise.all([
+        const [o, a] = await Promise.all([
           client.insightsDashboards(),
           // The reviewer workspace, not `demo/autopsy`: that route was
           // retired in D4 and this one is the same clusters, typed.
           client.autopsyClusters(),
-          client.demoForesight(),
         ]);
         setOps(o);
         setAutopsy(a);
-        setForesight(f);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Insights failed");
       }
+
+      if (!canReadForesight) {
+        setPredictions([]);
+        setForesightNote("Reading rehearsals needs foresight:read.");
+        return;
+      }
+      // The latest stored report, not a scenario built for this request. The
+      // demo route used to rehearse on every call and discard the result, so
+      // nothing this panel showed could be cited afterwards.
+      try {
+        const { runs } = await client.foresightRuns();
+        const latest = runs.find((run) => run.status === "succeeded");
+        if (!latest) {
+          setPredictions([]);
+          setForesightNote("No rehearsal has been run yet.");
+          return;
+        }
+        const full = await client.foresightRun(latest.run_id);
+        setPredictions(full.report?.predictions ?? []);
+        setForesightNote(full.report?.basis ?? "");
+      } catch (err) {
+        setPredictions([]);
+        setForesightNote(err instanceof Error ? err.message : "Foresight failed");
+      }
     })();
-  }, [allowed, client, generation]);
+  }, [allowed, canReadForesight, client, generation]);
 
   if (!session || !allowed) {
     return <AccessDenied need="desk:queue:read" />;
@@ -41,12 +68,7 @@ export default function InsightsPage() {
 
   const byOutcome = (ops?.by_outcome || {}) as Record<string, number>;
   const clusters = autopsy?.clusters ?? [];
-  const predictions = (foresight?.predictions || []) as Array<{
-    band: string;
-    segment: string;
-    theme: string;
-    mitigation: string;
-  }>;
+
 
   return (
     <div className="space-y-6">
@@ -117,16 +139,23 @@ export default function InsightsPage() {
 
       <Card>
         <h2 className="mb-2 font-medium">Foresight</h2>
-        <p className="mb-2 text-sm text-slate-600">
-          {String(foresight?.scenario || "")}. {String(foresight?.note || "")}
-        </p>
-        <ul className="space-y-2 text-sm">
-          {predictions.map((p, i) => (
-            <li key={i}>
-              <strong>{p.band}</strong> · {p.segment} · {p.theme} - {p.mitigation}
-            </li>
-          ))}
-        </ul>
+        <p className="mb-2 text-xs text-slate-500">{foresightNote}</p>
+        {predictions === null ? (
+          <p className="text-sm text-slate-600">Loading the latest rehearsal...</p>
+        ) : predictions.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            Nothing to show. A rehearsal is a scenario, never a forecast, and none has been
+            stored for this panel to read.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {predictions.map((p, i) => (
+              <li key={i}>
+                <strong>{p.band}</strong> · {p.segment} · {p.theme} - {p.mitigation}
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
   );
