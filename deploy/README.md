@@ -57,6 +57,11 @@ docker compose --env-file /opt/hutch-clarity/.env.production \
   -e WHATSAPP_PAIRING_PHONE=<country-code-digits> clarity-whatsapp npm run pair
 ```
 
+If WhatsApp refuses phone-number linking, use QR pairing from the same private
+operator terminal by replacing the phone environment option with
+`-e WHATSAPP_PAIRING_MODE=qr`. The QR and auth state must not be copied into
+logs, tickets or the repository.
+
 Baileys is an unofficial WhatsApp Web client and is not affiliated with Meta
 or HUTCH. The transport is limited to direct customer messages and must be
 operated in accordance with WhatsApp terms. The service ignores own messages,

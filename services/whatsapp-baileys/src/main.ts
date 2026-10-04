@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js"
 import { WhatsAppRuntime } from "./runtime.js"
 
+process.umask(0o077)
 const runtime = new WhatsAppRuntime(loadConfig())
 await runtime.start()
 
