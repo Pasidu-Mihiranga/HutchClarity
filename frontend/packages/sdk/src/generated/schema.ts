@@ -171,6 +171,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Offers
+         * @description Every recorded offer, newest first. Masked numbers only.
+         */
+        get: operations["list_offers_v1_admin_offers_get"];
+        put?: never;
+        /**
+         * Record Offer
+         * @description Record what HUTCH sent to a number.
+         *
+         *     **This is the authority the fraud check rests on**, which is why it is
+         *     security admin's alone: adding an offer here makes a matching message
+         *     read as genuine to the customer who pastes it. The record is
+         *     append-only, so a correction is a new row and nothing already checked
+         *     against can be rewritten.
+         *
+         *     The number is resolved to its pseudonym before anything is stored; the
+         *     raw MSISDN never reaches the offers table.
+         */
+        post: operations["record_offer_v1_admin_offers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/policy/changes": {
         parameters: {
             query?: never;
@@ -1857,7 +1890,7 @@ export interface paths {
         };
         /**
          * My Cases
-         * @description Cases opened for the signed-in number.
+         * @description Cases opened for the profile that is open.
          */
         get: operations["my_cases_v1_me_cases_get"];
         put?: never;
@@ -1894,7 +1927,7 @@ export interface paths {
         };
         /**
          * My Home
-         * @description Balance, pack, activity and alerts for the signed-in number.
+         * @description Balance, pack, activity and alerts for the open profile.
          */
         get: operations["my_home_v1_me_home_get"];
         put?: never;
@@ -1933,6 +1966,26 @@ export interface paths {
         put?: never;
         /** My Preferences */
         post: operations["my_preferences_v1_me_preferences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * My Profile
+         * @description Open a family profile, or return to the signed-in person.
+         */
+        post: operations["my_profile_v1_me_profile_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2004,6 +2057,37 @@ export interface paths {
         put?: never;
         /** My Cancel */
         post: operations["my_cancel_v1_me_subscriptions__subscription_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Offer Message
+         * @description Check a message a customer received against their own offers.
+         *
+         *     **The answer is what the records say, not a scam flag.** `ON_RECORD`
+         *     means an offer on record for this number matches; `NOT_ON_RECORD` means
+         *     none does; `NEEDS_A_PERSON` means it partly matched, which is the case
+         *     the other two would both get wrong. The reason it is phrased that way
+         *     is in `clarity.modules.offers.offers`: a verdict of "scam" would be an
+         *     inference past what was checked, and the pasted text is the one thing
+         *     an attacker controls (I2).
+         *
+         *     Bound to the caller's own subscriber, so one customer cannot test a
+         *     message against another's offers.
+         */
+        post: operations["verify_offer_message_v1_offers_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2363,6 +2447,11 @@ export interface components {
         FamilyRequest: {
             /** Msisdn */
             msisdn: string;
+            /**
+             * Role
+             * @default elder
+             */
+            role: string;
         };
         /**
          * ForesightRunRequest
@@ -2538,6 +2627,135 @@ export interface components {
             /** Subscriber Msisdn */
             subscriber_msisdn?: string | null;
         };
+        /**
+         * OfferCheckRequest
+         * @description A message a customer received, to be checked against their own offers.
+         *
+         *     `message` is customer-supplied text and is treated as one throughout: it
+         *     picks which recorded offer to compare against and never decides the answer
+         *     (I2). It is not stored.
+         */
+        OfferCheckRequest: {
+            /** Message */
+            message: string;
+        };
+        /**
+         * OfferCheckView
+         * @description What the records say about the pasted message.
+         *
+         *     `verdict` is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`. It is
+         *     deliberately **not** a scam flag: see `clarity.modules.offers.offers`.
+         */
+        OfferCheckView: {
+            matched?: components["schemas"]["OfferMatchView"] | null;
+            /** Offers On Record */
+            offers_on_record: number;
+            /** Signals */
+            signals?: components["schemas"]["OfferSignalView"][];
+            /**
+             * Simulated
+             * @default true
+             */
+            simulated: boolean;
+            /** Verdict */
+            verdict: string;
+        };
+        /**
+         * OfferMatchView
+         * @description The closest recorded offer, when one came close.
+         */
+        OfferMatchView: {
+            /** Code Matched */
+            code_matched: boolean;
+            /** Containment */
+            containment: number;
+            /**
+             * Offer Code
+             * @default
+             */
+            offer_code: string;
+            /** Offer Id */
+            offer_id: string;
+            /** Source */
+            source: string;
+            /** Still Valid */
+            still_valid: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to?: string | null;
+        };
+        /**
+         * OfferRecordRequest
+         * @description What HUTCH sent to one number, as a staff member records it.
+         */
+        OfferRecordRequest: {
+            /** Body */
+            body: string;
+            /** Msisdn */
+            msisdn: string;
+            /**
+             * Offer Code
+             * @default
+             */
+            offer_code: string;
+            /** Title */
+            title: string;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+        };
+        /**
+         * OfferSignalView
+         * @description One warning sign found in the message. Evidence, never a verdict.
+         */
+        OfferSignalView: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * OfferView
+         * @description One recorded offer, for the staff list. Never the raw MSISDN.
+         */
+        OfferView: {
+            /** Body */
+            body: string;
+            /** Msisdn Masked */
+            msisdn_masked: string;
+            /**
+             * Offer Code
+             * @default
+             */
+            offer_code: string;
+            /** Offer Id */
+            offer_id: string;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /** Recorded By */
+            recorded_by: string;
+            /** Source */
+            source: string;
+            /** Still Valid */
+            still_valid: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to?: string | null;
+        };
         /** OpenCaseRequest */
         OpenCaseRequest: {
             /** @default web */
@@ -2669,6 +2887,14 @@ export interface components {
              * @default important
              */
             notify: string;
+        };
+        /**
+         * ProfileSwitchRequest
+         * @description Whose home to open. Empty returns to the signed-in person.
+         */
+        ProfileSwitchRequest: {
+            /** Msisdn */
+            msisdn?: string | null;
         };
         /** ProposeRequest */
         ProposeRequest: {
@@ -3208,6 +3434,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_offers_v1_admin_offers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_offer_v1_admin_offers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferView"];
                 };
             };
             /** @description Validation Error */
@@ -6258,6 +6550,43 @@ export interface operations {
             };
         };
     };
+    my_profile_v1_me_profile_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_receipts_v1_me_receipts_get: {
         parameters: {
             query?: never;
@@ -6387,6 +6716,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_offer_message_v1_offers_verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferCheckView"];
                 };
             };
             /** @description Validation Error */

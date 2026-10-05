@@ -11,7 +11,7 @@ COMPOSE := deploy/compose/full.yml
 # 5440, not 5432: a developer machine usually already runs PostgreSQL there.
 FULL_DATABASE_URL := postgresql+psycopg://clarity:clarity@localhost:5440/clarity
 
-.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed synthetic-data eval \
+.PHONY: help setup dev mcp check lint format types imports test demo tokens keys seed synthetic-data eval cassettes cassettes-dry \
 	load chaos \
         up-full down-full test-full dev-e2e e2e e2e-install channel-gateway \
         contracts contracts-check \
@@ -52,8 +52,12 @@ setup:
 	python3 -m venv --clear .venv
 	$(PY)/pip install -e "$(BACKEND)[dev]"
 
+# A gitignored local directory wins, so one machine can add an account
+# without changing the shared synthetic file. E2E keeps the shared file.
+STAFF_DIRECTORY_FILE := $(if $(wildcard config/staff/local-directory.json),../config/staff/local-directory.json,../config/staff/synthetic-directory.json)
+
 dev:
-	cd $(BACKEND) && CLARITY_STAFF_DIRECTORY_FILE=../config/staff/synthetic-directory.json \
+	cd $(BACKEND) && CLARITY_STAFF_DIRECTORY_FILE=$(STAFF_DIRECTORY_FILE) \
 		$(PY)/uvicorn clarity.entrypoints.asgi:app --reload
 
 # The clarity-mcp deployable (A04, ADR-0018), on :8099. Needs the simulated
@@ -95,6 +99,16 @@ tokens:
 # live model call in the default mode; the nightly job passes --mode live.
 eval:
 	cd $(BACKEND) && $(PY)/python scripts/evaluate.py
+
+# Record the model responses the suite replays (F1). Needs your own provider
+# key (I14) and refuses to write anything without CLARITY_RECORD_CASSETTES=1:
+# a hand-written cassette is not a recording. `make cassettes-dry` lists the
+# prompts and their keys without calling anything.
+cassettes:
+	cd $(BACKEND) && CLARITY_RECORD_CASSETTES=1 $(PY)/python scripts/record_cassettes.py
+
+cassettes-dry:
+	cd $(BACKEND) && $(PY)/python scripts/record_cassettes.py --dry-run
 
 keys:
 	cd $(BACKEND) && $(PY)/python scripts/keys.py

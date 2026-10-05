@@ -15,10 +15,85 @@ body {
 
 h1,
 h2,
+h3,
+h4,
 .font-display {
   font-family: var(--font-display);
 }
 
 ::selection {
   background: rgb(var(--c-brand) / 0.22);
+}
+
+/*
+ * Desk copy sits on a quiet fill with a little extra height, so a note, a
+ * metric, or a row is readable without a heavier card. Scoped to the signed-in
+ * workspace. Headings, mono ids, and rows that already have their own padding
+ * stay as they are.
+ */
+#console-main .bg-surface > p:not(.font-mono):not(.font-display):not(.font-semibold):not(.text-lg):not(.text-xl):not(.text-2xl):not(.text-3xl):not(.px-4),
+#console-main .bg-surface p.text-fg-muted:not(.font-mono):not(.font-semibold):not(.px-4),
+#console-main .bg-surface p.text-mute:not(.font-mono):not(.font-semibold):not(.px-4) {
+  background: rgb(var(--c-surface-2));
+  border-radius: 8px;
+  color: rgb(var(--c-fg));
+  line-height: 1.55;
+  padding: 0.625rem 0.75rem;
+}
+
+#console-main .bg-surface li.rounded p,
+#console-main .bg-surface ul p.text-fg-muted,
+#console-main .bg-surface ul p.text-mute,
+#console-main .bg-surface ol p.text-fg-muted,
+#console-main .bg-surface ol p.text-mute {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+#console-main li.rounded.border {
+  background: rgb(var(--c-surface-2));
+  line-height: 1.5;
+  padding: 0.875rem;
+}
+
+#console-main .bg-surface dl > div:not(.bg-surface) {
+  background: rgb(var(--c-surface-2));
+  border-radius: 8px;
+  padding: 0.625rem 0.75rem;
+}
+
+#console-main .bg-surface dl > div > dt {
+  line-height: 1.4;
+}
+
+#console-main .bg-surface dl > div > dd {
+  line-height: 1.5;
+  margin-top: 0.125rem;
+}
+
+#console-main blockquote {
+  background: rgb(var(--c-surface-2));
+  border-radius: 8px;
+  line-height: 1.55;
+  padding: 0.625rem 0.75rem 0.625rem 0.875rem;
+}
+
+#console-main .bg-surface ul:not(:has(button)):not(:has(li.rounded)):not(.flex),
+#console-main .bg-surface ol:not(:has(button)):not(.flex) {
+  background: rgb(var(--c-surface-2));
+  border-radius: 8px;
+  line-height: 1.55;
+  padding: 0.625rem 0.75rem;
+}
+
+#console-main .bg-surface ul.list-disc:not(:has(button)),
+#console-main .bg-surface ol.list-disc:not(:has(button)) {
+  padding-left: 1.75rem;
+}
+
+#console-main tbody th,
+#console-main tbody td {
+  padding-bottom: 0.875rem;
+  padding-top: 0.875rem;
 }

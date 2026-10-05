@@ -92,6 +92,13 @@ ignore = ["ANN401"]
 # The receipt template is HTML and localized strings: wrapping them would hurt
 # readability more than the long lines do.
 "src/clarity/modules/receipts/render.py" = ["E501"]
+# The guard matches lookalike characters, so it has to contain them. RUF001 and
+# RUF002 flag exactly the Cyrillic, Greek and fullwidth letters that the
+# confusable map exists to fold, and the Sinhala and Tamil the signals are
+# written in (S01). Flagging them here would be the linter reporting the
+# feature.
+"src/clarity/ai/guard.py" = ["RUF001", "RUF002"]
+"tests/unit/test_guard_folding.py" = ["RUF001", "RUF002"]
 
 [tool.mypy]
 python_version = "3.12"

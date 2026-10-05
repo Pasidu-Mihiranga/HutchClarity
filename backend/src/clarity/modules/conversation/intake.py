@@ -413,9 +413,20 @@ RULES: tuple[Rule, ...] = (
     Rule(
         _any("how do i", "how to", "how can i", "what is", "kohomada", "kohomda")
         + r"|කොහොමද|කෙසේද|எப்படி",
-        Intent.ESIM_HELP,
+        Intent.FALLBACK,
         UNSURE,
-        note="A how-to with no topic. Knowledge will retrieve or refuse.",
+        note=(
+            "A how-to with no topic. This used to answer ESIM_HELP, on the "
+            "reasoning that knowledge would retrieve or refuse. Measured (S01): "
+            'on the caseless path it did neither. "What is the capital of '
+            'France?" and "How do I make a bomb" were both answered with "Here '
+            'is how to convert to eSIM", because the stateless path composes '
+            "from the intent template and has no grounding step to refuse. A "
+            "topicless question is not an eSIM question, so it is not labelled "
+            "one; FALLBACK invites the customer to say what it is about and "
+            "stays inside the domain. The stateful path still grounds or says "
+            "it has no published source."
+        ),
     ),
 )
 

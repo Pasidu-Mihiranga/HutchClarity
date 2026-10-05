@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, Dialog, Spinner } from "@clarity/ui";
+import { Alert, Badge, Button, Card, Dialog, Input, Spinner } from "@clarity/ui";
 import type {
   ExecutionView,
   CasePayload,
@@ -35,8 +35,23 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
 
 const APPROVING_ROLES = ["supervisor", "finance", "agent"] as const;
 
+type QueueFilter = "all" | "needs_action" | "handoff";
+
 function money(value?: string | null) {
   return value ? `LKR ${value}` : " - ";
+}
+
+function statusLabel(outcome?: string | null, state?: string) {
+  if (outcome === "STAFF_APPROVAL") return "Needs action";
+  if (outcome === "HANDOFF") return "Handoff";
+  if (outcome) return outcome.replace(/_/g, " ");
+  return (state || "Open").replace(/_/g, " ");
+}
+
+function statusTone(outcome?: string | null): "warning" | "danger" | "neutral" {
+  if (outcome === "STAFF_APPROVAL") return "warning";
+  if (outcome === "HANDOFF") return "danger";
+  return "neutral";
 }
 
 export default function DeskPage() {
@@ -60,11 +75,39 @@ export default function DeskPage() {
     verified: ReceiptPayload;
   } | null>(null);
   const [acting, setActing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<QueueFilter>("all");
 
   const approvalRoles = useMemo(() => {
     if (!session) return [];
     return APPROVING_ROLES.filter((r) => session.roles.includes(r));
   }, [session]);
+
+  const visibleQueue = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return queue.filter((item) => {
+      if (filter === "needs_action" && item.outcome !== "STAFF_APPROVAL") return false;
+      if (filter === "handoff" && item.outcome !== "HANDOFF") return false;
+      if (!needle) return true;
+      const haystack = [
+        item.case_no,
+        item.case_id,
+        item.msisdn_masked,
+        item.cause,
+        item.reason,
+        item.state,
+        item.channel,
+        item.outcome,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [filter, query, queue]);
+
+  const needsAction = queue.filter((item) => item.outcome === "STAFF_APPROVAL").length;
+  const handoffs = queue.filter((item) => item.outcome === "HANDOFF").length;
 
   const loadQueue = useCallback(async () => {
     if (!canQueue) return;
@@ -174,20 +217,34 @@ export default function DeskPage() {
     return <AccessDenied need="desk:queue:read" />;
   }
 
+  const filters: { id: QueueFilter; label: string; count: number }[] = [
+    { id: "all", label: "All", count: queue.length },
+    { id: "needs_action", label: "Needs action", count: needsAction },
+    { id: "handoff", label: "Handoff", count: handoffs },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="max-w-xl space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-            Resolve and support
-          </p>
-          <h1 className="font-display text-4xl font-semibold tracking-tight">Desk</h1>
-          <p className="text-sm leading-6 text-mute">
-            Cases that need a person, largest amount first. The subscribers are
-            synthetic.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <label htmlFor="desk-search" className="w-full max-w-md">
+          <span className="sr-only">Search cases</span>
+          <Input
+            id="desk-search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by number, case ID, or keyword..."
+            className="w-full rounded-full bg-surface"
+          />
+        </label>
+      </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Cases</h1>
+        <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
+          {queue.length} waiting
+        </span>
+        <p className="text-sm text-mute">The subscribers are synthetic.</p>
+        <div className="ml-auto">
           <Button
             variant="secondary"
             onClick={() => void loadQueue()}
@@ -199,31 +256,31 @@ export default function DeskPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter the queue">
+        {filters.map((item) => {
+          const selected = filter === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setFilter(item.id)}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                selected ? "bg-surface font-medium text-ink shadow-1" : "text-fg-muted hover:bg-surface"
+              }`}
+            >
+              {item.label}
+              {item.id === "needs_action" && item.count > 0 ? (
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warning align-middle" />
+              ) : null}
+              <span className="sr-only">, {item.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {note ? <Alert tone="warning">{note}</Alert> : null}
-
-      {canSuspend ? (
-        <section aria-labelledby="desk-merchant">
-          <Card className="flex flex-wrap items-center justify-between gap-3 rounded-card border-line bg-surface shadow-card">
-            <div>
-              <h2 id="desk-merchant" className="font-display text-lg font-semibold">
-                Merchant block
-              </h2>
-              <p className="text-sm text-mute">
-                Block GameZone for synthetic subscriber 0781234567. Step-up is
-                required. The merchant system is simulated.
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              onClick={() => setConfirmSuspend(true)}
-              disabled={acting}
-            >
-              Suspend GameZone
-            </Button>
-          </Card>
-        </section>
-      ) : null}
 
       <Dialog
         open={confirmSuspend}
@@ -249,69 +306,95 @@ export default function DeskPage() {
         </p>
       </Dialog>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section aria-labelledby="desk-queue" className="lg:col-span-1">
-          <Card className="max-h-[min(70vh,36rem)] space-y-2 overflow-y-auto rounded-card border-line bg-surface shadow-card">
-            <h2
-              id="desk-queue"
-              className="text-xs font-semibold uppercase tracking-[0.14em] text-mute"
-            >
-              Queue · {queue.length}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+        <section aria-labelledby="desk-queue">
+          <Card className="!p-0 overflow-hidden rounded-card border-line bg-surface shadow-card">
+            <h2 id="desk-queue" className="sr-only">
+              Queue · {visibleQueue.length}
             </h2>
+            <div className="hidden border-b border-line px-4 py-3 text-xs font-medium text-fg-subtle sm:grid sm:grid-cols-[minmax(7rem,1fr)_minmax(6rem,0.9fr)_minmax(8rem,1.3fr)_minmax(7rem,0.9fr)_minmax(5rem,0.7fr)] sm:gap-3">
+              <span>Case</span>
+              <span>Customer</span>
+              <span>Issue</span>
+              <span>Status</span>
+              <span>Amount</span>
+            </div>
             {loading && !queue.length ? (
-              <p className="flex items-center gap-2 text-sm text-mute">
+              <p className="flex items-center gap-2 px-4 py-6 text-sm text-mute">
                 <Spinner size="sm" label="Loading the queue" />
                 Loading…
               </p>
             ) : null}
             {!queue.length && !loading ? (
-              <p className="text-sm text-mute">
+              <p className="px-4 py-6 text-sm text-mute">
                 Nothing is waiting. Load the synthetic queue, or open a case from
                 the customer app.
               </p>
             ) : null}
-            <ul className="space-y-2">
-              {queue.map((item) => (
-                <li key={item.case_id}>
-                  <button
-                    type="button"
-                    onClick={() => void openCase(item.case_id)}
-                    aria-current={currentId === item.case_id ? "true" : undefined}
-                    className={`w-full rounded-2xl border px-3 py-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${
-                      currentId === item.case_id
-                        ? "border-accent bg-warm"
-                        : "border-line hover:border-primary"
-                    }`}
-                  >
-                    <span className="flex items-start justify-between gap-2">
+            {queue.length && !visibleQueue.length ? (
+              <p className="px-4 py-6 text-sm text-mute">No case matches this search.</p>
+            ) : null}
+            <ul>
+              {visibleQueue.map((item) => {
+                const selected = currentId === item.case_id;
+                const cause = (item.cause || " - ").replace(/_/g, " ");
+                return (
+                  <li key={item.case_id} className="border-b border-line last:border-b-0">
+                    <button
+                      type="button"
+                      onClick={() => void openCase(item.case_id)}
+                      aria-current={selected ? "true" : undefined}
+                      className={`grid w-full gap-1 px-4 py-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus sm:grid-cols-[minmax(7rem,1fr)_minmax(6rem,0.9fr)_minmax(8rem,1.3fr)_minmax(7rem,0.9fr)_minmax(5rem,0.7fr)] sm:items-center sm:gap-3 ${
+                        selected ? "bg-primary-soft" : "hover:bg-surface-2"
+                      }`}
+                    >
+                      <span className="font-mono text-xs font-medium text-ink">{item.case_no}</span>
+                      <span className="text-fg-muted">{item.msisdn_masked}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-ink">{cause}</span>
+                        {item.reason ? (
+                          <span className="block truncate text-xs text-fg-subtle">{item.reason}</span>
+                        ) : null}
+                      </span>
                       <span>
-                        <span className="block font-mono text-xs text-mute">{item.case_no}</span>
-                        <span className="block">{(item.cause || " - ").replace(/_/g, " ")}</span>
-                        <span className="block text-xs text-mute">{item.msisdn_masked}</span>
+                        <Badge tone={statusTone(item.outcome)}>{statusLabel(item.outcome, item.state)}</Badge>
                       </span>
-                      <span className="text-right">
-                        <Badge tone={item.outcome === "STAFF_APPROVAL" ? "warning" : "neutral"}>
-                          {item.outcome || item.state}
-                        </Badge>
-                        <span className="mt-1 block text-xs font-medium">
-                          {money(item.money_at_stake_lkr)}
-                        </span>
-                      </span>
-                    </span>
-                    {item.reason ? (
-                      <span className="mt-1 block text-xs text-mute line-clamp-2">
-                        {item.reason}
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
+                      <span className="text-xs font-medium text-ink">{money(item.money_at_stake_lkr)}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </Card>
         </section>
 
-        <section aria-labelledby="desk-case" className="lg:col-span-2">
-          <Card className="space-y-4 rounded-card border-line bg-surface shadow-card">
+        {canSuspend ? (
+          <section aria-labelledby="desk-merchant">
+            <Card className="flex flex-wrap items-center justify-between gap-3 rounded-card border-line bg-surface shadow-card">
+              <div>
+                <h2 id="desk-merchant" className="font-display text-lg font-semibold">
+                  Merchant block
+                </h2>
+                <p className="text-sm text-mute">
+                  Block GameZone for synthetic subscriber 0781234567. Step-up is
+                  required. The merchant system is simulated.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmSuspend(true)}
+                disabled={acting}
+              >
+                Suspend GameZone
+              </Button>
+            </Card>
+          </section>
+        ) : null}
+        </div>
+
+        <section aria-labelledby="desk-case">
+          <Card className="space-y-4 rounded-card border-line bg-surface shadow-card xl:sticky xl:top-5">
             <h2
               id="desk-case"
               className="text-xs font-semibold uppercase tracking-[0.14em] text-mute"
@@ -325,10 +408,15 @@ export default function DeskPage() {
                 <p className="text-sm text-mute">Open a case from the queue.</p>
               ) : (
                 <>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line pb-4">
                     <div>
-                      <p className="font-display text-2xl font-semibold">
+                      <p className="font-mono text-xs text-fg-subtle">
                         {String(summary.case_no || currentId)}
+                      </p>
+                      <p className="font-display text-2xl font-semibold tracking-tight">
+                        {decision.cause
+                          ? decision.cause.rule_id.replace(/_/g, " ")
+                          : "No cause confirmed"}
                       </p>
                       <p className="text-sm text-fg-muted">
                         {String(summary.msisdn_masked || "")} · {String(summary.channel || "")} ·{" "}
@@ -472,6 +560,7 @@ export default function DeskPage() {
           </Card>
         </section>
       ) : null}
+    </div>
     </div>
   );
 }

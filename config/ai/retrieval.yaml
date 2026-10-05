@@ -50,14 +50,42 @@ hybrid:
   # Weights for fusing the lexical and semantic rankings (plan 22 section 7:
   # pgvector plus BM25 in the full profile).
   #
-  # Only the lexical half exists today. There is no embedding model in the
-  # system: `ModelRole.EMBED` is a declared role name, `local-bge` is bound to
-  # the template provider as a stand-in, and `RoleRouter.invoke` returns text,
-  # which cannot carry a vector. So the semantic weight is unused and the
-  # hybrid runs lexical-only, which ADR-0009 makes a supported state rather
-  # than a degradation. See the K02 devlog.
+  # Both halves exist as of F4. `ModelRole.EMBED` has an implementation
+  # (`clarity.ai.embedding`), the local driver is an IDF-weighted hashed
+  # character-n-gram space, and a remote model implements the same port. With
+  # no embedder wired the weights still renormalise onto the lexical half, so
+  # lexical-only remains a supported state (ADR-0009).
+  #
+  # 0.5/0.5 is unchanged from K02 and is **not** tuned on the golden set:
+  # tuning the weights against the 30 queries the gate measures would be
+  # fitting the retriever to its own test.
   lexical: 0.5
   semantic: 0.5
+
+  # Absolute cosine a chunk must reach to be a candidate at all (F4).
+  #
+  # Turning the semantic half on removed a safety the lexical-only retriever
+  # had for free: a query sharing no term with any document produced no
+  # candidates, so K03 refused and said why. A cosine is never exactly zero,
+  # so every document became a weak candidate and "internet is crawling in
+  # the evenings" grounded itself in the billing-cycle clause, which is worse
+  # than refusing. `min_relative_score` cannot catch this: it is a share of
+  # the best hit, so it cannot tell "all weak" from "one strong".
+  #
+  # 0.25 is measured from the space's own noise band rather than chosen
+  # against the golden queries. Over this corpus, with IDF fitted:
+  #
+  #   - cosine between two unrelated clauses: median 0.089, p90 0.250
+  #   - best match for a deliberately irrelevant question
+  #     ("what is the share price of the company?", "who won the cricket
+  #     match", "recipe for chicken curry"): 0.182, 0.202, 0.107
+  #
+  # So 0.25 is "better than an unrelated question typically manages". It is a
+  # property of the embedder, and a different embedder needs it re-measured.
+  #
+  # **PROPOSED TARGET - REQUIRES HUTCH VALIDATION**: measured on the synthetic
+  # corpus, not on HUTCH documents.
+  min_semantic: 0.25
 
 rerank:
   # A deterministic rerank over the fused candidates (plan 22 section 7).

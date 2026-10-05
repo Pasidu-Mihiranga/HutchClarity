@@ -339,10 +339,11 @@ export default function AuditPage() {
         </Card>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid content-start gap-4">
         {/* 4. Alerts */}
         <section aria-labelledby="audit-alerts">
-          <Card className="space-y-3" data-testid="alerts-panel">
+          <Card className="h-fit space-y-3" data-testid="alerts-panel">
             <div className="flex items-center justify-between">
               <h2 id="audit-alerts" className="font-medium">
                 Alerts
@@ -458,9 +459,63 @@ export default function AuditPage() {
           </Card>
         </section>
 
+        {/* 6. Access */}
+        <section aria-labelledby="audit-access">
+          <Card className="h-fit space-y-3" data-testid="access-panel">
+            <div className="flex items-center justify-between">
+              <h2 id="audit-access" className="font-medium">
+                Access
+              </h2>
+              <Badge tone={breakGlass.length ? "warning" : "neutral"}>
+                {breakGlass.length} break-glass
+              </Badge>
+            </div>
+            <p className="text-xs text-fg-muted">
+              Audit duties are granted, approved by a second person, time-boxed and
+              recertified. Holding one removes every money permission.
+            </p>
+            {refused.grants ? (
+              <p className="text-sm text-fg-muted" data-testid="access-refused">
+                Not for this role: granting, approving and revoking audit duties needs
+                audit:assign, which is a role permission and never itself a grant.
+              </p>
+            ) : grants.length === 0 ? (
+              <p className="text-sm text-fg-muted">No grants have been requested.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {grants.slice(0, 10).map((grant) => (
+                  <li key={grant.grant_id} className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-mono text-xs">{grant.subject_ref}</span>
+                      <Badge
+                        tone={
+                          grant.state === "active"
+                            ? "success"
+                            : grant.state === "pending"
+                              ? "warning"
+                              : "neutral"
+                        }
+                      >
+                        {grant.state}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-fg-muted">
+                      {grant.permission} · expires {when(grant.expires_at)} · review due{" "}
+                      {when(grant.review_due_at)}
+                      {grant.break_glass ? " · BREAK-GLASS" : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+        </div>
+
+        <div className="grid content-start gap-4">
         {/* 5. Monitors */}
         <section aria-labelledby="audit-monitors">
-          <Card className="space-y-3" data-testid="monitors-panel">
+          <Card className="h-fit space-y-3" data-testid="monitors-panel">
             <h2 id="audit-monitors" className="font-medium">
               Monitors
             </h2>
@@ -511,61 +566,9 @@ export default function AuditPage() {
           </Card>
         </section>
 
-        {/* 6. Access */}
-        <section aria-labelledby="audit-access">
-          <Card className="space-y-3" data-testid="access-panel">
-            <div className="flex items-center justify-between">
-              <h2 id="audit-access" className="font-medium">
-                Access
-              </h2>
-              <Badge tone={breakGlass.length ? "warning" : "neutral"}>
-                {breakGlass.length} break-glass
-              </Badge>
-            </div>
-            <p className="text-xs text-fg-muted">
-              Audit duties are granted, approved by a second person, time-boxed and
-              recertified. Holding one removes every money permission.
-            </p>
-            {refused.grants ? (
-              <p className="text-sm text-fg-muted" data-testid="access-refused">
-                Not for this role: granting, approving and revoking audit duties needs
-                audit:assign, which is a role permission and never itself a grant.
-              </p>
-            ) : grants.length === 0 ? (
-              <p className="text-sm text-fg-muted">No grants have been requested.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {grants.slice(0, 10).map((grant) => (
-                  <li key={grant.grant_id} className="space-y-1">
-                    <div className="flex justify-between gap-2">
-                      <span className="font-mono text-xs">{grant.subject_ref}</span>
-                      <Badge
-                        tone={
-                          grant.state === "active"
-                            ? "success"
-                            : grant.state === "pending"
-                              ? "warning"
-                              : "neutral"
-                        }
-                      >
-                        {grant.state}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-fg-muted">
-                      {grant.permission} · expires {when(grant.expires_at)} · review due{" "}
-                      {when(grant.review_due_at)}
-                      {grant.break_glass ? " · BREAK-GLASS" : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </section>
-
         {/* 7. Recovery */}
         <section aria-labelledby="audit-recovery">
-          <Card className="space-y-3" data-testid="recovery-panel">
+          <Card className="h-fit space-y-3" data-testid="recovery-panel">
             <div className="flex items-center justify-between">
               <h2 id="audit-recovery" className="font-medium">
                 Recovery
@@ -618,6 +621,7 @@ export default function AuditPage() {
             ) : null}
           </Card>
         </section>
+        </div>
       </div>
 
       {/* 2 and 3. Trail explorer and actor timeline */}

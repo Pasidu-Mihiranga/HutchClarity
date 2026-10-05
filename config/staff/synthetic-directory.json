@@ -58,6 +58,13 @@
       "step_up_hash": "scrypt$16384$8$1$3dDvHV91P-JjNHX24zDdIg==$T9LFbkZY-lQIvpq4AJDjup0dT13SCXS50JC1rT3ZBHs="
     },
     {
+      "username": "admin",
+      "user_ref": "admin-1",
+      "role": "platform_admin",
+      "password_hash": "scrypt$16384$8$1$i3DQSqhHLMjFyt0JucofNA==$x06DHn6BNju-UXzqQ0P7NAU17Geqe615xM8xfxb9WCw=",
+      "step_up_hash": "scrypt$16384$8$1$MWSx2W0kYdeK-Gm7YFGhhQ==$Oqfdu7Al1UbpAWdqFaFJ38WrRbvLBGopH5v9VppETy4="
+    },
+    {
       "username": "platform",
       "user_ref": "plat-1",
       "role": "platform_admin",

@@ -13,6 +13,8 @@ be unexplained.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -245,6 +247,65 @@ def test_a_confirmed_cluster_proposes_a_draft_and_nothing_more(
     # It is a draft, not an activation: the change is still waiting for
     # somebody else to review and approve it.
     assert clarity.governance.get(body["change_id"]).state.value == "draft"
+
+
+def test_a_confirmed_complaint_pattern_can_complete_the_governed_policy_pipeline(
+    api: TestClient, reviewer: dict[str, str], clarity: Clarity
+) -> None:
+    """The Desk-to-Studio seam is real: the autopsy candidate is the same
+    persisted change that is reviewed, independently approved, scheduled and
+    activated. Complaint text itself never bypasses governance into policy."""
+    cluster_id = _a_cluster(api, reviewer)
+    confirmed = api.post(
+        f"/v1/autopsy/clusters/{cluster_id}/review",
+        json={"accept": True, "note": "recurring complaint outside the current mapping"},
+        headers=reviewer,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+
+    proposed = api.post(
+        f"/v1/autopsy/clusters/{cluster_id}/rule-candidate",
+        json={
+            "key": "decision.conflict_margin",
+            "value": "0.25",
+            "rationale": "confirmed complaints need a wider conflict margin",
+        },
+        headers=reviewer,
+    )
+    assert proposed.status_code == 200, proposed.text
+    change_id = proposed.json()["change_id"]
+
+    replayed = api.post(
+        f"/v1/admin/policy/changes/{change_id}/review",
+        json={"cases_evaluated": len(COMPLAINTS), "candidate_summary": "autopsy replay"},
+        headers=reviewer,
+    )
+    assert replayed.status_code == 200, replayed.text
+
+    approver = bearer(staff_token(api, "fin:amara", ["finance"], step_up=True))
+    approved = api.post(
+        f"/v1/admin/policy/changes/{change_id}/approve", headers=approver
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["state"] == "approved"
+
+    effective_from = datetime.now(UTC) - timedelta(seconds=1)
+    scheduled = api.post(
+        f"/v1/admin/policy/changes/{change_id}/schedule",
+        json={"effective_from": effective_from.isoformat()},
+        headers=approver,
+    )
+    assert scheduled.status_code == 200, scheduled.text
+    assert scheduled.json()["state"] == "scheduled"
+
+    activated = api.post(
+        f"/v1/admin/policy/changes/{change_id}/activate", headers=approver
+    )
+    assert activated.status_code == 200, activated.text
+    assert activated.json()["state"] == "active"
+    assert str(
+        clarity.policies.resolve("decision.conflict_margin", as_of=datetime.now(UTC))
+    ) == "0.25"
 
 
 def test_a_proposal_cannot_invent_a_policy_key(api: TestClient, reviewer: dict[str, str]) -> None:

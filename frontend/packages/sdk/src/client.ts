@@ -13,6 +13,9 @@ import type {
   AlertQueue,
   McpConnectorView,
   McpHealthView,
+  OfferCheckView,
+  OfferRecordBody,
+  OfferView,
   AlertView,
   ApproveResult,
   AuditGrantView,
@@ -493,8 +496,19 @@ export class ClarityClient {
     return this.declared("post", "/v1/me/safeguards", { body: { kind, value } });
   }
 
-  addFamilyMember(msisdn: string): Promise<CustomerApp> {
-    return this.declared("post", "/v1/me/family", { body: { msisdn } });
+  addFamilyMember(msisdn: string, role: "elder" | "child" = "elder"): Promise<CustomerApp> {
+    // The cast this replaced narrowed the body to `{ msisdn }`, which matched a
+    // stale generated schema: `role` was added to FamilyRequest on the backend
+    // and `schema.ts` had not been regenerated since. It is a server default,
+    // so the generator marks it required and the call already supplies it.
+    return this.declared("post", "/v1/me/family", { body: { msisdn, role } });
+  }
+
+  switchProfile(msisdn: string | null): Promise<CustomerApp> {
+    return this.request<CustomerApp>("/v1/me/profile", {
+      method: "POST",
+      body: JSON.stringify({ msisdn }),
+    });
   }
 
   savePreferences(body: PreferencesBody): Promise<CustomerApp> {
@@ -526,6 +540,39 @@ export class ClarityClient {
   /** Ask the MCP deployable whether it is up. It is its own process. */
   mcpHealth(): Promise<McpHealthView> {
     return this.call("get", "/v1/admin/mcp/health");
+  }
+
+  /* ------------------------------------------- offer verification (OFFER01) */
+
+  /**
+   * Check a message against the offers on record for the signed-in number.
+   *
+   * The verdict is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON` and is
+   * never a scam flag: the records say what HUTCH sent, and the inference
+   * past that belongs to the person holding the phone.
+   */
+  verifyOfferMessage(message: string): Promise<OfferCheckView> {
+    // `signals` and `simulated` carry server defaults, which the generator
+    // marks optional on the response as well as the request. The API always
+    // sends both, so they are filled here and callers get an array rather
+    // than guarding one. Same reason as `session()` above.
+    return this.call("post", "/v1/offers/verify", { body: { message } }).then((view) => ({
+      ...view,
+      signals: view.signals ?? [],
+      simulated: view.simulated ?? true,
+    }));
+  }
+
+  /** Every recorded offer. Security admin only (`offer:manage`). */
+  listOffers(): Promise<OfferView[]> {
+    return this.call("get", "/v1/admin/offers");
+  }
+
+  /** Record what HUTCH sent to a number. Security admin only. */
+  recordOffer(body: OfferRecordBody): Promise<OfferView> {
+    return this.call("post", "/v1/admin/offers", {
+      body: omittingServerDefaults({ offer_code: "", ...body }),
+    });
   }
 
   /* ---------------------------------------------------------------- demo */

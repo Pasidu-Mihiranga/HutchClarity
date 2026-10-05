@@ -36,7 +36,7 @@ export function AccessDenied({ need }: { need: string }) {
       <p className="text-sm text-fg">
         {session
           ? `Signed in as ${session.subject} (${activeRole}). Needs: ${need}.`
-          : "Sign in from the header to start."}
+          : "Sign in to start."}
       </p>
       <p className="text-xs text-fg-muted">
         Four-eyes approvals need a different person (supervisor, then finance),

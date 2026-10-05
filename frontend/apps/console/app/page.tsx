@@ -65,7 +65,7 @@ export default function ConsoleHomePage() {
         {!session ? (
           <Card className="space-y-3 rounded-card border-line bg-surface shadow-card">
             <p className="text-ink">
-              Sign in from the header. The account decides the role. A wrong
+              Sign in to open the desk. The account decides the role. A wrong
               password is refused, and the desk cannot grant a role by itself.
             </p>
           </Card>

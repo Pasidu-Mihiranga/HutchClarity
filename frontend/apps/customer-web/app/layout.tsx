@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { AppShell } from "@/components/AppShell";
+import { SeniorMode } from "@/components/SeniorMode";
+import { ThemeProvider } from "@clarity/ui";
+import { themeBootScript } from "@clarity/ui/theme-boot";
+import "@fontsource-variable/google-sans/wght.css";
+import "@fontsource-variable/google-sans-flex/wght.css";
 import "@clarity/ui/tokens.css";
 import "./globals.css";
 
@@ -12,7 +17,14 @@ export const metadata: Metadata = {
     capable: true,
     title: "Clarity",
   },
-  icons: { apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   // The standard name for what `appleWebApp.capable` declares for iOS only;
   // Chrome warns when the Apple tag appears without it.
   other: { "mobile-web-app-capable": "yes" },
@@ -22,6 +34,7 @@ export const viewport: Viewport = {
   themeColor: "#f26226",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -30,11 +43,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <LanguageProvider>
-          <AppShell>{children}</AppShell>
-        </LanguageProvider>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <ThemeProvider>
+          <SeniorMode />
+          <LanguageProvider>
+            <AppShell>{children}</AppShell>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

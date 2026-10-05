@@ -74,6 +74,7 @@ from clarity.interfaces.http.schemas import (
     DemoSubscriber,
     ExecutionView,
     FamilyRequest,
+    ProfileSwitchRequest,
     ForesightRunRequest,
     LaunchRecordRequest,
     McpAuthorizationView,
@@ -83,6 +84,12 @@ from clarity.interfaces.http.schemas import (
     McpServerView,
     McpToolView,
     MerchantSuspendRequest,
+    OfferCheckRequest,
+    OfferCheckView,
+    OfferMatchView,
+    OfferRecordRequest,
+    OfferSignalView,
+    OfferView,
     OpenCaseRequest,
     OtpRequest,
     OtpVerify,
@@ -161,6 +168,7 @@ from clarity.modules.iam.public import (
     TokenInvalid,
 )
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
+from clarity.modules.offers.public import OfferRefused
 from clarity.platform.audit.checkpoints import anchor_verifies, checkpoint_document
 from clarity.platform.audit.export import AuditExport, export_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType, record_hash
@@ -365,29 +373,10 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             "PROTOTYPE: all HUTCH systems are mocked and all data is synthetic."
         ),
     )
-    # Pinned to the origins this deployment actually serves, and credentials
-    # are allowed, because the staff console now authenticates with a cookie
-    # (B1). `allow_origins=["*"]` cannot carry credentials at all under the
-    # CORS spec, so the wildcard was not merely loose, it would have silently
-    # broken cookie-borne sign-in. A deployment sets CLARITY_ALLOWED_ORIGINS.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_allowed_origins(clarity or get_clarity()),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.middleware("http")(_audit_requests)
-    app.middleware("http")(_trace_requests)
-    # Outermost, so it also covers error responses and static files (X01).
-    app.middleware("http")(security_headers)
     # Authentication and authorization are profile-selected drivers. Lite uses
     # local JWT/Python drivers; full may use Keycloak and OPA.
     core = clarity or get_clarity()
 
-    # Rate limiting (A8). Inside the security headers and the trace, so a 429
-    # is still a recorded, header-complete response, and outside the route so
-    # the pipeline is never entered for a refused call.
     def _limit_for(policy_key: str, at: datetime) -> int:
         try:
             return int(core.policies.resolve(policy_key, as_of=at))
@@ -395,11 +384,29 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             _throttle_log.warning("rate limit %s unresolved; using the default", policy_key)
             return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
 
-    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
-
-    # CSRF, for requests relying on a cookie (B4). Inside the rate limiter, so
-    # a flood of forged requests is still throttled before it is inspected.
+    # Starlette runs the last middleware added as the outermost layer.
+    # Register from the route outward so a 429 still passes back through the
+    # trace, the security headers and CORS. An early 429 that skipped CORS
+    # reached the browser as "Failed to fetch".
     app.middleware("http")(csrf.enforce())
+    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
+    app.middleware("http")(_audit_requests)
+    app.middleware("http")(_trace_requests)
+    app.middleware("http")(security_headers)
+    # Pinned to the origins this deployment actually serves, and credentials
+    # are allowed, because the staff console now authenticates with a cookie
+    # (B1). `allow_origins=["*"]` cannot carry credentials at all under the
+    # CORS spec, so the wildcard was not merely loose, it would have silently
+    # broken cookie-borne sign-in. A deployment sets CLARITY_ALLOWED_ORIGINS.
+    # Chrome asks before a page on localhost may call another localhost port.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins(core),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_private_network=True,
+    )
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
@@ -1336,9 +1343,10 @@ def _register_routes(app: FastAPI) -> None:
             identity = directory.authenticate(body.username, body.password, body.step_up_code)
         except LoginRefused as error:
             raise HTTPException(status_code=401, detail="sign-in failed") from error
+        role_names = sorted(role.value for role in identity.roles)
         issued = clarity.tokens.for_staff(
             identity.user_ref,
-            roles={identity.role},
+            roles=set(identity.roles),
             assurance=identity.assurance,
         )
         trail.record(
@@ -1349,7 +1357,7 @@ def _register_routes(app: FastAPI) -> None:
             session_ref=trail.session_ref_for(issued.value),
             object_ref=identity.user_ref,
             detail={
-                "roles": [identity.role.value],
+                "roles": role_names,
                 "step_up": identity.assurance is Assurance.MFA_RECENT,
                 "assurance": issued.principal.assurance.value,
                 "simulated": True,
@@ -1360,7 +1368,7 @@ def _register_routes(app: FastAPI) -> None:
             refresh_token=issued.refresh_token,
             expires_at=issued.expires_at,
             subject=identity.user_ref,
-            roles=[identity.role.value],
+            roles=role_names,
             assurance=issued.principal.assurance.value,
             permissions=sorted(p.value for p in issued.principal.permissions),
         )
@@ -1489,6 +1497,7 @@ def _register_routes(app: FastAPI) -> None:
             "+94782223333": "Reload taken twice",
             "+94783334444": "'Unlimited' hit a fair-use cap",
             "+94784445555": "Large reload not credited, recent SIM swap",
+            "+94785720767": "Has real offers on record, for checking a suspect SMS",
         }
         return [
             DemoSubscriber(
@@ -2229,13 +2238,184 @@ def _register_routes(app: FastAPI) -> None:
             "simulated": True,
         }
 
+    # ---------------------------------------------------------- offers (OFFER01)
+
+    @app.post("/v1/offers/verify", response_model=OfferCheckView, tags=["offers"])
+    def verify_offer_message(
+        body: OfferCheckRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_VERIFY))],
+    ) -> OfferCheckView:
+        """Check a message a customer received against their own offers.
+
+        **The answer is what the records say, not a scam flag.** `ON_RECORD`
+        means an offer on record for this number matches; `NOT_ON_RECORD` means
+        none does; `NEEDS_A_PERSON` means it partly matched, which is the case
+        the other two would both get wrong. The reason it is phrased that way
+        is in `clarity.modules.offers.offers`: a verdict of "scam" would be an
+        inference past what was checked, and the pasted text is the one thing
+        an attacker controls (I2).
+
+        Bound to the caller's own subscriber, so one customer cannot test a
+        message against another's offers.
+        """
+        ref = _customer_ref(principal)
+        try:
+            check = clarity.offers.check(subscriber_ref=ref, message=body.message)
+        except OfferRefused as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        # Recorded for the verdict and the signals, never the text. The message
+        # reaches the hashed payload only, so the same scam checked by many
+        # customers is one correlatable fingerprint without the trail holding
+        # what anybody was sent (I13).
+        clarity.audit.append(
+            AuditEventType.OFFER_CHECKED,
+            actor_ref=principal.ref,
+            actor_kind=ActorKind.CUSTOMER,
+            object_ref=check.verdict.value,
+            payload={"message": body.message, "subscriber_ref": ref},
+            detail={
+                "verdict": check.verdict.value,
+                "signals": [signal.value for signal in check.signals],
+                "offers_on_record": check.offers_on_record,
+                "matched_offer_id": check.best.offer.offer_id if check.best else None,
+            },
+        )
+
+        matched = None
+        if check.best is not None:
+            offer = check.best.offer
+            matched = OfferMatchView(
+                offer_id=offer.offer_id,
+                title=offer.title,
+                offer_code=offer.offer_code,
+                containment=round(check.best.containment, 3),
+                code_matched=check.best.code_matched,
+                still_valid=check.matched_offer_effective,
+                valid_from=offer.valid_from,
+                valid_to=offer.valid_to,
+                source=offer.source,
+            )
+        return OfferCheckView(
+            verdict=check.verdict.value,
+            signals=[OfferSignalView(code=signal.value) for signal in check.signals],
+            offers_on_record=check.offers_on_record,
+            matched=matched,
+        )
+
+    @app.get("/v1/admin/offers", response_model=list[OfferView], tags=["admin"])
+    def list_offers(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_MANAGE))],
+    ) -> list[OfferView]:
+        """Every recorded offer, newest first. Masked numbers only."""
+        moment = clarity.case_aggregate._now()
+        offers = sorted(
+            clarity.offers.all_offers(), key=lambda o: o.recorded_at, reverse=True
+        )
+        return [
+            OfferView(
+                offer_id=offer.offer_id,
+                msisdn_masked=offer.msisdn_masked,
+                title=offer.title,
+                body=offer.body,
+                offer_code=offer.offer_code,
+                valid_from=offer.valid_from,
+                valid_to=offer.valid_to,
+                recorded_by=offer.recorded_by,
+                recorded_at=offer.recorded_at,
+                source=offer.source,
+                still_valid=offer.is_effective(moment),
+            )
+            for offer in offers
+        ]
+
+    @app.post(
+        "/v1/admin/offers",
+        response_model=OfferView,
+        status_code=201,
+        tags=["admin"],
+    )
+    def record_offer(
+        body: OfferRecordRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_MANAGE))],
+    ) -> OfferView:
+        """Record what HUTCH sent to a number.
+
+        **This is the authority the fraud check rests on**, which is why it is
+        security admin's alone: adding an offer here makes a matching message
+        read as genuine to the customer who pastes it. The record is
+        append-only, so a correction is a new row and nothing already checked
+        against can be rewritten.
+
+        The number is resolved to its pseudonym before anything is stored; the
+        raw MSISDN never reaches the offers table.
+        """
+        try:
+            normalised = normalise_msisdn(body.msisdn)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        account = clarity.world.account_by_msisdn(normalised)
+        if account is None:
+            # Not "we could not find this number" with a different status for a
+            # number that exists: the enumeration rule applies here too, and a
+            # staff caller holding `offer:manage` is told plainly either way.
+            raise HTTPException(status_code=404, detail="no such subscriber")
+
+        try:
+            offer = clarity.offers.record(
+                subscriber_ref=account.ref,
+                msisdn_masked=account.masked,
+                title=body.title,
+                body=body.body,
+                offer_code=body.offer_code,
+                valid_from=body.valid_from,
+                valid_to=body.valid_to,
+                recorded_by=principal.ref,
+            )
+        except OfferRefused as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        clarity.audit.append(
+            AuditEventType.OFFER_RECORDED,
+            actor_ref=principal.ref,
+            actor_kind=ActorKind.STAFF,
+            object_ref=offer.offer_id,
+            payload={"body": offer.body, "subscriber_ref": account.ref},
+            detail={
+                "offer_id": offer.offer_id,
+                "title": offer.title,
+                "offer_code": offer.offer_code,
+                "msisdn_masked": offer.msisdn_masked,
+                "source": offer.source,
+            },
+        )
+        return OfferView(
+            offer_id=offer.offer_id,
+            msisdn_masked=offer.msisdn_masked,
+            title=offer.title,
+            body=offer.body,
+            offer_code=offer.offer_code,
+            valid_from=offer.valid_from,
+            valid_to=offer.valid_to,
+            recorded_by=offer.recorded_by,
+            recorded_at=offer.recorded_at,
+            source=offer.source,
+            still_valid=offer.is_effective(clarity.case_aggregate._now()),
+        )
+
     @app.get("/v1/me/home", tags=["customer"])
     def my_home(
         clarity: ClarityDep,
         principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
     ) -> dict[str, Any]:
-        """Balance, pack, activity and alerts for the signed-in number."""
-        return _home_for(clarity, _customer_ref(principal))
+        """Balance, pack, activity and alerts for the open profile."""
+        _owner, view = _view_account(clarity, _customer_ref(principal))
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        return _home_for(clarity, view.ref)
 
     @app.get("/v1/me/app", tags=["customer"])
     def my_app(
@@ -2265,7 +2445,10 @@ def _register_routes(app: FastAPI) -> None:
         }
         if amount not in allowed_amounts:
             raise HTTPException(status_code=422, detail="choose a listed reload amount")
-        clarity.world.reload(ref, amount)
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        clarity.world.reload(view.ref, amount)
         return _app_for(clarity, ref)
 
     @app.post("/v1/me/packages/{offering_id}/purchase", tags=["customer"])
@@ -2275,8 +2458,11 @@ def _register_routes(app: FastAPI) -> None:
         principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
         try:
-            clarity.world.purchase_pack(ref, offering_id)
+            clarity.world.purchase_pack(view.ref, offering_id)
         except KeyError as error:
             raise HTTPException(
                 status_code=404, detail="that pack is not in the catalogue"
@@ -2292,7 +2478,10 @@ def _register_routes(app: FastAPI) -> None:
         principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
-        if not clarity.world.deactivate_subscription(ref, subscription_id):
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        if not clarity.world.deactivate_subscription(view.ref, subscription_id):
             raise HTTPException(status_code=404, detail="that subscription is not active")
         return _app_for(clarity, ref)
 
@@ -2319,13 +2508,27 @@ def _register_routes(app: FastAPI) -> None:
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         try:
-            clarity.world.add_family(ref, body.msisdn)
+            clarity.world.add_family(ref, body.msisdn, body.role)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except KeyError as error:
             raise HTTPException(
                 status_code=404, detail="We could not find this Hutch number."
             ) from error
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/profile", tags=["customer"])
+    def my_profile(
+        body: ProfileSwitchRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_SETTINGS))],
+    ) -> dict[str, Any]:
+        """Open a family profile, or return to the signed-in person."""
+        ref = _customer_ref(principal)
+        try:
+            clarity.world.set_profile(ref, body.msisdn)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="That number is not in this family.") from error
         return _app_for(clarity, ref)
 
     @app.post("/v1/me/preferences", tags=["customer"])
@@ -2352,8 +2555,11 @@ def _register_routes(app: FastAPI) -> None:
         clarity: ClarityDep,
         principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
     ) -> list[dict[str, Any]]:
-        """Cases opened for the signed-in number."""
-        ref = _customer_ref(principal)
+        """Cases opened for the profile that is open."""
+        _owner, view = _view_account(clarity, _customer_ref(principal))
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        ref = view.ref
         rows = [record for record in clarity.cases.all_cases() if record.subscriber_ref == ref]
         rows.sort(key=lambda record: record.case.opened_at, reverse=True)
         return [
@@ -3442,12 +3648,31 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     }
 
 
+def _view_account(clarity: Clarity, owner_ref: str):
+    """The account whose bills are on screen.
+
+    The signed-in person stays the owner of family links. When they have opened
+    a family profile that has its own records, Home, packages and receipts read
+    that profile.
+    """
+    owner = clarity.world.account(owner_ref)
+    if owner is None:
+        return None, None
+    if owner.active_profile and owner.active_profile in owner.family:
+        other = clarity.world.account_by_msisdn(owner.active_profile)
+        if other is not None:
+            return owner, other
+    return owner, owner
+
+
 def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     """One payload for Home, Usage, Clarity, Activity and More."""
-    home = _home_for(clarity, ref)
-    account = clarity.world.account(ref)
-    if account is None:
+    owner, view = _view_account(clarity, ref)
+    if owner is None or view is None:
         raise HTTPException(status_code=404, detail="no such account")
+    home = _home_for(clarity, view.ref)
+    account = owner
+    ref = view.ref
 
     cases: list[dict[str, Any]] = []
     mine: set[str] = set()
@@ -3509,18 +3734,28 @@ def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     family = []
     for number in account.family:
         other = clarity.world.account_by_msisdn(number)
-        if other is None:
-            continue
-        active = next((pack for pack in other.packs if pack.active), None)
+        role = account.family_roles.get(number, "elder")
+        active = next((pack for pack in other.packs if pack.active), None) if other is not None else None
         family.append(
             {
-                "name": other.name,
-                "masked": other.masked,
-                "msisdn": other.msisdn,
+                "name": other.name if other is not None and other.name else ("Child" if role == "child" else "Elder"),
+                "masked": other.masked if other is not None else number,
+                "msisdn": number,
+                "role": role,
                 "pack": active.name if active else None,
-                "safeguards": [key for key in other.safeguards if not str(key).startswith("_")],
+                "safeguards": [key for key in other.safeguards if not str(key).startswith("_")] if other is not None else [],
             }
         )
+
+    active_profile = None
+    if account.active_profile and account.active_profile in account.family:
+        current = clarity.world.account_by_msisdn(account.active_profile)
+        role = account.family_roles.get(account.active_profile, "elder")
+        active_profile = {
+            "name": current.name if current is not None and current.name else ("Child" if role == "child" else "Elder"),
+            "msisdn": account.active_profile,
+            "role": role,
+        }
 
     network = account.safeguards.get("_network")
     if not isinstance(network, dict):
@@ -3544,6 +3779,7 @@ def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
             "eta": network.get("eta"),
         },
         "family": family,
+        "active_profile": active_profile,
         "usage": {
             "data_used_gb": home["pack"]["used_gb"] if home["pack"] else None,
             "data_cap_gb": home["pack"]["data_gb"] if home["pack"] else None,

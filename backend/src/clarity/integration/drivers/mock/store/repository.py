@@ -94,6 +94,7 @@ def save_account(session: Session, account: Account) -> None:
             sim_swap_at=account.sim_swap_at,
             fraud_flag=account.fraud_flag,
             refunds_last_30d=account.refunds_last_30d,
+            active_profile_msisdn=account.active_profile,
             safeguards=dict(account.safeguards),
             blocked_merchants=sorted(account.blocked_merchants),
         )
@@ -159,7 +160,13 @@ def save_account(session: Session, account: Account) -> None:
             )
     session.execute(delete(FamilyLinkRow).where(FamilyLinkRow.customer_id == customer_id))
     for msisdn in account.family:
-        session.add(FamilyLinkRow(customer_id=customer_id, linked_msisdn=msisdn))
+        session.add(
+            FamilyLinkRow(
+                customer_id=customer_id,
+                linked_msisdn=msisdn,
+                role=account.family_roles.get(msisdn, "elder"),
+            )
+        )
 
 
 def load_world(session: Session, *, now: datetime = DEMO_NOW) -> SyntheticWorld:
@@ -187,6 +194,11 @@ def load_world(session: Session, *, now: datetime = DEMO_NOW) -> SyntheticWorld:
             safeguards=dict(account_row.safeguards or {}),
             blocked_merchants=set(account_row.blocked_merchants or []),
             family=[link.linked_msisdn for link in row.family_links],
+            family_roles={
+                link.linked_msisdn: link.role if link.role in {"elder", "child"} else "elder"
+                for link in row.family_links
+            },
+            active_profile=account_row.active_profile_msisdn,
             subscriptions=[
                 Subscription(
                     subscription_id=sub.subscription_id,

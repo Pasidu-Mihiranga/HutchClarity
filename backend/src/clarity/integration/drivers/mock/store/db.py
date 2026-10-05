@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -73,6 +73,22 @@ def reset_engine() -> None:
 def create_schema(engine: Engine | None = None) -> None:
     eng = engine or get_engine()
     Base.metadata.create_all(eng)
+    _ensure_profile_columns(eng)
+
+
+def _ensure_profile_columns(engine: Engine) -> None:
+    """Add profile columns on a database created before family roles existed."""
+    inspector = inspect(engine)
+    names = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "family_links" in names:
+            cols = {col["name"] for col in inspector.get_columns("family_links")}
+            if "role" not in cols:
+                conn.execute(text("ALTER TABLE family_links ADD COLUMN role VARCHAR(16) DEFAULT 'elder'"))
+        if "accounts" in names:
+            cols = {col["name"] for col in inspector.get_columns("accounts")}
+            if "active_profile_msisdn" not in cols:
+                conn.execute(text("ALTER TABLE accounts ADD COLUMN active_profile_msisdn VARCHAR(20)"))
 
 
 @contextmanager

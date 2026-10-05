@@ -165,6 +165,8 @@ class Account:
     safeguards: dict[str, Any] = field(default_factory=dict)
     blocked_merchants: set[str] = field(default_factory=set)
     family: list[str] = field(default_factory=list)
+    family_roles: dict[str, str] = field(default_factory=dict)
+    active_profile: str | None = None
     notify: str = "important"
     large_text: bool = False
     onboarded: bool = False
@@ -431,19 +433,52 @@ class SyntheticWorld:
         self._flush(account)
         return bought
 
-    def add_family(self, ref: str, msisdn: str) -> str:
-        """Link another Hutch number this customer looks after. At most 10."""
+    def add_family(self, ref: str, msisdn: str, role: str = "elder") -> str:
+        """Link another Hutch number this customer looks after. At most 10.
+
+        The number does not have to be one of the seeded demo accounts. A
+        missing account is still a profile: the number and the role are enough.
+        """
+        if role not in {"elder", "child"}:
+            raise ValueError("choose elder or child")
+        try:
+            number = normalise_msisdn(msisdn)
+        except ValueError as error:
+            raise ValueError("That is not a Hutch mobile number.") from error
         account = self._require(ref)
-        other = self.account_by_msisdn(msisdn)
-        if other is None or other.ref == ref:
-            raise KeyError(msisdn)
-        if other.msisdn in account.family:
-            return other.msisdn
-        if len(account.family) >= 10:
+        if number == account.msisdn:
+            raise ValueError("That number is already this account.")
+        other = self.account_by_msisdn(number)
+        if other is not None and other.ref == account.ref:
+            raise ValueError("That number is already this account.")
+        stored = other.msisdn if other is not None else number
+        if stored not in account.family and len(account.family) >= 10:
             raise ValueError("family list is full")
-        account.family.append(other.msisdn)
+        if stored not in account.family:
+            account.family.append(stored)
+        account.family_roles[stored] = role
         self._flush(account)
-        return other.msisdn
+        return stored
+
+    def set_profile(self, ref: str, msisdn: str | None) -> None:
+        """Whose home the full app is showing. Empty means the signed-in person."""
+        account = self._require(ref)
+        if not msisdn:
+            account.active_profile = None
+            self._flush(account)
+            return
+        try:
+            number = normalise_msisdn(msisdn)
+        except ValueError as error:
+            raise KeyError(msisdn) from error
+        if number == account.msisdn:
+            account.active_profile = None
+            self._flush(account)
+            return
+        if number not in account.family:
+            raise KeyError(msisdn)
+        account.active_profile = number
+        self._flush(account)
 
     def _require(self, ref: str) -> Account:
         account = self._accounts.get(ref)
@@ -469,6 +504,7 @@ def build_demo_world(now: datetime = DEMO_NOW, *, persist: bool = False) -> Synt
     _journey_nimal_thin(world)
     _journey_kavitha_thin(world)
     _journey_priya_thin(world)
+    _journey_sanduni_offers(world)
     return world
 
 
@@ -830,6 +866,53 @@ def _journey_kavitha_thin(world: SyntheticWorld) -> Account:
         offering_id="PKG-UNLTD",
         catalogue_version="2027.07",
         fup_cap_gb="50.00",
+        fup_disclosed=True,
+    )
+    return account
+
+
+def _journey_sanduni_offers(world: SyntheticWorld) -> Account:
+    """Sanduni: the account the offer-verification journey runs on (OFFER01).
+
+    Deliberately an ordinary account with nothing wrong on it. The question
+    this journey answers is not "why did my balance change" but "is this
+    message real", so the interesting data is in the offers recorded against
+    the number (`app/offer_seed.py`) and not in its event history. An account
+    with a dispute on it would confuse the two.
+    """
+    now = world.now
+    account = world.add_account(
+        Account(
+            msisdn="+94785720767",
+            name="Sanduni Fernando",
+            balance_lkr=money("310.00"),
+            language=Language.SI,
+            onboarded=True,
+            notify="important",
+            packs=[
+                Pack(
+                    offering_id="PKG-ANY10",
+                    name="Anytime 10GB",
+                    price_lkr=money("990.00"),
+                    purchased_at=now - timedelta(days=9),
+                    expires_at=now + timedelta(days=21),
+                    catalogue_version="2027.07",
+                    fup_cap_gb=money("10.00"),
+                    after_cap_speed="512 kbps",
+                    fup_disclosed_at_purchase=True,
+                )
+            ],
+        )
+    )
+    world.event(
+        account,
+        EventSource.CATALOGUE,
+        EventType.PACK_PURCHASED,
+        now - timedelta(days=9),
+        amount_lkr=money("990.00"),
+        offering_id="PKG-ANY10",
+        catalogue_version="2027.07",
+        fup_cap_gb="10.00",
         fup_disclosed=True,
     )
     return account

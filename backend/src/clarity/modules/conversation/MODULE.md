@@ -151,6 +151,7 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 - `backend/tests/acceptance/test_flows.py` - scripted conversations per flow (C02 acceptance 1)
 - `backend/tests/unit/test_agent_step.py` - plan validation, limits and fallback (C03 acceptance 1 and 2)
 - `backend/tests/evaluation/test_safety_set.py` - the injection set through a deliberately compromised planner (C03 acceptance 3)
+- `backend/tests/acceptance/test_adversarial_api.py` - the red-team set over `/v1` (S01): nothing executed, no internals in any reply, no reflection, off-topic unanswered, held text unsourced, cross-subject refused
 
 ## 10. Change history
 | Date | Devlog entry | Summary |
@@ -163,3 +164,4 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C04-intake-singlish.md` | Ordered intake rules, Singlish detection and vocabulary, the `extract` seam, and a held-out set |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-A4-A8-transcript-streaming-tools-copy-throttle.md` | A4: `transcript.py`, the record of what was said (ADR-0040) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-W0-A1-receipt-otp-and-reply-honesty.md` | A3: the stateless path gains the cheap refusals, forbidden-content refusal, injection guard and reply verifier; the shared pieces move into `service.py` and client facts are filtered on both routes |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-S01-guardrail-red-team.md` | S01: a topicless question is `FALLBACK` rather than `ESIM_HELP` (it used to answer "here is how to convert to eSIM" to any off-topic question), and held text gets the template with no citations rather than a sourced-looking knowledge answer |

@@ -396,12 +396,21 @@ export type CustomerNotification = {
   receipt_id?: string;
 };
 
+export type FamilyRole = "elder" | "child";
+
 export type FamilyMember = {
   name: string;
   masked: string;
   msisdn: string;
+  role?: FamilyRole;
   pack: string | null;
   safeguards: string[];
+};
+
+export type ActiveProfile = {
+  name: string;
+  msisdn: string;
+  role: FamilyRole;
 };
 
 /** `GET /v1/me/app`, and what every `/v1/me/*` write returns. */
@@ -414,6 +423,7 @@ export type CustomerApp = CustomerHome & {
   notifications: CustomerNotification[];
   network: { status: string; text: string; eta: string | null };
   family: FamilyMember[];
+  active_profile?: ActiveProfile | null;
   usage: {
     data_used_gb: string | null;
     data_cap_gb: string | null;
@@ -453,6 +463,22 @@ export type McpConnectorView = Omit<
   guarantees: string[];
   simulated: boolean;
 };
+/* ---------------------------------------------- offer verification (OFFER01) */
+
+/** `POST /v1/offers/verify`, `GET|POST /v1/admin/offers`. */
+export type OfferCheckRequest = Schemas["OfferCheckRequest"];
+/** `signals` and `simulated` are filled by the client, so callers get both. */
+export type OfferCheckView = Omit<Schemas["OfferCheckView"], "signals" | "simulated"> & {
+  signals: Schemas["OfferSignalView"][];
+  simulated: boolean;
+};
+export type OfferMatchView = Schemas["OfferMatchView"];
+export type OfferSignalView = Schemas["OfferSignalView"];
+export type OfferView = Schemas["OfferView"];
+export type OfferRecordBody = WithDefaults<Schemas["OfferRecordRequest"], "offer_code">;
+
+/** The three answers the records can give. Deliberately not a scam flag. */
+export type OfferVerdict = "ON_RECORD" | "NOT_ON_RECORD" | "NEEDS_A_PERSON";
 
 /* ------------------------------------------------------------------------ *
  * Policy governance (D3), Complaint Autopsy (D1) and Foresight (C4).
