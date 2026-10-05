@@ -26,6 +26,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from clarity.ai.embedding import HashingEmbedder
 from clarity.ai.evaluation import (
     LIVE,
     RECORDED,
@@ -55,6 +56,7 @@ from clarity.modules.knowledge.public import (
     KnowledgeRetriever,
     KnowledgeSource,
     RetrievalConfig,
+    VectorSemanticRanker,
     compose_answer,
 )
 
@@ -178,8 +180,16 @@ def measure_rag() -> dict[str, Measurement]:
     for document in corpus:
         registry.publish(KnowledgeSource(effective_from=RAG_EFFECTIVE_FROM, **document))
 
-    retriever = KnowledgeRetriever(registry, RetrievalConfig.from_file(RETRIEVAL))
-    retriever.index(registry.chunks_as_of(RAG_AS_OF, audience=Audience.STAFF))
+    # The retriever the deployment actually builds, hybrid half included (F4).
+    # Measuring a lexical-only retriever here while the container wires a
+    # hybrid one would make the gate a measurement of something nobody runs.
+    chunks = registry.chunks_as_of(RAG_AS_OF, audience=Audience.STAFF)
+    semantic = VectorSemanticRanker(HashingEmbedder())
+    semantic.fit(chunks)
+    retriever = KnowledgeRetriever(
+        registry, RetrievalConfig.from_file(RETRIEVAL), semantic=semantic
+    )
+    retriever.index(chunks)
 
     traces = [
         (

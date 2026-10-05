@@ -76,6 +76,7 @@ from clarity.modules.knowledge.retrieval import (
     RewritingRetriever,
     SemanticRanker,
 )
+from clarity.modules.knowledge.semantic import VectorSemanticRanker
 from clarity.modules.knowledge.service import Answer, KnowledgeService
 from clarity.modules.knowledge.sources import (
     Audience,
@@ -123,6 +124,7 @@ __all__ = [
     "SemanticRanker",
     "SourceKind",
     "StoredKnowledgeRepository",
+    "VectorSemanticRanker",
     "all_faults",
     "check_language",
     "citations_in",

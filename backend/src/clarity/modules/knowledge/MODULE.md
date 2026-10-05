@@ -33,7 +33,8 @@ way out: retrieve, compose, verify, cache, or refuse.
 `publish_all`, `SOURCES`, `CHUNKS`, `WORDS_PER_CHUNK`, `WORDS_OF_OVERLAP`.
 
 Retrieval (K02): `KnowledgeRetriever`, `RewritingRetriever`, `Hit`,
-`RetrievalTrace`, `SemanticRanker`, `QueryRewriter`, `RetrievalConfig`,
+`RetrievalTrace`, `SemanticRanker`, `VectorSemanticRanker`, `QueryRewriter`,
+`RetrievalConfig`,
 `BM25Params`, `HybridWeights`, `RerankBonuses`, `RetrievalConfigInvalid`,
 `tokens`, `query_terms`.
 
@@ -91,7 +92,8 @@ Four steps, and the order is the design:
 | Step | What | Why it is where it is |
 |---|---|---|
 | Filter | effective date, audience, language, products | K01 owns it and it is authoritative. Ranking never decides eligibility |
-| Rank | BM25 over the candidates, fused with a semantic score when one exists | |
+| Rank | BM25 over the candidates, fused with the semantic score (F4) | both halves normalised against their own best, so the configured weights mean the same thing on each |
+| Floor | drop anything the semantic half scores under `hybrid.min_semantic` | absolute, not relative: "is this related at all" does not depend on what else was retrieved. Without it a cosine is never zero, so every document became a weak candidate and a question about evening speeds grounded itself in the billing-cycle clause |
 | Rerank | small bonuses: a cited clause, the query's language, a product in the case | deterministic, each bonus a share of the top score so it nudges rather than replaces |
 | Cut | `top_k`, dropping anything under `min_relative_score` | a padded context is worse than a refusal (K03) |
 
@@ -202,16 +204,28 @@ K03 (#33).
 
 **The `full` profile's pgvector hybrid is blocked, and not on this module.**
 Plan 22 section 7 specifies pgvector with embeddings from the `embed` role.
-There is no embedding model anywhere in the system: `ModelRole.EMBED` is a
-declared role name with no implementation, `local-bge` is bound to
-`TemplateProvider` as a stand-in, and `RoleRouter.invoke` returns `str`, which
-cannot carry a vector. So the AI layer has no embedding API to call.
+**Resolved in F4.** `ModelRole.EMBED` has an implementation. The AI layer
+grew an embedding port (`clarity.ai.embedding.Embedder`) because
+`RoleRouter.invoke` returns `str` and a vector is not text, so the embed role
+could never have gone through the same seam as the others.
+`VectorSemanticRanker` is the first implementation of `SemanticRanker`, over
+that port, and the composition root wires it beside the lexical index and
+refits it whenever the corpus is republished.
 
-Rather than write a driver that cannot be exercised, K02 ships the seam
-(`SemanticRanker`), the fusion that uses it, and the port contract the driver
-will have to pass (`tests/contract/test_retriever_parity.py`, where the hybrid
-driver is registered and skips). With no semantic ranker the hybrid weights
-renormalise onto the lexical half, which ADR-0009 makes a supported state.
+**What the local driver buys, measured, because it is less than it sounds.** It
+is an IDF-weighted hashed character-n-gram space. It closes a morphological gap
+BM25 leaves open (`renewed` reaching a clause written `renewal`, which BM25
+scores at zero) and it cannot close a synonym gap (`turned on` against
+`activated`). On the retrieval golden set its scores for the clauses it should
+find sit inside its own noise band, so `hybrid.min_semantic` keeps it from
+grounding an answer on an unrelated clause and it changes neither
+`recall_at_5` nor `citation_accuracy` there. `tests/unit/test_embedding.py`
+asserts both the gap it closes and the gap it does not.
+
+A learned multilingual model (plan 19 §2.1 names BGE-M3) implements the same
+port and is what closes `rag.citation_accuracy`; the pgvector store for `full`
+is still to come. With no ranker at all the hybrid weights still renormalise
+onto the lexical half, which ADR-0009 makes a supported state.
 
 **Not yet under the governance change lifecycle.** Plan 20 makes a knowledge
 source a kind K2 artefact: draft, review, publish. Today `publish` enforces the
@@ -255,3 +269,4 @@ is how a long-lived process stops carrying dead entries.
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K01-knowledge-source-registry.md` | Source registry, effective dating, audience filtering and governed ingestion |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K02-index-and-retrieval.md` | BM25 index, Singlish query expansion, rerank, top-k from config, and the `rag` release gate made evaluable |
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-K03-grounded-answers.md` | Citation verifier, template and model composition, refusal, answer cache, `knowledge.published`, and `/v1/knowledge/search` served by this module |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-F-ai-credibility.md` | `VectorSemanticRanker` over the new `embed` port, `hybrid.min_semantic`, and the corpus grown to Sinhala and Tamil |
