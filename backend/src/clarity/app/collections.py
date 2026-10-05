@@ -41,6 +41,7 @@ from clarity.modules.iam.public import (
 from clarity.modules.insights.public import PROJECTIONS
 from clarity.modules.knowledge.public import CHUNKS, SOURCES
 from clarity.modules.notifications.public import NOTIFICATIONS, PREFERENCES
+from clarity.modules.offers.public import OFFERS
 from clarity.modules.proactive.public import RISKS, SIGNALS
 from clarity.modules.receipts.public import (
     BY_PLAN,
@@ -113,6 +114,11 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     BATCHES,
     # insights
     PROJECTIONS,
+    # offers: what HUTCH sent to a number (OFFER01). Not customer scoped by
+    # row-level security: a record is keyed by the subscriber pseudonym and
+    # read only through `offer:manage` (staff) or the subject-bound check,
+    # which is the same shape as the other staff-read collections.
+    OFFERS,
     # assurance
     ALERTS,
     HEARTBEATS,

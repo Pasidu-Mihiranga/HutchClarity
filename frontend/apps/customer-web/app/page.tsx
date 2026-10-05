@@ -84,6 +84,14 @@ export default function HomePage() {
     { label: "Support", onClick: () => router.push("/clarity") },
   ];
 
+  // Offer verification (OFFER01). Its own row rather than a sixth quick
+  // action: somebody holding a suspicious SMS is not browsing, and the thing
+  // they need is the one thing on the screen that names what they are holding.
+  const suspicious = {
+    title: "Got a message about an offer?",
+    body: "Check whether Hutch really sent it to your number",
+  };
+
   async function submitReload() {
     const ok = await act((api) => api.reload(amount));
     if (ok) setReloading(false);
@@ -246,6 +254,37 @@ export default function HomePage() {
           ))}
         </ul>
       </nav>
+
+      <button
+        type="button"
+        onClick={() => router.push("/check-message")}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius)",
+          background: "rgb(var(--c-surface))",
+          padding: "16px 18px",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          textAlign: "left",
+          marginBottom: 14,
+        }}
+      >
+        <span>
+          <span style={{ display: "block", fontWeight: 700, fontSize: 15, color: "var(--ink)" }}>
+            {suspicious.title}
+          </span>
+          <span style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 3 }}>
+            {suspicious.body}
+          </span>
+        </span>
+        <span aria-hidden="true" style={{ fontSize: 20, color: "var(--orange)", marginLeft: 12 }}>
+          →
+        </span>
+      </button>
 
       <button
         type="button"

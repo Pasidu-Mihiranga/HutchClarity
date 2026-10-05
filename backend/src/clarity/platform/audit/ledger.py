@@ -111,6 +111,22 @@ class AuditEventType(StrEnum):
     OTP_FAILED = "otp.failed"
     """A wrong, expired or reused code. The raw material of brute force."""
 
+    OFFER_RECORDED = "offer.recorded"
+    """A staff member recorded what HUTCH sent to a number (OFFER01).
+
+    Authority exercised, so it is recorded like one: whoever adds an offer
+    decides what the fraud check will vouch for.
+    """
+
+    OFFER_CHECKED = "offer.checked"
+    """A customer checked a message against their own offers (OFFER01).
+
+    Recorded for the verdict and the warning signs, **never the message text**.
+    The text reaches the hashed payload only, so the same scam checked by four
+    hundred customers is one correlatable fingerprint in the trail without the
+    trail becoming a store of what people were sent (I13).
+    """
+
     AUTOPSY_CLUSTER_REVIEWED = "autopsy.cluster_reviewed"
     """A person ruled on a complaint cluster (D1). Recorded whether they
     confirmed, rejected or superseded, because a reversal is the thing an
