@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Button, Card, Dialog } from "@clarity/ui";
 import type { SwitchStateView } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { McpConnector } from "@/components/McpConnector";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -331,23 +332,14 @@ export default function AdminPage() {
             </p>
           </Card>
         </section>
-
-        <section aria-labelledby="admin-mcp">
-          <Card className="space-y-3">
-            <h2 id="admin-mcp" className="font-medium">
-              MCP and templates
-            </h2>
-            <p className="text-sm text-fg-muted">
-              Placeholder inventory - not connected to live MCP clients.
-            </p>
-            <ul className="space-y-1 text-sm text-fg">
-              <li>desk-copilot (designed)</li>
-              <li>receipt_issued · si/ta/en</li>
-              <li>otp_request · si/ta/en</li>
-            </ul>
-          </Card>
-        </section>
       </div>
+
+      {/* The MCP connector, full width: it carries a tool table per profile
+          and the configuration another system needs, which do not fit beside
+          the kill switches. */}
+      <section aria-labelledby="admin-mcp">
+        <McpConnector />
+      </section>
     </div>
   );
 }

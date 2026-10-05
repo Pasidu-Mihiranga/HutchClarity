@@ -6,6 +6,22 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **`GET /v1/admin/mcp` and `GET /v1/admin/mcp/health`** (OPS01). The admin
+  console's MCP panel was a hard-coded placeholder reading "not connected to
+  live MCP clients"; `clarity-mcp` was a real deployable the whole time. The
+  first route reports the server as configured - endpoint, transport, discovery
+  URL, authorization parameters, and every profile with its scope, its case
+  binding and its tools, **read from the tool registry** so it cannot drift. The
+  second probes the deployable, which is its own process. Both need
+  `admin:manage`.
+  - Neither carries a secret: the client id and endpoints are public and the
+    client secret stays in the operator's identity provider (I14).
+  - `GET /v1/mcp/tools` is unchanged and still public.
+- **SDK**: `mcpConnector()`, `mcpHealth()`, and the `McpConnectorView` /
+  `McpHealthView` types.
+- **Console**: the admin page's MCP panel now lists the live tool surface per
+  profile and has a **Connect a system** dialog that generates the MCP client
+  configuration and the token request for the chosen profile.
 - **`POST /v1/offers/verify`** (OFFER01). A customer pastes a message claiming
   to be a HUTCH offer and is told whether an offer on record for *their* number
   matches it. The verdict is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`

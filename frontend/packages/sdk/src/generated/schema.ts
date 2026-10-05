@@ -86,6 +86,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mcp Connector
+         * @description Everything another system needs to connect to `clarity-mcp`.
+         *
+         *     The console's admin page used to carry a hard-coded list under the line
+         *     "not connected to live MCP clients". The server it was describing was
+         *     real the whole time: a separate deployable serving MCP over Streamable
+         *     HTTP, verifying OAuth 2.1 bearer tokens as a resource server, and
+         *     choosing a tool profile from the token's scope. This reports that
+         *     server as it is actually configured.
+         *
+         *     **The tool list is read from the registry, not restated here.** A tool
+         *     added to `ClarityMCPServer` appears on this page without anyone
+         *     remembering to update it, which is exactly what the placeholder got
+         *     wrong.
+         *
+         *     **No secret is returned.** The client id, the issuer and the endpoints
+         *     are all public; the client secret belongs to the operator's own
+         *     identity provider and never passes through Clarity (I14).
+         */
+        get: operations["mcp_connector_v1_admin_mcp_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/mcp/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mcp Health
+         * @description Ask the MCP deployable whether it is up, right now.
+         *
+         *     Separate from the inventory so the page loads without waiting on a
+         *     network call and the probe is something an operator asks for.
+         *     `clarity-mcp` is its own process (ADR-0018), so "the console is up"
+         *     says nothing about whether it is.
+         *
+         *     An unreachable server is reported, never raised: "we asked and got
+         *     nothing" is the answer, and a 500 here would read as the console being
+         *     broken rather than the thing it was asking about.
+         */
+        get: operations["mcp_health_v1_admin_mcp_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/merchants/suspend": {
         parameters: {
             query?: never;
@@ -1825,7 +1890,7 @@ export interface paths {
         };
         /**
          * My Cases
-         * @description Cases opened for the signed-in number.
+         * @description Cases opened for the profile that is open.
          */
         get: operations["my_cases_v1_me_cases_get"];
         put?: never;
@@ -1862,7 +1927,7 @@ export interface paths {
         };
         /**
          * My Home
-         * @description Balance, pack, activity and alerts for the signed-in number.
+         * @description Balance, pack, activity and alerts for the open profile.
          */
         get: operations["my_home_v1_me_home_get"];
         put?: never;
@@ -1901,6 +1966,26 @@ export interface paths {
         put?: never;
         /** My Preferences */
         post: operations["my_preferences_v1_me_preferences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * My Profile
+         * @description Open a family profile, or return to the signed-in person.
+         */
+        post: operations["my_profile_v1_me_profile_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2362,6 +2447,11 @@ export interface components {
         FamilyRequest: {
             /** Msisdn */
             msisdn: string;
+            /**
+             * Role
+             * @default elder
+             */
+            role: string;
         };
         /**
          * ForesightRunRequest
@@ -2407,6 +2497,123 @@ export interface components {
             provenance: string;
             /** Scenario Version Id */
             scenario_version_id: string;
+        };
+        /**
+         * McpAuthorizationView
+         * @description What a client needs to obtain a token, minus the secret.
+         *
+         *     `configured` is false when no issuer is set, which is the ordinary state in
+         *     the synthetic profiles: the server still refuses unauthenticated calls, so
+         *     a client cannot connect until an operator points it at a real issuer.
+         */
+        McpAuthorizationView: {
+            /** Audience */
+            audience: string;
+            /** Client Id */
+            client_id: string;
+            /** Configured */
+            configured: boolean;
+            /** Discovery Url */
+            discovery_url: string;
+            /** Flow */
+            flow: string;
+            /** Issuer */
+            issuer?: string | null;
+            /** Resource Indicator */
+            resource_indicator: string;
+            /** Secret Hint */
+            secret_hint: string;
+            /** Token Endpoint */
+            token_endpoint?: string | null;
+        };
+        /**
+         * McpConnectorView
+         * @description Everything the console needs to connect another system.
+         */
+        McpConnectorView: {
+            authorization: components["schemas"]["McpAuthorizationView"];
+            /** Guarantees */
+            guarantees?: string[];
+            /** Profiles */
+            profiles?: components["schemas"]["McpProfileView"][];
+            server: components["schemas"]["McpServerView"];
+            /**
+             * Simulated
+             * @default true
+             */
+            simulated: boolean;
+        };
+        /**
+         * McpHealthView
+         * @description Whether the MCP deployable answered just now.
+         */
+        McpHealthView: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /** Reachable */
+            reachable: boolean;
+            /** Status */
+            status: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * McpProfileView
+         * @description One tool profile, and the scope a token needs to get it.
+         *
+         *     A client cannot widen itself by asking: the profile comes from the scope
+         *     its token was issued for, which is why the scope is part of the connection
+         *     details rather than a request parameter.
+         */
+        McpProfileView: {
+            /** Case Bound */
+            case_bound: boolean;
+            /** Profile */
+            profile: string;
+            /** Scope */
+            scope: string;
+            /** Tools */
+            tools?: components["schemas"]["McpToolView"][];
+        };
+        /**
+         * McpServerView
+         * @description Where the MCP deployable is and how it speaks.
+         */
+        McpServerView: {
+            /** Allowed Hosts */
+            allowed_hosts?: string[];
+            /** Health Url */
+            health_url: string;
+            /** Instructions */
+            instructions: string;
+            /** Name */
+            name: string;
+            /** Resource Url */
+            resource_url: string;
+            /** Title */
+            title: string;
+            /** Transport */
+            transport: string;
+        };
+        /**
+         * McpToolView
+         * @description One tool a model may call, and how dangerous it is.
+         */
+        McpToolView: {
+            /** Description */
+            description: string;
+            /** Level */
+            level: string;
+            /** Name */
+            name: string;
         };
         /**
          * MerchantSuspendRequest
@@ -2680,6 +2887,14 @@ export interface components {
              * @default important
              */
             notify: string;
+        };
+        /**
+         * ProfileSwitchRequest
+         * @description Whose home to open. Empty returns to the signed-in person.
+         */
+        ProfileSwitchRequest: {
+            /** Msisdn */
+            msisdn?: string | null;
         };
         /** ProposeRequest */
         ProposeRequest: {
@@ -3129,6 +3344,68 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    mcp_connector_v1_admin_mcp_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpConnectorView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mcp_health_v1_admin_mcp_health_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpHealthView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6248,6 +6525,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_profile_v1_me_profile_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSwitchRequest"];
             };
         };
         responses: {

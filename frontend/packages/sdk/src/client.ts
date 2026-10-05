@@ -11,6 +11,8 @@ import type {
 } from "./routes";
 import type {
   AlertQueue,
+  McpConnectorView,
+  McpHealthView,
   OfferCheckView,
   OfferRecordBody,
   OfferView,
@@ -495,9 +497,11 @@ export class ClarityClient {
   }
 
   addFamilyMember(msisdn: string, role: "elder" | "child" = "elder"): Promise<CustomerApp> {
-    return this.declared("post", "/v1/me/family", {
-      body: { msisdn, role } as { msisdn: string },
-    });
+    // The cast this replaced narrowed the body to `{ msisdn }`, which matched a
+    // stale generated schema: `role` was added to FamilyRequest on the backend
+    // and `schema.ts` had not been regenerated since. It is a server default,
+    // so the generator marks it required and the call already supplies it.
+    return this.declared("post", "/v1/me/family", { body: { msisdn, role } });
   }
 
   switchProfile(msisdn: string | null): Promise<CustomerApp> {
@@ -511,6 +515,31 @@ export class ClarityClient {
     return this.declared("post", "/v1/me/preferences", {
       body: { large_text: false, notify: "important", ...body },
     });
+  }
+
+  /* ------------------------------------------- the MCP connector (OPS01) */
+
+  /**
+   * What another system needs to connect to `clarity-mcp`.
+   *
+   * Never carries a secret: the client id and the endpoints are public and the
+   * client secret stays in the operator's identity provider.
+   */
+  mcpConnector(): Promise<McpConnectorView> {
+    return this.call("get", "/v1/admin/mcp").then((view) => ({
+      ...view,
+      guarantees: view.guarantees ?? [],
+      simulated: view.simulated ?? true,
+      profiles: (view.profiles ?? []).map((profile) => ({
+        ...profile,
+        tools: profile.tools ?? [],
+      })),
+    }));
+  }
+
+  /** Ask the MCP deployable whether it is up. It is its own process. */
+  mcpHealth(): Promise<McpHealthView> {
+    return this.call("get", "/v1/admin/mcp/health");
   }
 
   /* ------------------------------------------- offer verification (OFFER01) */

@@ -33,6 +33,22 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/admin/mcp": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "McpConnectorView",
+      "status": "200"
+    },
+    "GET /v1/admin/mcp/health": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "McpHealthView",
+      "status": "200"
+    },
     "GET /v1/admin/offers": {
       "parameters": [
         "header:authorization?"
@@ -813,6 +829,14 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/me/profile": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "ProfileSwitchRequest",
+      "response": "object",
+      "status": "200"
+    },
     "POST /v1/me/reload": {
       "parameters": [
         "header:authorization?"
@@ -1064,7 +1088,8 @@
     },
     "FamilyRequest": {
       "fields": [
-        "msisdn"
+        "msisdn",
+        "role"
       ],
       "required": [
         "msisdn"
@@ -1098,6 +1123,100 @@
       ],
       "required": [
         "scenario_version_id"
+      ]
+    },
+    "McpAuthorizationView": {
+      "fields": [
+        "audience",
+        "client_id",
+        "configured",
+        "discovery_url",
+        "flow",
+        "issuer",
+        "resource_indicator",
+        "secret_hint",
+        "token_endpoint"
+      ],
+      "required": [
+        "audience",
+        "client_id",
+        "configured",
+        "discovery_url",
+        "flow",
+        "resource_indicator",
+        "secret_hint"
+      ]
+    },
+    "McpConnectorView": {
+      "fields": [
+        "authorization",
+        "guarantees",
+        "profiles",
+        "server",
+        "simulated"
+      ],
+      "required": [
+        "authorization",
+        "server"
+      ]
+    },
+    "McpHealthView": {
+      "fields": [
+        "checked_at",
+        "detail",
+        "reachable",
+        "status",
+        "url"
+      ],
+      "required": [
+        "checked_at",
+        "reachable",
+        "status",
+        "url"
+      ]
+    },
+    "McpProfileView": {
+      "fields": [
+        "case_bound",
+        "profile",
+        "scope",
+        "tools"
+      ],
+      "required": [
+        "case_bound",
+        "profile",
+        "scope"
+      ]
+    },
+    "McpServerView": {
+      "fields": [
+        "allowed_hosts",
+        "health_url",
+        "instructions",
+        "name",
+        "resource_url",
+        "title",
+        "transport"
+      ],
+      "required": [
+        "health_url",
+        "instructions",
+        "name",
+        "resource_url",
+        "title",
+        "transport"
+      ]
+    },
+    "McpToolView": {
+      "fields": [
+        "description",
+        "level",
+        "name"
+      ],
+      "required": [
+        "description",
+        "level",
+        "name"
       ]
     },
     "MerchantSuspendRequest": {
@@ -1320,6 +1439,12 @@
       "required": [
         "language"
       ]
+    },
+    "ProfileSwitchRequest": {
+      "fields": [
+        "msisdn"
+      ],
+      "required": []
     },
     "ProposeRequest": {
       "fields": [

@@ -77,6 +77,12 @@ from clarity.interfaces.http.schemas import (
     ProfileSwitchRequest,
     ForesightRunRequest,
     LaunchRecordRequest,
+    McpAuthorizationView,
+    McpConnectorView,
+    McpHealthView,
+    McpProfileView,
+    McpServerView,
+    McpToolView,
     MerchantSuspendRequest,
     OfferCheckRequest,
     OfferCheckView,
@@ -1792,6 +1798,170 @@ def _register_routes(app: FastAPI) -> None:
                 "minted outside the model."
             ),
         }
+
+    # --------------------------------------------- the MCP connector (admin)
+
+    @app.get("/v1/admin/mcp", response_model=McpConnectorView, tags=["admin"])
+    def mcp_connector(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ADMIN_MANAGE))],
+    ) -> McpConnectorView:
+        """Everything another system needs to connect to `clarity-mcp`.
+
+        The console's admin page used to carry a hard-coded list under the line
+        "not connected to live MCP clients". The server it was describing was
+        real the whole time: a separate deployable serving MCP over Streamable
+        HTTP, verifying OAuth 2.1 bearer tokens as a resource server, and
+        choosing a tool profile from the token's scope. This reports that
+        server as it is actually configured.
+
+        **The tool list is read from the registry, not restated here.** A tool
+        added to `ClarityMCPServer` appears on this page without anyone
+        remembering to update it, which is exactly what the placeholder got
+        wrong.
+
+        **No secret is returned.** The client id, the issuer and the endpoints
+        are all public; the client secret belongs to the operator's own
+        identity provider and never passes through Clarity (I14).
+        """
+        from clarity.interfaces.mcp.auth import PROFILE_SCOPES
+        from clarity.interfaces.mcp.server import ClarityMCPServer
+        from clarity.interfaces.mcp.server import Profile as McpProfile
+
+        settings = clarity.settings
+        resource = settings.mcp_resource_url
+        origin = resource.rsplit("/mcp", 1)[0].rstrip("/") if "/mcp" in resource else resource
+        issuer = settings.keycloak_issuer
+        hosts = [host.strip() for host in settings.mcp_allowed_hosts.split(",") if host.strip()]
+
+        registry = ClarityMCPServer(clarity.mcp_view)
+        scope_of = {profile: scope for scope, profile in PROFILE_SCOPES.items()}
+
+        return McpConnectorView(
+            server=McpServerView(
+                name="clarity",
+                title="Hutch Clarity",
+                transport="Streamable HTTP",
+                resource_url=resource,
+                health_url=f"{origin}/health",
+                allowed_hosts=hosts or [resource.split("://")[-1].split("/")[0]],
+                instructions=(
+                    "Explain charges from evidence. Every answer must cite the case "
+                    "evidence or a rule. You cannot move money: the strongest action "
+                    "available is proposing a remedy the decision already allows, "
+                    "which a person or the customer then confirms."
+                ),
+            ),
+            authorization=McpAuthorizationView(
+                configured=bool(issuer),
+                flow=(
+                    "OAuth 2.1 client credentials, with an RFC 8707 resource indicator"
+                ),
+                issuer=issuer,
+                token_endpoint=(
+                    f"{issuer.rstrip('/')}/protocol/openid-connect/token" if issuer else None
+                ),
+                discovery_url=f"{origin}/.well-known/oauth-protected-resource",
+                audience=settings.keycloak_audience,
+                resource_indicator=resource,
+                client_id="clarity-mcp",
+                secret_hint=(
+                    "The client secret lives in your identity provider, not in Clarity. "
+                    "Take it from the clarity-mcp client in the realm and give it to the "
+                    "connecting system as a secret, never in a file under version control."
+                ),
+            ),
+            profiles=[
+                McpProfileView(
+                    profile=profile.value,
+                    scope=scope_of[profile],
+                    # A customer-assist token is bound to one case by the
+                    # authorization server, so one subscriber's agent cannot
+                    # reach another's. Staff and analytics are not case-scoped.
+                    case_bound=profile is McpProfile.CUSTOMER_ASSIST,
+                    tools=[
+                        McpToolView(
+                            name=str(tool["name"]),
+                            level=str(tool["level"]),
+                            description=str(tool["description"]),
+                        )
+                        for tool in registry.list_tools(profile)
+                    ],
+                )
+                for profile in McpProfile
+            ],
+            guarantees=[
+                "No tool executes a financial or service-changing action. The "
+                "strongest is propose_action, which creates a pending plan.",
+                "propose_action takes an action type and no amount: the amount "
+                "comes from the decision record (I1).",
+                "The profile comes from the token's scope, so a client cannot "
+                "widen its own tool set by asking.",
+                "A customer-assist token is bound to one case, so one "
+                "subscriber's agent cannot read another's.",
+                "Every call, allowed or denied, is written to the audit trail.",
+            ],
+            # The tools read the synthetic world in every profile but prod. The
+            # profile is read here the same way `demo_only` reads it, which is
+            # the interfaces layer's one legitimate use of it.
+            simulated=clarity.profile is not Profile.PROD,
+        )
+
+    @app.get("/v1/admin/mcp/health", response_model=McpHealthView, tags=["admin"])
+    async def mcp_health(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.ADMIN_MANAGE))],
+    ) -> McpHealthView:
+        """Ask the MCP deployable whether it is up, right now.
+
+        Separate from the inventory so the page loads without waiting on a
+        network call and the probe is something an operator asks for.
+        `clarity-mcp` is its own process (ADR-0018), so "the console is up"
+        says nothing about whether it is.
+
+        An unreachable server is reported, never raised: "we asked and got
+        nothing" is the answer, and a 500 here would read as the console being
+        broken rather than the thing it was asking about.
+        """
+        import httpx
+
+        settings = clarity.settings
+        resource = settings.mcp_resource_url
+        origin = resource.rsplit("/mcp", 1)[0].rstrip("/") if "/mcp" in resource else resource
+        url = f"{origin}/health"
+        now = clarity.case_aggregate._now()
+
+        try:
+            async with httpx.AsyncClient(timeout=settings.auth_timeout_seconds) as client:
+                answered = await client.get(url)
+        except httpx.HTTPError as error:
+            return McpHealthView(
+                url=url,
+                reachable=False,
+                status="unreachable",
+                detail=type(error).__name__,
+                checked_at=now,
+            )
+
+        if answered.status_code != 200:
+            return McpHealthView(
+                url=url,
+                reachable=False,
+                status="refused",
+                detail=f"HTTP {answered.status_code}",
+                checked_at=now,
+            )
+
+        body: dict[str, Any] = {}
+        if answered.headers.get("content-type", "").startswith("application/json"):
+            body = answered.json()
+        return McpHealthView(
+            url=url,
+            reachable=True,
+            status=str(body.get("status", "ok")),
+            detail=str(body.get("service", "")),
+            checked_at=now,
+        )
 
     @app.get("/v1/receipts/{receipt_id}/render", tags=["receipts"])
     def render_receipt(
