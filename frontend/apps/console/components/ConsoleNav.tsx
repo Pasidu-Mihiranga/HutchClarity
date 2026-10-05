@@ -48,20 +48,15 @@ export function ConsoleNav() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
-        <span
-          aria-hidden="true"
-          className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-on"
-        >
-          <IconMark />
-        </span>
-        <span className="leading-tight">
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-            Hutch
-          </span>
-          <span className="block font-display text-[15px] font-semibold tracking-tight text-ink">
-            Clarity Desk
-          </span>
+      <Link href="/" aria-label="Hutch Clarity" className="block px-4 pb-4 pt-5">
+        <span className="inline-flex max-w-full rounded-lg bg-white px-2 py-1.5">
+          <img
+            src="/hutch-clarity-logo.png"
+            alt=""
+            width={920}
+            height={337}
+            className="h-auto w-full max-w-[188px] object-contain object-left"
+          />
         </span>
       </Link>
       <nav aria-label="Console sections" className="px-3">
@@ -92,14 +87,6 @@ export function ConsoleNav() {
         </ul>
       </nav>
     </div>
-  );
-}
-
-function IconMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M5 6.5A3.5 3.5 0 0 1 8.5 3h7A3.5 3.5 0 0 1 19 6.5v6A3.5 3.5 0 0 1 15.5 16H12l-4 4v-4H8.5A3.5 3.5 0 0 1 5 12.5v-6Z" />
-    </svg>
   );
 }
 

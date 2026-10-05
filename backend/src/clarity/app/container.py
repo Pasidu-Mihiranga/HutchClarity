@@ -1270,6 +1270,7 @@ class Clarity:
             real_launches=None,
             loop=self.foresight_loop,
         )
+        self._seed_synthetic_scenarios()
         # The baseline is the headline and a second method sits beside it
         # (C3/F11). `PersonaRehearsal` constructs the baseline itself, so the
         # only thing wired here is the comparison column.
@@ -1339,6 +1340,21 @@ class Clarity:
             open_unit=self.open_unit,
             intake_assist=self.intake_assist,
         )
+
+    def _seed_synthetic_scenarios(self) -> None:
+        """Store the labelled synthetic rehearsals (see ``foresight_seed``).
+
+        Best effort, like the complaint seed. An empty scenario list is a
+        better outcome than a process that will not start.
+        """
+        try:
+            from clarity.app.foresight_seed import seed_synthetic_scenarios
+
+            seed_synthetic_scenarios(self.foresight_service)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "could not seed synthetic foresight scenarios", exc_info=True
+            )
 
     def _seed_synthetic_complaints(self) -> None:
         """Put the labelled synthetic complaints into autopsy (D4).

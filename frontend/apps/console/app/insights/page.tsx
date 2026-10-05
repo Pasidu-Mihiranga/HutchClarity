@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, Badge, Card, EmptyState, Spinner } from "@clarity/ui";
 import type { AutopsyWorkspace, ForesightPrediction } from "@clarity/sdk";
@@ -146,19 +147,85 @@ export default function InsightsPage() {
       </section>
 
       <section aria-labelledby="insights-autopsy">
-        <Card>
-          <h2 id="insights-autopsy" className="mb-2 font-medium">
-            Complaint Autopsy
-          </h2>
-          <p className="mb-2 text-xs text-fg-muted">{autopsy?.note ?? ""}</p>
-          <ul className="space-y-1 text-sm">
-            {clusters.map((c) => (
-              <li key={c.cluster_id}>
-                {c.label} · {c.size} · {c.status}
-                {c.suggested_rule_id ? ` · ${c.suggested_rule_id}` : ""}
-              </li>
-            ))}
-          </ul>
+        <Card className="!p-0 overflow-hidden rounded-card border-line bg-surface shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="insights-autopsy" className="font-medium">
+                  Complaint Autopsy
+                </h2>
+                <Badge tone="warning">Hypothesis</Badge>
+              </div>
+              <p className="mt-1 max-w-3xl text-xs text-fg-muted">{autopsy?.note ?? ""}</p>
+            </div>
+            <Link href="/autopsy" className="text-sm font-medium text-primary hover:underline">
+              Open the review workspace
+            </Link>
+          </div>
+          <dl className="grid gap-px border-b border-line bg-line sm:grid-cols-3">
+            <div className="bg-surface px-4 py-3">
+              <dt className="text-xs uppercase text-fg-muted">Clusters</dt>
+              <dd className="text-lg font-medium">{clusters.length}</dd>
+            </div>
+            <div className="bg-surface px-4 py-3">
+              <dt className="text-xs uppercase text-fg-muted">Complaints</dt>
+              <dd className="text-lg font-medium">{autopsy?.complaint_count ?? 0}</dd>
+            </div>
+            <div className="bg-surface px-4 py-3">
+              <dt className="text-xs uppercase text-fg-muted">Not reviewed</dt>
+              <dd className="text-lg font-medium">
+                {clusters.filter((c) => c.hypothesis).length}
+              </dd>
+            </div>
+          </dl>
+          {clusters.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-mute">No clusters yet.</p>
+          ) : (
+            <div className="max-h-[28rem] overflow-auto">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">
+                  Autopsy clusters. Each row is one cluster: its label, how many complaints it holds, whether a person has reviewed it, and any suggested rule.
+                </caption>
+                <thead className="sticky top-0 bg-surface text-xs font-medium text-fg-subtle">
+                  <tr className="border-b border-line">
+                    <th scope="col" className="px-4 py-2 font-medium">
+                      Cluster
+                    </th>
+                    <th scope="col" className="px-4 py-2 font-medium">
+                      Complaints
+                    </th>
+                    <th scope="col" className="px-4 py-2 font-medium">
+                      Status
+                    </th>
+                    <th scope="col" className="px-4 py-2 font-medium">
+                      Suggested rule
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clusters.map((c) => (
+                    <tr key={c.cluster_id} className="border-b border-line last:border-b-0">
+                      <th scope="row" className="px-4 py-3 text-left font-medium text-ink">
+                        {c.label}
+                      </th>
+                      <td className="px-4 py-3 tabular-nums text-ink">{c.size}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone={c.hypothesis ? "warning" : c.status === "rejected" ? "danger" : "success"}>
+                          {c.status_label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {c.suggested_rule_id ? (
+                          <span className="block font-mono text-xs text-ink">{c.suggested_rule_id}</span>
+                        ) : null}
+                        <span className="block text-xs text-fg-muted">{c.mapping_label}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       </section>
 

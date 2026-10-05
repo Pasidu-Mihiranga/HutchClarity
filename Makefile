@@ -52,8 +52,12 @@ setup:
 	python3 -m venv --clear .venv
 	$(PY)/pip install -e "$(BACKEND)[dev]"
 
+# A gitignored local directory wins, so one machine can add an account
+# without changing the shared synthetic file. E2E keeps the shared file.
+STAFF_DIRECTORY_FILE := $(if $(wildcard config/staff/local-directory.json),../config/staff/local-directory.json,../config/staff/synthetic-directory.json)
+
 dev:
-	cd $(BACKEND) && CLARITY_STAFF_DIRECTORY_FILE=../config/staff/synthetic-directory.json \
+	cd $(BACKEND) && CLARITY_STAFF_DIRECTORY_FILE=$(STAFF_DIRECTORY_FILE) \
 		$(PY)/uvicorn clarity.entrypoints.asgi:app --reload
 
 # The clarity-mcp deployable (A04, ADR-0018), on :8099. Needs the simulated
