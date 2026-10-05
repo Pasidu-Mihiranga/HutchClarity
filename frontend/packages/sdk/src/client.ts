@@ -11,6 +11,8 @@ import type {
 } from "./routes";
 import type {
   AlertQueue,
+  McpConnectorView,
+  McpHealthView,
   AlertView,
   ApproveResult,
   AuditGrantView,
@@ -499,6 +501,31 @@ export class ClarityClient {
     return this.declared("post", "/v1/me/preferences", {
       body: { large_text: false, notify: "important", ...body },
     });
+  }
+
+  /* ------------------------------------------- the MCP connector (OPS01) */
+
+  /**
+   * What another system needs to connect to `clarity-mcp`.
+   *
+   * Never carries a secret: the client id and the endpoints are public and the
+   * client secret stays in the operator's identity provider.
+   */
+  mcpConnector(): Promise<McpConnectorView> {
+    return this.call("get", "/v1/admin/mcp").then((view) => ({
+      ...view,
+      guarantees: view.guarantees ?? [],
+      simulated: view.simulated ?? true,
+      profiles: (view.profiles ?? []).map((profile) => ({
+        ...profile,
+        tools: profile.tools ?? [],
+      })),
+    }));
+  }
+
+  /** Ask the MCP deployable whether it is up. It is its own process. */
+  mcpHealth(): Promise<McpHealthView> {
+    return this.call("get", "/v1/admin/mcp/health");
   }
 
   /* ---------------------------------------------------------------- demo */

@@ -169,6 +169,11 @@ SIGNED_IN = {
     ("POST", "/v1/me/safeguards"),
     ("POST", "/v1/me/family"),
     ("POST", "/v1/me/preferences"),
+    # The MCP connector (OPS01). Connection details for `clarity-mcp`: the
+    # endpoint, the scopes and the resource indicator are the recipe for
+    # pointing a client at this system, so both need `admin:manage`.
+    ("GET", "/v1/admin/mcp"),
+    ("GET", "/v1/admin/mcp/health"),
 }
 
 SYNTHETIC_ONLY = {

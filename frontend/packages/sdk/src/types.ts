@@ -432,6 +432,28 @@ export type MyCaseRow = {
   outcome: string | null;
 };
 
+/* --------------------------------------------------- the MCP connector (admin) */
+
+/** `GET /v1/admin/mcp`. What another system needs to connect to clarity-mcp. */
+export type McpToolView = Schemas["McpToolView"];
+export type McpServerView = Schemas["McpServerView"];
+export type McpAuthorizationView = Schemas["McpAuthorizationView"];
+export type McpHealthView = Schemas["McpHealthView"];
+
+/** `tools` carries a server default, which the generator marks optional. */
+export type McpProfileView = Omit<Schemas["McpProfileView"], "tools"> & {
+  tools: McpToolView[];
+};
+
+export type McpConnectorView = Omit<
+  Schemas["McpConnectorView"],
+  "profiles" | "guarantees" | "simulated"
+> & {
+  profiles: McpProfileView[];
+  guarantees: string[];
+  simulated: boolean;
+};
+
 /* ------------------------------------------------------------------------ *
  * Policy governance (D3), Complaint Autopsy (D1) and Foresight (C4).
  *

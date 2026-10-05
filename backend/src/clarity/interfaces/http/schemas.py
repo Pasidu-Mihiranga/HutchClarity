@@ -366,6 +366,89 @@ class MerchantSuspendRequest(ApiModel):
 
 
 # --------------------------------------------------------------------------- #
+# The MCP connector (plan 07 section 10.7, ADR-0018)
+# --------------------------------------------------------------------------- #
+
+
+class McpToolView(ApiModel):
+    """One tool a model may call, and how dangerous it is."""
+
+    name: str
+    level: str
+    """`L1_READ`, `L2_LOW_RISK`, `L3_FINANCIAL`. Nothing here executes."""
+
+    description: str
+
+
+class McpProfileView(ApiModel):
+    """One tool profile, and the scope a token needs to get it.
+
+    A client cannot widen itself by asking: the profile comes from the scope
+    its token was issued for, which is why the scope is part of the connection
+    details rather than a request parameter.
+    """
+
+    profile: str
+    scope: str
+    case_bound: bool
+    """True when a token of this profile must carry a case claim."""
+
+    tools: list[McpToolView] = Field(default_factory=list)
+
+
+class McpServerView(ApiModel):
+    """Where the MCP deployable is and how it speaks."""
+
+    name: str
+    title: str
+    transport: str
+    resource_url: str
+    health_url: str
+    allowed_hosts: list[str] = Field(default_factory=list)
+    instructions: str
+
+
+class McpAuthorizationView(ApiModel):
+    """What a client needs to obtain a token, minus the secret.
+
+    `configured` is false when no issuer is set, which is the ordinary state in
+    the synthetic profiles: the server still refuses unauthenticated calls, so
+    a client cannot connect until an operator points it at a real issuer.
+    """
+
+    configured: bool
+    flow: str
+    issuer: str | None = None
+    token_endpoint: str | None = None
+    discovery_url: str
+    audience: str
+    resource_indicator: str
+    client_id: str
+    secret_hint: str
+    """Where the operator gets the client secret. Never the secret itself."""
+
+
+class McpConnectorView(ApiModel):
+    """Everything the console needs to connect another system."""
+
+    server: McpServerView
+    authorization: McpAuthorizationView
+    profiles: list[McpProfileView] = Field(default_factory=list)
+    guarantees: list[str] = Field(default_factory=list)
+    simulated: bool = True
+
+
+class McpHealthView(ApiModel):
+    """Whether the MCP deployable answered just now."""
+
+    url: str
+    reachable: bool
+    status: str
+    detail: str = ""
+    checked_at: datetime
+
+
+# --------------------------------------------------------------------------- #
 # Audit access (audit assurance plan Phase 3)
 # --------------------------------------------------------------------------- #
 

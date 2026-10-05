@@ -685,6 +685,250 @@
         "title": "LaunchRecordRequest",
         "type": "object"
       },
+      "McpAuthorizationView": {
+        "additionalProperties": false,
+        "description": "What a client needs to obtain a token, minus the secret.\n\n`configured` is false when no issuer is set, which is the ordinary state in\nthe synthetic profiles: the server still refuses unauthenticated calls, so\na client cannot connect until an operator points it at a real issuer.",
+        "properties": {
+          "audience": {
+            "title": "Audience",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "discovery_url": {
+            "title": "Discovery Url",
+            "type": "string"
+          },
+          "flow": {
+            "title": "Flow",
+            "type": "string"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "resource_indicator": {
+            "title": "Resource Indicator",
+            "type": "string"
+          },
+          "secret_hint": {
+            "title": "Secret Hint",
+            "type": "string"
+          },
+          "token_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Endpoint"
+          }
+        },
+        "required": [
+          "configured",
+          "flow",
+          "discovery_url",
+          "audience",
+          "resource_indicator",
+          "client_id",
+          "secret_hint"
+        ],
+        "title": "McpAuthorizationView",
+        "type": "object"
+      },
+      "McpConnectorView": {
+        "additionalProperties": false,
+        "description": "Everything the console needs to connect another system.",
+        "properties": {
+          "authorization": {
+            "$ref": "#/components/schemas/McpAuthorizationView"
+          },
+          "guarantees": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guarantees",
+            "type": "array"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/McpProfileView"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "server": {
+            "$ref": "#/components/schemas/McpServerView"
+          },
+          "simulated": {
+            "default": true,
+            "title": "Simulated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "server",
+          "authorization"
+        ],
+        "title": "McpConnectorView",
+        "type": "object"
+      },
+      "McpHealthView": {
+        "additionalProperties": false,
+        "description": "Whether the MCP deployable answered just now.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "reachable",
+          "status",
+          "checked_at"
+        ],
+        "title": "McpHealthView",
+        "type": "object"
+      },
+      "McpProfileView": {
+        "additionalProperties": false,
+        "description": "One tool profile, and the scope a token needs to get it.\n\nA client cannot widen itself by asking: the profile comes from the scope\nits token was issued for, which is why the scope is part of the connection\ndetails rather than a request parameter.",
+        "properties": {
+          "case_bound": {
+            "title": "Case Bound",
+            "type": "boolean"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolView"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profile",
+          "scope",
+          "case_bound"
+        ],
+        "title": "McpProfileView",
+        "type": "object"
+      },
+      "McpServerView": {
+        "additionalProperties": false,
+        "description": "Where the MCP deployable is and how it speaks.",
+        "properties": {
+          "allowed_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Hosts",
+            "type": "array"
+          },
+          "health_url": {
+            "title": "Health Url",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resource_url": {
+            "title": "Resource Url",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "transport": {
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "transport",
+          "resource_url",
+          "health_url",
+          "instructions"
+        ],
+        "title": "McpServerView",
+        "type": "object"
+      },
+      "McpToolView": {
+        "additionalProperties": false,
+        "description": "One tool a model may call, and how dangerous it is.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "description"
+        ],
+        "title": "McpToolView",
+        "type": "object"
+      },
       "MerchantSuspendRequest": {
         "additionalProperties": false,
         "description": "Demo merchant block for VAS ops / compliance. Simulated world only.",
@@ -1964,6 +2208,106 @@
         "summary": "Health",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/admin/mcp": {
+      "get": {
+        "description": "Everything another system needs to connect to `clarity-mcp`.\n\nThe console's admin page used to carry a hard-coded list under the line\n\"not connected to live MCP clients\". The server it was describing was\nreal the whole time: a separate deployable serving MCP over Streamable\nHTTP, verifying OAuth 2.1 bearer tokens as a resource server, and\nchoosing a tool profile from the token's scope. This reports that\nserver as it is actually configured.\n\n**The tool list is read from the registry, not restated here.** A tool\nadded to `ClarityMCPServer` appears on this page without anyone\nremembering to update it, which is exactly what the placeholder got\nwrong.\n\n**No secret is returned.** The client id, the issuer and the endpoints\nare all public; the client secret belongs to the operator's own\nidentity provider and never passes through Clarity (I14).",
+        "operationId": "mcp_connector_v1_admin_mcp_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Connector",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/mcp/health": {
+      "get": {
+        "description": "Ask the MCP deployable whether it is up, right now.\n\nSeparate from the inventory so the page loads without waiting on a\nnetwork call and the probe is something an operator asks for.\n`clarity-mcp` is its own process (ADR-0018), so \"the console is up\"\nsays nothing about whether it is.\n\nAn unreachable server is reported, never raised: \"we asked and got\nnothing\" is the answer, and a 500 here would read as the console being\nbroken rather than the thing it was asking about.",
+        "operationId": "mcp_health_v1_admin_mcp_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpHealthView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Health",
+        "tags": [
+          "admin"
         ]
       }
     },
