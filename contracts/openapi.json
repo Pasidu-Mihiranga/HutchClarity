@@ -717,6 +717,277 @@
         "title": "MerchantSuspendRequest",
         "type": "object"
       },
+      "OfferCheckRequest": {
+        "additionalProperties": false,
+        "description": "A message a customer received, to be checked against their own offers.\n\n`message` is customer-supplied text and is treated as one throughout: it\npicks which recorded offer to compare against and never decides the answer\n(I2). It is not stored.",
+        "properties": {
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "OfferCheckRequest",
+        "type": "object"
+      },
+      "OfferCheckView": {
+        "additionalProperties": false,
+        "description": "What the records say about the pasted message.\n\n`verdict` is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`. It is\ndeliberately **not** a scam flag: see `clarity.modules.offers.offers`.",
+        "properties": {
+          "matched": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfferMatchView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offers_on_record": {
+            "title": "Offers On Record",
+            "type": "integer"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/OfferSignalView"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "simulated": {
+            "default": true,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict",
+          "offers_on_record"
+        ],
+        "title": "OfferCheckView",
+        "type": "object"
+      },
+      "OfferMatchView": {
+        "additionalProperties": false,
+        "description": "The closest recorded offer, when one came close.",
+        "properties": {
+          "code_matched": {
+            "title": "Code Matched",
+            "type": "boolean"
+          },
+          "containment": {
+            "title": "Containment",
+            "type": "number"
+          },
+          "offer_code": {
+            "default": "",
+            "title": "Offer Code",
+            "type": "string"
+          },
+          "offer_id": {
+            "title": "Offer Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "still_valid": {
+            "title": "Still Valid",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "offer_id",
+          "title",
+          "containment",
+          "code_matched",
+          "still_valid",
+          "valid_from",
+          "source"
+        ],
+        "title": "OfferMatchView",
+        "type": "object"
+      },
+      "OfferRecordRequest": {
+        "additionalProperties": false,
+        "description": "What HUTCH sent to one number, as a staff member records it.",
+        "properties": {
+          "body": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "msisdn": {
+            "minLength": 4,
+            "title": "Msisdn",
+            "type": "string"
+          },
+          "offer_code": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Offer Code",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "msisdn",
+          "title",
+          "body"
+        ],
+        "title": "OfferRecordRequest",
+        "type": "object"
+      },
+      "OfferSignalView": {
+        "additionalProperties": false,
+        "description": "One warning sign found in the message. Evidence, never a verdict.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "OfferSignalView",
+        "type": "object"
+      },
+      "OfferView": {
+        "additionalProperties": false,
+        "description": "One recorded offer, for the staff list. Never the raw MSISDN.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "msisdn_masked": {
+            "title": "Msisdn Masked",
+            "type": "string"
+          },
+          "offer_code": {
+            "default": "",
+            "title": "Offer Code",
+            "type": "string"
+          },
+          "offer_id": {
+            "title": "Offer Id",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "title": "Recorded By",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "still_valid": {
+            "title": "Still Valid",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "offer_id",
+          "msisdn_masked",
+          "title",
+          "body",
+          "valid_from",
+          "recorded_by",
+          "recorded_at",
+          "source",
+          "still_valid"
+        ],
+        "title": "OfferView",
+        "type": "object"
+      },
       "OpenCaseRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2024,6 +2295,118 @@
           }
         },
         "summary": "Suspend Merchant",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/offers": {
+      "get": {
+        "description": "Every recorded offer, newest first. Masked numbers only.",
+        "operationId": "list_offers_v1_admin_offers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OfferView"
+                  },
+                  "title": "Response List Offers V1 Admin Offers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Offers",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Record what HUTCH sent to a number.\n\n**This is the authority the fraud check rests on**, which is why it is\nsecurity admin's alone: adding an offer here makes a matching message\nread as genuine to the customer who pastes it. The record is\nappend-only, so a correction is a new row and nothing already checked\nagainst can be rewritten.\n\nThe number is resolved to its pseudonym before anything is stored; the\nraw MSISDN never reaches the offers table.",
+        "operationId": "record_offer_v1_admin_offers_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Offer",
         "tags": [
           "admin"
         ]
@@ -7341,6 +7724,66 @@
         "summary": "My Cancel",
         "tags": [
           "customer"
+        ]
+      }
+    },
+    "/v1/offers/verify": {
+      "post": {
+        "description": "Check a message a customer received against their own offers.\n\n**The answer is what the records say, not a scam flag.** `ON_RECORD`\nmeans an offer on record for this number matches; `NOT_ON_RECORD` means\nnone does; `NEEDS_A_PERSON` means it partly matched, which is the case\nthe other two would both get wrong. The reason it is phrased that way\nis in `clarity.modules.offers.offers`: a verdict of \"scam\" would be an\ninference past what was checked, and the pasted text is the one thing\nan attacker controls (I2).\n\nBound to the caller's own subscriber, so one customer cannot test a\nmessage against another's offers.",
+        "operationId": "verify_offer_message_v1_offers_verify_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferCheckView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Offer Message",
+        "tags": [
+          "offers"
         ]
       }
     },

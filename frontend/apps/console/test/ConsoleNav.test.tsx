@@ -58,7 +58,7 @@ describe("ConsoleNav", () => {
     pathname.mockReturnValue("/audit");
     render(<ConsoleNav />);
     expect(screen.getByRole("link", { name: "Audit" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Desk" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Cases" })).not.toHaveAttribute("aria-current");
   });
 
   test("a section this identity cannot open is not a link", () => {

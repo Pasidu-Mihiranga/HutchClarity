@@ -11,6 +11,9 @@ import type {
 } from "./routes";
 import type {
   AlertQueue,
+  OfferCheckView,
+  OfferRecordBody,
+  OfferView,
   AlertView,
   ApproveResult,
   AuditGrantView,
@@ -507,6 +510,39 @@ export class ClarityClient {
   savePreferences(body: PreferencesBody): Promise<CustomerApp> {
     return this.declared("post", "/v1/me/preferences", {
       body: { large_text: false, notify: "important", ...body },
+    });
+  }
+
+  /* ------------------------------------------- offer verification (OFFER01) */
+
+  /**
+   * Check a message against the offers on record for the signed-in number.
+   *
+   * The verdict is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON` and is
+   * never a scam flag: the records say what HUTCH sent, and the inference
+   * past that belongs to the person holding the phone.
+   */
+  verifyOfferMessage(message: string): Promise<OfferCheckView> {
+    // `signals` and `simulated` carry server defaults, which the generator
+    // marks optional on the response as well as the request. The API always
+    // sends both, so they are filled here and callers get an array rather
+    // than guarding one. Same reason as `session()` above.
+    return this.call("post", "/v1/offers/verify", { body: { message } }).then((view) => ({
+      ...view,
+      signals: view.signals ?? [],
+      simulated: view.simulated ?? true,
+    }));
+  }
+
+  /** Every recorded offer. Security admin only (`offer:manage`). */
+  listOffers(): Promise<OfferView[]> {
+    return this.call("get", "/v1/admin/offers");
+  }
+
+  /** Record what HUTCH sent to a number. Security admin only. */
+  recordOffer(body: OfferRecordBody): Promise<OfferView> {
+    return this.call("post", "/v1/admin/offers", {
+      body: omittingServerDefaults({ offer_code: "", ...body }),
     });
   }
 

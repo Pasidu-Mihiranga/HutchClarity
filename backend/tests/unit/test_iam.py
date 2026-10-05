@@ -98,6 +98,42 @@ def test_a_wrong_code_is_refused(otp: OtpService):
         otp.verify(challenge, "000000")
 
 
+def test_the_synthetic_fallback_proves_only_its_configured_number(monkeypatch):
+    monkeypatch.setattr("clarity.modules.iam.otp.secrets.randbelow", lambda _: 111111)
+    fallback = OtpService(fallback=(DILANI, "246810"))
+    challenge = fallback.request(DILANI)
+
+    assert fallback.verify(challenge, "246810") == DILANI
+
+    other = "+94782223333"
+    other_challenge = fallback.request(other)
+    with pytest.raises(OtpRefused):
+        fallback.verify(other_challenge, "246810")
+
+
+def test_no_fallback_exists_unless_the_composition_root_installs_one():
+    service = OtpService()
+    challenge = service.request(DILANI)
+
+    with pytest.raises(OtpRefused):
+        service.verify(challenge, "246810")
+
+
+def test_the_synthetic_profile_exposes_the_fallback_through_the_real_login_route(
+    client: TestClient,
+):
+    started = client.post("/v1/auth/otp/request", json={"msisdn": DILANI})
+    assert started.status_code == 200, started.text
+
+    signed_in = client.post(
+        "/v1/auth/otp/verify",
+        json={"challenge_id": started.json()["challenge_id"], "code": "246810"},
+    )
+
+    assert signed_in.status_code == 200, signed_in.text
+    assert signed_in.json()["assurance"] == "otp"
+
+
 def test_guessing_is_capped(otp: OtpService):
     """The cheap attack is trying every six-digit code."""
     challenge = otp.request(DILANI)

@@ -33,6 +33,14 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/admin/offers": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "array[OfferView]",
+      "status": "200"
+    },
     "GET /v1/admin/policy/changes": {
       "parameters": [
         "header:authorization?"
@@ -398,6 +406,14 @@
       "request": "MerchantSuspendRequest",
       "response": "object",
       "status": "200"
+    },
+    "POST /v1/admin/offers": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "OfferRecordRequest",
+      "response": "OfferView",
+      "status": "201"
     },
     "POST /v1/admin/policy/changes": {
       "parameters": [
@@ -822,6 +838,14 @@
       "response": "object",
       "status": "200"
     },
+    "POST /v1/offers/verify": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": "OfferCheckRequest",
+      "response": "OfferCheckView",
+      "status": "200"
+    },
     "POST /v1/receipts/{receipt_id}/verify": {
       "parameters": [
         "path:receipt_id"
@@ -1085,6 +1109,98 @@
       "required": [
         "merchant_id",
         "reason"
+      ]
+    },
+    "OfferCheckRequest": {
+      "fields": [
+        "message"
+      ],
+      "required": [
+        "message"
+      ]
+    },
+    "OfferCheckView": {
+      "fields": [
+        "matched",
+        "offers_on_record",
+        "signals",
+        "simulated",
+        "verdict"
+      ],
+      "required": [
+        "offers_on_record",
+        "verdict"
+      ]
+    },
+    "OfferMatchView": {
+      "fields": [
+        "code_matched",
+        "containment",
+        "offer_code",
+        "offer_id",
+        "source",
+        "still_valid",
+        "title",
+        "valid_from",
+        "valid_to"
+      ],
+      "required": [
+        "code_matched",
+        "containment",
+        "offer_id",
+        "source",
+        "still_valid",
+        "title",
+        "valid_from"
+      ]
+    },
+    "OfferRecordRequest": {
+      "fields": [
+        "body",
+        "msisdn",
+        "offer_code",
+        "title",
+        "valid_from",
+        "valid_to"
+      ],
+      "required": [
+        "body",
+        "msisdn",
+        "title"
+      ]
+    },
+    "OfferSignalView": {
+      "fields": [
+        "code"
+      ],
+      "required": [
+        "code"
+      ]
+    },
+    "OfferView": {
+      "fields": [
+        "body",
+        "msisdn_masked",
+        "offer_code",
+        "offer_id",
+        "recorded_at",
+        "recorded_by",
+        "source",
+        "still_valid",
+        "title",
+        "valid_from",
+        "valid_to"
+      ],
+      "required": [
+        "body",
+        "msisdn_masked",
+        "offer_id",
+        "recorded_at",
+        "recorded_by",
+        "source",
+        "still_valid",
+        "title",
+        "valid_from"
       ]
     },
     "OpenCaseRequest": {

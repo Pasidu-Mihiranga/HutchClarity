@@ -469,6 +469,7 @@ def build_demo_world(now: datetime = DEMO_NOW, *, persist: bool = False) -> Synt
     _journey_nimal_thin(world)
     _journey_kavitha_thin(world)
     _journey_priya_thin(world)
+    _journey_sanduni_offers(world)
     return world
 
 
@@ -830,6 +831,53 @@ def _journey_kavitha_thin(world: SyntheticWorld) -> Account:
         offering_id="PKG-UNLTD",
         catalogue_version="2027.07",
         fup_cap_gb="50.00",
+        fup_disclosed=True,
+    )
+    return account
+
+
+def _journey_sanduni_offers(world: SyntheticWorld) -> Account:
+    """Sanduni: the account the offer-verification journey runs on (OFFER01).
+
+    Deliberately an ordinary account with nothing wrong on it. The question
+    this journey answers is not "why did my balance change" but "is this
+    message real", so the interesting data is in the offers recorded against
+    the number (`app/offer_seed.py`) and not in its event history. An account
+    with a dispute on it would confuse the two.
+    """
+    now = world.now
+    account = world.add_account(
+        Account(
+            msisdn="+94785720767",
+            name="Sanduni Fernando",
+            balance_lkr=money("310.00"),
+            language=Language.SI,
+            onboarded=True,
+            notify="important",
+            packs=[
+                Pack(
+                    offering_id="PKG-ANY10",
+                    name="Anytime 10GB",
+                    price_lkr=money("990.00"),
+                    purchased_at=now - timedelta(days=9),
+                    expires_at=now + timedelta(days=21),
+                    catalogue_version="2027.07",
+                    fup_cap_gb=money("10.00"),
+                    after_cap_speed="512 kbps",
+                    fup_disclosed_at_purchase=True,
+                )
+            ],
+        )
+    )
+    world.event(
+        account,
+        EventSource.CATALOGUE,
+        EventType.PACK_PURCHASED,
+        now - timedelta(days=9),
+        amount_lkr=money("990.00"),
+        offering_id="PKG-ANY10",
+        catalogue_version="2027.07",
+        fup_cap_gb="10.00",
         fup_disclosed=True,
     )
     return account

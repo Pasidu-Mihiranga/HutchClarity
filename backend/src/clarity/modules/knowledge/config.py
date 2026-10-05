@@ -30,10 +30,21 @@ class BM25Params(ClarityModel):
 class HybridWeights(ClarityModel):
     lexical: float = Field(ge=0)
     semantic: float = Field(ge=0)
+    min_semantic: float = Field(default=0.0, ge=0, le=1)
+    """Absolute cosine below which a chunk is not a candidate at all (F4).
 
-    @property
-    def semantic_is_used(self) -> bool:
-        return self.semantic > 0
+    This exists because turning the semantic half on removed a safety the
+    lexical-only retriever had for free. With no embedder, a query sharing no
+    term with any document produced no candidates, so K03 refused to answer
+    and said why. A cosine is never exactly zero, so every document became a
+    weak candidate, `min_relative_score` is a *share of the best* and could not
+    tell "all weak" from "one strong", and a question about evening speeds
+    grounded itself in the billing-cycle clause.
+
+    An absolute floor is the right shape here where a relative one is not: the
+    question is whether this chunk is related to the query at all, which does
+    not depend on what else was retrieved.
+    """
 
 
 class RerankBonuses(ClarityModel):

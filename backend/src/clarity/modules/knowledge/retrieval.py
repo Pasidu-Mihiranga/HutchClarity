@@ -174,6 +174,15 @@ class KnowledgeRetriever:
 
         lexical = self._lexical.scores(terms, candidates)
         semantic = self._semantic.scores(query, candidates) if self._semantic else {}
+        # Drop chunks the semantic half scores below the absolute floor before
+        # fusing (F4). A chunk with no lexical match and a near-zero cosine is
+        # unrelated, and leaving it in makes it a candidate that the relative
+        # floor cannot catch: see `HybridWeights.min_semantic`.
+        floor = self._config.hybrid.min_semantic
+        if semantic and floor > 0:
+            semantic = {
+                cid: score for cid, score in semantic.items() if score >= floor
+            }
         fused = self._fuse(lexical, semantic)
         if not fused:
             # Terms and candidates, but nothing in common: a real outcome, not

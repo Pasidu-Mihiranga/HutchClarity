@@ -442,6 +442,23 @@ export type MyCaseRow = {
   outcome: string | null;
 };
 
+/* ---------------------------------------------- offer verification (OFFER01) */
+
+/** `POST /v1/offers/verify`, `GET|POST /v1/admin/offers`. */
+export type OfferCheckRequest = Schemas["OfferCheckRequest"];
+/** `signals` and `simulated` are filled by the client, so callers get both. */
+export type OfferCheckView = Omit<Schemas["OfferCheckView"], "signals" | "simulated"> & {
+  signals: Schemas["OfferSignalView"][];
+  simulated: boolean;
+};
+export type OfferMatchView = Schemas["OfferMatchView"];
+export type OfferSignalView = Schemas["OfferSignalView"];
+export type OfferView = Schemas["OfferView"];
+export type OfferRecordBody = WithDefaults<Schemas["OfferRecordRequest"], "offer_code">;
+
+/** The three answers the records can give. Deliberately not a scam flag. */
+export type OfferVerdict = "ON_RECORD" | "NOT_ON_RECORD" | "NEEDS_A_PERSON";
+
 /* ------------------------------------------------------------------------ *
  * Policy governance (D3), Complaint Autopsy (D1) and Foresight (C4).
  *

@@ -23,7 +23,7 @@ import { CONSOLE, signInOnDesk } from "./session";
 
 /** Every console section, with the permission its page actually checks. */
 const SECTIONS = [
-  { path: "/desk", link: "Desk", needs: "desk:queue:read" },
+  { path: "/desk", link: "Cases", needs: "desk:queue:read" },
   { path: "/insights", link: "Insights", needs: "desk:queue:read" },
   { path: "/autopsy", link: "Complaint Autopsy", needs: "desk:queue:read" },
   { path: "/foresight", link: "Foresight", needs: "foresight:read" },
@@ -40,7 +40,7 @@ test.describe("navigation and the API agree about what a role may open", () => {
     await expect(page.getByText(/desk:queue:read/)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("button", { name: /approve as/i })).toHaveCount(0);
     // And the nav agrees: no link to it.
-    await expect(page.getByRole("link", { name: "Desk", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Cases", exact: true })).toHaveCount(0);
 
     // The same refusal on the other workspace the desk's permission opens. An
     // auditor reads receipts and the trail; neither workspace is theirs.
@@ -54,7 +54,7 @@ test.describe("navigation and the API agree about what a role may open", () => {
   }) => {
     await page.goto(`${CONSOLE}/desk`);
     await signInOnDesk(page, "Supervisor");
-    await expect(page.getByRole("heading", { name: "Desk" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible({ timeout: 60_000 });
 
     // This is the regression E2 fixed. `foresight:read` is product and CX
     // engineering's; approving money is a different job from rehearsing a
