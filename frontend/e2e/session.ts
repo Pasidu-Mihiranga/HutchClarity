@@ -142,6 +142,7 @@ const LOGIN_BY_LABEL: Record<string, { username: string; password: string }> = {
   Auditor: { username: "auditor", password: "auditor-clarity" },
   Security: { username: "security", password: "security-clarity" },
   Platform: { username: "platform", password: "platform-clarity" },
+  Admin: { username: "admin", password: "admin123456" },
   // CX engineering is the only synthetic account holding `config:draft`, so
   // Policy Studio can only be reached as this person (WT-13 steps 8 and 10).
   // Verified against `POST /v1/auth/staff/login`, which answers with role

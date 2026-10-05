@@ -26,7 +26,7 @@ test.describe("synthetic provenance is never implied", () => {
   test("the desk says its subscribers are synthetic", async ({ page }) => {
     await page.goto(`${CONSOLE}/desk`);
     await signInOnDesk(page, "Supervisor");
-    await expect(page.getByRole("heading", { name: "Desk" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByText(/The subscribers are\s+synthetic/)).toBeVisible();
     // The shell carries it too, on every console page.
