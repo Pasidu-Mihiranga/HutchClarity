@@ -41,6 +41,12 @@ MAX_ATTEMPTS = 3
 MAX_REQUESTS_PER_WINDOW = 5
 REQUEST_WINDOW = timedelta(minutes=15)
 
+# Break-glass access for the synthetic customer profile only. The composition
+# root deliberately does not install it for ``prod``. It still needs a live,
+# unexpired challenge, is single-use and proves only this synthetic number.
+SYNTHETIC_FALLBACK_MSISDN = "+94781234567"
+SYNTHETIC_FALLBACK_CODE = "246810"
+
 
 class OtpRefused(ValueError):
     """A challenge could not be issued or verified.
@@ -151,8 +157,12 @@ class OtpService:
         delivery: OtpDelivery | None = None,
         *,
         open_unit: UnitOfWorkFactory | None = None,
+        fallback: tuple[str, str] | None = None,
     ) -> None:
         self._delivery = delivery or SimulatedInbox()
+        self._fallback = (
+            (normalise_msisdn(fallback[0]), fallback[1]) if fallback is not None else None
+        )
         if open_unit is None:
             store = MemoryStore()
 
@@ -222,7 +232,15 @@ class OtpService:
 
             # Constant-time, so response timing does not leak how much of
             # the code was right.
-            if not hmac.compare_digest(challenge.code, code.strip()):
+            supplied = code.strip()
+            regular_match = hmac.compare_digest(challenge.code, supplied)
+            fallback_match = False
+            if self._fallback is not None:
+                fallback_msisdn, fallback_code = self._fallback
+                fallback_match = hmac.compare_digest(
+                    challenge.msisdn, fallback_msisdn
+                ) and hmac.compare_digest(fallback_code, supplied)
+            if not (regular_match or fallback_match):
                 challenges.put(challenge_id, challenge)
                 unit.commit()
                 raise OtpRefused

@@ -19,6 +19,8 @@ const client = new ClarityClient();
  * stops offering the field once three have failed.
  */
 const MAX_OTP_ATTEMPTS = 3;
+const SYNTHETIC_FALLBACK_NUMBER = "0781234567";
+const SYNTHETIC_FALLBACK_CODE = "246810";
 
 type Status = { text: string; tone: "ok" | "bad" };
 
@@ -167,6 +169,20 @@ export default function LoginPage() {
 
         {step === "request" ? (
           <form onSubmit={onRequest} className="grid gap-3.5">
+            <div className="rounded-2xl border border-primary/20 bg-primary-soft px-4 py-3 text-sm text-fg">
+              <p className="font-semibold">Synthetic fallback access</p>
+              <p className="mt-1 text-xs text-fg-muted">
+                Number <strong>{SYNTHETIC_FALLBACK_NUMBER}</strong> · code{" "}
+                <strong>{SYNTHETIC_FALLBACK_CODE}</strong>
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-semibold text-primary underline"
+                onClick={() => setMsisdn(SYNTHETIC_FALLBACK_NUMBER)}
+              >
+                Use fallback number
+              </button>
+            </div>
             <Field label="Hutch number">
               {(control) => (
                 <div className="relative">
