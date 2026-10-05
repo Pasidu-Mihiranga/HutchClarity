@@ -6,6 +6,21 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ### Added
 
+- **IAM role policies (ADR-0045).** Platform admin may view, attach and detach
+  closed `Permission` values on closed `Role` values. Effective permissions are
+  `(baseline ∪ attached) − detached` on top of the checked-in
+  `ROLE_PERMISSIONS` matrix. Money cannot land on an admin role;
+  `audit:assign`, `audit:restore` and `iam:role:manage` stay baseline-only.
+  - **`GET /v1/admin/iam/roles`**, **`POST /v1/admin/iam/roles/attach`**,
+    **`POST /v1/admin/iam/roles/detach`**. Needs the new `iam:role:manage`
+    permission (held by `platform_admin` / `security_admin`). Mutations require
+    a reason and an `Idempotency-Key`, and append `role_policy.attached` /
+    `role_policy.detached` to the audit trail.
+  - Collections `iam.role_policies` and `iam.role_policy_idempotency`.
+  - Python and OPA authorization both resolve the override layer (parity suite).
+  - Console **IAM** tab (`/iam`) and SDK methods `listIamRoles`,
+    `attachIamPermission`, `detachIamPermission`.
+
 - **`POST /v1/offers/verify`** (OFFER01). A customer pastes a message claiming
   to be a HUTCH offer and is told whether an offer on record for *their* number
   matches it. The verdict is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`

@@ -7,14 +7,14 @@
 | Deployable | `clarity-api` today (modular monolith) |
 | Owner | TBD |
 | Status | built (`lite` profile); migration notes below |
-| Files | `authorization.py`, `directory.py`, `httpsms.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py` |
+| Files | `authorization.py`, `directory.py`, `httpsms.py`, `keycloak.py`, `otp.py`, `public.py`, `tokens.py`, `grants.py`, `role_policies.py` |
 
 ## 1. Purpose
 Customer identity: shared OTP state and short-lived EdDSA sessions whose subject is the `subscriber_ref`; Keycloak-compatible staff/MCP verification and OPA authorization; and staff sign-in through the provider (B1), where the API is the confidential client and the browser holds a cookie rather than a token.
 
 ## 2. Public surface (`public.py`)
 `StaffDirectory` loads simulated staff accounts. `authenticate` returns that account's role. A configured directory is what closes `POST /v1/auth/staff/session`.
-Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers, and the audit grant service: `AuditGrants`, `AuditGrant`, `GrantState`, `SubjectKind`, `GrantRefused`, `GrantNotFound`, `GrantAwareAuthorizationPolicy`, `is_subject`, `GRANTS` (audit assurance Phase 3, ADR-0036).
+Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers, and the audit grant service: `AuditGrants`, `AuditGrant`, `GrantState`, `SubjectKind`, `GrantRefused`, `GrantNotFound`, `GrantAwareAuthorizationPolicy`, `is_subject`, `GRANTS` (audit assurance Phase 3, ADR-0036). Role permission overrides (ADR-0045) are also exported: `RolePolicies`, `RolePolicyOverride`, `RolePolicyRefused`, `ROLE_POLICIES`, `ROLE_POLICY_IDEMPOTENCY`. Platform admin attaches or detaches closed `Permission` values on closed `Role` values; effective permissions are `(baseline ∪ attached) − detached`. Money cannot land on an admin role; `audit:assign`, `audit:restore` and `iam:role:manage` stay baseline-only.
 Other code imports only `public.py`, including token verifier and authorization policy ports plus lite and full drivers. `TokenIssuer(key_path=...)` keeps the customer token key in a file, created once and shared safely by processes that start together; the composition root passes `KEYS_DIR/iam-issuer.pem` when `KEYS_DIR` is set, and without it the key stays in memory.
 `HttpSmsDelivery` implements the OTP delivery port. Configured deployments send
 codes through a registered Android gateway phone; upstream errors become a
@@ -31,15 +31,16 @@ safe delivery failure without exposing the provider response.
 | `clarity.kernel` | - |
 | `clarity.platform.security` | - |
 | `clarity.platform.audit` | every grant step is appended to the trail |
-| `clarity.platform.persistence` | `iam.grants` |
+| `clarity.platform.persistence` | `iam.grants`, `iam.role_policies`, `iam.role_policy_idempotency` |
 
 ## 5. Data owned
-Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refresh_tokens`, `iam.pending_logins` and `iam.grants`. The issuer's signing keys are **not** a collection: they live on the shared key volume (`KEYS_DIR`), because a private key belongs on a mounted volume or in a secret store, not in an application table. A pending login looks like throwaway protocol state and is not: the browser decides which replica receives the callback, so holding it in a dictionary makes sign-in fail intermittently behind a load balancer. Grants are stored beside the audit trail's store so a demo reset carries them with it. Lite uses the shared memory store; full uses the IAM PostgreSQL schema.
+Collections `iam.otp_challenges`, `iam.otp_requests`, `iam.sessions`, `iam.refresh_tokens`, `iam.pending_logins`, `iam.grants`, `iam.role_policies` and `iam.role_policy_idempotency`. The issuer's signing keys are **not** a collection: they live on the shared key volume (`KEYS_DIR`), because a private key belongs on a mounted volume or in a secret store, not in an application table. A pending login looks like throwaway protocol state and is not: the browser decides which replica receives the callback, so holding it in a dictionary makes sign-in fail intermittently behind a load balancer. Grants are stored beside the audit trail's store so a demo reset carries them with it. Role policy overrides follow the same store so a demo reset clears them with grants. Lite uses the shared memory store; full uses the IAM PostgreSQL schema.
 
 ## 6. Invariants
 - The OTP code travels only through the delivery port; it is never returned by a request.
 - A token never contains the raw MSISDN.
 - A grant carries only an audit permission (`GRANTABLE_PERMISSIONS`): never money, never `audit:assign`.
+- Role permission overrides (ADR-0045) attach or detach only closed `Permission` values on closed `Role` values. Effective permissions are `(baseline ∪ attached) − detached`. Money cannot land on an admin role; `audit:assign`, `audit:restore` and `iam:role:manage` stay on the checked-in baseline only. Every change needs a reason and an `Idempotency-Key`, and is written to the audit trail.
 - A grant is requested by one holder of `audit:assign` and approved by a different one; nobody grants themselves, by name or through a role they hold. Break-glass is the one exception, admin-only, short, and recorded as `grant.break_glass`.
 - A grant that expires or lapses is recorded once, as `grant.expired` or `grant.lapsed`, with the moment it ended.
 - Whatever authorization driver is configured is wrapped, so grants and the rule that an audit duty removes money permissions hold under OPA too.
@@ -61,6 +62,7 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 
 ## 8. Tests
 - `tests/unit/test_iam.py`
+- `tests/unit/test_role_policies.py`
 - `tests/unit/test_httpsms.py`
 - `tests/contract/test_authz_parity.py` (real OPA in the `full` lane)
 - `tests/security/test_audit_grants.py`
@@ -87,3 +89,4 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-admin-account.md` | Synthetic directory account `admin` with role `platform_admin` |
 | 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-local-all-sections.md` | A directory account may hold several existing roles; the all-sections sign-in stays in a gitignored local file |
 | 2026-10-05 | `docs/devlog/2026/2026-10-05-platform-admin-foresight-read.md` | `platform_admin` holds `foresight:read` so the console Foresight tab opens |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-role-policy-overrides.md` | Role permission overrides on the static baseline (ADR-0045); `/v1/admin/iam/*`; console IAM tab |

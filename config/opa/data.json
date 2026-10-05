@@ -22,6 +22,7 @@
       "audit:assign",
       "audit:restore",
       "config:approve",
+      "iam:role:manage",
       "merchant:suspend",
       "rule:publish"
     ],
@@ -31,6 +32,7 @@
         "action:propose",
         "case:evaluate",
         "case:read",
+        "offer:verify",
         "receipt:read",
         "self:read",
         "self:settings",
@@ -118,12 +120,14 @@
         "audit:read",
         "audit:restore",
         "flags:kill_switch",
-        "foresight:read"
+        "foresight:read",
+        "iam:role:manage"
       ],
       "security_admin": [
         "admin:manage",
         "audit:assign",
-        "audit:read"
+        "audit:read",
+        "offer:manage"
       ],
       "product": [
         "config:draft",

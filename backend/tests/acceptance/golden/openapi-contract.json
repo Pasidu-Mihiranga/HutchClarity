@@ -33,6 +33,14 @@
       "response": "object",
       "status": "200"
     },
+    "GET /v1/admin/iam/roles": {
+      "parameters": [
+        "header:authorization?"
+      ],
+      "request": null,
+      "response": "object",
+      "status": "200"
+    },
     "GET /v1/admin/offers": {
       "parameters": [
         "header:authorization?"
@@ -397,6 +405,24 @@
       ],
       "request": null,
       "response": null,
+      "status": "200"
+    },
+    "POST /v1/admin/iam/roles/attach": {
+      "parameters": [
+        "header:Idempotency-Key",
+        "header:authorization?"
+      ],
+      "request": "RolePolicyChangeRequest",
+      "response": "object",
+      "status": "200"
+    },
+    "POST /v1/admin/iam/roles/detach": {
+      "parameters": [
+        "header:Idempotency-Key",
+        "header:authorization?"
+      ],
+      "request": "RolePolicyChangeRequest",
+      "response": "object",
       "status": "200"
     },
     "POST /v1/admin/merchants/suspend": {
@@ -1372,6 +1398,18 @@
       ],
       "required": [
         "accept"
+      ]
+    },
+    "RolePolicyChangeRequest": {
+      "fields": [
+        "permission",
+        "reason",
+        "role"
+      ],
+      "required": [
+        "permission",
+        "reason",
+        "role"
       ]
     },
     "RuleCandidateRequest": {

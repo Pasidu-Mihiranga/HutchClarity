@@ -15,6 +15,7 @@ Nothing is allowed unless it is listed here (plan §19 I9, deny by default).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -119,6 +120,12 @@ class Permission(StrEnum):
     rather than a duty that can be handed out for an afternoon."""
     KILL_SWITCH = "flags:kill_switch"
     ADMIN_MANAGE = "admin:manage"
+    IAM_ROLE_MANAGE = "iam:role:manage"
+    """Attach or detach closed permissions on closed roles (ADR-0045).
+
+    Platform admin only in the baseline. Step-up required. Does not invent new
+    permission names and cannot put money authority on an admin role.
+    """
     SELF_READ = "self:read"
     """Read your own account view, cases and receipts (customer self-service)."""
     SELF_SETTINGS = "self:settings"
@@ -179,6 +186,16 @@ GRANTABLE_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.AUDIT_READ, Permission.AUDIT_EXPORT, Permission.ALERT_DISPOSE}
 )
 
+#: Permissions the IAM role-policy surface cannot attach or detach (ADR-0045).
+#: They stay on the checked-in baseline only, same spirit as grant rules.
+ROLE_POLICY_LOCKED: frozenset[Permission] = frozenset(
+    {
+        Permission.AUDIT_ASSIGN,
+        Permission.AUDIT_RESTORE,
+        Permission.IAM_ROLE_MANAGE,
+    }
+)
+
 #: Permissions that need recent MFA, not just a valid session.
 STEP_UP_PERMISSIONS: frozenset[Permission] = frozenset(
     {
@@ -187,10 +204,48 @@ STEP_UP_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.CONFIG_APPROVE,
         Permission.MERCHANT_SUSPEND,
         Permission.ADMIN_MANAGE,
+        Permission.IAM_ROLE_MANAGE,
         Permission.AUDIT_ASSIGN,
         Permission.AUDIT_RESTORE,
     }
 )
+
+#: Optional provider of per-role (attached, detached) overrides. The composition
+#: root wires :class:`RolePolicies`; tests may leave this unset so the baseline
+#: alone answers.
+RoleOverrideSnapshot = dict[Role, tuple[frozenset[Permission], frozenset[Permission]]]
+_role_override_provider: Callable[[], RoleOverrideSnapshot] | None = None
+
+
+def set_role_override_provider(
+    provider: Callable[[], RoleOverrideSnapshot] | None,
+) -> None:
+    """Install or clear the IAM override reader used by :func:`permissions_for`."""
+    global _role_override_provider
+    _role_override_provider = provider
+
+
+def role_override_maps() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Attached/detached maps for the OPA input document (string keys/values)."""
+    if _role_override_provider is None:
+        return {}, {}
+    attached: dict[str, list[str]] = {}
+    detached: dict[str, list[str]] = {}
+    for role, (add, remove) in _role_override_provider().items():
+        if add:
+            attached[role.value] = sorted(p.value for p in add)
+        if remove:
+            detached[role.value] = sorted(p.value for p in remove)
+    return attached, detached
+
+
+def effective_role_permissions(role: Role) -> frozenset[Permission]:
+    """Baseline for ``role``, with persisted attach/detach overrides applied."""
+    baseline = ROLE_PERMISSIONS.get(role, frozenset())
+    if _role_override_provider is None:
+        return baseline
+    attached, detached = _role_override_provider().get(role, (frozenset(), frozenset()))
+    return frozenset((baseline | attached) - detached)
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -311,6 +366,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.PLATFORM_ADMIN: frozenset(
         {
             Permission.ADMIN_MANAGE,
+            Permission.IAM_ROLE_MANAGE,
             Permission.KILL_SWITCH,
             Permission.AUDIT_READ,
             # Restoring the trail is an operations job, and the only role that
@@ -348,10 +404,11 @@ def permissions_for(
     the exclusions are applied after the union, so they cannot be escaped by
     stacking roles, or by adding a grant. A grant can only carry a permission
     in ``GRANTABLE_PERMISSIONS``; anything else in ``granted`` is ignored.
+    Role overrides (ADR-0045) are applied per role before the union.
     """
     allowed: set[Permission] = set()
     for role in roles:
-        allowed |= ROLE_PERMISSIONS.get(role, frozenset())
+        allowed |= effective_role_permissions(role)
     allowed |= granted & GRANTABLE_PERMISSIONS
 
     if any(role.is_admin for role in roles):

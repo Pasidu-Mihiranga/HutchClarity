@@ -56,6 +56,8 @@ import type {
   TranscriptPayload,
   VerificationView,
   McpToolsInventory,
+  IamRoleCatalogue,
+  IamRoleChangeResult,
 } from "./types";
 
 export type ClarityClientOptions = {
@@ -757,6 +759,33 @@ export class ClarityClient {
 
   listSwitches(): Promise<SwitchStateView> {
     return this.declared("get", "/v1/admin/switches");
+  }
+
+  /** Effective role→permission matrix (ADR-0045). Needs `iam:role:manage`. */
+  listIamRoles(): Promise<IamRoleCatalogue> {
+    return this.declared("get", "/v1/admin/iam/roles");
+  }
+
+  /** Attach one closed permission to one closed role. */
+  attachIamPermission(
+    body: { role: string; permission: string; reason: string },
+    idempotencyKey: string,
+  ): Promise<IamRoleChangeResult> {
+    return this.declared("post", "/v1/admin/iam/roles/attach", {
+      body,
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
+  }
+
+  /** Detach one closed permission from one closed role. */
+  detachIamPermission(
+    body: { role: string; permission: string; reason: string },
+    idempotencyKey: string,
+  ): Promise<IamRoleChangeResult> {
+    return this.declared("post", "/v1/admin/iam/roles/detach", {
+      body,
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
   }
 
   /**

@@ -67,6 +67,7 @@ import type {
   AuditTrailPage,
 } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 import { useRovingRows } from "@/lib/useRovingRows";
 
@@ -255,13 +256,10 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Audit</h1>
-        <p className="text-sm text-fg-muted">
-          Every panel shows the evidence, not a reassurance. Reading the trail is
-          itself recorded, and so is this session.
-        </p>
-      </div>
+      <PageHeader
+        title="Audit"
+        description="Every panel shows the evidence, not a reassurance. Reading the trail is itself recorded, and so is this session."
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {message ? <Alert tone="success">{message}</Alert> : null}

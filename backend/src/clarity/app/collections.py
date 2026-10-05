@@ -32,6 +32,8 @@ from clarity.modules.foresight.public import (
 from clarity.modules.governance.public import CHANGES
 from clarity.modules.iam.public import (
     GRANTS,
+    ROLE_POLICIES,
+    ROLE_POLICY_IDEMPOTENCY,
     OTP_CHALLENGES,
     OTP_REQUESTS,
     PENDING_LOGINS,
@@ -85,6 +87,8 @@ ALL_COLLECTIONS: tuple[str, ...] = (
     SESSIONS,
     REFRESH_TOKENS,
     GRANTS,
+    ROLE_POLICIES,
+    ROLE_POLICY_IDEMPOTENCY,
     # notifications
     NOTIFICATIONS,
     PREFERENCES,

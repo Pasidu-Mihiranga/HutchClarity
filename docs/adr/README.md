@@ -49,6 +49,7 @@ reversed.
 | [0042](0042-the-issuer-signs-from-a-key-ring.md) | The issuer signs from a key ring | Accepted |
 | [0043](0043-a-persona-propensity-never-sets-a-reported-band.md) | A persona propensity never sets a reported band | Accepted |
 | [0044](0044-the-calibration-gate-opens-on-evidence-nobody-here-can-write.md) | The calibration gate opens on evidence nobody here can write | Accepted |
+| [0045](0045-role-permission-overrides-on-static-baseline.md) | Role permission overrides on a static baseline, with SoD | Accepted |
 ADRs 0001-0010 were written while building the prototype; 0011-0024 come from the v1.2 plan line; 0025-0028 belong to the merged plan v1.3. Templates: [../templates/ADR.md](../templates/ADR.md).
 
 ## Writing one

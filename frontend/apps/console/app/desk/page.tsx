@@ -11,6 +11,7 @@ import type {
   TimelinePayload,
 } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -238,13 +239,15 @@ export default function DeskPage() {
         </label>
       </div>
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Cases</h1>
-        <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
-          {queue.length} waiting
-        </span>
-        <p className="text-sm text-mute">The subscribers are synthetic.</p>
-        <div className="ml-auto">
+      <PageHeader
+        title="Cases"
+        description="The subscribers are synthetic."
+        meta={
+          <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
+            {queue.length} waiting
+          </span>
+        }
+        actions={
           <Button
             variant="secondary"
             onClick={() => void loadQueue()}
@@ -253,8 +256,8 @@ export default function DeskPage() {
           >
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter the queue">
         {filters.map((item) => {

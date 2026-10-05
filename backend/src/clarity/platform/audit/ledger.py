@@ -161,6 +161,10 @@ class AuditEventType(StrEnum):
     """An active grant reached its expiry. ``occurred_at`` is that moment."""
     GRANT_LAPSED = "grant.lapsed"
     """An active grant nobody recertified in time. ``occurred_at`` is its review deadline."""
+    ROLE_POLICY_ATTACHED = "iam.role_policy.attached"
+    """A closed permission was attached to a closed role (ADR-0045)."""
+    ROLE_POLICY_DETACHED = "iam.role_policy.detached"
+    """A closed permission was detached from a closed role (ADR-0045)."""
     BREAK_GLASS_USED = "grant.break_glass"
     """An admin self-granted an audit duty for an incident. Always a signal."""
 

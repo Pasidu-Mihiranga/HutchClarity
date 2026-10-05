@@ -54,6 +54,14 @@ from clarity.modules.iam.otp import (
     RoutedOtpDelivery,
     SimulatedInbox,
 )
+from clarity.modules.iam.role_policies import (
+    ROLE_POLICIES,
+    ROLE_POLICY_IDEMPOTENCY,
+    RolePolicies,
+    RolePolicyIdempotencyRecord,
+    RolePolicyOverride,
+    RolePolicyRefused,
+)
 from clarity.modules.iam.tokens import (
     REFRESH_TOKENS,
     SESSIONS,
@@ -72,6 +80,8 @@ __all__ = [
     "OTP_REQUESTS",
     "PENDING_LOGINS",
     "REFRESH_TOKENS",
+    "ROLE_POLICIES",
+    "ROLE_POLICY_IDEMPOTENCY",
     "SESSIONS",
     "AuditGrant",
     "AuditGrants",
@@ -96,6 +106,10 @@ __all__ = [
     "PendingLogin",
     "ProviderTokens",
     "PythonAuthorizationPolicy",
+    "RolePolicies",
+    "RolePolicyIdempotencyRecord",
+    "RolePolicyOverride",
+    "RolePolicyRefused",
     "RoutedOtpDelivery",
     "SimulatedInbox",
     "StaffDirectory",

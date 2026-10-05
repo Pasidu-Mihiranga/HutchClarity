@@ -17,7 +17,8 @@ Dimmed sidebar rows still clutter the workspace and invite dead clicks. Each rol
 
 ## Decisions made
 - Same `anyOf` gates as before (aligned with each page's own checks).
-- Direct URL to a denied section still hits AccessDenied.
+- Direct URL to a denied section redirects to the first allowed section
+  (see `2026-10-05-console-access-denied-redirect.md`).
 
 ## Docs updated
 - [x] Devlog (this file + sidebar-layout decision line)

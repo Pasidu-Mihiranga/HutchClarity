@@ -191,6 +191,35 @@ export type McpToolsInventory = {
   guarantee: string;
 };
 
+/** `GET /v1/admin/iam/roles` (ADR-0045). */
+export type IamRoleRow = {
+  role: string;
+  is_admin: boolean;
+  baseline: string[];
+  attached: string[];
+  detached: string[];
+  effective: string[];
+};
+
+export type IamRoleCatalogue = {
+  roles: IamRoleRow[];
+  permissions: string[];
+  locked_permissions: string[];
+  money_permissions: string[];
+};
+
+export type IamRoleChangeResult = {
+  role: string;
+  permission: string;
+  operation: string;
+  reason: string;
+  baseline: string[];
+  attached: string[];
+  detached: string[];
+  effective: string[];
+  replayed: boolean;
+};
+
 export type AuditRecordView = {
   seq: number;
   hash_version: number;

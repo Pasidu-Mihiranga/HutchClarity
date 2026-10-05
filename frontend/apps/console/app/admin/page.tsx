@@ -1,10 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Alert, Badge, Button, Card, Dialog } from "@clarity/ui";
 import type { SwitchStateView } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
+
+type SwitchFilter = "all" | "on" | "off";
+type FilterSlider = { left: number; width: number; ready: boolean };
+
+const SWITCH_FILTERS: readonly { id: SwitchFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "on", label: "On" },
+  { id: "off", label: "Off" },
+];
 
 /**
  * Admin, with the accessibility pass of E2.
@@ -66,9 +82,16 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [switchFilter, setSwitchFilter] = useState<"all" | "on" | "off">("all");
+  const [switchFilter, setSwitchFilter] = useState<SwitchFilter>("all");
   const [switchQuery, setSwitchQuery] = useState("");
   const [mcpCopied, setMcpCopied] = useState(false);
+  const filterTrackRef = useRef<HTMLDivElement>(null);
+  const filterItemRefs = useRef<Map<SwitchFilter, HTMLButtonElement>>(new Map());
+  const [filterSlider, setFilterSlider] = useState<FilterSlider>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
 
   const load = useCallback(async () => {
     if (!canRead) return;
@@ -83,6 +106,47 @@ export default function AdminPage() {
   useEffect(() => {
     void load();
   }, [load, generation]);
+
+  const switches =
+    state?.switches?.length
+      ? state.switches
+      : DEFAULT_KEYS.map((key) => ({ key, enabled: true }));
+  const onCount = switches.filter((sw) => sw.enabled).length;
+
+  useLayoutEffect(() => {
+    if (!canRead) {
+      setFilterSlider((prev) => ({ ...prev, ready: false }));
+      return;
+    }
+    const track = filterTrackRef.current;
+    if (!track) {
+      setFilterSlider((prev) => ({ ...prev, ready: false }));
+      return;
+    }
+
+    function place() {
+      const item = filterItemRefs.current.get(switchFilter);
+      if (!track || !item) return;
+      const trackBox = track.getBoundingClientRect();
+      const itemBox = item.getBoundingClientRect();
+      setFilterSlider({
+        left: itemBox.left - trackBox.left,
+        width: itemBox.width,
+        ready: true,
+      });
+    }
+
+    const frame = window.requestAnimationFrame(place);
+    window.addEventListener("resize", place);
+    const ro =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
+    ro?.observe(track);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      ro?.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [canRead, switchFilter, onCount]);
 
   const inspectorHref = mcpInspectorHref(MCP_URL, MCP_INSPECTOR_URL);
 
@@ -120,11 +184,6 @@ export default function AdminPage() {
     return <AccessDenied need="admin:manage or flags:kill_switch" />;
   }
 
-  const switches =
-    state?.switches?.length
-      ? state.switches
-      : DEFAULT_KEYS.map((key) => ({ key, enabled: true }));
-
   const needle = switchQuery.trim().toLowerCase();
   const visibleSwitches = switches.filter((sw) => {
     if (switchFilter === "on" && !sw.enabled) return false;
@@ -133,55 +192,72 @@ export default function AdminPage() {
     return true;
   });
   const selected = visibleSwitches.find((sw) => sw.key === selectedKey) ?? visibleSwitches[0] ?? null;
-  const onCount = switches.filter((sw) => sw.enabled).length;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-3xl font-semibold tracking-tight">Admin</h1>
-            <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
-              {switches.length} switches
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-fg-muted">
-            Kill switches degrade journeys; they never invent money.
-          </p>
-        </div>
-        <label className="w-full max-w-sm">
-          <span className="sr-only">Search switches</span>
-          <input
-            value={switchQuery}
-            onChange={(event) => setSwitchQuery(event.target.value)}
-            placeholder="Search switches"
-            className="w-full rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
-          />
-        </label>
-      </div>
+      <PageHeader
+        title="Admin"
+        description="Kill switches degrade journeys; they never invent money."
+        meta={
+          <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
+            {switches.length} switches
+          </span>
+        }
+        actions={
+          <label className="w-full max-w-sm">
+            <span className="sr-only">Search switches</span>
+            <input
+              value={switchQuery}
+              onChange={(event) => setSwitchQuery(event.target.value)}
+              placeholder="Search switches"
+              className="w-full rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
+            />
+          </label>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter switches">
-        {(
-          [
-            { id: "all", label: "All" },
-            { id: "on", label: "On" },
-            { id: "off", label: "Off" },
-          ] as const
-        ).map((item) => {
+      <div
+        ref={filterTrackRef}
+        className="segmented-filter relative inline-flex items-center rounded-full bg-surface-2/80 p-1"
+        role="group"
+        aria-label="Filter switches"
+      >
+        <div
+          aria-hidden="true"
+          className="segmented-filter-slider"
+          style={{
+            left: filterSlider.left,
+            width: filterSlider.width,
+            opacity: filterSlider.ready ? 1 : 0,
+          }}
+        />
+        {SWITCH_FILTERS.map((item) => {
           const selectedFilter = switchFilter === item.id;
           return (
             <button
               key={item.id}
               type="button"
+              ref={(node) => {
+                if (node) filterItemRefs.current.set(item.id, node);
+                else filterItemRefs.current.delete(item.id);
+              }}
               aria-pressed={selectedFilter}
               onClick={() => setSwitchFilter(item.id)}
-              className={`rounded-full px-3 py-1.5 text-sm ${
-                selectedFilter ? "bg-surface font-medium text-ink shadow-1" : "text-fg-muted hover:bg-surface"
+              className={`relative z-10 rounded-full px-3.5 py-1.5 text-sm transition-colors duration-300 ${
+                selectedFilter
+                  ? "font-semibold text-ink"
+                  : "font-medium text-fg-muted hover:text-ink"
               }`}
             >
               {item.label}
               {item.id === "on" ? (
-                <span className="ml-1.5 text-xs text-fg-subtle">{onCount}</span>
+                <span
+                  className={`ml-1.5 text-xs ${
+                    selectedFilter ? "text-fg-muted" : "text-fg-subtle"
+                  }`}
+                >
+                  {onCount}
+                </span>
               ) : null}
             </button>
           );

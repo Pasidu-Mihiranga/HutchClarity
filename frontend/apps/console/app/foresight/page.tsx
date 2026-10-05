@@ -24,6 +24,7 @@ import type {
   ScenarioView,
 } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -132,27 +133,31 @@ export default function ForesightPage() {
 
   return (
     <div className="space-y-5">
-      <header className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="warning">SYNTHETIC SCENARIO</Badge>
-          {/* Read from the API, not asserted by the page. A badge that says
-              "calibrated" because somebody typed it is worse than none. */}
-          {calibration ? (
-            <Badge tone={calibration.calibrated ? "success" : "warning"}>
-              {calibration.status.replace(/_/g, " ").toUpperCase()}
-            </Badge>
-          ) : (
-            <Badge tone="warning">NOT CALIBRATED</Badge>
-          )}
-        </div>
-        <h1 className="text-2xl font-semibold">Foresight rehearsal</h1>
-        <p className="font-medium text-warning">SCENARIO, NOT CERTAINTY</p>
-        <p className="text-sm text-fg-muted">
-          A rehearsal predicts which themes and segments a change is likely to stir up. It
-          is a scenario, never a forecast of what will happen, and no launch decision rests
-          on it until the model has been backtested against real launches.
-        </p>
-      </header>
+      <PageHeader
+        title="Foresight rehearsal"
+        description={
+          <>
+            <span className="font-medium text-warning">SCENARIO, NOT CERTAINTY. </span>
+            A rehearsal predicts which themes and segments a change is likely to stir up. It
+            is a scenario, never a forecast of what will happen, and no launch decision rests
+            on it until the model has been backtested against real launches.
+          </>
+        }
+        meta={
+          <>
+            <Badge tone="warning">SYNTHETIC SCENARIO</Badge>
+            {/* Read from the API, not asserted by the page. A badge that says
+                "calibrated" because somebody typed it is worse than none. */}
+            {calibration ? (
+              <Badge tone={calibration.calibrated ? "success" : "warning"}>
+                {calibration.status.replace(/_/g, " ").toUpperCase()}
+              </Badge>
+            ) : (
+              <Badge tone="warning">NOT CALIBRATED</Badge>
+            )}
+          </>
+        }
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

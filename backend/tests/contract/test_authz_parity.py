@@ -40,12 +40,21 @@ def _reimplemented_in_python(request: httpx.Request) -> httpx.Response:
     document = json.loads(request.content)["input"]
     roles = set(document["roles"])
     permission = document["permission"]
-    granted = any(permission in DATA["role_permissions"].get(role, []) for role in roles)
+    attached = document.get("role_attached") or {}
+    detached = document.get("role_detached") or {}
+
+    def effective(role: str) -> set[str]:
+        baseline = set(DATA["role_permissions"].get(role, []))
+        add = set(attached.get(role, []))
+        remove = set(detached.get(role, []))
+        return (baseline | add) - remove
+
+    granted = any(permission in effective(role) for role in roles)
     admin_money = bool(roles & set(DATA["admin_roles"])) and permission in DATA["money_permissions"]
     duties = set(DATA["audit_duty_permissions"])
-    holds_duty = any(
-        duties & set(DATA["role_permissions"].get(role, [])) for role in roles
-    ) or bool(duties & set(document.get("granted", [])))
+    holds_duty = any(duties & effective(role) for role in roles) or bool(
+        duties & set(document.get("granted", []))
+    )
     duty_money = holds_duty and permission in DATA["money_permissions"]
     missing_step_up = (
         permission in DATA["step_up_permissions"]

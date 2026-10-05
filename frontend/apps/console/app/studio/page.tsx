@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Button, Card, Dialog, EmptyState, Field, Input } from "@clarity/ui";
 import type { PolicyChangeView } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -132,15 +133,11 @@ export default function StudioPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Badge tone="warning">SYNTHETIC POLICY</Badge>
-        <h1 className="mt-2 text-2xl font-semibold">Policy Studio</h1>
-        <p className="text-sm text-fg-muted">
-          A change is drafted, replayed, approved, scheduled and only then active. The
-          change class comes from the artefact&apos;s own tags, and the number of approvals
-          it needs follows from that.
-        </p>
-      </div>
+      <PageHeader
+        title="Policy Studio"
+        description="A change is drafted, replayed, approved, scheduled and only then active. The change class comes from the artefact's own tags, and the number of approvals it needs follows from that."
+        meta={<Badge tone="warning">SYNTHETIC POLICY</Badge>}
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {status ? <Alert tone="success">{status}</Alert> : null}

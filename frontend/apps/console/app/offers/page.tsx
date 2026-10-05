@@ -20,6 +20,7 @@ import {
 } from "@clarity/ui";
 import type { OfferView } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -107,17 +108,10 @@ export default function OffersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="max-w-2xl space-y-2">
-        <Badge tone="warning">SYNTHETIC CAMPAIGN DATA</Badge>
-        <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-ink">
-          Offer records
-        </h1>
-        <p className="text-sm leading-6 text-mute">
-          What HUTCH sent to a number. A customer pasting a suspicious message
-          into the app is told whether anything here matches it, so these
-          records are what the answer is measured against.
-        </p>
-      </div>
+      <PageHeader
+        title="Offer records"
+        description="What HUTCH sent to a number. A customer pasting a suspicious message into the app is told whether anything here matches it, so these records are what the answer is measured against."
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {status ? <Alert tone="success">{status}</Alert> : null}

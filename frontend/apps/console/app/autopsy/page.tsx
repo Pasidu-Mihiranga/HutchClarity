@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Alert, Badge, Button, Card, EmptyState, Field, Input } from "@clarity/ui";
 import type { AutopsyCluster, AutopsyWorkspace } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -125,14 +126,11 @@ export default function AutopsyPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Badge tone="warning">SYNTHETIC DATA</Badge>
-        <h1 className="mt-2 text-2xl font-semibold">Complaint Autopsy</h1>
-        <p className="text-sm text-fg-muted">
-          Clusters are hypotheses until a person reviews them. A suggested mapping never
-          activates a rule.
-        </p>
-      </div>
+      <PageHeader
+        title="Complaint Autopsy"
+        description="Clusters are hypotheses until a person reviews them. A suggested mapping never activates a rule."
+        meta={<Badge tone="warning">SYNTHETIC DATA</Badge>}
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {status ? <Alert tone="success">{status}</Alert> : null}

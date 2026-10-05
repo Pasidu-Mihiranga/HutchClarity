@@ -12,7 +12,12 @@ from typing import Protocol, runtime_checkable
 
 import httpx
 
-from clarity.platform.security.principal import STEP_UP_PERMISSIONS, Permission, Principal
+from clarity.platform.security.principal import (
+    STEP_UP_PERMISSIONS,
+    Permission,
+    Principal,
+    role_override_maps,
+)
 
 
 @runtime_checkable
@@ -45,6 +50,7 @@ class OpaAuthorizationPolicy:
         self._url = f"{base_url.rstrip('/')}/v1/data/clarity/authz/allow"
 
     def allows(self, principal: Principal, permission: Permission) -> bool:
+        attached, detached = role_override_maps()
         try:
             response = self._client.post(
                 self._url,
@@ -64,6 +70,9 @@ class OpaAuthorizationPolicy:
                         # Remove the wrapper and the Rego would quietly stop
                         # enforcing rule 1. Now it stands on its own.
                         "granted": sorted(granted.value for granted in principal.granted),
+                        # Role matrix overrides (ADR-0045). Empty when none.
+                        "role_attached": attached,
+                        "role_detached": detached,
                     }
                 },
             )

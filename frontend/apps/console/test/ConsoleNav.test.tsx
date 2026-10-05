@@ -8,12 +8,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
  * section uses `aria-current`; after sign-in, sections this identity cannot
  * open are omitted from the sidebar.
  *
- * The permission check itself is the backend's and is tested there. What is
- * tested here is that the nav asks, and only renders links this identity can
- * keep.
+ * A signed-in identity that opens a URL they cannot keep is redirected to the
+ * first allowed section, rather than left on a dead AccessDenied card.
  */
 
 const pathname = vi.fn(() => "/desk");
+const replace = vi.fn();
 const hasPermission = vi.fn(() => true);
 const session = { subject: "sup:ruwan", roles: ["supervisor"], permissions: ["desk:queue:read"] };
 const sessionState: { session: unknown; restoring: boolean; activeRole: string | null } = {
@@ -22,7 +22,10 @@ const sessionState: { session: unknown; restoring: boolean; activeRole: string |
   activeRole: "supervisor",
 };
 
-vi.mock("next/navigation", () => ({ usePathname: () => pathname() }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => pathname(),
+  useRouter: () => ({ replace }),
+}));
 
 vi.mock("@/components/StaffSessionProvider", () => ({
   useStaffSession: () => ({
@@ -37,6 +40,7 @@ const { AccessDenied } = await import("@/components/AccessDenied");
 
 beforeEach(() => {
   pathname.mockReturnValue("/desk");
+  replace.mockReset();
   hasPermission.mockReturnValue(true);
   sessionState.session = session;
   sessionState.restoring = false;
@@ -48,7 +52,7 @@ describe("ConsoleNav", () => {
     render(<ConsoleNav />);
     const nav = screen.getByRole("navigation", { name: "Console sections" });
     expect(nav).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+    expect(screen.getAllByRole("listitem")).toHaveLength(9);
   });
 
   test("the section being viewed is marked, not just coloured", () => {
@@ -78,6 +82,7 @@ describe("ConsoleNav", () => {
     expect(screen.getByRole("link", { name: "Complaint Autopsy" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Foresight" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Studio" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Offers" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Audit" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
     expect(screen.getAllByRole("listitem")).toHaveLength(3);
@@ -85,14 +90,34 @@ describe("ConsoleNav", () => {
 });
 
 describe("AccessDenied", () => {
-  test("it carries the page's h1, because it replaces the page", () => {
+  test("signed in with another section: redirect instead of a dead card", () => {
+    hasPermission.mockImplementation((...needed: string[]) =>
+      needed.includes("admin:manage"),
+    );
+    render(<AccessDenied need="desk:queue:read" />);
+    expect(replace).toHaveBeenCalledWith("/admin");
+    expect(screen.getByRole("status")).toHaveTextContent(/Opening Admin/i);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("security with offers goes to Offers, not a desk refusal", () => {
+    hasPermission.mockImplementation((...needed: string[]) =>
+      needed.includes("offer:manage") || needed.includes("admin:manage"),
+    );
+    render(<AccessDenied need="desk:queue:read" />);
+    expect(replace).toHaveBeenCalledWith("/offers");
+  });
+
+  test("it carries the page's h1 when there is nowhere to send them", () => {
+    hasPermission.mockReturnValue(false);
     render(<AccessDenied need="audit:read" />);
     expect(
       screen.getByRole("heading", { level: 1, name: /cannot open this/i }),
     ).toBeInTheDocument();
   });
 
-  test("the refusal is announced and names the permission", () => {
+  test("the refusal is announced and names the permission when stuck", () => {
+    hasPermission.mockReturnValue(false);
     render(<AccessDenied need="audit:read" />);
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("audit:read");
@@ -100,12 +125,11 @@ describe("AccessDenied", () => {
   });
 
   test("restoring a session is a status, not an alert", () => {
-    // A session being read back is not news. Announcing it assertively would
-    // interrupt whatever the screen reader was saying.
     sessionState.restoring = true;
     render(<AccessDenied need="audit:read" />);
     expect(screen.getByRole("status")).toHaveTextContent(/restoring/i);
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   test("with no session it tells you to sign in rather than naming a role", () => {
@@ -113,5 +137,6 @@ describe("AccessDenied", () => {
     sessionState.activeRole = null;
     render(<AccessDenied need="audit:read" />);
     expect(screen.getByRole("alert")).toHaveTextContent(/sign in to start/i);
+    expect(replace).not.toHaveBeenCalled();
   });
 });

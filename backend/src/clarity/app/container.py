@@ -108,6 +108,7 @@ from clarity.modules.iam.public import (
     OtpDelivery,
     OtpService,
     PythonAuthorizationPolicy,
+    RolePolicies,
     RoutedOtpDelivery,
     SimulatedInbox,
     StaffDirectory,
@@ -994,6 +995,15 @@ class Clarity:
         # Audit duties by grant (Phase 3). They live beside the trail, so a
         # demo reset carries them with it, as it carries identity.
         self.audit_grants = audit_grants or self._new_audit_grants(clock)
+        # Role matrix overrides (ADR-0045). Same store family as grants.
+        self.role_policies = RolePolicies(
+            self.audit.open_unit,
+            audit=self.audit,
+            clock=(lambda: clock) if clock is not None else None,
+        )
+        from clarity.platform.security.principal import set_role_override_provider
+
+        set_role_override_provider(self.role_policies.snapshot)
         # Backups and restores of the trail (Phase 6). The key is read when a
         # backup is actually taken, so a process that never takes one never
         # holds it; an unset key refuses the backup rather than writing it in

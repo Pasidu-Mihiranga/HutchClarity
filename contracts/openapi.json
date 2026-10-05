@@ -1452,6 +1452,34 @@
         "title": "ReviewRequest",
         "type": "object"
       },
+      "RolePolicyChangeRequest": {
+        "additionalProperties": false,
+        "description": "Attach or detach one closed permission on one closed role (ADR-0045).",
+        "properties": {
+          "permission": {
+            "minLength": 1,
+            "title": "Permission",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "role": {
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "permission",
+          "reason"
+        ],
+        "title": "RolePolicyChangeRequest",
+        "type": "object"
+      },
       "RuleCandidateRequest": {
         "additionalProperties": false,
         "description": "A proposal that a confirmed cluster should change a detection parameter.\n\nIt names an **existing** policy key. Governance drafts changes to artefacts\nthat already exist, with a change class derived from that artefact's tags,\nand inventing a key here would route around the thing that decides how\nrisky the change is. Authoring a brand-new rule pack is a different act\nwith a different lifecycle, and this route does not pretend to do it.",
@@ -2235,6 +2263,205 @@
         "summary": "Health",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/admin/iam/roles": {
+      "get": {
+        "description": "Effective role\u2192permission matrix with baseline and overrides (ADR-0045).",
+        "operationId": "list_iam_roles_v1_admin_iam_roles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Iam Roles V1 Admin Iam Roles Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Iam Roles",
+        "tags": [
+          "admin",
+          "iam"
+        ]
+      }
+    },
+    "/v1/admin/iam/roles/attach": {
+      "post": {
+        "description": "Attach one closed permission to one closed role.",
+        "operationId": "attach_iam_permission_v1_admin_iam_roles_attach_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolePolicyChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Attach Iam Permission V1 Admin Iam Roles Attach Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach Iam Permission",
+        "tags": [
+          "admin",
+          "iam"
+        ]
+      }
+    },
+    "/v1/admin/iam/roles/detach": {
+      "post": {
+        "description": "Detach one closed permission from one closed role.",
+        "operationId": "detach_iam_permission_v1_admin_iam_roles_detach_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolePolicyChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Detach Iam Permission V1 Admin Iam Roles Detach Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detach Iam Permission",
+        "tags": [
+          "admin",
+          "iam"
         ]
       }
     },

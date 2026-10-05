@@ -8,29 +8,27 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CONSOLE_SECTIONS } from "@/lib/consoleSections";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
 import { useStaffSession } from "./StaffSessionProvider";
 
-const links: { href: string; label: string; anyOf: string[]; icon: ReactNode }[] = [
-  { href: "/desk", label: "Cases", anyOf: ["desk:queue:read"], icon: <IconCases /> },
-  { href: "/insights", label: "Insights", anyOf: ["desk:queue:read"], icon: <IconInsights /> },
-  { href: "/autopsy", label: "Complaint Autopsy", anyOf: ["desk:queue:read"], icon: <IconAutopsy /> },
-  // `foresight:read`, which the page itself requires (C4). Gating the link on
-  // the desk's permission instead offered every agent and supervisor a link
-  // that lands on "access denied": the nav must promise what the page keeps.
-  { href: "/foresight", label: "Foresight", anyOf: ["foresight:read"], icon: <IconForesight /> },
-  {
-    // The same two the Policy Studio page and the governance routes check
-    // (D3). `rule:publish` was in here and is held by compliance, who holds
-    // neither config permission, so they were shown a link to a refusal.
-    href: "/studio",
-    label: "Studio",
-    anyOf: ["config:draft", "config:approve"],
-    icon: <IconStudio />,
-  },
-  { href: "/audit", label: "Audit", anyOf: ["audit:read"], icon: <IconAudit /> },
-  { href: "/admin", label: "Admin", anyOf: ["admin:manage", "flags:kill_switch"], icon: <IconAdmin /> },
-];
+const SECTION_ICONS: Record<string, ReactNode> = {
+  "/desk": <IconCases />,
+  "/insights": <IconInsights />,
+  "/autopsy": <IconAutopsy />,
+  "/foresight": <IconForesight />,
+  "/studio": <IconStudio />,
+  "/offers": <IconOffers />,
+  "/audit": <IconAudit />,
+  "/iam": <IconIam />,
+  "/admin": <IconAdmin />,
+};
+
+const links = CONSOLE_SECTIONS.map((section) => ({
+  ...section,
+  anyOf: [...section.anyOf],
+  icon: SECTION_ICONS[section.href],
+}));
 
 type Slider = { top: number; height: number; ready: boolean };
 
@@ -264,6 +262,25 @@ function IconAudit() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <path d="M8 4h7.5L19 7.5V19a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 19V5.5A1.5 1.5 0 0 1 8 4Z" strokeLinejoin="round" />
       <path d="M15 4v3.5H19M9.5 12h5M9.5 15.5h3.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconOffers() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M4.5 12.5 12.5 4.5h5.2A1.8 1.8 0 0 1 19.5 6.3v5.2L11.5 19.5a1.2 1.2 0 0 1-1.7 0L4.5 14.2a1.2 1.2 0 0 1 0-1.7Z" strokeLinejoin="round" />
+      <circle cx="15.2" cy="8.8" r="1.2" />
+    </svg>
+  );
+}
+
+function IconIam() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <circle cx="8.2" cy="14.2" r="3.2" />
+      <path d="M10.6 12.4 19.2 3.8" strokeLinecap="round" />
+      <path d="M15.4 5.6 18 8.2M13.2 7.8l2.4 2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

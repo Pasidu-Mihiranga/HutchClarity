@@ -334,6 +334,14 @@ class SwitchFlipRequest(ApiModel):
     reason: str = Field(min_length=1)
 
 
+class RolePolicyChangeRequest(ApiModel):
+    """Attach or detach one closed permission on one closed role (ADR-0045)."""
+
+    role: str = Field(min_length=1)
+    permission: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class PolicyDraftRequest(ApiModel):
     key: str
     value: Any

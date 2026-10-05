@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, Spinner } from "@clarity/ui";
+import { firstAllowedSection } from "@/lib/consoleSections";
 import { useStaffSession } from "./StaffSessionProvider";
 
 /**
@@ -11,11 +14,24 @@ import { useStaffSession } from "./StaffSessionProvider";
  * heading lands nowhere. It is also announced, because a refusal that renders
  * silently leaves somebody waiting for a page that has already decided.
  *
+ * **Signed in with somewhere else to go: redirect.** A security admin who
+ * bookmarks `/desk` should land on Offers or Admin, not sit on a card that
+ * asks for `desk:queue:read` and talks about four-eyes. The redirect is the
+ * same permission map the sidebar uses.
+ *
  * The restoring state is a `status` rather than an `alert`: a session being
  * read back is not news, and announcing it assertively would interrupt.
  */
 export function AccessDenied({ need }: { need: string }) {
-  const { session, activeRole, restoring } = useStaffSession();
+  const router = useRouter();
+  const { session, activeRole, restoring, hasPermission } = useStaffSession();
+  const fallback = session ? firstAllowedSection(hasPermission) : null;
+
+  useEffect(() => {
+    if (restoring || !session || !fallback) return;
+    router.replace(fallback.href);
+  }, [restoring, session, fallback, router]);
+
   if (restoring) {
     return (
       <Card className="flex items-center gap-3" role="status">
@@ -28,6 +44,18 @@ export function AccessDenied({ need }: { need: string }) {
       </Card>
     );
   }
+
+  if (session && fallback) {
+    return (
+      <Card className="flex items-center gap-3" role="status">
+        <Spinner size="sm" label="" role="presentation" aria-hidden="true" />
+        <p className="text-sm text-mute">
+          Opening {fallback.label}… This identity needs {need} for this page.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card className="space-y-2 rounded-card border-primary/30 bg-warm shadow-card" role="alert">
       <h1 className="font-display text-lg font-semibold text-ink">
@@ -38,10 +66,12 @@ export function AccessDenied({ need }: { need: string }) {
           ? `Signed in as ${session.subject} (${activeRole}). Needs: ${need}.`
           : "Sign in to start."}
       </p>
-      <p className="text-xs text-fg-muted">
-        Four-eyes approvals need a different person (supervisor, then finance),
-        not two roles on the same user.
-      </p>
+      {need.includes("desk:") || need.includes("approve") ? (
+        <p className="text-xs text-fg-muted">
+          Four-eyes approvals need a different person (supervisor, then finance),
+          not two roles on the same user.
+        </p>
+      ) : null}
     </Card>
   );
 }

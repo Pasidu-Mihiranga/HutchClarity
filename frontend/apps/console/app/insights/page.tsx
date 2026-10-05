@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert, Badge, Card, EmptyState, Spinner } from "@clarity/ui";
 import type { AutopsyWorkspace, ForesightPrediction } from "@clarity/sdk";
 import { AccessDenied } from "@/components/AccessDenied";
+import { PageHeader } from "@/components/PageHeader";
 import { useStaffSession } from "@/components/StaffSessionProvider";
 
 /**
@@ -81,16 +82,10 @@ export default function InsightsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-          Anticipate
-        </p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight">Insights</h1>
-        <p className="text-sm text-mute">
-          Counts from synthetic cases in this process. Autopsy and foresight
-          stay labelled as hypotheses.
-        </p>
-      </div>
+      <PageHeader
+        title="Insights"
+        description="Counts from synthetic cases in this process. Autopsy and foresight stay labelled as hypotheses."
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

@@ -98,6 +98,7 @@ from clarity.interfaces.http.schemas import (
     QueueItem,
     RefreshRequest,
     ReloadRequest,
+    RolePolicyChangeRequest,
     RuledOutView,
     SafeguardRequest,
     ScenarioDraftRequest,
@@ -155,6 +156,7 @@ from clarity.modules.iam.public import (
     HttpSmsDeliveryFailed,
     LoginRefused,
     OtpRefused,
+    RolePolicyRefused,
     RoutedOtpDelivery,
     SimulatedInbox,
     SubjectKind,
@@ -2041,6 +2043,62 @@ def _register_routes(app: FastAPI) -> None:
                 for flip in clarity.switches.history[-20:]
             ],
         }
+
+    @app.get("/v1/admin/iam/roles", tags=["admin", "iam"])
+    def list_iam_roles(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.IAM_ROLE_MANAGE))],
+    ) -> dict[str, Any]:
+        """Effective role→permission matrix with baseline and overrides (ADR-0045)."""
+        return clarity.role_policies.catalogue()
+
+    @app.post("/v1/admin/iam/roles/attach", tags=["admin", "iam"])
+    def attach_iam_permission(
+        body: RolePolicyChangeRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.IAM_ROLE_MANAGE))],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    ) -> dict[str, Any]:
+        """Attach one closed permission to one closed role."""
+        try:
+            role = Role(body.role)
+            permission = Permission(body.permission)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail="unknown role or permission") from error
+        try:
+            return clarity.role_policies.attach(
+                role=role,
+                permission=permission,
+                actor_ref=principal.ref,
+                reason=body.reason,
+                idempotency_key=idempotency_key,
+            )
+        except RolePolicyRefused as error:
+            raise HTTPException(status_code=403, detail={"code": error.code, "detail": str(error)}) from error
+
+    @app.post("/v1/admin/iam/roles/detach", tags=["admin", "iam"])
+    def detach_iam_permission(
+        body: RolePolicyChangeRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.IAM_ROLE_MANAGE))],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    ) -> dict[str, Any]:
+        """Detach one closed permission from one closed role."""
+        try:
+            role = Role(body.role)
+            permission = Permission(body.permission)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail="unknown role or permission") from error
+        try:
+            return clarity.role_policies.detach(
+                role=role,
+                permission=permission,
+                actor_ref=principal.ref,
+                reason=body.reason,
+                idempotency_key=idempotency_key,
+            )
+        except RolePolicyRefused as error:
+            raise HTTPException(status_code=403, detail={"code": error.code, "detail": str(error)}) from error
 
     @app.post("/v1/admin/merchants/suspend", tags=["admin"])
     def suspend_merchant(
