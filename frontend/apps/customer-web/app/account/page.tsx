@@ -103,6 +103,12 @@ export default function AccountPage() {
     if (ok) setEditing(null);
   }
 
+  async function saveLargeText(value: boolean) {
+    await act((api) =>
+      api.savePreferences({ language: lang, notify: app?.notify ?? "important", large_text: value }),
+    );
+  }
+
   async function addFamily() {
     const ok = await act((api) => api.addFamilyMember(familyMsisdn.trim(), familyRole));
     if (ok) setFamilyMsisdn("");
@@ -186,6 +192,38 @@ export default function AccountPage() {
           {localNumber(app.msisdn)}
         </p>
         <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>{app.name}</p>
+      </section>
+
+      <section aria-labelledby="account-elder" className="h-card" style={{ marginBottom: 14 }}>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={app.large_text}
+          disabled={busy}
+          onClick={() => void saveLargeText(!app.large_text)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            minHeight: 52,
+            padding: 0,
+            border: 0,
+            background: "transparent",
+            cursor: busy ? "wait" : "pointer",
+            fontFamily: "inherit",
+            textAlign: "left",
+          }}
+        >
+          <span>
+            <span style={{ display: "block", fontSize: 16, fontWeight: 800 }}>Elder view</span>
+            <span style={{ display: "block", marginTop: 4, fontSize: 13, color: "var(--muted)" }}>
+              Larger text and bigger buttons. Your own choice, not the family profile.
+            </span>
+          </span>
+          <span className={app.large_text ? "senior-switch is-on" : "senior-switch"} aria-hidden="true" />
+        </button>
       </section>
 
       <section aria-labelledby="account-language" className="h-card" style={{ marginBottom: 14 }}>

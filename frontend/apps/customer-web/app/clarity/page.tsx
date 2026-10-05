@@ -7,6 +7,7 @@ import { t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
 import { AppHeader } from "@/components/AppHeader";
 import { expireSession, withSession } from "@/lib/session";
+import { useMe } from "@/lib/useMe";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
 import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
 import {
@@ -283,6 +284,20 @@ const STAGE_LABELS: Record<TurnStage, string> = {
 
 // ─── component ─────────────────────────────────────────────────────────────────
 
+const ELDER_CARDS: Array<{
+  title: string;
+  icon: string;
+  href?: string;
+  key: string | null;
+  ask: string;
+  intent: string | null;
+}> = [
+  { title: "Check bill", icon: "wallet", key: "qBalance", ask: "Why did my balance change?", intent: "BALANCE_DEDUCTION_QUERY" },
+  { title: "Buy package", icon: "box", href: "/packages", key: null, ask: "", intent: null },
+  { title: "Report issue", icon: "shield", key: null, ask: "I want to report a problem with my service.", intent: null },
+  { title: "Track complaint", icon: "headset", href: "/cases", key: null, ask: "", intent: null },
+];
+
 export default function ClarityPage() {
   const { lang } = useLanguage();
   const router = useRouter();
@@ -301,6 +316,9 @@ export default function ClarityPage() {
   // which a render-time closure would leave stale.
   const appRef = useRef<AppState>({});
   const appReady = useRef<Promise<void> | null>(null);
+  const { app: me } = useMe();
+  const profileKey = me?.active_profile?.msisdn ?? "";
+  const greetingName = me?.active_profile?.name ?? me?.name ?? app.name;
 
   useEffect(() => {
     let cancelled = false;
@@ -327,7 +345,7 @@ export default function ClarityPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profileKey]);
 
   const [input, setInput] = useState("");
   const [topicOpen, setTopicOpen] = useState(false);
@@ -782,8 +800,8 @@ export default function ClarityPage() {
               <div style={{ textAlign: "center", padding: "8px 8px 4px", flexShrink: 0 }}>
                 <img src="/icon-192.png" alt="" className="chat-logo-bounce" width={72} height={72} />
                 <h1 style={{ fontSize: "clamp(22px,5.5vw,28px)", fontWeight: 800, letterSpacing: "-.03em", margin: "10px 0 4px", color: "var(--ink)" }}>
-                  {app.name
-                    ? tl(lang, "chatHi").replace("{name}", app.name)
+                  {greetingName
+                    ? tl(lang, "chatHi").replace("{name}", greetingName)
                     : tl(lang, "chatHiAnon")}
                 </h1>
                 <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "rgb(var(--c-fg-muted))" }}>{tl(lang, "howHelpToday")}</p>
@@ -792,6 +810,58 @@ export default function ClarityPage() {
                 </p>
               </div>
 
+              {me?.large_text ? (
+                <div style={{ width: "100%", maxWidth: 440 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {ELDER_CARDS.map((card) => (
+                      <button
+                        key={card.title}
+                        type="button"
+                        onClick={() => {
+                          if (card.href) router.push(card.href);
+                          else ask(card.key, card.ask, card.intent);
+                        }}
+                        style={{
+                          minHeight: 108,
+                          borderRadius: 18,
+                          border: "1px solid var(--line)",
+                          background: "rgb(var(--c-surface))",
+                          padding: 16,
+                          textAlign: "left",
+                          fontFamily: "inherit",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <MarkIcon name={card.icon} />
+                        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, fontSize: 16, fontWeight: 800 }}>
+                          {card.title}
+                          <span aria-hidden="true">›</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--muted)" }}>Try asking</p>
+                  <button
+                    type="button"
+                    onClick={() => ask("qBalance", "Why did my balance change?", "BALANCE_DEDUCTION_QUERY")}
+                    style={{
+                      width: "100%",
+                      minHeight: 52,
+                      borderRadius: 16,
+                      border: "1px solid var(--line)",
+                      background: "rgb(var(--c-surface))",
+                      textAlign: "left",
+                      padding: "12px 16px",
+                      fontFamily: "inherit",
+                      fontSize: 15,
+                      fontWeight: 650,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Why did my balance change?
+                  </button>
+                </div>
+              ) : (
               <DialList label="Suggested questions" tall>
                 {chips.map((chip) => {
                   const label = chip.label ?? tl(lang, chip.i18n_key) ?? chip.id;
@@ -809,6 +879,7 @@ export default function ClarityPage() {
                   );
                 })}
               </DialList>
+              )}
             </div>
           ) : (
             /* ── Transcript ── */

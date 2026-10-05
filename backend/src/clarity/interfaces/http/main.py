@@ -2241,8 +2241,11 @@ def _register_routes(app: FastAPI) -> None:
         clarity: ClarityDep,
         principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
     ) -> dict[str, Any]:
-        """Balance, pack, activity and alerts for the signed-in number."""
-        return _home_for(clarity, _customer_ref(principal))
+        """Balance, pack, activity and alerts for the open profile."""
+        _owner, view = _view_account(clarity, _customer_ref(principal))
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        return _home_for(clarity, view.ref)
 
     @app.get("/v1/me/app", tags=["customer"])
     def my_app(
@@ -2272,7 +2275,10 @@ def _register_routes(app: FastAPI) -> None:
         }
         if amount not in allowed_amounts:
             raise HTTPException(status_code=422, detail="choose a listed reload amount")
-        clarity.world.reload(ref, amount)
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        clarity.world.reload(view.ref, amount)
         return _app_for(clarity, ref)
 
     @app.post("/v1/me/packages/{offering_id}/purchase", tags=["customer"])
@@ -2282,8 +2288,11 @@ def _register_routes(app: FastAPI) -> None:
         principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
         try:
-            clarity.world.purchase_pack(ref, offering_id)
+            clarity.world.purchase_pack(view.ref, offering_id)
         except KeyError as error:
             raise HTTPException(
                 status_code=404, detail="that pack is not in the catalogue"
@@ -2299,7 +2308,10 @@ def _register_routes(app: FastAPI) -> None:
         principal: Annotated[Principal, Depends(requires(Permission.SELF_TRANSACT))],
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
-        if not clarity.world.deactivate_subscription(ref, subscription_id):
+        _owner, view = _view_account(clarity, ref)
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        if not clarity.world.deactivate_subscription(view.ref, subscription_id):
             raise HTTPException(status_code=404, detail="that subscription is not active")
         return _app_for(clarity, ref)
 
@@ -2373,8 +2385,11 @@ def _register_routes(app: FastAPI) -> None:
         clarity: ClarityDep,
         principal: Annotated[Principal, Depends(requires(Permission.SELF_READ))],
     ) -> list[dict[str, Any]]:
-        """Cases opened for the signed-in number."""
-        ref = _customer_ref(principal)
+        """Cases opened for the profile that is open."""
+        _owner, view = _view_account(clarity, _customer_ref(principal))
+        if view is None:
+            raise HTTPException(status_code=404, detail="no such account")
+        ref = view.ref
         rows = [record for record in clarity.cases.all_cases() if record.subscriber_ref == ref]
         rows.sort(key=lambda record: record.case.opened_at, reverse=True)
         return [
@@ -3463,12 +3478,31 @@ def _home_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     }
 
 
+def _view_account(clarity: Clarity, owner_ref: str):
+    """The account whose bills are on screen.
+
+    The signed-in person stays the owner of family links. When they have opened
+    a family profile that has its own records, Home, packages and receipts read
+    that profile.
+    """
+    owner = clarity.world.account(owner_ref)
+    if owner is None:
+        return None, None
+    if owner.active_profile and owner.active_profile in owner.family:
+        other = clarity.world.account_by_msisdn(owner.active_profile)
+        if other is not None:
+            return owner, other
+    return owner, owner
+
+
 def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     """One payload for Home, Usage, Clarity, Activity and More."""
-    home = _home_for(clarity, ref)
-    account = clarity.world.account(ref)
-    if account is None:
+    owner, view = _view_account(clarity, ref)
+    if owner is None or view is None:
         raise HTTPException(status_code=404, detail="no such account")
+    home = _home_for(clarity, view.ref)
+    account = owner
+    ref = view.ref
 
     cases: list[dict[str, Any]] = []
     mine: set[str] = set()

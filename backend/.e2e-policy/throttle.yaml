@@ -15,7 +15,7 @@ keys:
 
     '
   values:
-  - value: '30'
+  - value: '600'
     version: 1
 - key: throttle.knowledge.per_minute
   kind: number
@@ -31,7 +31,7 @@ keys:
 
     '
   values:
-  - value: '60'
+  - value: '600'
     version: 1
 - key: throttle.anonymous.per_minute
   kind: number
@@ -48,7 +48,7 @@ keys:
 
     '
   values:
-  - value: '45'
+  - value: '600'
     version: 1
 - key: throttle.auth.per_minute
   kind: number

@@ -69,10 +69,6 @@ export default function HomePage() {
     );
   }
 
-  if (app.active_profile) {
-    return <GuidedHome profile={app.active_profile} onOpen={(href) => router.push(href)} />;
-  }
-
   const pack = app.pack;
   const usedPct = pack?.used_pct ?? null;
   const remaining =

@@ -43,13 +43,9 @@ function applySenior(on: boolean) {
 const appListeners = new Set<(app: CustomerApp) => void>();
 
 function publishApp(app: CustomerApp) {
-  // Choosing a family profile does not enlarge the screen. The person holding
-  // the phone is the account holder, not the elder or the child.
-  applySenior(false);
+  applySenior(Boolean(app.large_text));
   appListeners.forEach((listener) => listener(app));
 }
-
-applySenior(false);
 
 export type MeState = {
   app: CustomerApp | null;
