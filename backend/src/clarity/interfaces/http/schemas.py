@@ -366,6 +366,86 @@ class MerchantSuspendRequest(ApiModel):
 
 
 # --------------------------------------------------------------------------- #
+# Offer verification (OFFER01)
+# --------------------------------------------------------------------------- #
+
+
+class OfferCheckRequest(ApiModel):
+    """A message a customer received, to be checked against their own offers.
+
+    `message` is customer-supplied text and is treated as one throughout: it
+    picks which recorded offer to compare against and never decides the answer
+    (I2). It is not stored.
+    """
+
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class OfferSignalView(ApiModel):
+    """One warning sign found in the message. Evidence, never a verdict."""
+
+    code: str
+    """A stable code, so the wording a customer reads stays in the UI
+    catalogue rather than being invented here (I15)."""
+
+
+class OfferMatchView(ApiModel):
+    """The closest recorded offer, when one came close."""
+
+    offer_id: str
+    title: str
+    offer_code: str = ""
+    containment: float
+    code_matched: bool
+    still_valid: bool
+    valid_from: datetime
+    valid_to: datetime | None = None
+    source: str
+
+
+class OfferCheckView(ApiModel):
+    """What the records say about the pasted message.
+
+    `verdict` is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`. It is
+    deliberately **not** a scam flag: see `clarity.modules.offers.offers`.
+    """
+
+    verdict: str
+    signals: list[OfferSignalView] = Field(default_factory=list)
+    offers_on_record: int
+    matched: OfferMatchView | None = None
+    simulated: bool = True
+    """The offer records are `hutch-sim` in every profile but `prod` (I16)."""
+
+
+class OfferRecordRequest(ApiModel):
+    """What HUTCH sent to one number, as a staff member records it."""
+
+    msisdn: str = Field(min_length=4)
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=2000)
+    offer_code: str = Field(default="", max_length=32)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+
+class OfferView(ApiModel):
+    """One recorded offer, for the staff list. Never the raw MSISDN."""
+
+    offer_id: str
+    msisdn_masked: str
+    title: str
+    body: str
+    offer_code: str = ""
+    valid_from: datetime
+    valid_to: datetime | None = None
+    recorded_by: str
+    recorded_at: datetime
+    source: str
+    still_valid: bool
+
+
+# --------------------------------------------------------------------------- #
 # Audit access (audit assurance plan Phase 3)
 # --------------------------------------------------------------------------- #
 

@@ -4,6 +4,19 @@ import { useState, type FormEvent } from "react";
 import { Button, Input } from "@clarity/ui";
 import { useStaffSession } from "./StaffSessionProvider";
 
+const SYNTHETIC_ROLES = [
+  { username: "agent", password: "agent-clarity", label: "Agent" },
+  { username: "supervisor", password: "supervisor-clarity", label: "Supervisor" },
+  { username: "finance", password: "finance-clarity", label: "Finance" },
+  { username: "vasops", password: "vasops-clarity", label: "VAS operations" },
+  { username: "cx", password: "cx-clarity", label: "CX engineer" },
+  { username: "product", password: "product-clarity", label: "Product" },
+  { username: "compliance", password: "compliance-clarity", label: "Compliance" },
+  { username: "auditor", password: "auditor-clarity", label: "Auditor" },
+  { username: "admin", password: "admin123456", label: "Platform admin" },
+  { username: "security", password: "security-clarity", label: "Security admin" },
+] as const;
+
 /**
  * The signed-out desk (the split screen from the desk mockup).
  *
@@ -23,6 +36,12 @@ export function DeskLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [stepUpCode, setStepUpCode] = useState("");
+
+  function fillRole(account: (typeof SYNTHETIC_ROLES)[number]) {
+    setUsername(account.username);
+    setPassword(account.password);
+    setStepUpCode("step-up");
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -76,6 +95,31 @@ export function DeskLogin() {
               <p className="text-xs text-mute">
                 Simulated staff directory. The server assigns the role.
               </p>
+              <fieldset className="grid gap-2">
+                <legend className="mb-1 text-xs font-semibold text-ink">
+                  Autofill a role
+                </legend>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {SYNTHETIC_ROLES.map((account) => (
+                    <button
+                      key={account.username}
+                      type="button"
+                      aria-pressed={username === account.username}
+                      onClick={() => fillRole(account)}
+                      className={`rounded-xl border px-3 py-2 text-left text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                        username === account.username
+                          ? "border-primary bg-primary-soft font-semibold text-primary"
+                          : "border-border bg-surface text-fg hover:border-primary/50"
+                      }`}
+                    >
+                      {account.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-fg-subtle">
+                  Selecting a role only fills the credentials. Review them, then click Sign in.
+                </p>
+              </fieldset>
               <div className="flex flex-col gap-1 text-sm text-mute">
                 <label htmlFor="staff-username">Staff ID or email</label>
                 <div className="relative">

@@ -77,6 +77,12 @@ from clarity.interfaces.http.schemas import (
     ForesightRunRequest,
     LaunchRecordRequest,
     MerchantSuspendRequest,
+    OfferCheckRequest,
+    OfferCheckView,
+    OfferMatchView,
+    OfferRecordRequest,
+    OfferSignalView,
+    OfferView,
     OpenCaseRequest,
     OtpRequest,
     OtpVerify,
@@ -155,6 +161,7 @@ from clarity.modules.iam.public import (
     TokenInvalid,
 )
 from clarity.modules.knowledge.public import Audience as KnowledgeAudience
+from clarity.modules.offers.public import OfferRefused
 from clarity.platform.audit.checkpoints import anchor_verifies, checkpoint_document
 from clarity.platform.audit.export import AuditExport, export_document
 from clarity.platform.audit.ledger import ActorKind, AuditEventType, record_hash
@@ -1484,6 +1491,7 @@ def _register_routes(app: FastAPI) -> None:
             "+94782223333": "Reload taken twice",
             "+94783334444": "'Unlimited' hit a fair-use cap",
             "+94784445555": "Large reload not credited, recent SIM swap",
+            "+94785720767": "Has real offers on record, for checking a suspect SMS",
         }
         return [
             DemoSubscriber(
@@ -2059,6 +2067,174 @@ def _register_routes(app: FastAPI) -> None:
             "actor_ref": principal.ref,
             "simulated": True,
         }
+
+    # ---------------------------------------------------------- offers (OFFER01)
+
+    @app.post("/v1/offers/verify", response_model=OfferCheckView, tags=["offers"])
+    def verify_offer_message(
+        body: OfferCheckRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_VERIFY))],
+    ) -> OfferCheckView:
+        """Check a message a customer received against their own offers.
+
+        **The answer is what the records say, not a scam flag.** `ON_RECORD`
+        means an offer on record for this number matches; `NOT_ON_RECORD` means
+        none does; `NEEDS_A_PERSON` means it partly matched, which is the case
+        the other two would both get wrong. The reason it is phrased that way
+        is in `clarity.modules.offers.offers`: a verdict of "scam" would be an
+        inference past what was checked, and the pasted text is the one thing
+        an attacker controls (I2).
+
+        Bound to the caller's own subscriber, so one customer cannot test a
+        message against another's offers.
+        """
+        ref = _customer_ref(principal)
+        try:
+            check = clarity.offers.check(subscriber_ref=ref, message=body.message)
+        except OfferRefused as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        # Recorded for the verdict and the signals, never the text. The message
+        # reaches the hashed payload only, so the same scam checked by many
+        # customers is one correlatable fingerprint without the trail holding
+        # what anybody was sent (I13).
+        clarity.audit.append(
+            AuditEventType.OFFER_CHECKED,
+            actor_ref=principal.ref,
+            actor_kind=ActorKind.CUSTOMER,
+            object_ref=check.verdict.value,
+            payload={"message": body.message, "subscriber_ref": ref},
+            detail={
+                "verdict": check.verdict.value,
+                "signals": [signal.value for signal in check.signals],
+                "offers_on_record": check.offers_on_record,
+                "matched_offer_id": check.best.offer.offer_id if check.best else None,
+            },
+        )
+
+        matched = None
+        if check.best is not None:
+            offer = check.best.offer
+            matched = OfferMatchView(
+                offer_id=offer.offer_id,
+                title=offer.title,
+                offer_code=offer.offer_code,
+                containment=round(check.best.containment, 3),
+                code_matched=check.best.code_matched,
+                still_valid=check.matched_offer_effective,
+                valid_from=offer.valid_from,
+                valid_to=offer.valid_to,
+                source=offer.source,
+            )
+        return OfferCheckView(
+            verdict=check.verdict.value,
+            signals=[OfferSignalView(code=signal.value) for signal in check.signals],
+            offers_on_record=check.offers_on_record,
+            matched=matched,
+        )
+
+    @app.get("/v1/admin/offers", response_model=list[OfferView], tags=["admin"])
+    def list_offers(
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_MANAGE))],
+    ) -> list[OfferView]:
+        """Every recorded offer, newest first. Masked numbers only."""
+        moment = clarity.case_aggregate._now()
+        offers = sorted(
+            clarity.offers.all_offers(), key=lambda o: o.recorded_at, reverse=True
+        )
+        return [
+            OfferView(
+                offer_id=offer.offer_id,
+                msisdn_masked=offer.msisdn_masked,
+                title=offer.title,
+                body=offer.body,
+                offer_code=offer.offer_code,
+                valid_from=offer.valid_from,
+                valid_to=offer.valid_to,
+                recorded_by=offer.recorded_by,
+                recorded_at=offer.recorded_at,
+                source=offer.source,
+                still_valid=offer.is_effective(moment),
+            )
+            for offer in offers
+        ]
+
+    @app.post(
+        "/v1/admin/offers",
+        response_model=OfferView,
+        status_code=201,
+        tags=["admin"],
+    )
+    def record_offer(
+        body: OfferRecordRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.OFFER_MANAGE))],
+    ) -> OfferView:
+        """Record what HUTCH sent to a number.
+
+        **This is the authority the fraud check rests on**, which is why it is
+        security admin's alone: adding an offer here makes a matching message
+        read as genuine to the customer who pastes it. The record is
+        append-only, so a correction is a new row and nothing already checked
+        against can be rewritten.
+
+        The number is resolved to its pseudonym before anything is stored; the
+        raw MSISDN never reaches the offers table.
+        """
+        try:
+            normalised = normalise_msisdn(body.msisdn)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        account = clarity.world.account_by_msisdn(normalised)
+        if account is None:
+            # Not "we could not find this number" with a different status for a
+            # number that exists: the enumeration rule applies here too, and a
+            # staff caller holding `offer:manage` is told plainly either way.
+            raise HTTPException(status_code=404, detail="no such subscriber")
+
+        try:
+            offer = clarity.offers.record(
+                subscriber_ref=account.ref,
+                msisdn_masked=account.masked,
+                title=body.title,
+                body=body.body,
+                offer_code=body.offer_code,
+                valid_from=body.valid_from,
+                valid_to=body.valid_to,
+                recorded_by=principal.ref,
+            )
+        except OfferRefused as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        clarity.audit.append(
+            AuditEventType.OFFER_RECORDED,
+            actor_ref=principal.ref,
+            actor_kind=ActorKind.STAFF,
+            object_ref=offer.offer_id,
+            payload={"body": offer.body, "subscriber_ref": account.ref},
+            detail={
+                "offer_id": offer.offer_id,
+                "title": offer.title,
+                "offer_code": offer.offer_code,
+                "msisdn_masked": offer.msisdn_masked,
+                "source": offer.source,
+            },
+        )
+        return OfferView(
+            offer_id=offer.offer_id,
+            msisdn_masked=offer.msisdn_masked,
+            title=offer.title,
+            body=offer.body,
+            offer_code=offer.offer_code,
+            valid_from=offer.valid_from,
+            valid_to=offer.valid_to,
+            recorded_by=offer.recorded_by,
+            recorded_at=offer.recorded_at,
+            source=offer.source,
+            still_valid=offer.is_effective(clarity.case_aggregate._now()),
+        )
 
     @app.get("/v1/me/home", tags=["customer"])
     def my_home(

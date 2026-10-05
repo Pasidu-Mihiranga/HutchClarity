@@ -20,6 +20,7 @@ from sqlalchemy import create_engine
 
 from clarity.ai.buckets import TokenBuckets
 from clarity.ai.cassettes import CassetteLibrary, RecordedProvider
+from clarity.ai.embedding import Embedder, HashingEmbedder
 from clarity.ai.gateway import (
     AIGateway,
     ModelProvider,
@@ -36,6 +37,7 @@ from clarity.app.desk import ServiceCaseFixer, ServiceDeskCases
 from clarity.app.flow_tools import FlowToolAdapter
 from clarity.app.knowledge_seed import seed_help_articles
 from clarity.app.mcp_view import ResolutionServiceMCPView
+from clarity.app.offer_seed import seed_offers
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
 from clarity.contracts.decision import Outcome
@@ -121,6 +123,7 @@ from clarity.modules.knowledge.public import (
     KnowledgeRetriever,
     KnowledgeService,
     RetrievalConfig,
+    VectorSemanticRanker,
 )
 from clarity.modules.notifications.public import (
     CONSUMED_EVENTS as NOTIFICATION_EVENTS,
@@ -129,6 +132,7 @@ from clarity.modules.notifications.public import (
     MemoryNotificationDispatcher,
     NotificationService,
 )
+from clarity.modules.offers.public import OfferService
 from clarity.modules.proactive.public import CONSUMED_EVENTS as PROACTIVE_EVENTS
 from clarity.modules.proactive.public import ProactiveService
 from clarity.modules.receipts.public import (
@@ -537,6 +541,27 @@ class _RoleIntakeAssist:
         if answer.is_refusal or answer.provider in LOCAL_PROVIDERS:
             return None
         return answer.text.strip()
+
+
+def _embedder(remote: Embedder | None = None) -> Embedder:
+    """The `embed` role's driver (F4).
+
+    Unlike `_guard_assist` and `_planner` this never returns ``None``. Those
+    two ask whether a *model* can do a job a template cannot, and a template
+    genuinely cannot choose a tool. Embedding is different: the local driver is
+    a real implementation of the port rather than a stand-in, so the chain
+    always terminates in something that produces a vector (ADR-0009).
+
+    **Why this takes an embedder rather than finding one on the router.**
+    `RoleRouter` resolves a role to *text*, which is why the embed role had no
+    implementation before F4, and widening it to return vectors would make
+    every provider implement a method only one role uses. So a remote
+    embedding driver is injected here instead, and none exists yet: plan 19
+    section 2.1 names BGE-M3 and nothing in the repository speaks to it. Until
+    one does, this is the local space, whose limits are measured in the F4
+    devlog.
+    """
+    return remote or HashingEmbedder()
 
 
 def _planner(router: RoleRouter, catalogue: ModelCatalogue) -> Planner | None:
@@ -1106,6 +1131,24 @@ class Clarity:
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
 
+        # Offer verification (OFFER01). What HUTCH sent to a number, and the
+        # comparison a pasted "you have won 10GB" SMS is checked against.
+        #
+        # Wired beside knowledge because it is the same shape of thing: a store
+        # of what HUTCH actually said, which a customer's question is answered
+        # from rather than guessed at. The thresholds and the warning-sign
+        # lexicons come from the policy store (I10), and the clock is the
+        # domain one so a validity window replays exactly (I11).
+        self.offers = OfferService(
+            self.policies,
+            open_unit=self.open_unit,
+            now=self.case_aggregate._now,
+        )
+        # The simulated campaigns, so the journey has something true to be
+        # measured against. Labelled `hutch-sim` on the way in (I16); nothing
+        # about a real HUTCH offer is asserted. See app/offer_seed.py.
+        seed_offers(self.offers, now=self.case_aggregate._now)
+
         # Governed knowledge content (K01, #31). The registry is wired here and
         # starts empty: the corpus is HUTCH content (catalogue, T&C, Gazette
         # text, help articles) and inventing any of it would be inventing HUTCH
@@ -1114,20 +1157,40 @@ class Clarity:
             open_unit=self.open_unit,
             clock=self.case_aggregate._now,
         )
-        # Retrieval over whatever has been published (K02, #32). The lexical
-        # index only: there is no embedding model in the system, so no semantic
-        # ranker is wired and the hybrid weights renormalise onto BM25. ADR-0009
-        # makes that a supported state rather than a degradation.
+        # Retrieval over whatever has been published (K02, #32), now hybrid
+        # (F4). The `embed` role has an implementation, so a semantic ranker is
+        # wired beside the lexical index and the configured hybrid weights are
+        # live. With no embedder the weights still renormalise onto BM25, which
+        # ADR-0009 keeps a supported state rather than a degradation.
+        #
+        # **What the local embedder does and does not buy, measured.** It is an
+        # IDF-weighted hashed character-n-gram space, which closes the
+        # morphological gap BM25 leaves (`renewed` against `renewal`) and does
+        # not close a synonym gap (`turned on` against `activated`). On the
+        # retrieval golden set its relevant scores fall inside its own noise
+        # band, so `hybrid.min_semantic` keeps it from grounding an answer on
+        # one and it changes nothing there. It is wired anyway because the port
+        # is the point: a learned multilingual model (plan 19 section 2.1 names
+        # BGE-M3) implements the same `Embedder` and needs no change here, and
+        # subword matching is worth more on real Sinhala and Tamil content than
+        # on 35 English clauses. See the F4 devlog.
         self.retrieval_config = RetrievalConfig.from_file(
             default_retrieval_file(self.settings.retrieval_file)
         )
-        self.retriever = KnowledgeRetriever(self.knowledge, self.retrieval_config)
+        self.semantic_ranker = VectorSemanticRanker(_embedder())
+        self.retriever = KnowledgeRetriever(
+            self.knowledge, self.retrieval_config, semantic=self.semantic_ranker
+        )
         # The corpus (K03). The simulated help articles already served by
         # /v1/knowledge/search, published here so that route can be served by
         # the module without regressing to answering nothing. Nothing is
         # invented: see app/knowledge_seed.py.
         seed_help_articles(self.knowledge)
-        self.retriever.index(self.knowledge.chunks_as_of(audience=Audience.STAFF))
+        published = self.knowledge.chunks_as_of(audience=Audience.STAFF)
+        # IDF needs the corpus, and the semantic half has to see the same one
+        # the lexical index does or the two halves rank different worlds.
+        self.semantic_ranker.fit(published)
+        self.retriever.index(published)
         # Grounded answers (K03). No composer: with no model configured the
         # template path quotes the source verbatim and cites it, which is the
         # floor ADR-0009 requires and is never worse than correct.
@@ -1334,7 +1397,11 @@ class Clarity:
         payload = event.payload()
         if not isinstance(payload, KnowledgePublishedV1):
             return
-        self.retriever.index(self.knowledge.chunks_as_of(audience=Audience.STAFF))
+        republished = self.knowledge.chunks_as_of(audience=Audience.STAFF)
+        # Refit as well as reindex: a newly published clause changes the
+        # document frequencies the weighting is built from.
+        self.semantic_ranker.fit(republished)
+        self.retriever.index(republished)
         if payload.corpus_version:
             self.answers.on_knowledge_published(payload.corpus_version)
 

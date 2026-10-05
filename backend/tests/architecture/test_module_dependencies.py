@@ -49,6 +49,11 @@ ALLOWED: dict[str, set[str]] = {
     "insights": set(),
     "knowledge": set(),
     "notifications": set(),
+    # Holds what HUTCH sent to a number and compares a pasted message against
+    # it (OFFER01). Calls no module: the comparison needs the records and the
+    # policy store and nothing else, and keeping it a leaf is what lets the
+    # fraud check be reasoned about on its own.
+    "offers": set(),
     "proactive": set(),
     "reconciliation": set(),
 }

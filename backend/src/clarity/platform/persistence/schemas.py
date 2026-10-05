@@ -27,6 +27,7 @@ OWNERS: dict[str, str] = {
     "foresight": "foresight",
     "deskops": "deskops",
     "insights": "insights",
+    "offers": "offers",
     "platform": "platform",
 }
 
@@ -53,6 +54,12 @@ APPEND_ONLY: frozenset[str] = frozenset(
         # by expiry on read; an expired line is deleted, which is a removal of
         # the whole row and not a rewrite of one.
         "conversation.transcripts",
+        # What HUTCH sent to a number (OFFER01). A customer's fraud check is
+        # decided against these records, so a record that can be edited after
+        # the check proves nothing: somebody could add the offer the customer
+        # asked about and the answer would change retrospectively. A correction
+        # is a new record.
+        "offers.records",
         # What a rehearsal said, and what the change actually did (C2, F05).
         # A scenario version, an engine output and a recorded launch outcome are
         # all claims about the past that a later reader relies on. The launches

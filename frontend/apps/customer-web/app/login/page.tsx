@@ -60,32 +60,34 @@ export default function LoginPage() {
     setSimulatedDelivery(false);
   }
 
-  async function onRequest(e: FormEvent) {
-    e.preventDefault();
+  async function requestCode() {
     setBusy(true);
     setStatus(null);
     setFailures(0);
     setCode("");
+    setDemoCode(null);
     try {
       const result = await client.requestOtp(msisdn);
       setChallengeId(result.challenge_id);
       setSimulatedDelivery(result.simulated === true);
       setStatus({
-        text: result.detail ?? "OTP sent to your number.",
+        text: result.detail ?? "A sign-in code was requested.",
         tone: "ok",
       });
       setStep("verify");
-      // Read the simulated SMS back and prefill it. Synthetic profiles only;
-      // the route 404s in prod, so a failure here is not an error worth
-      // showing, it just means there is no inbox to read.
-      try {
-        const message = await client.demoInbox(msisdn);
-        if (message.code) {
-          setDemoCode(message.code);
-          setCode(message.code);
+
+      // The inbox route exists only for synthetic delivery. Calling it after
+      // a real SMS request creates a guaranteed production 404.
+      if (result.simulated === true) {
+        try {
+          const message = await client.demoInbox(msisdn);
+          if (message.code) {
+            setDemoCode(message.code);
+            setCode(message.code);
+          }
+        } catch {
+          setDemoCode(null);
         }
-      } catch {
-        setDemoCode(null);
       }
     } catch (err) {
       setSimulatedDelivery(false);
@@ -97,6 +99,11 @@ export default function LoginPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onRequest(e: FormEvent) {
+    e.preventDefault();
+    await requestCode();
   }
 
   async function onVerify(e: FormEvent) {
@@ -240,7 +247,19 @@ export default function LoginPage() {
               >
                 Request a new code
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={busy}
+                disabled={busy}
+                onClick={() => void requestCode()}
+                className="w-full"
+              >
+                Resend code
+              </Button>
+            )}
           </form>
         )}
 
@@ -261,8 +280,8 @@ export default function LoginPage() {
         </button>
         {helpOpen ? (
           <p id="login-help" className="mt-2 text-center text-sm leading-6 text-fg-muted">
-            Enter your Hutch number and the 6-digit code we send. In this prototype
-            the code is shown in the simulated inbox on this page. No real SMS is sent.
+            Enter your Hutch number and the 6-digit code we send. If it does not arrive,
+            check your mobile signal and use Resend code.
           </p>
         ) : null}
 

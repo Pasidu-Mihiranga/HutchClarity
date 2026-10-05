@@ -68,6 +68,13 @@ DERIVED_INDEXES = frozenset(
         # candidate it has not seen, so a cold index scores the same.
         "_frequencies",
         "_lengths",
+        # Embedding vectors per chunk, for the semantic half of retrieval
+        # (F4). Derived from `knowledge.chunks` through a deterministic
+        # embedder, and `VectorSemanticRanker.scores` embeds any candidate it
+        # has not seen, so a cold index scores the same as a warm one. A refit
+        # clears it, because vectors weighted against a different corpus are
+        # not comparable with ones weighted against this one.
+        "_vectors",
     }
 )
 
