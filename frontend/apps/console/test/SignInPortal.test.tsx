@@ -29,7 +29,8 @@ describe("SignInPortal", () => {
     render(<SignInPortal />);
 
     expect(screen.getByRole("list", { name: "Staff roles" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button")).toHaveLength(10);
+    expect(screen.getAllByRole("button")).toHaveLength(11);
+    expect(screen.getByRole("button", { name: /Product/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Security admin/i })).toBeInTheDocument();
   });
 

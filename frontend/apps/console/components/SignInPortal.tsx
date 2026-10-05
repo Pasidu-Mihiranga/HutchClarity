@@ -20,6 +20,7 @@ const SYNTHETIC_ROLES: ReadonlyArray<{
   { username: "finance", role: "Finance", summary: "Second approver for money, reconciliation" },
   { username: "vasops", role: "VAS operations", summary: "Propose fixes, suspend a merchant" },
   { username: "cx", role: "CX engineer", summary: "Draft rules and config, Foresight outcomes" },
+  { username: "product", role: "Product", summary: "Rehearse Foresight scenarios and draft product changes" },
   { username: "compliance", role: "Compliance", summary: "Publish rules, audit export, regulator pack" },
   { username: "auditor", role: "Auditor", summary: "Read-only cases, receipts and audit trail" },
   { username: "platform", role: "Platform admin", summary: "Flags, kill switches, audit restore" },
