@@ -19,6 +19,7 @@ const BACK_ROUTES: Array<[string, { href: string; label: string; title: string }
   ["/receipt", { href: "/cases", label: "Cases", title: "Trust Receipt" }],
   ["/packages", { href: "/", label: "Home", title: "Packages" }],
   ["/usage", { href: "/", label: "Home", title: "Usage" }],
+  ["/check-message", { href: "/", label: "Home", title: "Check a message" }],
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

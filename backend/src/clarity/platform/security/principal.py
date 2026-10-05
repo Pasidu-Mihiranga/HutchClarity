@@ -85,6 +85,23 @@ class Permission(StrEnum):
     CONFIG_DRAFT = "config:draft"
     CONFIG_APPROVE = "config:approve"
     MERCHANT_SUSPEND = "merchant:suspend"
+
+    OFFER_VERIFY = "offer:verify"
+    """A customer checking a message against their own offers (OFFER01).
+
+    Separate from `self:read` because it is a different question with a
+    different blast radius: `self:read` shows the account, this compares text
+    against the campaign record. A rate limit or a kill switch wants to reach
+    one without the other.
+    """
+    OFFER_MANAGE = "offer:manage"
+    """Record what HUTCH sent to a number.
+
+    Security admin's, and nobody else's. Whoever holds this decides what the
+    fraud check will vouch for: adding an offer makes a message read as
+    genuine, so it is the same shape of authority as flipping a kill switch and
+    is deliberately not given to an agent, a supervisor or CX.
+    """
     REGULATOR_PACK_EXPORT = "regulator_pack:export"
     AUDIT_READ = "audit:read"
     AUDIT_EXPORT = "audit:export"
@@ -187,6 +204,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.SELF_READ,
             Permission.SELF_SETTINGS,
             Permission.SELF_TRANSACT,
+            Permission.OFFER_VERIFY,
         }
     ),
     Role.AGENT: frozenset(
@@ -307,6 +325,11 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ADMIN_MANAGE,
             Permission.AUDIT_READ,
             Permission.AUDIT_ASSIGN,
+            # Recording what HUTCH sent to a number (OFFER01). Security's
+            # because it is the authority the fraud check rests on, and
+            # because they already hold no money permission, so the person who
+            # decides what reads as genuine cannot also move a balance.
+            Permission.OFFER_MANAGE,
         }
     ),
 }

@@ -36,6 +36,7 @@ from clarity.app.desk import ServiceCaseFixer, ServiceDeskCases
 from clarity.app.flow_tools import FlowToolAdapter
 from clarity.app.knowledge_seed import seed_help_articles
 from clarity.app.mcp_view import ResolutionServiceMCPView
+from clarity.app.offer_seed import seed_offers
 from clarity.app.settings import Settings, SettingsInvalid
 from clarity.contracts.case import CaseTrigger
 from clarity.contracts.decision import Outcome
@@ -129,6 +130,7 @@ from clarity.modules.notifications.public import (
     MemoryNotificationDispatcher,
     NotificationService,
 )
+from clarity.modules.offers.public import OfferService
 from clarity.modules.proactive.public import CONSUMED_EVENTS as PROACTIVE_EVENTS
 from clarity.modules.proactive.public import ProactiveService
 from clarity.modules.receipts.public import (
@@ -1105,6 +1107,24 @@ class Clarity:
         # MCP gets the narrow view, never the case service itself (ADR-0004).
         # The MCP server itself is an interface, built by the interface layer.
         self.mcp_view = ResolutionServiceMCPView(self.cases, self.receipts, self.world)
+
+        # Offer verification (OFFER01). What HUTCH sent to a number, and the
+        # comparison a pasted "you have won 10GB" SMS is checked against.
+        #
+        # Wired beside knowledge because it is the same shape of thing: a store
+        # of what HUTCH actually said, which a customer's question is answered
+        # from rather than guessed at. The thresholds and the warning-sign
+        # lexicons come from the policy store (I10), and the clock is the
+        # domain one so a validity window replays exactly (I11).
+        self.offers = OfferService(
+            self.policies,
+            open_unit=self.open_unit,
+            now=self.case_aggregate._now,
+        )
+        # The simulated campaigns, so the journey has something true to be
+        # measured against. Labelled `hutch-sim` on the way in (I16); nothing
+        # about a real HUTCH offer is asserted. See app/offer_seed.py.
+        seed_offers(self.offers, now=self.case_aggregate._now)
 
         # Governed knowledge content (K01, #31). The registry is wired here and
         # starts empty: the corpus is HUTCH content (catalogue, T&C, Gazette

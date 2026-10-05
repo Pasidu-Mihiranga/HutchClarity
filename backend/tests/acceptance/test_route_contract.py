@@ -169,6 +169,12 @@ SIGNED_IN = {
     ("POST", "/v1/me/safeguards"),
     ("POST", "/v1/me/family"),
     ("POST", "/v1/me/preferences"),
+    # Offer verification (OFFER01). The customer check is subject-bound and
+    # needs `offer:verify`; recording what HUTCH sent needs `offer:manage`,
+    # which only security admin holds.
+    ("POST", "/v1/offers/verify"),
+    ("GET", "/v1/admin/offers"),
+    ("POST", "/v1/admin/offers"),
 }
 
 SYNTHETIC_ONLY = {

@@ -33,6 +33,9 @@ const links = [
     label: "Audit",
     anyOf: ["audit:read"],
   },
+  // What HUTCH sent to a number, which is what a customer's fraud check is
+  // measured against (OFFER01). Security admin's alone, like the page.
+  { href: "/offers", label: "Offers", anyOf: ["offer:manage"] },
   {
     href: "/admin",
     label: "Admin",

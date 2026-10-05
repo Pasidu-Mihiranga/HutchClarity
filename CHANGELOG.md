@@ -4,6 +4,33 @@ Notable changes to Hutch Clarity. Format: [Keep a Changelog](https://keepachange
 
 ## [Unreleased]
 
+### Added
+
+- **`POST /v1/offers/verify`** (OFFER01). A customer pastes a message claiming
+  to be a HUTCH offer and is told whether an offer on record for *their* number
+  matches it. The verdict is `ON_RECORD`, `NOT_ON_RECORD` or `NEEDS_A_PERSON`
+  and is deliberately **not** a scam flag: the records say what HUTCH sent, and
+  the inference past that is the customer's with the evidence in front of them.
+  Needs the new `offer:verify` permission, which `Role.CUSTOMER` holds, and is
+  bound to the caller's own subscriber.
+  - Warning signs found in the text (a non-HUTCH link, a request for an OTP, a
+    fee, urgency) are returned as stable codes beside the verdict and never
+    move it: a genuine HUTCH SMS can contain a link and a scam can contain
+    none.
+- **`GET` and `POST /v1/admin/offers`** (OFFER01). Record what HUTCH sent to a
+  number, and list what is on record. Needs the new `offer:manage` permission,
+  which only `Role.SECURITY_ADMIN` holds: whoever holds it decides what the
+  fraud check will vouch for, which is the same shape of authority as a kill
+  switch. Records are append-only, so a correction is a new row.
+- **SDK**: `verifyOfferMessage`, `listOffers`, `recordOffer`, and the
+  `OfferCheckView` / `OfferView` types.
+- **New module `clarity.modules.offers`** with the `offers.records` collection
+  (append-only), and `config/policy/offers.yaml` for the two match bars, the
+  HUTCH host list and the four signal lexicons.
+- **Audit**: `offer.recorded` and `offer.checked`. The latter records the
+  verdict and the signals and never the message text, which reaches the hashed
+  payload only.
+
 ### Removed
 
 - **`GET /v1/demo/ops` and `GET /v1/demo/autopsy`** (D4), breaking for any
