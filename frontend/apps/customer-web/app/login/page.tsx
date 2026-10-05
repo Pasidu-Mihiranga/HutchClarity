@@ -143,23 +143,23 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="sign-in-light box-border min-h-dvh w-full bg-white px-[max(1rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))]">
-      <div className="relative mx-auto flex w-full max-w-[440px] flex-col pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+    <main className="login-screen sign-in-light box-border w-full bg-white px-[max(1rem,env(safe-area-inset-left))] pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[440px] flex-col overflow-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <img src="/login-hero.png" alt="" className="login-hero mx-auto mb-1" />
 
-        <h1 className="mb-1 text-center text-[clamp(1.35rem,5.2vw,1.7rem)] font-extrabold tracking-tight text-fg">
+        <h1 className="login-keep mb-1 text-center text-[clamp(1.35rem,5.2vw,1.7rem)] font-extrabold tracking-tight text-fg">
           Welcome to Hutch Clarity
         </h1>
-        <p className="mb-4 text-center text-sm leading-6 text-fg-muted sm:mb-6">
+        <p className="login-keep login-lead mb-4 text-center text-sm leading-6 text-fg-muted sm:mb-6">
           Manage your bills, packages and services anytime, anywhere.
         </p>
 
-        <p className="mb-3 text-center text-xs text-fg-muted">
+        <p className="login-keep mb-3 text-center text-xs text-fg-muted">
           {step === "request" ? "Step 1 of 2 - Enter your number" : "Step 2 of 2 - Enter your OTP"}
         </p>
 
         {step === "request" ? (
-          <form onSubmit={onRequest} className="grid gap-3.5">
+          <form onSubmit={onRequest} className="login-keep grid gap-3.5">
             <Field label="Hutch number">
               {(control) => (
                 <div className="relative">
@@ -184,7 +184,7 @@ export default function LoginPage() {
             </Button>
           </form>
         ) : (
-          <form onSubmit={onVerify} className="grid gap-3.5">
+          <form onSubmit={onVerify} className="login-keep grid gap-3.5">
             <Field label="6-digit code">
               {(control) => (
                 <div
@@ -245,14 +245,14 @@ export default function LoginPage() {
         )}
 
         {status && (
-          <Alert tone={status.tone === "ok" ? "success" : "danger"} className="mt-3.5">
+          <Alert tone={status.tone === "ok" ? "success" : "danger"} className="login-keep mt-3.5">
             {status.text}
           </Alert>
         )}
 
         <button
           type="button"
-          className="mt-5 text-sm font-semibold text-primary"
+          className="login-keep login-help mt-5 text-sm font-semibold text-primary"
           aria-expanded={helpOpen}
           aria-controls="login-help"
           onClick={() => setHelpOpen((open) => !open)}
@@ -260,13 +260,13 @@ export default function LoginPage() {
           Need help?
         </button>
         {helpOpen ? (
-          <p id="login-help" className="mt-2 text-center text-sm leading-6 text-fg-muted">
+          <p id="login-help" className="login-keep mt-2 text-center text-sm leading-6 text-fg-muted">
             Enter your Hutch number and the 6-digit code we send. In this prototype
             the code is shown in the simulated inbox on this page. No real SMS is sent.
           </p>
         ) : null}
 
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-primary/15 bg-surface px-4 py-3">
+        <div className="login-keep login-note mt-4 flex items-start gap-3 rounded-2xl border border-primary/15 bg-surface px-4 py-3">
           <ShieldIcon />
           <p className="text-sm leading-5 text-fg-muted">
             Secure support for bills, packages and service help.
@@ -278,7 +278,7 @@ export default function LoginPage() {
         {simulatedDelivery && (
           <div
             data-testid="simulated-sms-inbox"
-            className="mt-4 overflow-hidden rounded-[10px] border border-dashed border-warning bg-warning-soft"
+            className="login-keep login-inbox mt-4 overflow-hidden rounded-[10px] border border-dashed border-warning bg-warning-soft"
           >
             <div className="bg-warning px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary-on">
               Simulated SMS inbox
@@ -303,13 +303,13 @@ export default function LoginPage() {
   );
 }
 
-/** City line under the form, in the page flow so a short phone can scroll to it. */
+/** City line under the form. It shrinks, and hides on a short phone, so the page never scrolls. */
 function CityLine() {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 480 90"
-      className="mt-4 h-16 w-full shrink-0 text-brand opacity-35 sm:h-20"
+      className="login-city text-brand opacity-35"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.2"
