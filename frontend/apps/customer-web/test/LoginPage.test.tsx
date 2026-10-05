@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const requestOtp = vi.fn();
 const demoInbox = vi.fn();
+const signInMethods = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/LanguageProvider", () => ({ useLanguage: () => ({ lang: "en" }) }));
@@ -10,6 +11,7 @@ vi.mock("@clarity/sdk", () => ({
   ClarityClient: class {
     requestOtp = requestOtp;
     demoInbox = demoInbox;
+    signInMethods = signInMethods;
   },
 }));
 
@@ -18,13 +20,22 @@ const { default: LoginPage } = await import("@/app/login/page");
 beforeEach(() => {
   requestOtp.mockReset();
   demoInbox.mockReset();
+  signInMethods.mockReset();
+  signInMethods.mockResolvedValue({ customer_fallback: false });
 });
 
 describe("customer OTP request", () => {
-  test("fallback access fills the synthetic number without signing in", () => {
+  test("fallback access is hidden unless the API accepts it", async () => {
+    render(<LoginPage />);
+    await waitFor(() => expect(signInMethods).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Use fallback number" })).toBeNull();
+  });
+
+  test("fallback access fills the synthetic number without signing in", async () => {
+    signInMethods.mockResolvedValue({ customer_fallback: true });
     render(<LoginPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Use fallback number" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use fallback number" }));
 
     expect(screen.getByLabelText("Hutch number")).toHaveValue("0781234567");
     expect(screen.getByText("246810")).toBeInTheDocument();

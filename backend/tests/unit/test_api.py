@@ -595,3 +595,26 @@ def test_an_anonymous_caller_still_gets_401_not_503() -> None:
     clarity = Clarity(world=build_demo_world())
 
     assert TestClient(create_app(clarity)).get("/v1/desk/queue").status_code == 401
+
+
+def test_a_conversation_handoff_puts_the_case_on_the_desk(client: TestClient):
+    """The assistant saying "a person will take this" must be true on the desk.
+
+    Seen live: the chat told the customer the case went to a team, and the
+    desk queue never showed it, because nothing consumed the turn's handoff.
+    """
+    case_id = open_case(client, DILANI)
+    evaluate(client, case_id)
+    assert all(item["case_id"] != case_id for item in client.get("/v1/desk/queue").json())
+
+    turn = client.post(
+        "/v1/conversation/turn",
+        json={"case_id": case_id, "text": "I want to talk to a human agent please"},
+    )
+    assert turn.status_code == 200, turn.text
+    assert turn.json()["turn"]["handoff"]["handoff"] is True
+
+    queued = [item for item in client.get("/v1/desk/queue").json() if item["case_id"] == case_id]
+    assert len(queued) == 1
+    assert "Handed off by the assistant" in queued[0]["reason"]
+    assert "cx-general" in queued[0]["reason"]

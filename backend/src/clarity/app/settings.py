@@ -175,6 +175,15 @@ class Settings(BaseSettings):
     httpsms_sender: str | None = Field(default=None, alias="HTTPSMS_SENDER")
     httpsms_base_url: str = Field(default="https://api.httpsms.com/v1", alias="HTTPSMS_BASE_URL")
     httpsms_timeout_seconds: float = Field(default=10.0, alias="HTTPSMS_TIMEOUT", gt=0)
+    synthetic_fallback_otp: bool = Field(
+        default=False,
+        alias="CLARITY_SYNTHETIC_FALLBACK_OTP",
+        description=(
+            "Accept the one synthetic fallback number and code (demo only). Off by "
+            "default: a published code is a login anyone can use, so a public "
+            "deployment turns it on deliberately. Never honoured in prod."
+        ),
+    )
     linked_phones: str | None = Field(
         default=None,
         alias="CLARITY_LINKED_PHONES",

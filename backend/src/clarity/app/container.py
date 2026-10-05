@@ -876,9 +876,15 @@ class Clarity:
                 sms_numbers=frozenset(phone for phone, _ in linked),
                 known=lambda msisdn: world.account_by_msisdn(msisdn) is not None,
             )
+        # Opt-in (CLARITY_SYNTHETIC_FALLBACK_OTP): a code printed on the login
+        # page is a login for anyone who opens it, so no deployment gets one
+        # by default, and prod never does.
+        self.synthetic_fallback_enabled = (
+            self.settings.synthetic_fallback_otp and self.settings.profile != "prod"
+        )
         fallback = (
             (SYNTHETIC_FALLBACK_MSISDN, SYNTHETIC_FALLBACK_CODE)
-            if self.settings.profile != "prod"
+            if self.synthetic_fallback_enabled
             else None
         )
         self.otp = otp or OtpService(
@@ -1114,6 +1120,12 @@ class Clarity:
             EventType.ACTION_COMPLETED,
             group="reconciliation",
             handler=self.reconciliation.on_action_completed,
+        )
+        # A conversation that hands the case to a person puts it on the desk.
+        self.consumers.register(
+            EventType.CONVERSATION_TURN_COMPLETED,
+            group="case-handoff",
+            handler=self.cases.on_conversation_turn_completed,
         )
         for event_type in NOTIFICATION_EVENTS:
             self.consumers.register(

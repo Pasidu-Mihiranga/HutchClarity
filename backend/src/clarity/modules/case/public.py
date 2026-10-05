@@ -19,6 +19,7 @@ from clarity.modules.case.records import (
     CaseNotFound,
     CaseNotReady,
     CaseRecord,
+    HandoffRequest,
 )
 from clarity.modules.case.repository import (
     CASE_SEQUENCE,
@@ -36,5 +37,6 @@ __all__ = [
     "CaseNotReady",
     "CaseRecord",
     "CaseRepository",
+    "HandoffRequest",
     "StoredCaseRepository",
 ]

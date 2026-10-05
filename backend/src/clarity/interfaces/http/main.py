@@ -691,6 +691,16 @@ def _plan_view(plan: Any) -> PlanView:
     )
 
 
+def _queue_reason(record: CaseRecord) -> str | None:
+    """Why a case is on the desk, for the queue row."""
+    if record.handoff is not None:
+        why = (record.handoff.reason or "handoff").replace("_", " ")
+        return f"Handed off by the assistant ({why}) to {record.handoff.queue}"
+    if record.decision and record.decision.rationale:
+        return record.decision.rationale[0]
+    return None
+
+
 def _execution_view(record: CaseRecord, plan_id: str) -> ExecutionView:
     execution = record.execution
     assert execution is not None
@@ -1846,9 +1856,13 @@ def _register_routes(app: FastAPI) -> None:
         waiting = [
             record
             for record in clarity.cases.all_cases()
-            if record.decision is not None
-            and record.decision.outcome in {Outcome.STAFF_APPROVAL, Outcome.HANDOFF}
-            and record.execution is None
+            if (
+                record.decision is not None
+                and record.decision.outcome in {Outcome.STAFF_APPROVAL, Outcome.HANDOFF}
+                and record.execution is None
+            )
+            # The conversation handed it to a person, whatever the rules decided.
+            or (record.handoff is not None and record.case.state is not CaseState.CLOSED)
         ]
         waiting.sort(key=lambda r: r.case.money_at_stake_lkr or 0, reverse=True)
         return [
@@ -1861,7 +1875,7 @@ def _register_routes(app: FastAPI) -> None:
                 money_at_stake_lkr=r.case.money_at_stake_lkr,
                 msisdn_masked=r.case.customer.msisdn_masked,
                 channel=r.case.origin_channel,
-                reason=(r.decision.rationale[0] if r.decision and r.decision.rationale else None),
+                reason=_queue_reason(r),
                 plan_id=next(iter(r.plans), None),
             )
             for r in waiting
@@ -2538,6 +2552,10 @@ def _register_routes(app: FastAPI) -> None:
                 facts=_case_facts(record) | _client_context(facts),
                 on_stage=on_stage,
             )
+            # The turn's event says what it caused (a handoff puts the case on
+            # the desk, insights count it). No relay process runs beside the
+            # API, so deliver now, as the case module does after a change.
+            clarity.deliver_events()
             payload = turn.to_dict()
             route = turn.intake.route
         else:

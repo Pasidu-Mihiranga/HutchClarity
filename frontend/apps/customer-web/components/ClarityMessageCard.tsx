@@ -9,7 +9,7 @@ import type {
   Pack,
   ResultKind,
 } from "@/lib/clarityChat";
-import { PROGRESS_STEPS, INTENT_EMPTY } from "@/lib/clarityChat";
+import { PROGRESS_STEPS, INTENT_EMPTY, receiptIdOf } from "@/lib/clarityChat";
 import type { Lang } from "@/lib/clarityChat";
 import { t } from "@clarity/i18n";
 import { ThinkingOrb } from "@/components/ui/thinking-orb";
@@ -517,8 +517,7 @@ function SuccessCard({ state, lang, app, onViewReceipt, onFollow }: {
 }
 
 function ReceiptCard({ state, lang, onViewReceipt }: { state: ClarityState; lang: string; onViewReceipt: () => void }) {
-  const full = state.receiptDoc ?? {};
-  const id = (full.receipt_id ?? full.id ?? "-") as string;
+  const id = receiptIdOf(state.receiptDoc) ?? "-";
   const verified = state.receiptCheck && ((state.receiptCheck as Record<string, unknown>).valid || (state.receiptCheck as Record<string, unknown>).ok);
   return (
     <div style={card}>

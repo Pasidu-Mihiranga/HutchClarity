@@ -46,6 +46,7 @@ None. Case state is the aggregate's, plan state is the actions module's, receipt
 |---|---|---|
 | `case.created@v1` | **publishes** | On `open_case`, so insights and autopsy can follow a case from its start. |
 | `action.completed@v1` | **consumes** (group `receipts`) | Issues the one receipt for the completed plan, idempotent by plan id (B06). |
+| `conversation.turn.completed@v1` | **consumes** (group `case-handoff`) | When the turn handed off, records a `HandoffRequest` (queue, reason code, turn) on the case so `GET /v1/desk/queue` lists it. Idempotent: the first request is kept. |
 
 ## 6. Invariants
 - The money path is identical whichever channel the customer starts from.
@@ -63,3 +64,4 @@ Section 2.2 asked for orchestration in a thin resolution application service. Do
 | Date | Devlog entry | Summary |
 |---|---|---|
 | 2026-10-02 | `docs/devlog/2026/2026-10-02-M-CASE-resolution-service.md` | Split out of `CaseService` (M-CASE, #34) |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-E3-handoff-to-desk-and-receipt-link.md` | Conversation handoffs reach the desk queue |

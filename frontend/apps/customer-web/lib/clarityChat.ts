@@ -543,6 +543,18 @@ export async function issueExplainReceipt(caseId: string) {
   return apiFetch<{ receipt_id: string }>(`/v1/cases/${caseId}/receipt`, "POST");
 }
 
+/**
+ * The id of a receipt document from `GET /v1/receipts/{id}`. The signed
+ * document carries it inside `payload`; the top level is only the envelope
+ * (payload, hash, signature, verify_url).
+ */
+export function receiptIdOf(doc: Record<string, unknown> | null | undefined): string | null {
+  if (!doc) return null;
+  const payload = doc.payload as Record<string, unknown> | undefined;
+  const id = payload?.receipt_id ?? doc.receipt_id ?? doc.id;
+  return typeof id === "string" && id ? id : null;
+}
+
 export async function fetchReceipt(receiptId: string) {
   return apiFetch<Record<string, unknown>>(`/v1/receipts/${receiptId}`);
 }

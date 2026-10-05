@@ -46,6 +46,7 @@ import {
   type AppState,
 } from "@/lib/clarityChat";
 import type { ResultKind } from "@/lib/clarityChat";
+import { receiptIdOf } from "@/lib/clarityChat";
 
 // ─── inline translations (chat UI labels) ─────────────────────────────────────
 const CHAT_I18N: Record<Lang, Record<string, string>> = {
@@ -409,10 +410,11 @@ export default function ClarityPage() {
 
     // step 2+3 - evaluate + timeline
     setCs((s) => ({ ...s, caseId, progressStep: 2 }));
-    const [decision, timeline] = await Promise.all([
-      evaluateCase(caseId, wantsHuman),
-      fetchTimeline(caseId),
-    ]);
+    // In order, not in parallel: the timeline read collects and saves the
+    // evidence when the case has none yet, and so does evaluate. Run together
+    // they raced on the same case and one answered 409 under PostgreSQL.
+    const decision = await evaluateCase(caseId, wantsHuman);
+    const timeline = await fetchTimeline(caseId);
     setCs((s) => ({ ...s, progressStep: 3 }));
 
     const mode = decision.outcome === "HANDOFF" || wantsHuman ? "human" : "result";
@@ -566,7 +568,7 @@ export default function ClarityPage() {
     onToggleEvidence: () => setShowEvidence((v) => !v),
     onViewCase: () => router.push("/cases"),
     onViewReceipt: () => {
-      const id = cs.receiptDoc?.receipt_id ?? cs.receiptDoc?.id;
+      const id = receiptIdOf(cs.receiptDoc);
       if (id) router.push(`/receipt/${id}`);
     },
     onRetry: () => ask("qBalance", tl(lang, "qBalance")),

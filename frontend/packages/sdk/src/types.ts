@@ -87,6 +87,8 @@ export type SignInMethods = {
   directory: boolean;
   /** The development role picker, which has no credential at all. */
   development_role_picker: boolean;
+  /** The synthetic customer fallback number and code are accepted (opt-in, never prod). */
+  customer_fallback?: boolean;
 };
 
 /** `POST /v1/auth/logout`. */

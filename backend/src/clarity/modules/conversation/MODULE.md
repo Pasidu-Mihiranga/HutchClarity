@@ -139,7 +139,7 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 ## 8. Events
 | Event | Direction | Notes |
 |---|---|---|
-| `conversation.turn.completed@v1` | produced | One finished turn. Carries what the assistant did, never what was said: no message text, no reply. Consumers: insights, audit (plan 21 section 11.3). |
+| `conversation.turn.completed@v1` | produced | One finished turn. Carries what the assistant did, never what was said: no message text, no reply. Optional `handoff_queue` and `handoff_reason` (stable codes) say where a handoff went. Consumers: insights, audit, resolution, which puts a handed-off case on the desk (plan 21 section 11.3). |
 
 ## 9. Tests
 - `backend/tests/unit/test_conversation_chat.py` - intake, routing, suggestions
@@ -163,3 +163,4 @@ Flows are policy content: versioned YAML in `config/flows/`, loaded strictly, wi
 | 2026-10-03 | `docs/devlog/2026/2026-10-03-C04-intake-singlish.md` | Ordered intake rules, Singlish detection and vocabulary, the `extract` seam, and a held-out set |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-A4-A8-transcript-streaming-tools-copy-throttle.md` | A4: `transcript.py`, the record of what was said (ADR-0040) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-W0-A1-receipt-otp-and-reply-honesty.md` | A3: the stateless path gains the cheap refusals, forbidden-content refusal, injection guard and reply verifier; the shared pieces move into `service.py` and client facts are filtered on both routes |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-E3-handoff-to-desk-and-receipt-link.md` | `handoff_queue` and `handoff_reason` on the turn record and event |

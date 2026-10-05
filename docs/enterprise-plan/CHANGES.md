@@ -16,6 +16,12 @@ This plan is a **versioned baseline**. Once the team starts building, it changes
 
 ---
 
+## v1.14 - 2026-10-05
+
+| Area | Change | Chapters |
+|---|---|---|
+| Event catalogue | `conversation.turn.completed` gains a third consumer: resolution puts a case the assistant handed to a person on the desk queue. The payload adds optional `handoff_queue` and `handoff_reason` (stable codes, no text) | 21 §11.3 |
+
 ## v1.13 - 2026-10-04
 
 | Area | Change | Chapters |

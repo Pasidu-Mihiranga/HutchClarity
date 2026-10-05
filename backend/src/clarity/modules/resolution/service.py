@@ -36,6 +36,7 @@ from clarity.contracts.events import (
     ActionCompletedV1,
     CaseCreatedV1,
     CauseDetectedV1,
+    ConversationTurnCompletedV1,
     DecisionGeneratedV1,
 )
 from clarity.contracts.receipt import TrustReceipt
@@ -54,6 +55,7 @@ from clarity.modules.case.public import (
     CaseNotFound,
     CaseNotReady,
     CaseRecord,
+    HandoffRequest,
 )
 from clarity.modules.decision.public import (
     DecisionPolicy,
@@ -553,6 +555,36 @@ class ResolutionService:
                 raise
             receipt = self._issue_receipt(record, plan_id=payload.plan_id)
             record.receipts_by_plan[payload.plan_id] = receipt
+            self._cache_outcome(record)
+
+    def on_conversation_turn_completed(self, event: Event) -> None:
+        """Put a case on the desk when its conversation handed it to a person.
+
+        The consumer for ``conversation.turn.completed`` (ADR-0029: a reaction
+        to a fact, never a call from the conversation module). Only turns that
+        handed off do anything. Idempotent: a redelivery, or a later handoff
+        on a case already waiting, keeps the first request.
+        """
+        payload = event.payload()
+        if not isinstance(payload, ConversationTurnCompletedV1):  # pragma: no cover
+            return
+        if not payload.handoff:
+            return
+        with span("case.on_conversation_handoff", case_id=payload.case_id, event_id=event.id):
+            try:
+                record = self._aggregate.get(payload.case_id)
+            except CaseNotFound:
+                # A conversation without a case (the stateless path) has
+                # nothing for the desk to open.
+                return
+            if record.handoff is not None:
+                return
+            record.handoff = HandoffRequest(
+                queue=payload.handoff_queue or "cx-general",
+                reason=payload.handoff_reason,
+                turn_no=payload.turn_no,
+                requested_at=self._now(),
+            )
             self._cache_outcome(record)
 
     def _join_original(

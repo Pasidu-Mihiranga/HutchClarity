@@ -177,6 +177,8 @@ class TurnRecord:
     model: str | None
     verifier: VerifierResult
     agent: dict[str, Any] = field(default_factory=dict)
+    handoff_queue: str | None = None
+    handoff_reason: str | None = None
 
     def to_detail(self) -> dict[str, Any]:
         """The audit detail. Masked kinds, never masked values."""
@@ -478,6 +480,8 @@ class ConversationOrchestrator:
             confidence=intake.confidence,
             resumed=resumed,
             handoff=bool(handoff["handoff"]),
+            handoff_queue=(handoff.get("queue") or "cx-general") if handoff["handoff"] else None,
+            handoff_reason=handoff.get("reason") if handoff["handoff"] else None,
             refused=False,
             refusal_code=None,
             guard_codes=verdict.codes,
@@ -696,6 +700,8 @@ class ConversationOrchestrator:
                         language=record.language,
                         resumed=record.resumed,
                         handoff=record.handoff,
+                        handoff_queue=record.handoff_queue,
+                        handoff_reason=record.handoff_reason,
                         refused=record.refused,
                         guard_codes=list(record.guard_codes),
                         tools_called=list(record.tools_called),

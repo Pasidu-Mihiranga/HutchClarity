@@ -134,11 +134,10 @@ export default function DeskPage() {
     setCurrentId(caseId);
     setActing(true);
     try {
-      const [sum, dec, tl] = await Promise.all([
-        client.getCase(caseId),
-        client.evaluateCase(caseId),
-        client.caseTimeline(caseId),
-      ]);
+      // Evaluate before reading the timeline: both save the evidence on a
+      // case that has none, and in parallel they raced into a 409.
+      const dec = await client.evaluateCase(caseId);
+      const [sum, tl] = await Promise.all([client.getCase(caseId), client.caseTimeline(caseId)]);
       setSummary(sum);
       setDecision(dec);
       setTimeline(tl);

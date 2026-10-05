@@ -336,7 +336,7 @@ Producers own the schema (`clarity.contracts.events`, versioned `type@vN`). Key 
 | `reconciliation.mismatch` | reconciliation | finance queue, alerts | exists |
 | `complaint.created` | channels / case | autopsy, **foresight (the radar, counts only)** | exists |
 | `cluster.updated` | autopsy | foresight (post-launch comparison; codes and counts only) | exists |
-| `conversation.turn.completed` | conversation | insights, audit | exists |
+| `conversation.turn.completed` | conversation | insights, audit, resolution (handoff to desk) | exists |
 | `forecast.ready` | foresight | console (Foresight page), audit | exists |
 | `spike.detected` | foresight (the radar) | console, alerts | exists |
 | `payment.recorded`, `charge.applied`, `usage.threshold_reached`, `pack.expiring`, `vas.renewed` | integration (HUTCH feeds) | proactive, timeline cache | exists |

@@ -42,6 +42,21 @@ export default function LoginPage() {
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [failures, setFailures] = useState(0);
   const locked = failures >= MAX_OTP_ATTEMPTS;
+  // Shown only when the API will accept it (CLARITY_SYNTHETIC_FALLBACK_OTP):
+  // advertising a code the server refuses would be one more dead end.
+  const [fallbackOffered, setFallbackOffered] = useState(false);
+  useEffect(() => {
+    let live = true;
+    client
+      .signInMethods()
+      .then((methods) => {
+        if (live) setFallbackOffered(methods.customer_fallback === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // After a refusal the field is a new node (the shake restarts by remounting
   // it) and it is empty. Put the cursor back in it, or the next attempt starts
@@ -169,6 +184,7 @@ export default function LoginPage() {
 
         {step === "request" ? (
           <form onSubmit={onRequest} className="grid gap-3.5">
+            {fallbackOffered ? (
             <div className="rounded-2xl border border-primary/20 bg-primary-soft px-4 py-3 text-sm text-fg">
               <p className="font-semibold">Synthetic fallback access</p>
               <p className="mt-1 text-xs text-fg-muted">
@@ -183,6 +199,7 @@ export default function LoginPage() {
                 Use fallback number
               </button>
             </div>
+            ) : null}
             <Field label="Hutch number">
               {(control) => (
                 <div className="relative">

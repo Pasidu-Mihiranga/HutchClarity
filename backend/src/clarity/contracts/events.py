@@ -468,6 +468,11 @@ class ConversationTurnCompletedV1(EventPayload):
     """Whether this turn continued an existing conversation, possibly on
     another channel. The cross-channel handover is visible here."""
     handoff: bool = False
+    handoff_queue: str | None = None
+    """The team a handoff was routed to (a queue name such as ``cx-general``).
+    Optional so events written before it existed still parse."""
+    handoff_reason: str | None = None
+    """Stable code for why, such as ``customer_requested_agent``."""
     refused: bool = False
     guard_codes: list[str] = Field(default_factory=list)
     tools_called: list[str] = Field(default_factory=list)

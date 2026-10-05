@@ -119,9 +119,31 @@ def test_no_fallback_exists_unless_the_composition_root_installs_one():
         service.verify(challenge, "246810")
 
 
-def test_the_synthetic_profile_exposes_the_fallback_through_the_real_login_route(
-    client: TestClient,
-):
+def test_the_fallback_is_off_unless_the_deployment_turns_it_on(client: TestClient):
+    """Changed 2026-10-05: opt-in through CLARITY_SYNTHETIC_FALLBACK_OTP.
+
+    The code is printed on the login page, so on by default meant a public
+    deployment shipped a login for anyone; it is now a deliberate setting.
+    """
+    started = client.post("/v1/auth/otp/request", json={"msisdn": DILANI})
+    refused = client.post(
+        "/v1/auth/otp/verify",
+        json={"challenge_id": started.json()["challenge_id"], "code": "246810"},
+    )
+    assert refused.status_code == 401
+    assert client.get("/v1/auth/sign-in-methods").json()["customer_fallback"] is False
+
+
+def test_the_synthetic_profile_exposes_the_fallback_through_the_real_login_route():
+    client = TestClient(
+        create_app(
+            Clarity(
+                world=build_demo_world(),
+                settings=Settings(_env_file=None, CLARITY_SYNTHETIC_FALLBACK_OTP=True),
+            )
+        )
+    )
+    assert client.get("/v1/auth/sign-in-methods").json()["customer_fallback"] is True
     started = client.post("/v1/auth/otp/request", json={"msisdn": DILANI})
     assert started.status_code == 200, started.text
 

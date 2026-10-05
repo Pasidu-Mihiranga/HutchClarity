@@ -454,6 +454,15 @@ export class ClarityClient {
     });
   }
 
+  /**
+   * The QR image for a receipt (`GET /v1/receipts/{id}/qr.svg`, public). It
+   * encodes only the public verify URL, so scanning it re-checks the signed
+   * receipt on the server rather than trusting anything printed beside it.
+   */
+  receiptQrUrl(receiptId: string): string {
+    return `${this.baseUrl}/v1/receipts/${encodeURIComponent(receiptId)}/qr.svg`;
+  }
+
   /* ------------------------------------------------------ the customer ("me") */
 
   /** The one customer read: every screen renders this payload. */

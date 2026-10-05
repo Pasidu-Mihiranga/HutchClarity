@@ -483,6 +483,9 @@ def test_the_simulator_is_not_reachable_in_prod(core):
         conversation = core.conversation
         case_aggregate = core.case_aggregate
         open_unit = core.open_unit
+        # The gateway delivers a turn's events after handling it (a handoff
+        # reaches the desk at once), so the stub carries that seam too.
+        deliver_events = core.deliver_events
 
     api = TestClient(
         create_channel_gateway_app(InProd(), verifier=WebhookVerifier(SECRET, clock=lambda: NOW)),

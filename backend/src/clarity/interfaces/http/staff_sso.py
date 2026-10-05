@@ -154,6 +154,9 @@ def register(app: FastAPI) -> None:
             "development_role_picker": (
                 clarity.staff_directory is None and clarity.profile is not Profile.PROD
             ),
+            # The customer sign-in page shows the synthetic fallback number
+            # only when the API will accept it.
+            "customer_fallback": bool(getattr(clarity, "synthetic_fallback_enabled", False)),
         }
 
     @app.get("/v1/auth/staff/oidc/start", tags=["auth"])

@@ -232,6 +232,8 @@ def _handle(clarity: Any, windows: ServiceWindows, message: InboundMessage) -> d
         language_hint=message.language.value if message.language else None,
         facts={"case_id": record.case_id},
     )
+    # Deliver what the turn caused (a handoff reaches the desk) now.
+    clarity.deliver_events()
 
     state = windows.state(message.channel.value, message.thread, now=now)
     language = (message.language or Language.EN).value
