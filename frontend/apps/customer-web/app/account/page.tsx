@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Dialog, ErrorState, Field, Input, Skeleton } from "@clarity/ui";
+import { Alert, Dialog, ErrorState, Field, Input, Skeleton, useTheme, type ThemeChoice } from "@clarity/ui";
 import { supportedLangs, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useMe, meClient } from "@/lib/useMe";
@@ -68,10 +68,12 @@ const SAFEGUARDS: Array<{ kind: "data_on_expiry" | "spend_cap" | "vas_confirm" |
 
 export default function AccountPage() {
   const { lang, setLang } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { app, loading, error, refresh, act, busy } = useMe();
   const [editing, setEditing] = useState<null | "notify" | "safeguards" | "family" | "network">(null);
   const [familyMsisdn, setFamilyMsisdn] = useState("");
+  const [familyRole, setFamilyRole] = useState<"elder" | "child">("elder");
   const [safeguardValues, setSafeguardValues] = useState<Record<string, string>>({});
   const [signingOut, setSigningOut] = useState(false);
 
@@ -101,18 +103,9 @@ export default function AccountPage() {
     if (ok) setEditing(null);
   }
 
-  async function saveLargeText(value: boolean) {
-    await act((api) =>
-      api.savePreferences({ language: lang, notify: app?.notify ?? "important", large_text: value }),
-    );
-  }
-
   async function addFamily() {
-    const ok = await act((api) => api.addFamilyMember(familyMsisdn.trim()));
-    if (ok) {
-      setFamilyMsisdn("");
-      setEditing(null);
-    }
+    const ok = await act((api) => api.addFamilyMember(familyMsisdn.trim(), familyRole));
+    if (ok) setFamilyMsisdn("");
   }
 
   if (loading) {
@@ -190,7 +183,7 @@ export default function AccountPage() {
           Account
         </h1>
         <p style={{ margin: 0, fontWeight: 700, fontSize: 18, letterSpacing: "-.02em" }}>
-          {app.masked}
+          {localNumber(app.msisdn)}
         </p>
         <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>{app.name}</p>
       </section>
@@ -198,7 +191,7 @@ export default function AccountPage() {
       <section aria-labelledby="account-language" className="h-card" style={{ marginBottom: 14 }}>
         <h2
           id="account-language"
-          style={{ fontSize: 13, fontWeight: 650, color: "var(--muted)", margin: "0 0 10px" }}
+          style={{ fontSize: "var(--text-small)", fontWeight: 650, color: "var(--muted)", margin: "0 0 10px" }}
         >
           Language
         </h2>
@@ -213,7 +206,7 @@ export default function AccountPage() {
               style={{
                 borderRadius: 999,
                 padding: "8px 16px",
-                fontSize: 14,
+                fontSize: "var(--text-ui)",
                 fontWeight: 650,
                 fontFamily: "inherit",
                 cursor: "pointer",
@@ -226,24 +219,48 @@ export default function AccountPage() {
             </button>
           ))}
         </div>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginTop: 14,
-            fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={app.large_text}
-            disabled={busy}
-            onChange={(event) => void saveLargeText(event.target.checked)}
-          />
-          Larger text
-        </label>
+      </section>
+
+      <section aria-labelledby="account-appearance" className="h-card" style={{ marginBottom: 14 }}>
+        <h2 id="account-appearance" style={{ fontSize: "var(--text-small)", fontWeight: 650, color: "var(--muted)", margin: "0 0 10px" }}>
+          Appearance
+        </h2>
+        <div role="group" aria-labelledby="account-appearance" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(
+            [
+              ["light", "Light", "☀"],
+              ["dark", "Dark", "☾"],
+              ["system", "System", "◐"],
+            ] as Array<[ThemeChoice, string, string]>
+          ).map(([value, label, icon]) => {
+            const selected = theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setTheme(value)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  fontSize: "var(--text-ui)",
+                  fontWeight: 650,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  border: selected ? "2px solid var(--orange)" : "1px solid var(--line)",
+                  background: selected ? "var(--orange-soft)" : "rgb(var(--c-surface))",
+                  color: selected ? "var(--orange-ink)" : "var(--ink)",
+                }}
+              >
+                <span aria-hidden="true">{icon}</span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       <nav aria-label="Settings" style={{ marginBottom: 14 }}>
@@ -412,7 +429,7 @@ export default function AccountPage() {
         open={editing === "family"}
         onClose={() => setEditing(null)}
         title="Family"
-        description="Numbers you can see the packs and safeguards of. Both numbers must be Hutch."
+        description="Add an elder or a child by their Hutch number. Switch to them from the profile menu."
         footer={
           <>
             <button type="button" className="h-btn h-btn-ghost" onClick={() => setEditing(null)}>
@@ -429,12 +446,16 @@ export default function AccountPage() {
           </>
         }
       >
+        {error ? (
+          <div style={{ marginBottom: 12 }}>
+            <Alert tone="danger">{error}</Alert>
+          </div>
+        ) : null}
         {app.family.length ? (
           <ul style={{ margin: "0 0 14px", paddingLeft: 20, fontSize: 14 }}>
             {app.family.map((member) => (
               <li key={member.msisdn}>
-                {member.name} · {member.masked}
-                {member.pack ? ` · ${member.pack}` : ""}
+                {member.name} · {localNumber(member.msisdn)} · {member.role === "child" ? "Child" : "Elder"}
               </li>
             ))}
           </ul>
@@ -443,6 +464,29 @@ export default function AccountPage() {
             Nobody has been added yet.
           </p>
         )}
+        <div role="group" aria-label="Who is this number" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          {(["elder", "child"] as const).map((role) => (
+            <button
+              key={role}
+              type="button"
+              aria-pressed={familyRole === role}
+              onClick={() => setFamilyRole(role)}
+              style={{
+                flex: 1,
+                minHeight: 44,
+                borderRadius: 999,
+                border: familyRole === role ? "2px solid var(--orange)" : "1px solid var(--line)",
+                background: familyRole === role ? "var(--orange-soft)" : "transparent",
+                color: familyRole === role ? "var(--orange-ink)" : "var(--ink)",
+                font: "inherit",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {role === "child" ? "Child" : "Elder"}
+            </button>
+          ))}
+        </div>
         <Field label="Hutch number" hint="We tell you if the number is not on Hutch.">
           {(control) => (
             <Input
@@ -470,4 +514,11 @@ export default function AccountPage() {
       </Dialog>
     </main>
   );
+}
+
+function localNumber(msisdn: string): string {
+  const digits = msisdn.replace(/\D/g, "");
+  const local = digits.startsWith("94") ? `0${digits.slice(2)}` : digits;
+  if (local.length === 10) return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+  return msisdn;
 }

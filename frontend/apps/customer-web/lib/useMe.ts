@@ -31,6 +31,26 @@ import { expireSession } from "./session";
 /** One client for the app. The session is an HttpOnly cookie the SDK sends. */
 const client = new ClarityClient();
 
+/** The saved senior choice. CSS under html[data-senior="on"] does the rest. */
+function applySenior(on: boolean) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (on) root.setAttribute("data-senior", "on");
+  else root.removeAttribute("data-senior");
+}
+
+/** Every useMe() on the page shares the latest account, so a family add shows up in the profile menu. */
+const appListeners = new Set<(app: CustomerApp) => void>();
+
+function publishApp(app: CustomerApp) {
+  // Choosing a family profile does not enlarge the screen. The person holding
+  // the phone is the account holder, not the elder or the child.
+  applySenior(false);
+  appListeners.forEach((listener) => listener(app));
+}
+
+applySenior(false);
+
 export type MeState = {
   app: CustomerApp | null;
   /** True only on the first load, so a refresh does not blank the screen. */
@@ -59,8 +79,13 @@ export function useMe(): MeState {
 
   useEffect(() => {
     live.current = true;
+    const listener = (next: CustomerApp) => {
+      if (live.current) setApp(next);
+    };
+    appListeners.add(listener);
     return () => {
       live.current = false;
+      appListeners.delete(listener);
     };
   }, []);
 
@@ -70,12 +95,13 @@ export function useMe(): MeState {
       try {
         const payload = await client.myApp();
         if (!cancelled) {
-          setApp(payload);
           setError(null);
+          publishApp(payload);
         }
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ClarityApiError && (err.status === 401 || err.status === 403)) {
+          applySenior(false);
           expireSession();
           return;
         }
@@ -96,10 +122,11 @@ export function useMe(): MeState {
     setError(null);
     try {
       const payload = await run(client);
-      if (live.current) setApp(payload);
+      if (live.current) publishApp(payload);
       return true;
     } catch (err) {
       if (err instanceof ClarityApiError && (err.status === 401 || err.status === 403)) {
+        applySenior(false);
         expireSession();
         return false;
       }

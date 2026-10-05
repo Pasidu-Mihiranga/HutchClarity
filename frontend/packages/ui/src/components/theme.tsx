@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { THEME_STORAGE_KEY } from "../theme-boot";
 
 export type ThemeChoice = "light" | "dark" | "system";
 
@@ -8,7 +9,9 @@ type ThemeApi = { theme: ThemeChoice; setTheme: (theme: ThemeChoice) => void };
 
 const ThemeContext = React.createContext<ThemeApi | null>(null);
 
-const STORAGE_KEY = "clarity.theme";
+const STORAGE_KEY = THEME_STORAGE_KEY;
+
+const useIsoLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
 function apply(theme: ThemeChoice) {
   const root = document.documentElement;
@@ -23,17 +26,18 @@ function read(): ThemeChoice {
   } catch {
     // Storage can be blocked; fall through to the default.
   }
-  return "light";
+  return "system";
 }
 
 /**
- * Applies the chosen theme to <html data-theme>. The default is light so
- * nothing changes for an app until it offers the switch.
+ * Applies the chosen theme to <html data-theme>. The default is the system
+ * setting: no attribute, so the dark media query in tokens.css decides.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<ThemeChoice>("light");
+  const [theme, setThemeState] = React.useState<ThemeChoice>("system");
 
-  React.useEffect(() => {
+  // Before paint, so a click that remounts this tree does not flash the system colours.
+  useIsoLayoutEffect(() => {
     const stored = read();
     setThemeState(stored);
     apply(stored);

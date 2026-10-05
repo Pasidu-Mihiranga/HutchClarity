@@ -74,6 +74,7 @@ from clarity.interfaces.http.schemas import (
     DemoSubscriber,
     ExecutionView,
     FamilyRequest,
+    ProfileSwitchRequest,
     ForesightRunRequest,
     LaunchRecordRequest,
     MerchantSuspendRequest,
@@ -366,29 +367,10 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             "PROTOTYPE: all HUTCH systems are mocked and all data is synthetic."
         ),
     )
-    # Pinned to the origins this deployment actually serves, and credentials
-    # are allowed, because the staff console now authenticates with a cookie
-    # (B1). `allow_origins=["*"]` cannot carry credentials at all under the
-    # CORS spec, so the wildcard was not merely loose, it would have silently
-    # broken cookie-borne sign-in. A deployment sets CLARITY_ALLOWED_ORIGINS.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_allowed_origins(clarity or get_clarity()),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.middleware("http")(_audit_requests)
-    app.middleware("http")(_trace_requests)
-    # Outermost, so it also covers error responses and static files (X01).
-    app.middleware("http")(security_headers)
     # Authentication and authorization are profile-selected drivers. Lite uses
     # local JWT/Python drivers; full may use Keycloak and OPA.
     core = clarity or get_clarity()
 
-    # Rate limiting (A8). Inside the security headers and the trace, so a 429
-    # is still a recorded, header-complete response, and outside the route so
-    # the pipeline is never entered for a refused call.
     def _limit_for(policy_key: str, at: datetime) -> int:
         try:
             return int(core.policies.resolve(policy_key, as_of=at))
@@ -396,11 +378,29 @@ def create_app(clarity: Clarity | None = None) -> FastAPI:
             _throttle_log.warning("rate limit %s unresolved; using the default", policy_key)
             return ANONYMOUS_FALLBACK if policy_key == ANONYMOUS_KEY else FALLBACK_LIMIT
 
-    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
-
-    # CSRF, for requests relying on a cookie (B4). Inside the rate limiter, so
-    # a flood of forged requests is still throttled before it is inspected.
+    # Starlette runs the last middleware added as the outermost layer.
+    # Register from the route outward so a 429 still passes back through the
+    # trace, the security headers and CORS. An early 429 that skipped CORS
+    # reached the browser as "Failed to fetch".
     app.middleware("http")(csrf.enforce())
+    app.middleware("http")(rate_limit(core.rate_limiter, _limit_for, core.case_aggregate._now))
+    app.middleware("http")(_audit_requests)
+    app.middleware("http")(_trace_requests)
+    app.middleware("http")(security_headers)
+    # Pinned to the origins this deployment actually serves, and credentials
+    # are allowed, because the staff console now authenticates with a cookie
+    # (B1). `allow_origins=["*"]` cannot carry credentials at all under the
+    # CORS spec, so the wildcard was not merely loose, it would have silently
+    # broken cookie-borne sign-in. A deployment sets CLARITY_ALLOWED_ORIGINS.
+    # Chrome asks before a page on localhost may call another localhost port.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins(core),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_private_network=True,
+    )
 
     app.state.token_verifier = core.token_verifier
     app.state.authorization_policy = core.authorization
@@ -2340,13 +2340,27 @@ def _register_routes(app: FastAPI) -> None:
     ) -> dict[str, Any]:
         ref = _customer_ref(principal)
         try:
-            clarity.world.add_family(ref, body.msisdn)
+            clarity.world.add_family(ref, body.msisdn, body.role)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except KeyError as error:
             raise HTTPException(
                 status_code=404, detail="We could not find this Hutch number."
             ) from error
+        return _app_for(clarity, ref)
+
+    @app.post("/v1/me/profile", tags=["customer"])
+    def my_profile(
+        body: ProfileSwitchRequest,
+        clarity: ClarityDep,
+        principal: Annotated[Principal, Depends(requires(Permission.SELF_SETTINGS))],
+    ) -> dict[str, Any]:
+        """Open a family profile, or return to the signed-in person."""
+        ref = _customer_ref(principal)
+        try:
+            clarity.world.set_profile(ref, body.msisdn)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="That number is not in this family.") from error
         return _app_for(clarity, ref)
 
     @app.post("/v1/me/preferences", tags=["customer"])
@@ -3534,18 +3548,28 @@ def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
     family = []
     for number in account.family:
         other = clarity.world.account_by_msisdn(number)
-        if other is None:
-            continue
-        active = next((pack for pack in other.packs if pack.active), None)
+        role = account.family_roles.get(number, "elder")
+        active = next((pack for pack in other.packs if pack.active), None) if other is not None else None
         family.append(
             {
-                "name": other.name,
-                "masked": other.masked,
-                "msisdn": other.msisdn,
+                "name": other.name if other is not None and other.name else ("Child" if role == "child" else "Elder"),
+                "masked": other.masked if other is not None else number,
+                "msisdn": number,
+                "role": role,
                 "pack": active.name if active else None,
-                "safeguards": [key for key in other.safeguards if not str(key).startswith("_")],
+                "safeguards": [key for key in other.safeguards if not str(key).startswith("_")] if other is not None else [],
             }
         )
+
+    active_profile = None
+    if account.active_profile and account.active_profile in account.family:
+        current = clarity.world.account_by_msisdn(account.active_profile)
+        role = account.family_roles.get(account.active_profile, "elder")
+        active_profile = {
+            "name": current.name if current is not None and current.name else ("Child" if role == "child" else "Elder"),
+            "msisdn": account.active_profile,
+            "role": role,
+        }
 
     network = account.safeguards.get("_network")
     if not isinstance(network, dict):
@@ -3569,6 +3593,7 @@ def _app_for(clarity: Clarity, ref: str) -> dict[str, Any]:
             "eta": network.get("eta"),
         },
         "family": family,
+        "active_profile": active_profile,
         "usage": {
             "data_used_gb": home["pack"]["used_gb"] if home["pack"] else None,
             "data_cap_gb": home["pack"]["data_gb"] if home["pack"] else None,

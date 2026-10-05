@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, useFocusTrap } from "@clarity/ui";
-import { supportedLangs, t, type Lang } from "@clarity/i18n";
+import { t, type Lang } from "@clarity/i18n";
 import { useLanguage } from "@/components/LanguageProvider";
+import { AppHeader } from "@/components/AppHeader";
 import { expireSession, withSession } from "@/lib/session";
 import { ClarityMessageCard } from "@/components/ClarityMessageCard";
 import { VoiceSheet, useVoiceSupported } from "@/components/VoiceSheet";
@@ -61,6 +62,7 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     newChat: "New chat", chatHistory: "History", empty: "Nothing here yet.",
     seeMoreTopics: "See more topics", seeFewerTopics: "Show fewer",
     browseTopics: "Browse topics",
+    chatPrivate: "Don't share your OTP or password in this chat.",
     catMoney: "Money & Balance", catPacks: "Packages & Data", catReloads: "Reloads",
     catSubs: "Subscriptions", catNetwork: "Network", catEsim: "SIM & eSIM",
     catProtect: "Account Protection", catSupport: "Support",
@@ -95,6 +97,7 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     newChat: "නව කතාබස්", chatHistory: "ඉතිහාසය", empty: "මෙතැන තවම කිසිවක් නැත.",
     seeMoreTopics: "තවත් මාතෘකා", seeFewerTopics: "අඩුවෙන් පෙන්වන්න",
     browseTopics: "මාතෘකා බලන්න",
+    chatPrivate: "මෙම කතාබසේ OTP හෝ මුරපදය බෙදා නොගන්න.",
     catMoney: "මුදල් සහ ශේෂය", catPacks: "පැකේජ සහ දත්ත", catReloads: "රීලෝඩ්",
     catSubs: "දායකත්ව", catNetwork: "ජාලය", catEsim: "SIM සහ eSIM",
     catProtect: "ගිණුම් ආරක්ෂාව", catSupport: "සහාය",
@@ -122,6 +125,7 @@ const CHAT_I18N: Record<Lang, Record<string, string>> = {
     newChat: "புதிய அரட்டை", chatHistory: "வரலாறு", empty: "இங்கே இன்னும் ஒன்றுமில்லை.",
     seeMoreTopics: "மேலும் தலைப்புகள்", seeFewerTopics: "குறைவாகக் காட்டு",
     browseTopics: "தலைப்புகளைப் பார்",
+    chatPrivate: "இந்த அரட்டையில் OTP அல்லது கடவுச்சொல்லைப் பகிர வேண்டாம்.",
     catMoney: "பணம் & இருப்பு", catPacks: "பேக்குகள் & தரவு", catReloads: "ரீலோட்கள்",
     catSubs: "சந்தாக்கள்", catNetwork: "நெட்வொர்க்", catEsim: "SIM & eSIM",
     catProtect: "கணக்குப் பாதுகாப்பு", catSupport: "ஆதரவு",
@@ -144,7 +148,130 @@ function tl(lang: Lang, key: string): string {
   return CHAT_I18N[lang]?.[key] ?? CHAT_I18N.en[key] ?? key;
 }
 
-const LANG_LABELS: Record<Lang, string> = { en: "EN", si: "සිං", ta: "த" };
+function markFor(id: string): string {
+  if (/balance|money|refund/i.test(id)) return "wallet";
+  if (/pack|activate|expiry/i.test(id)) return "box";
+  if (/reload|missing|twice/i.test(id)) return "reload";
+  if (/sub|vas/i.test(id)) return "repeat";
+  if (/slow|fup|network/i.test(id)) return "signal";
+  if (/esim|sim/i.test(id)) return "sim";
+  if (/prevent|protect/i.test(id)) return "shield";
+  if (/support|case/i.test(id)) return "headset";
+  if (/recommend/i.test(id)) return "star";
+  return "dot";
+}
+
+function MarkIcon({ name }: { name: string }) {
+  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <span className="dial-mark" aria-hidden="true">
+      <svg width={16} height={16} viewBox="0 0 24 24" {...stroke}>
+        {name === "wallet" ? <path d="M4 8.5h16v9H4zM4 8.5 6.5 5h9L18 8.5M16 13h2" /> : null}
+        {name === "box" ? <path d="M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9" /> : null}
+        {name === "reload" ? <path d="M19 12a7 7 0 1 1-2-4.9M19 4.5V8h-3.5" /> : null}
+        {name === "repeat" ? <path d="M7 7h9l-2-2M17 17H8l2 2M7 11v6M17 7v6" /> : null}
+        {name === "signal" ? <path d="M5 18v-3M9 18v-6M13 18V9M17 18V6" /> : null}
+        {name === "sim" ? <path d="M8 3.5h6l4 4V20H8zM10 13h6M10 17h4" /> : null}
+        {name === "shield" ? <path d="M12 3.5 19 6.2v5.2c0 4-2.8 6.8-7 8.1-4.2-1.3-7-4.1-7-8.1V6.2z" /> : null}
+        {name === "headset" ? <path d="M5 13a7 7 0 0 1 14 0M5 13v4.5A1.5 1.5 0 0 0 6.5 19H8v-6H6.5A1.5 1.5 0 0 0 5 14.5M19 13v4.5a1.5 1.5 0 0 1-1.5 1.5H16v-6h1.5A1.5 1.5 0 0 1 19 14.5" /> : null}
+        {name === "star" ? <path d="m12 4 2.1 4.6 5 .6-3.7 3.4.9 5L12 15.4 7.7 17.6l.9-5L4.9 9.2l5-.6z" /> : null}
+        {name === "dot" ? <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" /> : null}
+      </svg>
+    </span>
+  );
+}
+
+function DialList({
+  label,
+  tall,
+  children,
+}: {
+  label: string;
+  tall?: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const frame = useRef(0);
+  const layout = useCallback(() => {
+    const root = ref.current;
+    if (!root) return;
+    const box = root.getBoundingClientRect();
+    const mid = box.top + box.height / 2;
+    const reach = box.height / 2 || 1;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (const node of Array.from(root.children)) {
+      const el = node as HTMLElement;
+      const card = el.getBoundingClientRect();
+      const signed = (card.top + card.height / 2 - mid) / reach;
+      const dist = Math.min(Math.abs(signed), 1);
+      if (reduce) {
+        el.style.transform = "none";
+        el.style.opacity = "1";
+        continue;
+      }
+      // The previous wheel. A circular ease only softens the moment a row leaves the middle.
+      const sign = signed < 0 ? -1 : signed > 0 ? 1 : 0;
+      const circ = 1 - Math.sqrt(Math.max(0, 1 - dist * dist));
+      const travel = dist * 0.85 + circ * 0.15;
+      const tilt = (-sign * travel * 46).toFixed(2);
+      const depth = (-travel * 150).toFixed(1);
+      const scale = (1 - travel * 0.38).toFixed(3);
+      el.style.transform = `rotateX(${tilt}deg) translateZ(${depth}px) scale(${scale})`;
+      el.style.opacity = (1 - travel * 0.42).toFixed(3);
+    }
+  }, []);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const onScroll = () => {
+      cancelAnimationFrame(frame.current);
+      frame.current = requestAnimationFrame(layout);
+    };
+    layout();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame.current);
+    };
+  }, [layout, children]);
+  return (
+    <div ref={ref} className={tall ? "dial-wheel dial-wheel-tall" : "dial-wheel dial-wheel-short"} role="list" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+const toolBtnStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 999,
+  border: "1px solid var(--line)",
+  background: "rgb(var(--c-surface-2))",
+  cursor: "pointer",
+  color: "var(--ink)",
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+  padding: 0,
+} as const;
+
+function HistoryIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v5l3 2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M20 13.5 12.5 21a2 2 0 0 1-2.8 0L3 14.3V4h10.3L20 10.7a2 2 0 0 1 0 2.8z" />
+      <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
 
 /** Server stage code -> the i18n key the waiting card shows (A5). */
 const STAGE_LABELS: Record<TurnStage, string> = {
@@ -158,7 +285,7 @@ const STAGE_LABELS: Record<TurnStage, string> = {
 // ─── component ─────────────────────────────────────────────────────────────────
 
 export default function ClarityPage() {
-  const { lang, setLang } = useLanguage();
+  const { lang } = useLanguage();
   const router = useRouter();
 
   const [cs, setCs] = useState<ClarityState>(makeInitialState);
@@ -204,7 +331,8 @@ export default function ClarityPage() {
   }, []);
 
   const [input, setInput] = useState("");
-  const [showTopics, setShowTopics] = useState(false);
+  const [topicOpen, setTopicOpen] = useState(false);
+  const [topicTag, setTopicTag] = useState<string | null>(null);
   const [topicCategory, setTopicCategory] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   // The history drawer is modal, so it gets the same treatment as a dialog:
@@ -532,7 +660,8 @@ export default function ClarityPage() {
   function newChat() {
     saveThread(cs);
     setCs((s) => ({ ...makeInitialState(), suggestions: s.suggestions }));
-    setShowTopics(false);
+    setTopicOpen(false);
+    setTopicTag(null);
     fetchSuggestions(lang, app).then((suggestions) => setCs((s) => ({ ...s, suggestions })));
   }
 
@@ -581,9 +710,22 @@ export default function ClarityPage() {
 
   // ─── suggestion chips ──────────────────────────────────────────────────────
 
-  const chips = cs.suggestions.length
-    ? cs.suggestions
-    : SUGGESTED.slice(0, 6).map((s) => ({ id: s.key, i18n_key: s.key, intent: s.chatIntent, reason: "default" } as SuggestionChip));
+  const chips = (() => {
+    const seen = new Set<string>();
+    const rows: SuggestionChip[] = [];
+    for (const chip of cs.suggestions) {
+      const id = chip.i18n_key || chip.id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      rows.push(chip);
+    }
+    for (const item of SUGGESTED) {
+      if (seen.has(item.key)) continue;
+      seen.add(item.key);
+      rows.push({ id: item.key, i18n_key: item.key, intent: item.chatIntent, reason: "default" });
+    }
+    return rows;
+  })();
 
   // ─── render ────────────────────────────────────────────────────────────────
 
@@ -592,160 +734,83 @@ export default function ClarityPage() {
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: "rgb(var(--c-surface-2))" }}>
+      <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "rgb(var(--c-surface-2))", overflow: "hidden" }}>
 
-        {/* ── Header ── */}
-        <header style={{
-          position: "sticky", top: "env(safe-area-inset-top,0px)", zIndex: 30,
-          background: "rgb(var(--c-surface))", borderBottom: "1px solid var(--line)",
-          padding: "12px 14px", display: "flex", alignItems: "center", gap: 10,
+        <AppHeader />
+
+        <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 14px", borderBottom: "1px solid var(--line)",
+          background: "rgb(var(--c-surface))", flexShrink: 0,
         }}>
-          {/* back button */}
           <button
-            onClick={() => router.back()}
+            type="button"
+            onClick={() => router.push("/")}
             aria-label="Back"
             style={{
-              border: 0, background: "transparent", padding: "6px 4px",
-              cursor: "pointer", fontSize: 20, color: "var(--ink)",
+              width: 36, height: 36, borderRadius: 999, border: "1px solid var(--line)",
+              background: "rgb(var(--c-surface-2))", cursor: "pointer", color: "var(--ink)",
               display: "grid", placeItems: "center", flexShrink: 0,
             }}
-          >←</button>
-
-          <div style={{
-            width: 40, height: 40, borderRadius: 14,
-            background: "linear-gradient(145deg,rgb(var(--c-brand)),rgb(var(--c-primary)))",
-            color: "rgb(var(--c-on-primary))", display: "grid", placeItems: "center",
-            fontWeight: 800, fontSize: 18, flexShrink: 0,
-          }} aria-hidden="true">C</div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: 16, lineHeight: 1.2 }}>{tl(lang, "clarityBrand")}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>{tl(lang, "claritySubtitle")}</div>
-          </div>
-
-          {/* lang switcher */}
-          <div style={{ display: "flex", gap: 2, background: "rgb(var(--c-surface-2))", borderRadius: 10, padding: 2 }} role="group" aria-label="Language">
-            {supportedLangs.map((l) => (
-              <button key={l} type="button" onClick={() => setLang(l)} style={{
-                border: 0,
-                background: l === lang ? "rgb(var(--c-surface))" : "transparent",
-                color: l === lang ? "var(--orange-ink)" : "rgb(var(--c-fg-muted))",
-                boxShadow: l === lang ? "0 1px 2px rgba(0,0,0,.06)" : "none",
-                fontSize: 11, fontWeight: 700, padding: "6px 8px", borderRadius: 8,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>{LANG_LABELS[l]}</button>
-            ))}
-          </div>
-
-          <button onClick={() => setShowHistory(true)} aria-label={tl(lang, "chatHistory")} style={{ border: 0, background: "transparent", padding: "6px 4px", cursor: "pointer", fontSize: 18, color: "var(--ink)" }}>☰</button>
-          <button onClick={newChat} aria-label={tl(lang, "newChat")} style={{ border: 0, background: "transparent", padding: "6px 4px", cursor: "pointer", fontSize: 20, color: "var(--ink)", fontWeight: 300 }}>+</button>
-        </header>
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            aria-label={tl(lang, "chatHistory")}
+            style={toolBtnStyle}
+          >
+            <HistoryIcon />
+          </button>
+          <button type="button" onClick={newChat} aria-label={tl(lang, "newChat")} style={toolBtnStyle}>
+            <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>+</span>
+          </button>
+        </div>
 
         {/* ── Scrollable body ── */}
         <div ref={bodyRef} style={{
-          flex: 1, overflowY: "auto",
-          padding: "0 16px calc(88px + 32px)",
+          flex: 1, minHeight: 0, overflowY: isEmpty ? "hidden" : "auto",
+          padding: "0 16px 12px",
           maxWidth: 640, margin: "0 auto", width: "100%",
+          display: "flex", flexDirection: "column",
         }}>
 
           {isEmpty ? (
             /* ── Welcome ── */
-            <div>
-              <div style={{ textAlign: "center", padding: "40px 8px 24px" }}>
-                <div style={{
-                  width: 72, height: 72, margin: "0 auto 18px", borderRadius: 22,
-                  background: "linear-gradient(145deg,rgb(var(--c-primary-soft)),rgb(var(--c-primary) / 0.2))",
-                  border: "1px solid rgb(var(--c-primary) / 0.3)", display: "grid", placeItems: "center",
-                  color: "var(--orange)",
-                }} aria-hidden="true">
-                  <svg width="36" height="36" viewBox="0 0 36 36" fill="currentColor">
-                    <rect x="10" y="10" width="16" height="16" rx="8" fill="currentColor" />
-                  </svg>
-                </div>
-                <h1 style={{ fontSize: "clamp(24px,6vw,30px)", fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px", color: "var(--ink)" }}>
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ textAlign: "center", padding: "8px 8px 4px", flexShrink: 0 }}>
+                <img src="/icon-192.png" alt="" className="chat-logo-bounce" width={72} height={72} />
+                <h1 style={{ fontSize: "clamp(22px,5.5vw,28px)", fontWeight: 800, letterSpacing: "-.03em", margin: "10px 0 4px", color: "var(--ink)" }}>
                   {app.name
                     ? tl(lang, "chatHi").replace("{name}", app.name)
                     : tl(lang, "chatHiAnon")}
                 </h1>
                 <p style={{ fontSize: 19, fontWeight: 700, margin: "0 0 6px", color: "rgb(var(--c-fg-muted))" }}>{tl(lang, "howHelpToday")}</p>
-                <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 24px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
+                <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 12px", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
                   {tl(lang, "chatSubtitle")}
                 </p>
               </div>
 
-              {/* suggestion chips */}
-              <div style={{ display: "grid", gap: 8 }}>
+              <DialList label="Suggested questions" tall>
                 {chips.map((chip) => {
                   const label = chip.label ?? tl(lang, chip.i18n_key) ?? chip.id;
-                  const personalized = chip.personalized ?? false;
                   return (
-                    <button key={chip.id} onClick={() => ask(chip.i18n_key, label, chip.intent ?? null)}
-                      style={{
-                        width: "100%", textAlign: "left", padding: "14px 18px",
-                        borderRadius: 999, border: `1.5px solid ${personalized ? "var(--orange)" : "rgb(var(--c-primary) / 0.3)"}`,
-                        background: personalized ? "var(--orange-soft)" : "rgb(var(--c-surface))",
-                        cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
-                        fontSize: 15, color: "var(--ink)",
-                        boxShadow: "0 1px 2px rgba(24,24,27,.04)",
-                      }}
-                    >{label}</button>
+                    <button
+                      key={chip.id}
+                      type="button"
+                      role="listitem"
+                      className="dial-card"
+                      onClick={() => ask(chip.i18n_key, label, chip.intent ?? null)}
+                    >
+                      <MarkIcon name={markFor(chip.i18n_key || chip.id)} />
+                      {label}
+                    </button>
                   );
                 })}
-              </div>
-
-              {/* see more topics toggle */}
-              <button onClick={() => setShowTopics((v) => !v)} style={{
-                border: 0, background: "transparent", color: "var(--orange-ink)",
-                fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "14px 4px",
-                fontFamily: "inherit",
-              }}>
-                {tl(lang, showTopics ? "seeFewerTopics" : "seeMoreTopics")}
-              </button>
-
-              {showTopics && (
-                <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--muted)", margin: "0 0 10px" }}>
-                    {tl(lang, "browseTopics")}
-                  </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                    {TOPIC_CATEGORIES.map((cat) => (
-                      <button key={cat.id} onClick={() => setTopicCategory((v) => (v === cat.id ? null : cat.id))}
-                        style={{
-                          border: "1.5px solid",
-                          borderColor: topicCategory === cat.id ? "var(--orange)" : "var(--line)",
-                          background: topicCategory === cat.id ? "var(--orange-soft)" : "rgb(var(--c-surface))",
-                          color: topicCategory === cat.id ? "var(--orange-ink)" : "var(--ink)",
-                          borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 600,
-                          cursor: "pointer", fontFamily: "inherit",
-                        }}
-                      >{tl(lang, cat.i18n)}</button>
-                    ))}
-                  </div>
-
-                  {topicCategory && (() => {
-                    const cat = TOPIC_CATEGORIES.find((c) => c.id === topicCategory);
-                    if (!cat) return null;
-                    return (
-                      <div style={{ display: "grid", gap: 6 }}>
-                        {cat.keys.map((key) => {
-                          const label = tl(lang, key);
-                          const sug = SUGGESTED.find((s) => s.key === key);
-                          return (
-                            <button key={key} onClick={() => ask(key, label, sug?.chatIntent ?? null)}
-                              style={{
-                                width: "100%", textAlign: "left", padding: "12px 16px",
-                                borderRadius: 12, border: "1px solid var(--line)",
-                                background: "rgb(var(--c-surface))", cursor: "pointer", fontFamily: "inherit",
-                                fontWeight: 500, fontSize: 14, color: "var(--ink)",
-                              }}
-                            >{label}</button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
+              </DialList>
             </div>
           ) : (
             /* ── Transcript ── */
@@ -833,143 +898,203 @@ export default function ClarityPage() {
 
         {/* ── Composer ── */}
         <div style={{
-          position: "fixed", left: 0, right: 0, bottom: "var(--safe-bottom,0px)", zIndex: 35,
-          background: "linear-gradient(to top,rgb(var(--c-surface)) 70%,rgba(255,255,255,0))",
-          padding: "10px 16px 8px",
+          flexShrink: 0, zIndex: 35,
+          background: "rgb(var(--c-surface))",
+          borderTop: "1px solid var(--line)",
+          padding: "8px 16px calc(28px + env(safe-area-inset-bottom, 0px))",
         }}>
+          {topicOpen ? (
+            <div className="topic-list" role="listbox" aria-label={tl(lang, "browseTopics")}>
+              {TOPIC_CATEGORIES.map((cat) => {
+                const label = tl(lang, cat.i18n);
+                const selected = topicTag === label;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    className="dial-card"
+                    style={{ borderColor: selected ? "var(--orange)" : undefined }}
+                    onClick={() => {
+                      setTopicTag(label);
+                      setTopicCategory(cat.id);
+                      setTopicOpen(false);
+                    }}
+                  >
+                    <MarkIcon name={markFor(cat.id)} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div style={{
-            maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "flex-end", gap: 8,
+            maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "center", gap: 8,
             background: "rgb(var(--c-surface))", border: "1px solid var(--line)", borderRadius: 22,
             padding: "8px 10px", boxShadow: "0 8px 24px rgba(24,24,27,.08)",
           }}>
-            {/* Shown only where the browser can turn speech into text, so
-                the button never opens something that cannot work. */}
+            <button
+              type="button"
+              aria-label={tl(lang, "browseTopics")}
+              aria-expanded={topicOpen}
+              onClick={() => setTopicOpen((open) => !open)}
+              style={{
+                width: 36, height: 36, borderRadius: 999, border: "1px solid var(--line)",
+                background: topicOpen ? "var(--orange-soft)" : "rgb(var(--c-surface-2))",
+                color: "var(--orange-ink)", cursor: "pointer", flexShrink: 0,
+                display: "grid", placeItems: "center",
+              }}
+            >
+              <TagIcon />
+            </button>
             {voiceSupported ? (
-              <button type="button" aria-haspopup="dialog" onClick={() => setVoiceOpen(true)} disabled={busy} style={{
-                border: 0, background: "var(--orange-soft)", color: "var(--orange-ink)",
-                fontWeight: 700, fontSize: 14, cursor: busy ? "not-allowed" : "pointer", padding: "8px 12px",
-                fontFamily: "inherit", flexShrink: 0, borderRadius: 999,
-                display: "inline-flex", alignItems: "center", gap: 6,
+              <button type="button" className="composer-mic" aria-label={tl(lang, "speak")} aria-haspopup="dialog" onClick={() => setVoiceOpen(true)} disabled={busy} style={{
+                width: 36, height: 36, border: 0, background: "var(--orange-soft)", color: "var(--orange-ink)",
+                cursor: busy ? "not-allowed" : "pointer", padding: 0,
+                flexShrink: 0, borderRadius: 999,
+                display: "grid", placeItems: "center",
               }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="9" y="3" width="6" height="11" rx="3" />
                   <path d="M5 11a7 7 0 0 0 14 0" />
                   <path d="M12 18v3" />
                 </svg>
-                {tl(lang, "speak")}
               </button>
             ) : null}
 
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              // A placeholder is not an accessible name: it disappears on the
-              // first keystroke and some screen readers never announce it, so
-              // the one control on this screen had no name at all (C05 scope).
-              aria-label={tl(lang, "askClarityAnything")}
-              placeholder={tl(lang, "askClarityAnything")}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  ask(null, input);
-                }
-              }}
-              style={{
-                flex: 1, border: 0, resize: "none", fontFamily: "inherit", fontSize: 15,
-                minHeight: 24, maxHeight: 96, padding: "8px 4px", background: "transparent",
-                outline: "none", color: "var(--ink)", lineHeight: 1.4,
-              }}
-            />
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 6 }}>
+              {topicTag ? (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, maxWidth: 128,
+                  borderRadius: 999, padding: "4px 8px 4px 10px",
+                  background: "var(--orange-soft)", color: "var(--orange-ink)",
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topicTag}</span>
+                  <button
+                    type="button"
+                    aria-label="Remove topic"
+                    onClick={() => setTopicTag(null)}
+                    style={{ border: 0, background: "transparent", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              <textarea
+                className="composer-field"
+                ref={textareaRef}
+                rows={1}
+                aria-label={tl(lang, "askClarityAnything")}
+                placeholder={tl(lang, "askClarityAnything")}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    const text = topicTag ? `${topicTag}: ${input}`.trim() : input;
+                    ask(null, text);
+                  }
+                }}
+                style={{
+                  flex: 1, minWidth: 0, border: 0, resize: "none", fontFamily: "inherit", fontSize: 15,
+                  minHeight: 24, maxHeight: 96, padding: "8px 4px", background: "transparent",
+                  outline: "none", color: "var(--ink)", lineHeight: 1.4,
+                }}
+              />
+            </div>
 
             <button
               type="button"
-              onClick={() => ask(null, input)}
-              disabled={!input.trim() || busy}
+              className="composer-send"
+              onClick={() => {
+                const text = topicTag ? `${topicTag}: ${input}`.trim() : input;
+                ask(null, text);
+              }}
+              disabled={(!input.trim() && !topicTag) || busy}
               style={{
                 width: 40, height: 40, borderRadius: 999, border: 0,
-                background: input.trim() && !busy ? "var(--orange-strong)" : "rgb(var(--c-border))",
-                color: input.trim() && !busy ? "rgb(var(--c-surface))" : "rgb(var(--c-fg-subtle))",
+                background: (input.trim() || topicTag) && !busy ? "var(--orange-strong)" : "rgb(var(--c-border))",
+                color: (input.trim() || topicTag) && !busy ? "rgb(var(--c-surface))" : "rgb(var(--c-fg-subtle))",
                 fontSize: 16, fontWeight: 700,
-                cursor: input.trim() && !busy ? "pointer" : "not-allowed",
+                cursor: (input.trim() || topicTag) && !busy ? "pointer" : "not-allowed",
                 display: "grid", placeItems: "center", flexShrink: 0, transition: "background .15s",
               }}
               aria-label="Send"
             >↑</button>
           </div>
+          <p className="chat-private">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <rect x="6" y="10" width="12" height="9" rx="2" />
+              <path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10" strokeLinecap="round" />
+            </svg>
+            {tl(lang, "chatPrivate")}
+          </p>
         </div>
-      </div>
-
-      {/* ── History drawer ── */}
-      {showHistory && (
-        <div
-          role="presentation"
-          onClick={(event) => {
-            // Only the scrim itself dismisses. Closing on any click that
-            // bubbled up from the panel is what forced the panel to stop
-            // propagation, which left a dialog carrying a mouse handler.
-            if (event.target === event.currentTarget) setShowHistory(false);
-          }}
-          style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.4)" }}
-        >
+        {showHistory && (
           <div
-            ref={historyPanel}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-history-title"
-            tabIndex={-1}
-            style={{
-              position: "absolute", top: 0, left: 0, bottom: 0, width: "min(320px,90vw)",
-              background: "rgb(var(--c-surface))", display: "flex", flexDirection: "column",
-              boxShadow: "4px 0 24px rgba(0,0,0,.12)", overflowY: "auto",
+            className="history-scrim"
+            role="presentation"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowHistory(false);
             }}
           >
-            <div style={{
-              padding: "20px 16px 12px", borderBottom: "1px solid var(--line)",
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-            }}>
-              <h2 id="chat-history-title" style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
-                {tl(lang, "chatHistory")}
-              </h2>
-              <button
-                type="button"
-                data-autofocus
-                aria-label={tl(lang, "cancel")}
-                onClick={() => setShowHistory(false)}
-                style={{
-                  border: 0, background: "transparent", cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 22, lineHeight: 1, color: "var(--muted)", padding: "0 4px",
-                }}
-              >
-                <span aria-hidden="true">×</span>
-              </button>
-            </div>
-            {threads.length === 0 ? (
-              <p style={{ padding: 16, fontSize: 14, color: "var(--muted)" }}>{tl(lang, "empty")}</p>
-            ) : (
-              threads.map((th) => (
-                <button key={th.id} onClick={() => {
-                  setCs((s) => ({
-                    ...s,
-                    ...(th.snapshot as Partial<ClarityState>),
-                    messages: th.messages,
-                    threadId: th.id,
-                  }));
-                  setShowHistory(false);
-                }} style={{
-                  display: "flex", flexDirection: "column", gap: 2, textAlign: "left",
-                  border: 0, borderBottom: "1px solid var(--line)", background: "transparent",
-                  padding: "14px 16px", cursor: "pointer", fontFamily: "inherit",
-                }}>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{th.title}</span>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{th.status}</span>
+            <div
+              ref={historyPanel}
+              className="history-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="chat-history-title"
+              tabIndex={-1}
+            >
+              <div style={{
+                padding: "16px 16px 12px", borderBottom: "1px solid var(--line)",
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              }}>
+                <h2 id="chat-history-title" style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+                  {tl(lang, "chatHistory")}
+                </h2>
+                <button
+                  type="button"
+                  data-autofocus
+                  aria-label={tl(lang, "cancel")}
+                  onClick={() => setShowHistory(false)}
+                  style={{
+                    border: 0, background: "transparent", cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 22, lineHeight: 1, color: "var(--muted)", padding: "0 4px",
+                  }}
+                >
+                  <span aria-hidden="true">×</span>
                 </button>
-              ))
-            )}
+              </div>
+              {threads.length === 0 ? (
+                <p style={{ padding: 16, fontSize: 14, color: "var(--muted)" }}>{tl(lang, "empty")}</p>
+              ) : (
+                threads.map((th) => (
+                  <button key={th.id} onClick={() => {
+                    setCs((s) => ({
+                      ...s,
+                      ...(th.snapshot as Partial<ClarityState>),
+                      messages: th.messages,
+                      threadId: th.id,
+                    }));
+                    setShowHistory(false);
+                  }} style={{
+                    display: "flex", flexDirection: "column", gap: 2, textAlign: "left",
+                    border: 0, borderBottom: "1px solid var(--line)", background: "transparent",
+                    padding: "14px 16px", cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{th.title}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{th.status}</span>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
+        )}
         </div>
-      )}
+      </div>
 
       {/* ── Confirm modal ── */}
       {voiceOpen && (

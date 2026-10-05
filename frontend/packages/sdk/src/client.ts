@@ -503,8 +503,17 @@ export class ClarityClient {
     return this.declared("post", "/v1/me/safeguards", { body: { kind, value } });
   }
 
-  addFamilyMember(msisdn: string): Promise<CustomerApp> {
-    return this.declared("post", "/v1/me/family", { body: { msisdn } });
+  addFamilyMember(msisdn: string, role: "elder" | "child" = "elder"): Promise<CustomerApp> {
+    return this.declared("post", "/v1/me/family", {
+      body: { msisdn, role } as { msisdn: string },
+    });
+  }
+
+  switchProfile(msisdn: string | null): Promise<CustomerApp> {
+    return this.request<CustomerApp>("/v1/me/profile", {
+      method: "POST",
+      body: JSON.stringify({ msisdn }),
+    });
   }
 
   savePreferences(body: PreferencesBody): Promise<CustomerApp> {

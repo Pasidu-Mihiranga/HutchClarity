@@ -398,12 +398,21 @@ export type CustomerNotification = {
   receipt_id?: string;
 };
 
+export type FamilyRole = "elder" | "child";
+
 export type FamilyMember = {
   name: string;
   masked: string;
   msisdn: string;
+  role?: FamilyRole;
   pack: string | null;
   safeguards: string[];
+};
+
+export type ActiveProfile = {
+  name: string;
+  msisdn: string;
+  role: FamilyRole;
 };
 
 /** `GET /v1/me/app`, and what every `/v1/me/*` write returns. */
@@ -416,6 +425,7 @@ export type CustomerApp = CustomerHome & {
   notifications: CustomerNotification[];
   network: { status: string; text: string; eta: string | null };
   family: FamilyMember[];
+  active_profile?: ActiveProfile | null;
   usage: {
     data_used_gb: string | null;
     data_cap_gb: string | null;

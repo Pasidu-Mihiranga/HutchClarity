@@ -47,6 +47,64 @@ a { color: var(--orange-ink); }
   }
 }
 
+:root {
+  --text-kicker: 12px;
+  --text-small: 13px;
+  --text-ui: 14px;
+  --text-body: 16px;
+  --text-title: 26px;
+  --text-balance: 32px;
+  --tap: 44px;
+}
+html[data-senior="on"] {
+  --text-kicker: 16px;
+  --text-small: 18px;
+  --text-ui: 18px;
+  --text-body: 20px;
+  --text-title: 34px;
+  --text-balance: 44px;
+  --tap: 52px;
+}
+html[data-senior="on"] .h-card { padding: 24px; }
+html[data-senior="on"] .h-card button { min-height: var(--tap); }
+html[data-senior="on"] .h-btn {
+  min-height: var(--tap);
+  font-size: 18px;
+  padding: 14px 22px;
+}
+html[data-senior="on"] .dial-card {
+  font-size: 18px;
+  padding: 16px 16px;
+  min-height: 56px;
+}
+html[data-senior="on"] .chat-private { font-size: 16px; }
+html[data-senior="on"] .composer-field { font-size: 20px !important; }
+html[data-senior="on"] .composer-mic,
+html[data-senior="on"] .composer-send {
+  width: 48px !important;
+  height: 48px !important;
+}
+.senior-switch {
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgb(var(--c-border));
+  position: relative;
+}
+.senior-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgb(var(--c-surface));
+}
+.senior-switch.is-on { background: var(--orange); }
+.senior-switch.is-on::after { left: 23px; }
+
 /* ---- Hutch card ---- */
 .h-card {
   background: var(--bg);
@@ -339,25 +397,245 @@ a { color: var(--orange-ink); }
   .vo-backdrop, .vo-sheet, .vo-orb-fallback { animation: none; }
 }
 
-/* ---- Sign-in page (login/page.tsx) ----
-   The picture shrinks with the screen so the form, help line and footer
-   stay on the page. A short phone can still scroll; nothing is clipped. */
+/* The light wordmark. In dark mode the whole mark is white. */
+.brand-logo {
+  display: block;
+  height: 34px;
+  width: auto;
+}
+:root[data-theme="dark"] .brand-logo {
+  filter: brightness(0) invert(1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .brand-logo {
+    filter: brightness(0) invert(1);
+  }
+}
+
+/* Floating bottom pill. It shrinks once the page scrolls. */
+.island {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  right: auto;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  width: min(440px, calc(100% - 24px));
+  padding: 6px;
+  border-radius: 999px;
+  background: rgb(var(--c-surface) / 0.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+  backdrop-filter: blur(16px);
+  transition: width .25s ease, padding .25s ease, gap .25s ease;
+}
+.island-compact {
+  width: auto;
+  padding: 4px;
+  gap: 0;
+}
+.island a {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 64px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+.island-compact a {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+}
+.island a[aria-current="page"] {
+  color: var(--orange-ink);
+  background: rgb(var(--c-primary-soft));
+}
+.island-label {
+  line-height: 1.1;
+}
+.island-compact .island-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .island { transition: none; }
+}
+
+/* Sign-in and OTP fill the phone and do not scroll. The picture gives up
+   height first; the city line drops away on a short screen. */
+html:has(.login-screen),
+html:has(.login-screen) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.login-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.login-keep { flex-shrink: 0; }
 .login-hero {
   display: block;
   width: 100%;
+  min-height: 0;
   height: auto;
-  max-height: min(32svh, 280px);
+  max-height: min(28svh, 240px);
+  flex: 1 1 auto;
   object-fit: contain;
   object-position: center bottom;
 }
-@media (max-height: 740px) {
-  .login-hero { max-height: min(24svh, 200px); }
+.login-city {
+  display: block;
+  width: 100%;
+  height: 64px;
+  margin-top: auto;
+  flex: 0 1 64px;
+  min-height: 0;
 }
-@media (max-height: 640px) {
-  .login-hero { max-height: min(18svh, 140px); }
+@media (max-height: 740px) {
+  .login-hero { max-height: min(20svh, 160px); }
+  .login-city { height: 40px; flex-basis: 40px; }
+  .login-lead { margin-bottom: 0.5rem; }
+  .login-help, .login-note, .login-inbox { margin-top: 0.5rem; }
+}
+@media (max-height: 680px) {
+  .login-hero { max-height: min(12svh, 72px); }
+  .login-city, .login-lead { display: none; }
 }
 
 /* ---- Sign-in: a wrong code shakes, then the field is cleared (login/page.tsx) ---- */
+@keyframes chat-logo-bounce {
+  0% { transform: translateY(28px); opacity: 0; }
+  55% { transform: translateY(-10px); opacity: 1; }
+  100% { transform: translateY(0); }
+}
+.chat-logo-bounce {
+  display: block;
+  margin: 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  animation: chat-logo-bounce 0.7s cubic-bezier(.22, 1, .36, 1) both;
+}
+.dial-wheel {
+  width: min(440px, 100%);
+  margin: 0 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 0 16px;
+  scrollbar-width: none;
+  perspective: 760px;
+  perspective-origin: center center;
+  -webkit-mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+}
+.dial-wheel::-webkit-scrollbar { display: none; }
+.dial-wheel-tall {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
+  padding-top: 22%;
+  padding-bottom: 22%;
+}
+.topic-list {
+  width: min(440px, 100%);
+  max-height: 240px;
+  margin: 0 auto 8px;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+.topic-list .dial-card {
+  width: 100%;
+  margin: 0;
+  opacity: 1;
+  transform: none;
+}
+.dial-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 6px 8px;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgb(var(--c-surface));
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+}
+.dial-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--orange-soft);
+  color: var(--orange-ink);
+}
+.history-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgb(var(--c-fg) / 0.08);
+  backdrop-filter: blur(8px);
+}
+.history-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(320px, 88vw);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: rgb(var(--c-surface) / 0.62);
+  backdrop-filter: blur(22px) saturate(1.35);
+  border-right: 1px solid rgb(255 255 255 / 0.28);
+  box-shadow: 8px 0 32px rgb(0 0 0 / 0.12);
+}
+.chat-private {
+  max-width: 640px;
+  margin: 8px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-logo-bounce, .dial-card { animation: none; }
+}
 @keyframes otp-shake {
   0%, 100% { transform: translateX(0); }
   15% { transform: translateX(-8px); }
