@@ -96,6 +96,8 @@ from clarity.modules.governance.public import (
     StoredPolicyChangeRepository,
 )
 from clarity.modules.iam.public import (
+    SYNTHETIC_FALLBACK_CODE,
+    SYNTHETIC_FALLBACK_MSISDN,
     AuditGrants,
     AuthorizationPolicy,
     CompositeTokenVerifier,
@@ -874,7 +876,16 @@ class Clarity:
                 sms_numbers=frozenset(phone for phone, _ in linked),
                 known=lambda msisdn: world.account_by_msisdn(msisdn) is not None,
             )
-        self.otp = otp or OtpService(delivery=gateway, open_unit=self.open_unit)
+        fallback = (
+            (SYNTHETIC_FALLBACK_MSISDN, SYNTHETIC_FALLBACK_CODE)
+            if self.settings.profile != "prod"
+            else None
+        )
+        self.otp = otp or OtpService(
+            delivery=gateway,
+            open_unit=self.open_unit,
+            fallback=fallback,
+        )
         self.token_verifier: TokenVerifier = self.tokens
         if self.settings.keycloak_issuer:
             self.token_verifier = CompositeTokenVerifier(

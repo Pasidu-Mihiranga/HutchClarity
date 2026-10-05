@@ -21,6 +21,16 @@ beforeEach(() => {
 });
 
 describe("customer OTP request", () => {
+  test("fallback access fills the synthetic number without signing in", () => {
+    render(<LoginPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Use fallback number" }));
+
+    expect(screen.getByLabelText("Hutch number")).toHaveValue("0781234567");
+    expect(screen.getByText("246810")).toBeInTheDocument();
+    expect(requestOtp).not.toHaveBeenCalled();
+  });
+
   test("real SMS delivery does not call the production-disabled inbox", async () => {
     requestOtp.mockResolvedValue({
       challenge_id: "challenge-1",

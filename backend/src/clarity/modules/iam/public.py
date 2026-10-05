@@ -48,6 +48,8 @@ from clarity.modules.iam.oidc import (
 from clarity.modules.iam.otp import (
     OTP_CHALLENGES,
     OTP_REQUESTS,
+    SYNTHETIC_FALLBACK_CODE,
+    SYNTHETIC_FALLBACK_MSISDN,
     OtpDelivery,
     OtpRefused,
     OtpService,
@@ -73,6 +75,8 @@ __all__ = [
     "PENDING_LOGINS",
     "REFRESH_TOKENS",
     "SESSIONS",
+    "SYNTHETIC_FALLBACK_CODE",
+    "SYNTHETIC_FALLBACK_MSISDN",
     "AuditGrant",
     "AuditGrants",
     "AuthorizationPolicy",
