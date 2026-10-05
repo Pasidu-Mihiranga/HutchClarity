@@ -44,6 +44,7 @@ the API runs elsewhere. There is no static Desk to fall back to any more.
 | 2 | Desk → open a waiting STAFF_APPROVAL case | Desk | queue + evaluate | Case panel shows cause and Approve as agent (may refuse above-cap) |
 | 3 | Sign out. Sign in as `supervisor` / `supervisor-clarity` with step-up code `step-up`. Approve as supervisor | Desk | approve | Receipt issued; high-value needs the step-up code |
 | 4 | Sign in as `platform` / `platform-clarity` with step-up, open Admin, turn off `auto_fix_global` | Admin | GET/POST `/v1/admin/switches` | Flip succeeds; history lists actor |
+| 4a | Still on Admin, open **MCP Inspector**, press Open MCP Inspector | Admin | MCP Inspector deep-link to `clarity-mcp` | Inspector opens with Streamable HTTP URL; connect after `make mcp` + Inspector (WT-10) |
 | 5 | Sign in as `auditor` / `auditor-clarity` | Nav | - | Desk/Insights denied (no `desk:queue:read`); honest AccessDenied |
 | 6 | Sign in as `security` / `security-clarity` | Admin | GET switches | Can read switches; flip returns 403 (no `flags:kill_switch`) |
 | 7 | Sign in as `vasops` / `vasops-clarity` with step-up → Suspend GameZone | Desk card | `POST /v1/admin/merchants/suspend` | Simulated block on Dilani |

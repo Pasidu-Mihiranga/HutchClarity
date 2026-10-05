@@ -55,6 +55,7 @@ import type {
   TimelineView,
   TranscriptPayload,
   VerificationView,
+  McpToolsInventory,
 } from "./types";
 
 export type ClarityClientOptions = {
@@ -756,6 +757,14 @@ export class ClarityClient {
 
   listSwitches(): Promise<SwitchStateView> {
     return this.declared("get", "/v1/admin/switches");
+  }
+
+  /**
+   * What `clarity-mcp` exposes for a given agent profile (ops inventory).
+   * No tool here executes money or service changes (ADR-0004).
+   */
+  listMcpTools(profile = "staff-assist"): Promise<McpToolsInventory> {
+    return this.declared("get", "/v1/mcp/tools", { query: { profile } }) as Promise<McpToolsInventory>;
   }
 
   flipSwitch(body: { key: string; enabled: boolean; reason: string }): Promise<SwitchStateView> {

@@ -58,10 +58,9 @@ test.describe("navigation and the API agree about what a role may open", () => {
 
     // This is the regression E2 fixed. `foresight:read` is product and CX
     // engineering's; approving money is a different job from rehearsing a
-    // change.
+    // change. The sidebar omits the section rather than dimming it.
     await expect(page.getByRole("link", { name: "Foresight", exact: true })).toHaveCount(0);
-    await expect(page.getByText("Foresight")).toBeVisible();
-    await expect(page.getByText("(not available for your role)").first()).toBeVisible();
+    await expect(page.getByText("Foresight")).toHaveCount(0);
 
     // Reached directly, the page refuses, which is the half that has to be
     // true even if the nav were wrong.

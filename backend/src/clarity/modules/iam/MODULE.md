@@ -86,3 +86,4 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-SMS01-httpsms-otp.md` | Customer OTP delivery through httpSMS |
 | 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-admin-account.md` | Synthetic directory account `admin` with role `platform_admin` |
 | 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-local-all-sections.md` | A directory account may hold several existing roles; the all-sections sign-in stays in a gitignored local file |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-platform-admin-foresight-read.md` | `platform_admin` holds `foresight:read` so the console Foresight tab opens |

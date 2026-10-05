@@ -124,7 +124,14 @@ class Settings(BaseSettings):
         ),
     )
     allowed_origins: str = Field(
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3101,http://127.0.0.1:3101,http://localhost:3102,http://127.0.0.1:3102,http://localhost:3100,http://127.0.0.1:3100",
+        default=(
+            "http://localhost:3000,http://127.0.0.1:3000,"
+            "http://localhost:3001,http://127.0.0.1:3001,"
+            "http://localhost:3002,http://127.0.0.1:3002,"
+            "http://localhost:3101,http://127.0.0.1:3101,"
+            "http://localhost:3102,http://127.0.0.1:3102,"
+            "http://localhost:3100,http://127.0.0.1:3100"
+        ),
         alias="CLARITY_ALLOWED_ORIGINS",
         description=(
             "Comma-separated browser origins allowed to call this API with "
@@ -133,7 +140,7 @@ class Settings(BaseSettings):
         ),
     )
     console_base_url: str = Field(
-        default="http://127.0.0.1:3101",
+        default="http://127.0.0.1:3001",
         alias="CLARITY_CONSOLE_BASE_URL",
         description="Where a completed sign-in returns the browser to.",
     )

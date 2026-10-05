@@ -12,13 +12,24 @@ export const metadata: Metadata = {
   title: "Clarity Desk",
   description: "Staff desk for synthetic cases: evidence, approval, and Trust Receipts.",
   appleWebApp: { capable: true, title: "Clarity Desk" },
+  // Unique public path (+ version query) so browsers drop a stale /favicon.ico tab icon.
   icons: {
     icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      {
+        url: "/clarity-mark-favicon.png?v=orange-c-1",
+        type: "image/png",
+        sizes: "48x48",
+      },
+      { url: "/icon-192.png?v=orange-c-1", type: "image/png", sizes: "192x192" },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: [
+      {
+        url: "/apple-touch-icon.png?v=orange-c-1",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
+    shortcut: "/clarity-mark-favicon.png?v=orange-c-1",
   },
 };
 

@@ -177,6 +177,20 @@ export type SwitchStateView = {
   }>;
 };
 
+/** One tool from `GET /v1/mcp/tools` (ops inventory for clarity-mcp). */
+export type McpToolView = {
+  name: string;
+  level: string;
+  description: string;
+};
+
+/** `GET /v1/mcp/tools`. */
+export type McpToolsInventory = {
+  profile: string;
+  tools: McpToolView[];
+  guarantee: string;
+};
+
 export type AuditRecordView = {
   seq: number;
   hash_version: number;

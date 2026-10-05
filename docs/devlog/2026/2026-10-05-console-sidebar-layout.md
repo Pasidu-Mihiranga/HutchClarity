@@ -18,7 +18,7 @@ The signed-in admin screen was a top bar. The expected desk is a sidebar workspa
 ## Decisions made
 - Nav labels stay the real sections. Customers, Knowledge, Automation, Reports, and an AI copilot are not in this system, so they are not in the nav.
 - Admin filters are All, On, and Off over the switches the API already returns. Search matches the switch key. No case names, amounts, or timestamps were added.
-- A section this role cannot open is still text, with "(not available for your role)", not a link.
+- A section this role cannot open is omitted from the sidebar (not a dimmed row).
 - The sign-in page is unchanged.
 
 ## Docs updated

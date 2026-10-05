@@ -22,6 +22,10 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
  * The confirmation is a courtesy, not a control: the API still decides whether
  * this identity may flip anything, and the button is absent without
  * `flags:kill_switch` rather than present and failing.
+ *
+ * **MCP card opens the Inspector.** It does not list tools in-console; it
+ * deep-links the MCP Inspector to `clarity-mcp` (Streamable HTTP) so staff
+ * connect and explore tools in the real MCP UI (WT-10).
  */
 
 const DEFAULT_KEYS = [
@@ -30,6 +34,23 @@ const DEFAULT_KEYS = [
   "llm_explanations",
   "proactive_messages",
 ];
+
+/** Streamable HTTP endpoint for `make mcp` (override with NEXT_PUBLIC_MCP_URL). */
+const MCP_URL =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MCP_URL) ||
+  "http://127.0.0.1:8099/mcp";
+
+/** MCP Inspector web UI (override with NEXT_PUBLIC_MCP_INSPECTOR_URL). */
+const MCP_INSPECTOR_URL =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MCP_INSPECTOR_URL) ||
+  "http://127.0.0.1:6274";
+
+function mcpInspectorHref(serverUrl: string, inspectorBase: string): string {
+  const url = new URL(inspectorBase);
+  url.searchParams.set("transport", "streamable-http");
+  url.searchParams.set("serverUrl", serverUrl);
+  return url.toString();
+}
 
 type Pending = { key: string; enabled: boolean };
 
@@ -47,6 +68,7 @@ export default function AdminPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [switchFilter, setSwitchFilter] = useState<"all" | "on" | "off">("all");
   const [switchQuery, setSwitchQuery] = useState("");
+  const [mcpCopied, setMcpCopied] = useState(false);
 
   const load = useCallback(async () => {
     if (!canRead) return;
@@ -61,6 +83,18 @@ export default function AdminPage() {
   useEffect(() => {
     void load();
   }, [load, generation]);
+
+  const inspectorHref = mcpInspectorHref(MCP_URL, MCP_INSPECTOR_URL);
+
+  async function copyMcpUrl() {
+    try {
+      await navigator.clipboard.writeText(MCP_URL);
+      setMcpCopied(true);
+      window.setTimeout(() => setMcpCopied(false), 2000);
+    } catch {
+      setMcpCopied(false);
+    }
+  }
 
   async function flip(key: string, enabled: boolean) {
     setPending(null);
@@ -334,17 +368,53 @@ export default function AdminPage() {
 
         <section aria-labelledby="admin-mcp">
           <Card className="space-y-3">
-            <h2 id="admin-mcp" className="font-medium">
-              MCP and templates
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="admin-mcp" className="font-medium">
+                MCP Inspector
+              </h2>
+              <Badge tone="neutral">Streamable HTTP</Badge>
+            </div>
             <p className="text-sm text-fg-muted">
-              Placeholder inventory - not connected to live MCP clients.
+              Connect the MCP Inspector to{" "}
+              <code className="text-xs">clarity-mcp</code>. Tools stay in the
+              Inspector UI; no tool here executes money or service changes.
             </p>
-            <ul className="space-y-1 text-sm text-fg">
-              <li>desk-copilot (designed)</li>
-              <li>receipt_issued · si/ta/en</li>
-              <li>otp_request · si/ta/en</li>
-            </ul>
+            <div className="rounded-xl border border-line bg-bg px-3 py-2">
+              <p className="text-xs font-medium text-fg-subtle">Server URL</p>
+              <p className="mt-1 break-all font-mono text-xs text-ink">{MCP_URL}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                onClick={() => window.open(inspectorHref, "_blank", "noopener,noreferrer")}
+              >
+                Open MCP Inspector
+              </Button>
+              <Button variant="ghost" onClick={() => void copyMcpUrl()}>
+                {mcpCopied ? "Copied" : "Copy server URL"}
+              </Button>
+            </div>
+            <ol className="list-decimal space-y-1 pl-4 text-xs text-fg-muted">
+              <li>
+                Run <code className="text-xs">make mcp</code> (serves{" "}
+                <code className="text-xs">{MCP_URL}</code>).
+              </li>
+              <li>
+                Run{" "}
+                <code className="text-xs">npx @modelcontextprotocol/inspector</code>{" "}
+                (UI on <code className="text-xs">{MCP_INSPECTOR_URL}</code>).
+              </li>
+              <li>
+                Open the button above, or paste the server URL with transport{" "}
+                <code className="text-xs">streamable-http</code>.
+              </li>
+              <li>Authenticate with a staff-assist token (WT-10). Deny by default without one.</li>
+            </ol>
+            <p className="text-xs text-fg-muted">
+              Walkthrough:{" "}
+              <code className="text-xs">docs/walkthroughs/WT-10-external-mcp-client.md</code>
+              .
+            </p>
           </Card>
         </section>
       </div>

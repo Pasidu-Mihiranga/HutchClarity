@@ -111,9 +111,6 @@ export default function InsightsPage() {
             <dd className="text-lg font-medium">
               LKR {String(ops?.money_at_stake_lkr ?? "0.00")}
             </dd>
-            <dd>
-              <Badge tone="warning">Synthetic records</Badge>
-            </dd>
           </Card>
           <Card className="space-y-2">
             <dt className="text-xs uppercase text-fg-muted">Top autopsy cluster</dt>

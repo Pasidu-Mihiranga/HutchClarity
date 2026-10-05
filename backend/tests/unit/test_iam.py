@@ -400,6 +400,15 @@ def test_an_admin_cannot_approve_money(role: Role):
     assert not (permissions_for({role}) & MONEY_PERMISSIONS)
 
 
+def test_platform_admin_can_read_foresight():
+    """Platform admin opens the foresight section; product still runs it."""
+    granted = permissions_for({Role.PLATFORM_ADMIN})
+    assert Permission.FORESIGHT_READ in granted
+    assert Permission.FORESIGHT_RUN not in granted
+    assert Permission.FORESIGHT_SCENARIO_DRAFT not in granted
+    assert Permission.FORESIGHT_OUTCOME_RECORD not in granted
+
+
 def test_stacking_roles_cannot_buy_an_admin_the_money_permissions():
     """The exclusion is applied after the union, so it cannot be escaped."""
     granted = permissions_for({Role.PLATFORM_ADMIN, Role.FINANCE})

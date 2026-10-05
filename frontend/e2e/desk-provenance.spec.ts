@@ -29,8 +29,6 @@ test.describe("synthetic provenance is never implied", () => {
     await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByText(/The subscribers are\s+synthetic/)).toBeVisible();
-    // The shell carries it too, on every console page.
-    await expect(page.getByText("Synthetic records")).toBeVisible();
   });
 
   test("a case shows where its decision came from, not just what it decided", async ({ page }) => {
@@ -101,7 +99,6 @@ test.describe("synthetic provenance is never implied", () => {
     });
 
     await expect(page.getByText(/Counts from synthetic cases/)).toBeVisible();
-    await expect(page.getByText("Synthetic records")).toBeVisible();
     await expect(page.getByText("Hypothesis").first()).toBeVisible();
   });
 

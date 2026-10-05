@@ -117,7 +117,8 @@
         "audit:export",
         "audit:read",
         "audit:restore",
-        "flags:kill_switch"
+        "flags:kill_switch",
+        "foresight:read"
       ],
       "security_admin": [
         "admin:manage",

@@ -318,6 +318,10 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             # permission (rule 1), so it is not a convenience anybody carries.
             Permission.AUDIT_RESTORE,
             Permission.AUDIT_EXPORT,
+            # Read the foresight workspace (rehearsal results as labelled
+            # scenarios). Draft/run stay with product; outcome record stays
+            # with CX so an admin cannot write the evidence they operate on.
+            Permission.FORESIGHT_READ,
         }
     ),
     Role.SECURITY_ADMIN: frozenset(

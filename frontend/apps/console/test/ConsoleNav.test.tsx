@@ -4,16 +4,13 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 /**
  * The console's section navigation and its refusal card (E6, for E2).
  *
- * **Why these two.** They are the parts that decide what a staff member can
- * even see, and both state it in ways only assistive tech reads: the active
- * section through `aria-current`, an unreachable section through text rather
- * than a dimmed link. Neither is visible to a reviewer skimming the rendered
- * page, so both are easy to lose in a later edit.
+ * **Why these two.** They decide what a staff member can even see. The active
+ * section uses `aria-current`; after sign-in, sections this identity cannot
+ * open are omitted from the sidebar.
  *
  * The permission check itself is the backend's and is tested there. What is
- * tested here is that the nav asks, and renders the answer honestly: a section
- * this identity cannot open must not be a link, because a link that lands on a
- * refusal wastes the click and tells a screen reader nothing.
+ * tested here is that the nav asks, and only renders links this identity can
+ * keep.
  */
 
 const pathname = vi.fn(() => "/desk");
@@ -61,28 +58,29 @@ describe("ConsoleNav", () => {
     expect(screen.getByRole("link", { name: "Cases" })).not.toHaveAttribute("aria-current");
   });
 
-  test("a section this identity cannot open is not a link", () => {
+  test("a section this identity cannot open is omitted", () => {
     hasPermission.mockReturnValue(false);
     render(<ConsoleNav />);
 
-    // Not a dimmed link that goes to a refusal: no link at all.
     expect(screen.queryByRole("link", { name: "Audit" })).toBeNull();
-    expect(screen.getByText("Audit")).toBeInTheDocument();
+    expect(screen.queryByText("Audit")).toBeNull();
+    expect(screen.queryByRole("listitem")).toBeNull();
   });
 
-  test("and it says why, in text a screen reader reads", () => {
-    hasPermission.mockReturnValue(false);
+  test("only sections this identity can open stay in the sidebar", () => {
+    hasPermission.mockImplementation((...needed: string[]) =>
+      needed.includes("desk:queue:read"),
+    );
     render(<ConsoleNav />);
-    expect(screen.getAllByText("(not available for your role)").length).toBeGreaterThan(0);
-  });
 
-  test("a signed-out console offers every section", () => {
-    // Before sign-in there is no identity to refuse, so the nav shows the map
-    // of the product rather than an empty bar.
-    sessionState.session = null;
-    hasPermission.mockReturnValue(false);
-    render(<ConsoleNav />);
-    expect(screen.getAllByRole("link").length).toBeGreaterThan(7);
+    expect(screen.getByRole("link", { name: "Cases" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Insights" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Complaint Autopsy" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Foresight" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Studio" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Audit" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 });
 
