@@ -316,8 +316,13 @@ def test_sign_in_methods_needs_no_session(unconfigured: TestClient) -> None:
 
 
 def test_sign_in_methods_names_mechanisms_and_not_people(configured: TestClient) -> None:
-    """Public, so it must say nothing about who can sign in."""
+    """Public, so it must say nothing about who can sign in.
+
+    `customer_fallback` added 2026-10-05: whether the synthetic customer
+    fallback is accepted, so the login page offers it only when it works.
+    Still a mechanism, never a person.
+    """
     body = configured.get("/v1/auth/sign-in-methods").json()
 
-    assert set(body) == {"provider", "directory", "development_role_picker"}
+    assert set(body) == {"provider", "directory", "development_role_picker", "customer_fallback"}
     assert all(isinstance(value, bool) for value in body.values())
