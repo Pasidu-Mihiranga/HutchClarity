@@ -34,7 +34,7 @@ class HttpSmsDelivery:
                 json={
                     "from": self._sender,
                     "to": msisdn,
-                    "content": f"Your Hutch Clarity code is {code}. It expires in 5 minutes.",
+                    "content": f"Clarity sign-in number {code}. Valid for 5 minutes. Never share it.",
                 },
             )
             response.raise_for_status()

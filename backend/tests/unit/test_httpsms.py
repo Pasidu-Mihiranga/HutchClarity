@@ -14,7 +14,7 @@ def test_httpsms_sends_the_otp_with_the_registered_phone() -> None:
         assert request.headers["x-api-key"] == "secret-key"
         assert request.read() == (
             b'{"from":"+94780000000","to":"+94781234567",'
-            b'"content":"Your Hutch Clarity code is 123456. It expires in 5 minutes."}'
+            b'"content":"Clarity sign-in number 123456. Valid for 5 minutes. Never share it."}'
         )
         return httpx.Response(200, json={"status": "success"})
 
