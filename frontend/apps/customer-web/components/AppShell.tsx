@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppHeader } from "./AppHeader";
 import { BottomNav } from "./BottomNav";
@@ -24,6 +25,8 @@ const BACK_ROUTES: Array<[string, { href: string; label: string; title: string }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const scroller = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
   const isLogin = pathname === "/login";
   const isImmersive = pathname === "/clarity";
   const backRoute = BACK_ROUTES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
@@ -34,26 +37,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isImmersive || isLogin) return <>{children}</>;
 
   return (
-    <>
-      {!isLogin && (
-        <AppHeader
-          backHref={backRoute?.href}
-          backLabel={backRoute?.label}
-          title={backRoute?.title}
-        />
-      )}
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background: "rgb(var(--c-surface))",
+      }}
+    >
+      <AppHeader
+        backHref={backRoute?.href}
+        backLabel={backRoute?.label}
+        title={backRoute?.title}
+      />
       <div
+        ref={scroller}
+        onScroll={(event) => setCompact(event.currentTarget.scrollTop > 24)}
         style={{
-          maxWidth: 720,
-          margin: "0 auto",
-          padding: isLogin
-            ? "0 16px"
-            : "0 16px calc(var(--nav-h) + var(--safe-bottom) + 28px)",
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
         }}
       >
-        {children}
+        <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 16px 16px" }}>
+          {children}
+        </div>
       </div>
-      {!isLogin && <BottomNav />}
-    </>
+      <BottomNav compact={compact} />
+    </div>
   );
 }

@@ -69,6 +69,10 @@ export default function HomePage() {
     );
   }
 
+  if (app.active_profile) {
+    return <GuidedHome profile={app.active_profile} onOpen={(href) => router.push(href)} />;
+  }
+
   const pack = app.pack;
   const usedPct = pack?.used_pct ?? null;
   const remaining =
@@ -101,7 +105,7 @@ export default function HomePage() {
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 0 8px" }}>
       <p
         style={{
-          fontSize: 12,
+          fontSize: "var(--text-kicker)",
           color: "var(--muted)",
           margin: "0 0 2px",
           fontWeight: 600,
@@ -113,7 +117,7 @@ export default function HomePage() {
       </p>
       <h1
         style={{
-          fontSize: 26,
+          fontSize: "var(--text-title)",
           fontWeight: 800,
           letterSpacing: "-.03em",
           margin: "0 0 2px",
@@ -124,13 +128,13 @@ export default function HomePage() {
       </h1>
       <p
         style={{
-          fontSize: 13,
+          fontSize: "var(--text-small)",
           color: "var(--muted)",
           margin: "0 0 20px",
           fontFamily: "monospace",
         }}
       >
-        {app.masked}
+        {localNumber(app.msisdn)}
       </p>
 
       {error ? (
@@ -146,13 +150,13 @@ export default function HomePage() {
       >
         <h2
           id="home-balance"
-          style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
+          style={{ fontSize: "var(--text-kicker)", color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
         >
           Main balance
         </h2>
         <p
           style={{
-            fontSize: 32,
+            fontSize: "var(--text-balance)",
             fontWeight: 800,
             letterSpacing: "-.03em",
             margin: 0,
@@ -175,12 +179,12 @@ export default function HomePage() {
         <section aria-labelledby="home-pack" className="h-card" style={{ marginBottom: 14 }}>
           <h2
             id="home-pack"
-            style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
+            style={{ fontSize: "var(--text-kicker)", color: "var(--muted)", margin: "0 0 4px", fontWeight: 600 }}
           >
             Current pack
           </h2>
           <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>{pack.name}</p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
+          <p style={{ fontSize: "var(--text-small)", color: "var(--muted)", margin: "0 0 10px" }}>
             {remaining ? `Data remaining: ${remaining} GB` : "Data allowance not metered"}
             &nbsp;·&nbsp; Valid for {pack.days_left} days
           </p>
@@ -315,7 +319,7 @@ export default function HomePage() {
           >
             Something doesn&apos;t look right?
           </span>
-          <span style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 3 }}>
+          <span style={{ display: "block", fontSize: "var(--text-small)", color: "var(--muted)", marginTop: 3 }}>
             Ask Clarity why your balance changed
           </span>
         </span>
@@ -450,5 +454,103 @@ export default function HomePage() {
         ) : null}
       </Dialog>
     </main>
+  );
+}
+
+function localNumber(msisdn: string): string {
+  const digits = msisdn.replace(/\D/g, "");
+  const local = digits.startsWith("94") ? `0${digits.slice(2)}` : digits;
+  if (local.length === 10) return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+  return msisdn;
+}
+
+const GUIDE = [
+  { href: "/clarity", title: "Check bill", icon: "bill" },
+  { href: "/packages", title: "Buy package", icon: "box" },
+  { href: "/clarity", title: "Report issue", icon: "alert" },
+  { href: "/cases", title: "Track complaint", icon: "headset" },
+] as const;
+
+function GuidedHome({
+  profile,
+  onOpen,
+}: {
+  profile: { name: string; msisdn: string; role: "elder" | "child" };
+  onOpen: (href: string) => void;
+}) {
+  const who = profile.role === "child" ? "Child" : "Elder";
+  return (
+    <main style={{ maxWidth: 720, margin: "0 auto", padding: "12px 0 16px" }}>
+      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "var(--orange-ink)" }}>{who}</p>
+      <h1 style={{ margin: "0 0 4px", fontSize: 26, fontWeight: 800, letterSpacing: "-.03em" }}>{profile.name}</h1>
+      <p style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 650 }}>{localNumber(profile.msisdn)}</p>
+      <div style={{ textAlign: "center", marginBottom: 18 }}>
+        <img src="/icon-192.png" alt="" width={72} height={72} style={{ borderRadius: 22 }} />
+        <h2 style={{ margin: "12px 0 4px", fontSize: 22, fontWeight: 800 }}>Hutch Clarity</h2>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--muted)" }}>Your support buddy</p>
+        <p style={{ margin: "6px auto 0", maxWidth: 280, fontSize: 14, color: "var(--muted)", lineHeight: 1.4 }}>
+          Ask about bills, data, packages, or service issues.
+        </p>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {GUIDE.map((card) => (
+          <button
+            key={card.title}
+            type="button"
+            onClick={() => onOpen(card.href)}
+            style={{
+              minHeight: 112,
+              borderRadius: 18,
+              border: "1px solid var(--line)",
+              background: "rgb(var(--c-surface))",
+              padding: 16,
+              textAlign: "left",
+              fontFamily: "inherit",
+              cursor: "pointer",
+              boxShadow: "var(--shadow)",
+            }}
+          >
+            <GuideIcon name={card.icon} />
+            <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 15, fontWeight: 800 }}>
+              {card.title}
+              <span aria-hidden="true">›</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <p style={{ margin: "18px 0 8px", fontSize: 14, color: "var(--muted)" }}>Try asking</p>
+      <button
+        type="button"
+        onClick={() => onOpen("/clarity")}
+        style={{
+          width: "100%",
+          minHeight: 56,
+          borderRadius: 16,
+          border: "1px solid var(--line)",
+          background: "rgb(var(--c-surface))",
+          textAlign: "left",
+          padding: "12px 16px",
+          fontFamily: "inherit",
+          fontSize: 15,
+          fontWeight: 650,
+          cursor: "pointer",
+        }}
+      >
+        Why did my balance change?
+      </button>
+    </main>
+  );
+}
+
+function GuideIcon({ name }: { name: string }) {
+  return (
+    <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 12, display: "grid", placeItems: "center", background: "var(--orange-soft)", color: "var(--orange-ink)" }}>
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        {name === "bill" ? <path d="M7 3.5h10v17l-2-1.2-2 1.2-2-1.2L9 20.5 7 19.3zM9 8h6M9 12h6" /> : null}
+        {name === "box" ? <path d="M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9" /> : null}
+        {name === "alert" ? <path d="M12 4 3 19h18L12 4zM12 10v4M12 17h.01" /> : null}
+        {name === "headset" ? <path d="M5 13a7 7 0 0 1 14 0M5 13v4.5A1.5 1.5 0 0 0 6.5 19H8v-6H5M19 13v4.5a1.5 1.5 0 0 1-1.5 1.5H16v-6h3" /> : null}
+      </svg>
+    </span>
   );
 }
