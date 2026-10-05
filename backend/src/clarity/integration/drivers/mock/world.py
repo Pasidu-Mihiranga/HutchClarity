@@ -165,6 +165,8 @@ class Account:
     safeguards: dict[str, Any] = field(default_factory=dict)
     blocked_merchants: set[str] = field(default_factory=set)
     family: list[str] = field(default_factory=list)
+    family_roles: dict[str, str] = field(default_factory=dict)
+    active_profile: str | None = None
     notify: str = "important"
     large_text: bool = False
     onboarded: bool = False
@@ -431,19 +433,52 @@ class SyntheticWorld:
         self._flush(account)
         return bought
 
-    def add_family(self, ref: str, msisdn: str) -> str:
-        """Link another Hutch number this customer looks after. At most 10."""
+    def add_family(self, ref: str, msisdn: str, role: str = "elder") -> str:
+        """Link another Hutch number this customer looks after. At most 10.
+
+        The number does not have to be one of the seeded demo accounts. A
+        missing account is still a profile: the number and the role are enough.
+        """
+        if role not in {"elder", "child"}:
+            raise ValueError("choose elder or child")
+        try:
+            number = normalise_msisdn(msisdn)
+        except ValueError as error:
+            raise ValueError("That is not a Hutch mobile number.") from error
         account = self._require(ref)
-        other = self.account_by_msisdn(msisdn)
-        if other is None or other.ref == ref:
-            raise KeyError(msisdn)
-        if other.msisdn in account.family:
-            return other.msisdn
-        if len(account.family) >= 10:
+        if number == account.msisdn:
+            raise ValueError("That number is already this account.")
+        other = self.account_by_msisdn(number)
+        if other is not None and other.ref == account.ref:
+            raise ValueError("That number is already this account.")
+        stored = other.msisdn if other is not None else number
+        if stored not in account.family and len(account.family) >= 10:
             raise ValueError("family list is full")
-        account.family.append(other.msisdn)
+        if stored not in account.family:
+            account.family.append(stored)
+        account.family_roles[stored] = role
         self._flush(account)
-        return other.msisdn
+        return stored
+
+    def set_profile(self, ref: str, msisdn: str | None) -> None:
+        """Whose home the full app is showing. Empty means the signed-in person."""
+        account = self._require(ref)
+        if not msisdn:
+            account.active_profile = None
+            self._flush(account)
+            return
+        try:
+            number = normalise_msisdn(msisdn)
+        except ValueError as error:
+            raise KeyError(msisdn) from error
+        if number == account.msisdn:
+            account.active_profile = None
+            self._flush(account)
+            return
+        if number not in account.family:
+            raise KeyError(msisdn)
+        account.active_profile = number
+        self._flush(account)
 
     def _require(self, ref: str) -> Account:
         account = self._accounts.get(ref)

@@ -304,6 +304,13 @@ class SafeguardRequest(ApiModel):
 
 class FamilyRequest(ApiModel):
     msisdn: str
+    role: str = "elder"
+
+
+class ProfileSwitchRequest(ApiModel):
+    """Whose home to open. Empty returns to the signed-in person."""
+
+    msisdn: str | None = None
 
 
 class PreferencesRequest(ApiModel):

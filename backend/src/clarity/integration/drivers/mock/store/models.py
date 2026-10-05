@@ -60,6 +60,7 @@ class AccountRow(Base):
     sim_swap_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fraud_flag: Mapped[bool] = mapped_column(Boolean, default=False)
     refunds_last_30d: Mapped[int] = mapped_column(Integer, default=0)
+    active_profile_msisdn: Mapped[str | None] = mapped_column(String(20), nullable=True)
     safeguards: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     blocked_merchants: Mapped[list[str]] = mapped_column(JSON, default=list)
 
@@ -152,6 +153,7 @@ class FamilyLinkRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), index=True)
     linked_msisdn: Mapped[str] = mapped_column(String(20))
+    role: Mapped[str] = mapped_column(String(16), default="elder")
 
     customer: Mapped[CustomerRow] = relationship(
         back_populates="family_links", foreign_keys=[customer_id]

@@ -130,3 +130,20 @@ def test_a_refused_call_never_enters_the_pipeline(api: TestClient) -> None:
 
     assert refused.status_code == 429
     assert "turn" not in refused.json()
+
+
+def test_a_refused_call_still_tells_the_browser_which_origin(api: TestClient) -> None:
+    """A 429 without CORS headers is what the sign-in page calls Failed to fetch."""
+    body = {"text": "why was I charged"}
+    for _ in range(80):
+        api.post("/v1/conversation/turn", json=body)
+
+    refused = api.post(
+        "/v1/conversation/turn",
+        json=body,
+        headers={"Origin": "http://localhost:3000"},
+    )
+
+    assert refused.status_code == 429
+    assert refused.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert refused.headers["access-control-allow-credentials"] == "true"
