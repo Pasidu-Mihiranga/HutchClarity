@@ -37,6 +37,10 @@ export function RoleSwitcherBar() {
   const [password, setPassword] = useState("");
   const [stepUpCode, setStepUpCode] = useState("");
 
+  // The full role picker and credential form own the signed-out state. Keep
+  // the header compact and useful only after authentication.
+  if (!session) return null;
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const ok = await signIn(username, password, stepUpCode);
