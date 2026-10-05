@@ -84,3 +84,4 @@ M-IAM complete: lite keeps the labelled dev issuer and full can validate Keycloa
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-B3-B7-session-keys-sms-csrf-authz.md` | Absolute session deadline and a session inventory (B3, ADR-0041); the signing key ring (B5, ADR-0042); an SMS delivery driver (B6); CSRF for cookie sessions (B4); the OPA driver sends `granted` (B7) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-B1-B2-keycloak-staff-sso.md` | Staff SSO through the provider: `oidc.py`, the cookie session, step-up by level of assurance (B1, B2) |
 | 2026-10-04 | `docs/devlog/2026/2026-10-04-SMS01-httpsms-otp.md` | Customer OTP delivery through httpSMS |
+| 2026-10-05 | `docs/devlog/2026/2026-10-05-iam-admin-account.md` | Synthetic directory account `admin` with role `platform_admin` |

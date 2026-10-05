@@ -157,7 +157,7 @@ test.describe("console accessibility", () => {
   test("the desk has no serious violations, with a case open", async ({ page }) => {
     await page.goto(`${CONSOLE}/desk`);
     await signInOnDesk(page, "Supervisor");
-    await expect(page.getByRole("heading", { name: "Desk" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Cases" })).toBeVisible({
       timeout: 30_000,
     });
 

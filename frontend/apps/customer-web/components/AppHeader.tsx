@@ -77,7 +77,7 @@ export function AppHeader({ backHref, backLabel = "Back", title }: Props) {
             </span>
           )}
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-.02em" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 16, letterSpacing: "-.02em" }}>
               {backHref ? title ?? "Hutch" : "Hutch"}
             </div>
             {!backHref && (

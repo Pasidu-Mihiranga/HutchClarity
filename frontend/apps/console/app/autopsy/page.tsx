@@ -31,6 +31,7 @@ import { useStaffSession } from "@/components/StaffSessionProvider";
  */
 
 type Busy = { clusterId: string; action: string } | null;
+type RuleCandidate = { key: string; value: string; rationale: string };
 
 export default function AutopsyPage() {
   const { client, session, generation, hasPermission } = useStaffSession();
@@ -42,6 +43,7 @@ export default function AutopsyPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [status, setStatus] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!canRead) return;
@@ -62,12 +64,30 @@ export default function AutopsyPage() {
   async function act(clusterId: string, action: string, run: () => Promise<unknown>) {
     setBusy({ clusterId, action });
     setError(null);
+    setStatus(null);
     try {
       await run();
       load();
       setNotes((current) => ({ ...current, [clusterId]: "" }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : `${action} failed`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function propose(clusterId: string, candidate: RuleCandidate) {
+    setBusy({ clusterId, action: "propose" });
+    setError(null);
+    setStatus(null);
+    try {
+      const created = await client.proposeRuleCandidate(clusterId, candidate);
+      setStatus(
+        `Draft ${created.change_id} created. Continue its review, approval and activation in Policy Studio.`,
+      );
+      load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Rule proposal failed");
     } finally {
       setBusy(null);
     }
@@ -89,6 +109,7 @@ export default function AutopsyPage() {
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {status ? <Alert tone="success">{status}</Alert> : null}
 
       <section aria-labelledby="autopsy-basis">
         <Card>
@@ -150,6 +171,7 @@ export default function AutopsyPage() {
                     }),
                   )
                 }
+                onCandidate={(candidate) => void propose(cluster.cluster_id, candidate)}
               />
             </li>
           ))}
@@ -168,6 +190,7 @@ function ClusterCard({
   onNote,
   onReview,
   onSupersede,
+  onCandidate,
 }: {
   cluster: AutopsyCluster;
   canReview: boolean;
@@ -177,6 +200,7 @@ function ClusterCard({
   onNote: (value: string) => void;
   onReview: (accept: boolean) => void;
   onSupersede: (accept: boolean) => void;
+  onCandidate: (candidate: RuleCandidate) => void;
 }) {
   const working = busy?.clusterId === cluster.cluster_id;
   const ruled = !cluster.hypothesis;
@@ -184,6 +208,12 @@ function ClusterCard({
   // is disabled rather than the refusal being a surprise after the click.
   const canSupersede = ruled && note.trim().length > 0;
   const headingId = `cluster-${cluster.cluster_id}`;
+  const confirmed = cluster.status === "confirmed";
+  const [candidate, setCandidate] = useState<RuleCandidate>({
+    key: "",
+    value: "",
+    rationale: "",
+  });
 
   return (
     <Card
@@ -304,11 +334,66 @@ function ClusterCard({
               </>
             )}
           </div>
-          {canDraft && ruled ? (
-            <p className="text-xs text-fg-muted">
-              A confirmed cluster can be proposed as a policy change from Policy Studio. It
-              becomes a draft for somebody else to approve, never a live rule.
-            </p>
+          {canDraft && confirmed ? (
+            <fieldset className="grid gap-2 rounded-lg border border-border bg-surface-2 p-3">
+              <legend className="px-1 text-xs font-semibold uppercase text-fg-muted">
+                Create governed rule draft
+              </legend>
+              <p className="text-xs text-fg-muted">
+                Use an existing policy key. This creates a draft only; another authorized,
+                stepped-up officer must approve and activate it in Policy Studio.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Field label="Policy key">
+                  {(control) => (
+                    <Input
+                      {...control}
+                      value={candidate.key}
+                      placeholder="refund.auto_cap_lkr"
+                      onChange={(e) => setCandidate({ ...candidate, key: e.target.value })}
+                    />
+                  )}
+                </Field>
+                <Field label="Candidate value">
+                  {(control) => (
+                    <Input
+                      {...control}
+                      value={candidate.value}
+                      onChange={(e) => setCandidate({ ...candidate, value: e.target.value })}
+                    />
+                  )}
+                </Field>
+                <Field label="Rationale">
+                  {(control) => (
+                    <Input
+                      {...control}
+                      value={candidate.rationale}
+                      onChange={(e) =>
+                        setCandidate({ ...candidate, rationale: e.target.value })
+                      }
+                    />
+                  )}
+                </Field>
+              </div>
+              <Button
+                size="sm"
+                disabled={
+                  working ||
+                  !candidate.key.trim() ||
+                  !candidate.value.trim() ||
+                  !candidate.rationale.trim()
+                }
+                onClick={() =>
+                  onCandidate({
+                    key: candidate.key.trim(),
+                    value: candidate.value.trim(),
+                    rationale: candidate.rationale.trim(),
+                  })
+                }
+              >
+                Send draft to Policy Studio
+              </Button>
+            </fieldset>
           ) : null}
         </div>
       ) : null}

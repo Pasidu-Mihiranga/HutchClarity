@@ -82,10 +82,33 @@ gates:
         #
         # It currently FAILS at 0.931. That is the honest state: two of 29
         # answered queries cite a source that is real, effective and
-        # audience-allowed but is the wrong document. Lexical retrieval cannot
-        # tell those apart on this corpus and the fix is the embedding model
-        # the system does not have, so the gate blocks rather than being
-        # lowered to the number we happen to achieve (K02 and K03 devlogs).
+        # audience-allowed but is the wrong document.
+        #
+        # **F4 built the embedding model this comment used to blame, and the
+        # gate still fails at 0.931.** The measurement, so the next person
+        # does not repeat it:
+        #
+        #   - lexical only:            0.931, recall@5 0.967
+        #   - hybrid, no score floor:  0.900, recall@5 1.000
+        #   - hybrid, floor at 0.25:   0.931, recall@5 0.967
+        #
+        # The local embedder is an IDF-weighted hashed character-n-gram space.
+        # It closes a morphological gap (`renewed` reaching a clause written
+        # `renewal`) and cannot close a synonym gap: `turned on` shares no
+        # substring with `activated`, and `crawling in the evenings` shares
+        # none with `speed may be reduced`. Worse, its scores for the clauses
+        # it *should* find sit inside its own noise band, so with no floor it
+        # grounds an answer on an unrelated clause (which is why the middle row
+        # above is the worst of the three) and with the measured floor it
+        # contributes nothing here. See `config/ai/retrieval.yaml`.
+        #
+        # So the remaining two failures need a learned multilingual model. The
+        # `Embedder` port exists for exactly that and needs no further change
+        # to accept one. The gate stays at 0.98 and stays red: lowering it to
+        # the number we achieve is the one move this gate layer exists to
+        # refuse, and 0.98 over 29 answered queries means "no wrong citations",
+        # which is the right bar for a product whose promise is a checkable
+        # citation (K02, K03 and F4 devlogs).
         min: 0.98
         per_language: false
 

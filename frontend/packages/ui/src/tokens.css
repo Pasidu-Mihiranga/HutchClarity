@@ -26,10 +26,10 @@
   --c-fg-muted: 98 106 118;
   --c-fg-subtle: 120 128 140;
 
-  /* Brand (Hutch orange). White text sits on --c-primary at 5.2:1. */
-  --c-primary: 194 65 12;
-  --c-primary-hover: 154 52 18;
-  --c-primary-soft: 255 241 235;
+  /* Brand. The logo orange. Labels on it are white. */
+  --c-primary: 242 98 38;
+  --c-primary-hover: 214 82 22;
+  --c-primary-soft: 255 247 242;
   --c-on-primary: 255 255 255;
   --c-brand: 242 98 38;
 
@@ -43,7 +43,7 @@
   --c-info: 3 105 161;
   --c-info-soft: 224 242 254;
 
-  --c-focus: 194 65 12;
+  --c-focus: 242 98 38;
   --c-overlay: 24 24 27;
 
   /* Spacing scale (4px base) */
@@ -69,10 +69,11 @@
   --shadow-2: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
   --shadow-3: 0 12px 40px rgb(0 0 0 / 0.18);
 
-  /* Type */
-  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
-  --font-display: "Space Grotesk Variable", "Space Grotesk", var(--font-sans);
+  /* Type. Titles use Google Sans (the Clarity Desk heading face).
+     Everything else uses Google Sans Flex. Both are OFL-1.1 and self-hosted. */
+  --font-sans: "Google Sans Flex Variable", "Google Sans Flex", ui-sans-serif, system-ui,
+    "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  --font-display: "Google Sans Variable", "Google Sans", var(--font-sans);
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -153,6 +154,40 @@
     --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
     --shadow-3: 0 12px 40px rgb(0 0 0 / 0.6);
   }
+}
+
+/*
+ * Sign-in screens stay on the light palette.
+ *
+ * The wordmark is the light-theme logo (navy "Clarity") and the mockups are
+ * a cream page. Inheriting a dark theme puts that navy on a brown wash.
+ * The variables are the same light values as :root, scoped to the screen.
+ */
+.sign-in-light {
+  color-scheme: light;
+  --c-bg: 246 247 249;
+  --c-surface: 255 255 255;
+  --c-surface-2: 241 243 245;
+  --c-border: 225 229 233;
+  --c-border-strong: 190 197 205;
+  --c-fg: 23 26 31;
+  --c-fg-muted: 98 106 118;
+  --c-fg-subtle: 120 128 140;
+  --c-primary: 242 98 38;
+  --c-primary-hover: 214 82 22;
+  --c-primary-soft: 255 247 242;
+  --c-on-primary: 255 255 255;
+  --c-brand: 242 98 38;
+  --c-success: 4 120 87;
+  --c-success-soft: 220 252 231;
+  --c-warning: 180 83 9;
+  --c-warning-soft: 254 243 199;
+  --c-danger: 185 28 28;
+  --c-danger-soft: 254 226 226;
+  --c-info: 3 105 161;
+  --c-info-soft: 224 242 254;
+  --c-focus: 242 98 38;
+  --c-overlay: 24 24 27;
 }
 
 @media (prefers-reduced-motion: reduce) {
