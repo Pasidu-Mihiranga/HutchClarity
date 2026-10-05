@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DILANI } from "./session";
+import { DILANI, NIMAL } from "./session";
 
 /**
  * The one test that drives the login page itself (FE01, #28).
@@ -38,6 +38,10 @@ test.describe("sign in", () => {
     await page.getByLabel("6-digit code").fill(wrong);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/login/);
+    // A wrong code shakes the field and clears it, so the next attempt is
+    // typed into an empty box rather than edited on top of the refusal.
+    await expect(page.getByLabel("6-digit code")).toHaveValue("");
+    await expect(page.getByTestId("otp-field")).toHaveAttribute("data-shaken", "1");
     expect(
       (await page.context().cookies()).find((c) => c.name === "clarity_customer_session"),
       "a refused sign-in set a session cookie anyway",
@@ -61,5 +65,34 @@ test.describe("sign in", () => {
       await page.evaluate(() => window.sessionStorage.getItem("clarity_token")),
       "the token must not also be left where a script can read it",
     ).toBeNull();
+  });
+
+  test("three wrong codes lock the sign-in", async ({ page }) => {
+    // Nimal, not Dilani. The other test in this file, and the token minted
+    // for the rest of the suite, already spend Dilani's five challenges per
+    // fifteen minutes. This one needs its own.
+    await page.goto("/login");
+    await page.getByLabel("Hutch number").fill(NIMAL);
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    const shown = page.getByTestId("demo-otp-code");
+    await expect(shown).toBeVisible();
+    const code = (await shown.innerText()).trim();
+    const wrong = code === "000000" ? "111111" : "000000";
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await page.getByLabel("6-digit code").fill(wrong);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      await expect(page.getByLabel("6-digit code")).toHaveValue("");
+      await expect(page.getByTestId("otp-field")).toHaveAttribute("data-shaken", String(attempt));
+    }
+
+    await expect(page.getByText(/cannot sign in with this code/i)).toBeVisible();
+    await expect(page.getByLabel("6-digit code")).toBeDisabled();
+    await expect(page).toHaveURL(/\/login/);
+    expect(
+      (await page.context().cookies()).find((c) => c.name === "clarity_customer_session"),
+      "a locked sign-in set a session cookie anyway",
+    ).toBeUndefined();
   });
 });

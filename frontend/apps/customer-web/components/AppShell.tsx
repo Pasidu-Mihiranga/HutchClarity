@@ -27,8 +27,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isImmersive = pathname === "/clarity";
   const backRoute = BACK_ROUTES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
 
-  // Clarity is fully immersive - it renders its own header + composer
-  if (isImmersive) return <>{children}</>;
+  // Clarity is fully immersive - it renders its own header + composer.
+  // Sign-in is the same kind of screen: the mockup is the whole page, so the
+  // app header, the bottom nav and the 720px column would crop it.
+  if (isImmersive || isLogin) return <>{children}</>;
 
   return (
     <>

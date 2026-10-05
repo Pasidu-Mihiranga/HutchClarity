@@ -79,16 +79,22 @@ test.describe("navigation and the API agree about what a role may open", () => {
     await expect(page.getByTestId("trail-explorer")).toHaveCount(0);
   });
 
-  test("a signed-out console refuses every section it offers", async ({ page }) => {
-    // The nav shows the whole map before sign-in, because there is no identity
-    // to refuse yet. Each page still has to refuse.
+  test("a signed-out console shows the sign-in page instead of the sections", async ({ page }) => {
+    // Until there is a session the shell is the sign-in page, on every
+    // address. Offering the section map first meant every link landed on a
+    // refusal, because there was no identity to authorise.
     await page.goto(`${CONSOLE}/`);
+    await expect(page.getByRole("heading", { name: "Hutch Clarity Desk" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByLabel("Staff ID or email")).toBeVisible();
     for (const section of SECTIONS) {
-      await expect(page.getByRole("link", { name: section.link, exact: true })).toBeVisible();
+      await expect(page.getByRole("link", { name: section.link, exact: true })).toHaveCount(0);
     }
 
     await page.goto(`${CONSOLE}/desk`);
-    await expect(page.getByText(/Sign in from the header/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByLabel("Staff ID or email")).toBeVisible();
+    await expect(page.getByRole("button", { name: /approve as/i })).toHaveCount(0);
   });
 
   test("a role that may read cannot write, and the controls are absent not broken", async ({

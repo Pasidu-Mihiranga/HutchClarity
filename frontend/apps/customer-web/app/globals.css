@@ -4,12 +4,10 @@
 
 /* Hutch Clarity design tokens - mirrored from the old app */
 :root {
-  /* Aliases onto the shared design tokens (@clarity/ui/tokens.css). The orange
-     fills keep --orange for borders and icons; white text on an orange fill
-     uses --orange-strong (5.2:1), which is what --c-primary resolves to. */
+  /* Aliases onto the shared design tokens. Fills use the logo orange. */
   --orange:        rgb(var(--c-brand));
-  --orange-strong: rgb(var(--c-primary));
-  --orange-ink:    rgb(var(--c-primary));
+  --orange-strong: rgb(var(--c-brand));
+  --orange-ink:    rgb(var(--c-brand));
   --orange-soft:   rgb(var(--c-primary-soft));
   --ink:           rgb(var(--c-fg));
   --muted:         rgb(var(--c-fg-muted));
@@ -31,8 +29,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-        "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  font: 16px/1.55 var(--font-sans);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
 }
 
 a { color: var(--orange-ink); }
@@ -336,4 +337,36 @@ a { color: var(--orange-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   .vo-backdrop, .vo-sheet, .vo-orb-fallback { animation: none; }
+}
+
+/* ---- Sign-in page (login/page.tsx) ----
+   The picture shrinks with the screen so the form, help line and footer
+   stay on the page. A short phone can still scroll; nothing is clipped. */
+.login-hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(32svh, 280px);
+  object-fit: contain;
+  object-position: center bottom;
+}
+@media (max-height: 740px) {
+  .login-hero { max-height: min(24svh, 200px); }
+}
+@media (max-height: 640px) {
+  .login-hero { max-height: min(18svh, 140px); }
+}
+
+/* ---- Sign-in: a wrong code shakes, then the field is cleared (login/page.tsx) ---- */
+@keyframes otp-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-8px); }
+  30% { transform: translateX(8px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+}
+.otp-shake { animation: otp-shake 0.45s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .otp-shake { animation: none; }
 }

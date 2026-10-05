@@ -114,6 +114,6 @@ describe("AccessDenied", () => {
     sessionState.session = null;
     sessionState.activeRole = null;
     render(<AccessDenied need="audit:read" />);
-    expect(screen.getByRole("alert")).toHaveTextContent(/sign in from the header/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/sign in to start/i);
   });
 });

@@ -194,7 +194,7 @@ export async function signInOnDesk(
   if (await signOut.isVisible().catch(() => false)) {
     await signOut.click();
   }
-  await page.getByLabel("Username").fill(account.username);
+  await page.getByLabel("Staff ID or email").fill(account.username);
   await page.getByLabel("Password").fill(account.password);
   if (stepUp) {
     await page.getByLabel("Step-up code").fill("step-up");
